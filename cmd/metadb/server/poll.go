@@ -120,6 +120,7 @@ func pollLoop(spr *sproc) error {
 			if !spr.svr.opt.NoKafkaCommit {
 				_, err = consumer.Commit()
 				if err != nil {
+					log.Error("%s", err)
 					panic(err)
 				}
 			}
@@ -145,6 +146,7 @@ func pollLoop(spr *sproc) error {
 				if !svr.opt.NoKafkaCommit {
 					_, err = consumer.Commit()
 					if err != nil {
+						log.Error("%s", err)
 						panic(err)
 					}
 				}
@@ -161,6 +163,7 @@ func pollLoop(spr *sproc) error {
 			if !spr.svr.opt.NoKafkaCommit {
 				_, err = consumer.Commit()
 				if err != nil {
+					log.Error("%s", err)
 					panic(err)
 				}
 			}
@@ -172,6 +175,7 @@ func pollLoop(spr *sproc) error {
 		if !spr.svr.opt.NoKafkaCommit {
 			_, err = consumer.Commit()
 			if err != nil {
+				log.Error("%s", err)
 				panic(err)
 			}
 		}
