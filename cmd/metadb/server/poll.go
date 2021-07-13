@@ -117,7 +117,7 @@ func pollLoop(spr *sproc) error {
 		if _, err = parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.source.SchemaPrefix, sourceFileScanner, spr.sourceLog); err != nil {
 			////////////////////////////////////////////////////
 			log.Error("%s", err)
-			if !spr.svr.opt.NoKafkaCommit {
+			if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
 				_, err = consumer.Commit()
 				if err != nil {
 					log.Error("%s", err)
@@ -143,7 +143,7 @@ func pollLoop(spr *sproc) error {
 			if err = rewriteCommandList(cl, svr); err != nil {
 				////////////////////////////////////////////////////
 				log.Info("skipping non-rewriteable command: %s", err)
-				if !svr.opt.NoKafkaCommit {
+				if sourceFileScanner == nil && !svr.opt.NoKafkaCommit {
 					_, err = consumer.Commit()
 					if err != nil {
 						log.Error("%s", err)
@@ -160,7 +160,7 @@ func pollLoop(spr *sproc) error {
 		if err = execCommandList(cl, spr.db[0]); err != nil {
 			////////////////////////////////////////////////////
 			log.Error("%s", err)
-			if !spr.svr.opt.NoKafkaCommit {
+			if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
 				_, err = consumer.Commit()
 				if err != nil {
 					log.Error("%s", err)
@@ -172,7 +172,7 @@ func pollLoop(spr *sproc) error {
 			// return err
 		}
 
-		if !spr.svr.opt.NoKafkaCommit {
+		if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
 			_, err = consumer.Commit()
 			if err != nil {
 				log.Error("%s", err)
