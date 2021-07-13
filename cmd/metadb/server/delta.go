@@ -1,6 +1,8 @@
 package server
 
 import (
+	"strings"
+
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 )
@@ -90,6 +92,10 @@ func findDeltaColumnSchema(tschema string, tableName string, column1 *sysdb.Colu
 	// If the types are the same and the existing type size is larger than
 	// the new one, the columns schema are compatible
 	if column1.DType == column2.DType && column1.DTypeSize >= column2.DTypeSize {
+		return nil
+	}
+	// If the old type was JSON and the new data is empty, we can retain the JSON type.
+	if column1.DType == JSONType && strings.TrimSpace(column2.SampleData) == "" {
 		return nil
 	}
 	// Otherwise a type or size change is required.
