@@ -1,8 +1,6 @@
 package server
 
 import (
-	"strings"
-
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 )
@@ -62,6 +60,7 @@ func tableSchemaFromCommand(c *command.Command) *sysdb.TableSchema {
 		cs.Name = col.Name
 		cs.DType = col.DType
 		cs.DTypeSize = col.DTypeSize
+		cs.DataSampleNull = (col.Data == nil)
 		cs.PrimaryKey = col.PrimaryKey
 		ts.Column = append(ts.Column, cs)
 	}
@@ -94,8 +93,8 @@ func findDeltaColumnSchema(tschema string, tableName string, column1 *sysdb.Colu
 	if column1.DType == column2.DType && column1.DTypeSize >= column2.DTypeSize {
 		return nil
 	}
-	// If the old type was JSON and the new data is empty, we can retain the JSON type.
-	if column1.DType == JSONType && strings.TrimSpace(column2.SampleData) == "" {
+	// If the old type was JSON and the new data is null, we can retain the JSON type.
+	if column1.DType == command.JSONType && column2.DataSampleNull {
 		return nil
 	}
 	// Otherwise a type or size change is required.
