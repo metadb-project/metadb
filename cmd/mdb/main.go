@@ -14,7 +14,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/mdb/config"
 	"github.com/metadb-project/metadb/cmd/mdb/option"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 var program = "mdb"
@@ -422,7 +422,7 @@ func inputPassword(prompt string, confirm bool) (string, error) {
 	defer signal.Reset(os.Interrupt)
 	// Read the input.
 	fmt.Print(prompt)
-	p, err := terminal.ReadPassword(syscall.Stdin)
+	p, err := term.ReadPassword(syscall.Stdin)
 	fmt.Println("")
 	if err != nil {
 		return "", err
@@ -430,7 +430,7 @@ func inputPassword(prompt string, confirm bool) (string, error) {
 	// Read the input again to confirm.
 	if confirm {
 		fmt.Print("(Confirming) " + prompt)
-		q, err := terminal.ReadPassword(syscall.Stdin)
+		q, err := term.ReadPassword(syscall.Stdin)
 		fmt.Println("")
 		if err != nil {
 			return "", err
