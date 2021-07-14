@@ -114,7 +114,9 @@ func ConfigDatabase(opt *option.ConfigDatabase) error {
 		// json.NewEncoder(w).Encode(m)
 		//return responseBodyError(hrs)
 		var m map[string]interface{}
-		json.NewDecoder(hrs.Body).Decode(&m)
+		if err = json.NewDecoder(hrs.Body).Decode(&m); err != nil {
+			return fmt.Errorf("decoding server response: %s", err)
+		}
 		return fmt.Errorf("%v", m["message"])
 	}
 
@@ -231,7 +233,9 @@ func ConfigSource(opt *option.ConfigSource) error {
 		// json.NewEncoder(w).Encode(m)
 		//return responseBodyError(hrs)
 		var m map[string]interface{}
-		json.NewDecoder(hrs.Body).Decode(&m)
+		if err = json.NewDecoder(hrs.Body).Decode(&m); err != nil {
+			return fmt.Errorf("decoding server response: %s", err)
+		}
 		return fmt.Errorf("%v", m["message"])
 	}
 
@@ -320,7 +324,9 @@ func Status(opt *option.Status) error {
 		// json.NewEncoder(w).Encode(m)
 		//return responseBodyError(hrs)
 		var m map[string]interface{}
-		json.NewDecoder(hrs.Body).Decode(&m)
+		if err = json.NewDecoder(hrs.Body).Decode(&m); err != nil {
+			return fmt.Errorf("decoding server response: %s", err)
+		}
 		return fmt.Errorf("%v", m["message"])
 	}
 

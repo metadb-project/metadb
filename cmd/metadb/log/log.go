@@ -16,19 +16,18 @@ var DisableColor bool
 
 type Log struct {
 	log      *glog.Logger
-	csvlog   *glog.Logger
 	logDebug bool
 	logTrace bool
 }
 
-const (
-	logtypeFatal   = 0
-	logtypeError   = 1
-	logtypeWarning = 2
-	logtypeInfo    = 3
-	logtypeDebug   = 4
-	logtypeTrace   = 5
-)
+//const (
+//        logtypeFatal   = 0
+//        logtypeError   = 1
+//        logtypeWarning = 2
+//        logtypeInfo    = 3
+//        logtypeDebug   = 4
+//        logtypeTrace   = 5
+//)
 
 var std *Log
 var csv *Log

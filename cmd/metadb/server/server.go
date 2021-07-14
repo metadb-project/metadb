@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/metadb-project/metadb/cmd/internal/api"
-	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
@@ -61,7 +60,7 @@ func runServer(svr *server) error {
 	var sigc = make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGTERM)
 	go func() {
-		_ = <-sigc
+		<-sigc
 		log.Info("received shutdown request")
 		log.Info("shutting down")
 		process.SetStop()
@@ -83,14 +82,14 @@ func runServer(svr *server) error {
 	return nil
 }
 
-func goListenAndServe(svr *server) {
-	var err error
-	if err = listenAndServe(svr); err != nil {
-		eout.Error("%s", err)
-	}
-}
+//func goListenAndServe(svr *server) {
+//        var err error
+//        if err = listenAndServe(svr); err != nil {
+//                eout.Error("%s", err)
+//        }
+//}
 
-func listenAndServe(svr *server) error {
+func listenAndServe(svr *server) {
 	var err error
 	var host string
 	if svr.opt.Listen == "" {
@@ -107,14 +106,17 @@ func listenAndServe(svr *server) error {
 	log.Info("server is ready to accept connections")
 	if svr.opt.Listen == "" || svr.opt.NoTLS {
 		if err = httpsvr.ListenAndServe(); err != nil {
-			return fmt.Errorf("error starting server: %s", err)
+			// TODO error handling
+			//return fmt.Errorf("error starting server: %s", err)
+			_ = err
 		}
 	} else {
 		if err = httpsvr.ListenAndServeTLS(svr.opt.TLSCert, svr.opt.TLSKey); err != nil {
-			return fmt.Errorf("error starting server: %s", err)
+			// TODO error handling
+			//return fmt.Errorf("error starting server: %s", err)
+			_ = err
 		}
 	}
-	return nil
 }
 
 func unsupportedMethod(path string, r *http.Request) string {
@@ -229,7 +231,10 @@ func (svr *server) handleStatusGet(w http.ResponseWriter, r *http.Request) {
 	// Respond with success.
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(stat)
+	if err = json.NewEncoder(w).Encode(stat); err != nil {
+		// TODO error handling
+		_ = err
+	}
 }
 
 func (svr *server) handleDatabasesPost(w http.ResponseWriter, r *http.Request) {
@@ -368,5 +373,8 @@ func HTTPError(w http.ResponseWriter, err error, code int) {
 		//"data":    "",
 	}
 	//json.NewEncoder(w).Encode(err)
-	json.NewEncoder(w).Encode(m)
+	if err = json.NewEncoder(w).Encode(m); err != nil {
+		// TODO error handling
+		_ = err
+	}
 }

@@ -334,21 +334,21 @@ func IsJSONIndent(data interface{}) (interface{}, bool) {
 	}
 }
 
-func indentJSON(name, data string) string {
-	if name != "jsonb" {
-		return data
-	}
-	var err error
-	var j map[string]interface{}
-	if err = json.Unmarshal([]byte(data), &j); err != nil {
-		return data
-	}
-	var jb []byte
-	if jb, err = json.MarshalIndent(j, "", "    "); err != nil {
-		return data
-	}
-	return string(jb)
-}
+//func indentJSON(name, data string) string {
+//        if name != "jsonb" {
+//                return data
+//        }
+//        var err error
+//        var j map[string]interface{}
+//        if err = json.Unmarshal([]byte(data), &j); err != nil {
+//                return data
+//        }
+//        var jb []byte
+//        if jb, err = json.MarshalIndent(j, "", "    "); err != nil {
+//                return data
+//        }
+//        return string(jb)
+//}
 
 func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string) (*Command, error) {
 	var err error
@@ -423,7 +423,7 @@ func SQLEncodeData(data interface{}, datatype DataType) string {
 	}
 	switch v := data.(type) {
 	case string:
-		return fmt.Sprintf("%s", util.PostgresEncodeString(v, true))
+		return util.PostgresEncodeString(v, true)
 	case int:
 		return fmt.Sprintf("%d", v)
 	case int64:
@@ -432,20 +432,11 @@ func SQLEncodeData(data interface{}, datatype DataType) string {
 		return fmt.Sprintf("%g", v)
 	case bool:
 		if v {
-			return fmt.Sprintf("TRUE")
+			return "TRUE"
 		} else {
-			return fmt.Sprintf("FALSE")
+			return "FALSE"
 		}
 	default:
 		return fmt.Sprintf("(unknown:%T)", data)
 	}
-	/////////////////////////////////////
-	// switch datatype {
-	// case IntegerType:
-	// 	return data
-	// case VarcharType:
-	// 	return fmt.Sprintf("'%s'", data)
-	// default:
-	// 	return "(unknown)"
-	// }
 }
