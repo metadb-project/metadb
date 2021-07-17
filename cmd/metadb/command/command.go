@@ -3,8 +3,10 @@ package command
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
@@ -37,6 +39,8 @@ const (
 	IntegerType
 	FloatType
 	BooleanType
+	TimestampType
+	//TimestamptzType
 	JSONType
 )
 
@@ -50,6 +54,8 @@ func (d DataType) String() string {
 		return "float"
 	case BooleanType:
 		return "boolean"
+	case TimestampType:
+		return "timestamp"
 	case JSONType:
 		return "json"
 	default:
@@ -68,6 +74,8 @@ func MakeDataType(dtype string) DataType {
 		return FloatType
 	case "boolean":
 		return BooleanType
+	case "timestamp":
+		return TimestampType
 	case "json":
 		return JSONType
 	default:
@@ -102,6 +110,8 @@ func DataTypeToSQL(dtype DataType, typeSize int64) string {
 		}
 	case BooleanType:
 		return "boolean"
+	case TimestampType:
+		return "timestamp"
 	case JSONType:
 		// Postgres only
 		return "json"
@@ -111,12 +121,13 @@ func DataTypeToSQL(dtype DataType, typeSize int64) string {
 }
 
 type CommandColumn struct {
-	Name        string
-	DType       DataType
-	DTypeSize   int64
-	Data        interface{}
-	EncodedData interface{}
-	PrimaryKey  int
+	Name         string
+	DType        DataType
+	DTypeSize    int64
+	SemanticType string
+	Data         interface{}
+	EncodedData  interface{}
+	PrimaryKey   int
 }
 
 type Command struct {
@@ -135,7 +146,7 @@ type CommandList struct {
 	Cmd []Command
 }
 
-func convertDataType(coltype string) (DataType, error) {
+func convertDataType(coltype, semtype string) (DataType, error) {
 	switch coltype {
 	case "int8":
 		fallthrough
@@ -144,6 +155,9 @@ func convertDataType(coltype string) (DataType, error) {
 	case "int32":
 		fallthrough
 	case "int64":
+		if strings.HasSuffix(semtype, ".time.MicroTimestamp") {
+			return TimestampType, nil
+		}
 		return IntegerType, nil
 	case "string":
 		return VarcharType, nil
@@ -187,6 +201,8 @@ func convertTypeSize(data interface{}, coltype string, datatype DataType) (int64
 		}
 		return lenS, nil
 	case BooleanType:
+		return 0, nil
+	case TimestampType:
 		return 0, nil
 	case JSONType:
 		return 0, nil
@@ -293,11 +309,21 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 		if ftype, ok = ti.(string); !ok {
 			return nil, fmt.Errorf("value: $.schema.fields: \"type\" not expected data type")
 		}
+		// Field semantic type
+		var semtype string
+		var si interface{}
+		if si, ok = m["name"]; ok {
+			if semtype, ok = si.(string); !ok {
+				return nil, fmt.Errorf("value: $.schema.fields: \"name\" not expected data type")
+			}
+		}
+
 		var col CommandColumn
 		col.Name = field
-		if col.DType, err = convertDataType(ftype); err != nil {
+		if col.DType, err = convertDataType(ftype, semtype); err != nil {
 			return nil, fmt.Errorf("value: $.schema.fields: \"type\": %s", err)
 		}
+		col.SemanticType = semtype
 		col.Data = fieldData[field]
 		var isJSON bool
 		var indented interface{}
@@ -429,7 +455,13 @@ func SQLEncodeData(data interface{}, datatype DataType) string {
 	case int64:
 		return fmt.Sprintf("%d", v)
 	case float64:
-		return fmt.Sprintf("%g", v)
+		switch datatype {
+		case TimestampType:
+			var i, f float64 = math.Modf(v / 1000000)
+			return "'" + time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000000") + "'"
+		default:
+			return fmt.Sprintf("%g", v)
+		}
 	case bool:
 		if v {
 			return "TRUE"
