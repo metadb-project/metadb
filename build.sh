@@ -7,15 +7,22 @@ test_f='false'
 verbose_f='false'
 
 usage() {
-	echo ''
-	echo 'Usage:  build.sh [<flags>]'
-	echo ''
-	echo 'Flags:'
-	echo '-c                            - Clean (remove executables) before building'
-	echo '-h                            - Help'
-	echo '-l                            - Run all linters (requires golangci-lint)'
-	echo '-t                            - Run tests'
-	echo '-v                            - Enable verbose output'
+    echo ''
+    echo 'Usage:  build.sh [<flags>]'
+    echo ''
+    echo 'Flags:'
+    echo '-c                            - Remove executables before building'
+    echo '-h                            - Help'
+    echo '-l                            - Run linters; requires "go get"'
+    echo '                                  honnef.co/go/tools/cmd/staticcheck@latest'
+    echo '                                  github.com/kisielk/errcheck'
+    echo '                                  gitlab.com/opennota/check/cmd/aligncheck'
+    echo '                                  gitlab.com/opennota/check/cmd/structcheck'
+    echo '                                  gitlab.com/opennota/check/cmd/varcheck'
+    echo '                                  github.com/gordonklaus/ineffassign'
+    echo '                                  github.com/remyoudompheng/go-misc/deadcode'
+    echo '-t                            - Run tests'
+    echo '-v                            - Enable verbose output'
 }
 
 while getopts 'chltv' flag; do
@@ -54,14 +61,30 @@ if $clean_f; then
 fi
 
 if $lint_f; then
-    echo 'build.sh: running all linters' 1>&2
-    golangci-lint run $v 1>&2
-else
-    echo 'build.sh: running linter' 1>&2
-    pkg=metadb
-    go vet $v ./cmd/$pkg 1>&2
-    pkg=mdb
-    go vet $v ./cmd/$pkg 1>&2
+    echo 'build.sh: linter: vet' 1>&2
+    go vet $v ./cmd/metadb 1>&2
+    go vet $v ./cmd/mdb 1>&2
+    echo 'build.sh: linter: staticcheck' 1>&2
+    staticcheck ./cmd/metadb 1>&2
+    staticcheck ./cmd/mdb 1>&2
+    echo 'build.sh: linter: errcheck' 1>&2
+    errcheck -exclude .errcheck ./cmd/metadb 1>&2
+    errcheck -exclude .errcheck ./cmd/mdb 1>&2
+    echo 'build.sh: linter: aligncheck' 1>&2
+    aligncheck ./cmd/metadb 1>&2
+    aligncheck ./cmd/mdb 1>&2
+    echo 'build.sh: linter: structcheck' 1>&2
+    structcheck ./cmd/metadb 1>&2
+    structcheck ./cmd/mdb 1>&2
+    echo 'build.sh: linter: varcheck' 1>&2
+    varcheck ./cmd/metadb 1>&2
+    varcheck ./cmd/mdb 1>&2
+    echo 'build.sh: linter: ineffassign' 1>&2
+    ineffassign ./cmd/metadb 1>&2
+    ineffassign ./cmd/mdb 1>&2
+    echo 'build.sh: linter: deadcode' 1>&2
+    deadcode -test ./cmd/metadb 1>&2
+    deadcode -test ./cmd/mdb 1>&2
 fi
 
 echo 'build.sh: compiling Metadb' 1>&2
@@ -70,11 +93,8 @@ version=`git describe --tags --always`
 
 mkdir -p $bindir
 
-pkg=metadb
-go build -o $bindir $v -ldflags "-X main.metadbVersion=$version" ./cmd/$pkg
-
-pkg=mdb
-go build -o $bindir $v -ldflags "-X main.metadbVersion=$version" ./cmd/$pkg
+go build -o $bindir $v -ldflags "-X main.metadbVersion=$version" ./cmd/metadb
+go build -o $bindir $v -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
 
 if $test_f; then
     echo 'build.sh: running tests' 1>&2

@@ -436,7 +436,7 @@ func inputPassword(prompt string, confirm bool) (string, error) {
 			return "", err
 		}
 		if string(p) != string(q) {
-			return "", errors.New("Passwords do not match")
+			return "", errors.New("passwords do not match")
 		}
 	}
 	// Return password.
