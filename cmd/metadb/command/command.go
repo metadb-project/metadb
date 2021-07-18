@@ -246,6 +246,10 @@ func convertTypeSize(data interface{}, coltype string, datatype DataType) (int64
 		return 0, nil
 	case DateType:
 		return 0, nil
+	case TimeType:
+		return 0, nil
+	case TimetzType:
+		return 0, nil
 	case TimestampType:
 		return 0, nil
 	case TimestamptzType:
