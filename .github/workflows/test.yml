@@ -1,0 +1,16 @@
+name: test
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: install linters
+      run: go get -u honnef.co/go/tools/cmd/staticcheck@latest github.com/kisielk/errcheck gitlab.com/opennota/check/cmd/aligncheck gitlab.com/opennota/check/cmd/structcheck gitlab.com/opennota/check/cmd/varcheck github.com/gordonklaus/ineffassign github.com/remyoudompheng/go-misc/deadcode
+    - name: build
+      run: PATH=$PATH:$HOME/go/bin ./build.sh -lt
+    - name: run metadb
+      run: ./bin/metadb help
+    - name: run mdb
+      run: ./bin/mdb help
+
