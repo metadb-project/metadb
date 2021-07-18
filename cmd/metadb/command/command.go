@@ -479,7 +479,7 @@ func SQLEncodeData(data interface{}, datatype DataType) string {
 		return fmt.Sprintf("%d", v)
 	case float64:
 		if datatype == DateType {
-			return "'" + time.Unix(int64((v+1.0)*86400), int64(0)).Format("2006-01-02") + "'"
+			return "'" + time.Unix(int64(v*86400), int64(0)).UTC().Format("2006-01-02") + "'"
 		}
 		if datatype == TimestampType {
 			var i, f float64 = math.Modf(v / 1000000)
