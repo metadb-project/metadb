@@ -13,7 +13,7 @@ usage() {
 	echo 'Flags:'
 	echo '-c                            - Clean (remove executables) before building'
 	echo '-h                            - Help'
-	echo '-l                            - Run linters (requires golangci-lint)'
+	echo '-l                            - Run all linters (requires golangci-lint)'
 	echo '-t                            - Run tests'
 	echo '-v                            - Enable verbose output'
 }
@@ -46,16 +46,22 @@ if $verbose_f; then
     v='-v'
 fi
 
-if $lint_f; then
-    echo 'build.sh: running linters' 1>&2
-    golangci-lint run $v 1>&2
-fi
-
 bindir=bin
 
 if $clean_f; then
     echo 'build.sh: removing executables' 1>&2
     rm -f ./$bindir/metadb ./$bindir/mdb
+fi
+
+if $lint_f; then
+    echo 'build.sh: running all linters' 1>&2
+    golangci-lint run $v 1>&2
+else
+    echo 'build.sh: running linter' 1>&2
+    pkg=metadb
+    go vet $v ./cmd/$pkg 1>&2
+    pkg=mdb
+    go vet $v ./cmd/$pkg 1>&2
 fi
 
 echo 'build.sh: compiling Metadb' 1>&2
@@ -64,11 +70,11 @@ version=`git describe --tags --always`
 
 mkdir -p $bindir
 
-command=metadb
-go build $v -ldflags "-X main.metadbVersion=$version" -o $bindir ./cmd/$command
+pkg=metadb
+go build -o $bindir $v -ldflags "-X main.metadbVersion=$version" ./cmd/$pkg
 
-command=mdb
-go build $v -ldflags "-X main.metadbVersion=$version" -o $bindir ./cmd/$command
+pkg=mdb
+go build -o $bindir $v -ldflags "-X main.metadbVersion=$version" ./cmd/$pkg
 
 if $test_f; then
     echo 'build.sh: running tests' 1>&2
