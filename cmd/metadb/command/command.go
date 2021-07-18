@@ -39,8 +39,9 @@ const (
 	IntegerType
 	FloatType
 	BooleanType
+	DateType
 	TimestampType
-	//TimestamptzType
+	TimestamptzType
 	JSONType
 )
 
@@ -54,8 +55,12 @@ func (d DataType) String() string {
 		return "float"
 	case BooleanType:
 		return "boolean"
+	case DateType:
+		return "date"
 	case TimestampType:
 		return "timestamp"
+	case TimestamptzType:
+		return "timestamptz"
 	case JSONType:
 		return "json"
 	default:
@@ -74,8 +79,12 @@ func MakeDataType(dtype string) DataType {
 		return FloatType
 	case "boolean":
 		return BooleanType
+	case "date":
+		return DateType
 	case "timestamp":
 		return TimestampType
+	case "timestamptz":
+		return TimestamptzType
 	case "json":
 		return JSONType
 	default:
@@ -110,8 +119,12 @@ func DataTypeToSQL(dtype DataType, typeSize int64) string {
 		}
 	case BooleanType:
 		return "boolean"
+	case DateType:
+		return "date"
 	case TimestampType:
 		return "timestamp"
+	case TimestamptzType:
+		return "timestamptz"
 	case JSONType:
 		// Postgres only
 		return "json"
@@ -158,8 +171,14 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 		if strings.HasSuffix(semtype, ".time.MicroTimestamp") {
 			return TimestampType, nil
 		}
+		if strings.HasSuffix(semtype, ".time.Date") {
+			return DateType, nil
+		}
 		return IntegerType, nil
 	case "string":
+		if strings.HasSuffix(semtype, ".time.ZonedTimestamp") {
+			return TimestamptzType, nil
+		}
 		return VarcharType, nil
 	case "boolean":
 		return BooleanType, nil
@@ -202,7 +221,11 @@ func convertTypeSize(data interface{}, coltype string, datatype DataType) (int64
 		return lenS, nil
 	case BooleanType:
 		return 0, nil
+	case DateType:
+		return 0, nil
 	case TimestampType:
+		return 0, nil
+	case TimestamptzType:
 		return 0, nil
 	case JSONType:
 		return 0, nil
@@ -455,19 +478,19 @@ func SQLEncodeData(data interface{}, datatype DataType) string {
 	case int64:
 		return fmt.Sprintf("%d", v)
 	case float64:
-		switch datatype {
-		case TimestampType:
+		if datatype == DateType {
+			return "'" + time.Unix(int64((v+1.0)*86400), int64(0)).Format("2006-01-02") + "'"
+		}
+		if datatype == TimestampType {
 			var i, f float64 = math.Modf(v / 1000000)
 			return "'" + time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000000") + "'"
-		default:
-			return fmt.Sprintf("%g", v)
 		}
+		return fmt.Sprintf("%g", v)
 	case bool:
 		if v {
 			return "TRUE"
-		} else {
-			return "FALSE"
 		}
+		return "FALSE"
 	default:
 		return fmt.Sprintf("(unknown:%T)", data)
 	}
