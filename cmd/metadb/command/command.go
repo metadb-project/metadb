@@ -40,6 +40,8 @@ const (
 	FloatType
 	BooleanType
 	DateType
+	TimeType
+	TimetzType
 	TimestampType
 	TimestamptzType
 	JSONType
@@ -57,6 +59,10 @@ func (d DataType) String() string {
 		return "boolean"
 	case DateType:
 		return "date"
+	case TimeType:
+		return "time"
+	case TimetzType:
+		return "timetz"
 	case TimestampType:
 		return "timestamp"
 	case TimestamptzType:
@@ -81,6 +87,10 @@ func MakeDataType(dtype string) DataType {
 		return BooleanType
 	case "date":
 		return DateType
+	case "time":
+		return TimeType
+	case "timetz":
+		return TimetzType
 	case "timestamp":
 		return TimestampType
 	case "timestamptz":
@@ -121,6 +131,10 @@ func DataTypeToSQL(dtype DataType, typeSize int64) string {
 		return "boolean"
 	case DateType:
 		return "date"
+	case TimeType:
+		return "time"
+	case TimetzType:
+		return "time with time zone"
 	case TimestampType:
 		return "timestamp"
 	case TimestamptzType:
@@ -166,18 +180,27 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 	case "int16":
 		fallthrough
 	case "int32":
+		if strings.HasSuffix(semtype, ".time.Time") {
+			return TimeType, nil
+		}
 		fallthrough
 	case "int64":
-		if strings.HasSuffix(semtype, ".time.MicroTimestamp") {
+		if strings.HasSuffix(semtype, ".time.MicroTimestamp") || strings.HasSuffix(semtype, ".time.Timestamp") {
 			return TimestampType, nil
 		}
 		if strings.HasSuffix(semtype, ".time.Date") {
 			return DateType, nil
 		}
+		if strings.HasSuffix(semtype, ".time.MicroTime") {
+			return TimeType, nil
+		}
 		return IntegerType, nil
 	case "string":
 		if strings.HasSuffix(semtype, ".time.ZonedTimestamp") {
 			return TimestamptzType, nil
+		}
+		if strings.HasSuffix(semtype, ".time.ZonedTime") {
+			return TimetzType, nil
 		}
 		return VarcharType, nil
 	case "boolean":
@@ -354,7 +377,7 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 		if isJSON {
 			col.DType = JSONType
 		}
-		col.EncodedData = SQLEncodeData(indented, col.DType)
+		col.EncodedData = SQLEncodeData(indented, col.DType, col.SemanticType)
 		if col.DTypeSize, err = convertTypeSize(col.EncodedData, ftype, col.DType); err != nil {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type size", field)
 		}
@@ -466,7 +489,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 	return u, nil
 }
 
-func SQLEncodeData(data interface{}, datatype DataType) string {
+func SQLEncodeData(data interface{}, datatype DataType, semtype string) string {
 	if data == nil {
 		return "NULL"
 	}
@@ -481,9 +504,21 @@ func SQLEncodeData(data interface{}, datatype DataType) string {
 		if datatype == DateType {
 			return "'" + time.Unix(int64(v*86400), int64(0)).UTC().Format("2006-01-02") + "'"
 		}
-		if datatype == TimestampType {
+		if datatype == TimestampType && semtype == ".time.MicroTimestamp" {
 			var i, f float64 = math.Modf(v / 1000000)
 			return "'" + time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000000") + "'"
+		}
+		if datatype == TimestampType && semtype == ".time.Timestamp" {
+			var i, f float64 = math.Modf(v / 1000)
+			return "'" + time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000000") + "'"
+		}
+		if datatype == TimeType && semtype == ".time.MicroTime" {
+			var i, f float64 = math.Modf(v / 1000000)
+			return "'" + time.Unix(int64(i), int64(f*1000000000)).UTC().Format("15:04:05.000000000") + "'"
+		}
+		if datatype == TimeType && semtype == ".time.Time" {
+			var i, f float64 = math.Modf(v / 1000)
+			return "'" + time.Unix(int64(i), int64(f*1000000000)).UTC().Format("15:04:05.000000000") + "'"
 		}
 		return fmt.Sprintf("%g", v)
 	case bool:

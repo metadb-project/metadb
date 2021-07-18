@@ -192,7 +192,7 @@ func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64,
 		if x != 0 {
 			fmt.Fprintf(&b, " AND\n        ")
 		}
-		fmt.Fprintf(&b, "%s = %s", col.Name, command.SQLEncodeData(col.Data, col.DType))
+		fmt.Fprintf(&b, "%s = %s", col.Name, command.SQLEncodeData(col.Data, col.DType, col.SemanticType))
 	}
 	fmt.Fprintf(&b, " AND\n        __current = TRUE;")
 	var q = b.String()
