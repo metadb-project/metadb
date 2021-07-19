@@ -499,6 +499,9 @@ func SQLEncodeData(data interface{}, datatype DataType, semtype string) string {
 	}
 	switch v := data.(type) {
 	case string:
+		if datatype == TimestamptzType || datatype == TimetzType {
+			return "'" + v + "'"
+		}
 		return util.PostgresEncodeString(v, true)
 	case int:
 		return fmt.Sprintf("%d", v)
@@ -508,19 +511,19 @@ func SQLEncodeData(data interface{}, datatype DataType, semtype string) string {
 		if datatype == DateType {
 			return "'" + time.Unix(int64(v*86400), int64(0)).UTC().Format("2006-01-02") + "'"
 		}
-		if datatype == TimestampType && semtype == ".time.MicroTimestamp" {
+		if datatype == TimestampType && strings.HasSuffix(semtype, ".time.MicroTimestamp") {
 			var i, f float64 = math.Modf(v / 1000000)
 			return "'" + time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000000") + "'"
 		}
-		if datatype == TimestampType && semtype == ".time.Timestamp" {
+		if datatype == TimestampType && strings.HasSuffix(semtype, ".time.Timestamp") {
 			var i, f float64 = math.Modf(v / 1000)
 			return "'" + time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000000") + "'"
 		}
-		if datatype == TimeType && semtype == ".time.MicroTime" {
+		if datatype == TimeType && strings.HasSuffix(semtype, ".time.MicroTime") {
 			var i, f float64 = math.Modf(v / 1000000)
 			return "'" + time.Unix(int64(i), int64(f*1000000000)).UTC().Format("15:04:05.000000000") + "'"
 		}
-		if datatype == TimeType && semtype == ".time.Time" {
+		if datatype == TimeType && strings.HasSuffix(semtype, ".time.Time") {
 			var i, f float64 = math.Modf(v / 1000)
 			return "'" + time.Unix(int64(i), int64(f*1000000000)).UTC().Format("15:04:05.000000000") + "'"
 		}
