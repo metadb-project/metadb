@@ -88,14 +88,17 @@ func pollLoop(spr *sproc) error {
 		var topics = spr.source.Topics
 		var group = spr.source.Group
 		log.Info("connecting to \"%s\", topics \"%s\"", brokers, topics)
-		consumer, err = kafka.NewConsumer(&kafka.ConfigMap{
+		var config = &kafka.ConfigMap{
 			"auto.offset.reset":    "earliest",
 			"bootstrap.servers":    brokers,
 			"enable.auto.commit":   false,
 			"enable.partition.eof": true,
 			"group.id":             group,
-			// "session.timeout.ms": 6000,
-		})
+		}
+		if spr.svr.opt.Trace {
+			config.SetKey("debug", "cgrp")
+		}
+		consumer, err = kafka.NewConsumer(config)
 		if err != nil {
 			spr.source.Status.Error()
 			return err
@@ -109,6 +112,7 @@ func pollLoop(spr *sproc) error {
 		}
 		spr.source.Status.Active()
 	}
+	var firstEvent = true
 	for {
 		log.Trace("(poll)")
 		var cl = &command.CommandList{}
@@ -136,6 +140,10 @@ func pollLoop(spr *sproc) error {
 				return nil
 			}
 			continue
+		}
+		if firstEvent {
+			firstEvent = false
+			log.Info("receiving data")
 		}
 
 		/*
