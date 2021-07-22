@@ -267,7 +267,13 @@ func convertTypeSize(data interface{}, coltype string, datatype DataType) (int64
 func extractPrimaryKey(ce *change.Event) (map[string]int, error) {
 	var ok bool
 	if ce.Key == nil {
-		return nil, fmt.Errorf("primary key not defined: %s", ce.Message.TopicPartition)
+		var topic string
+		if ce.Message.TopicPartition.Topic != nil {
+			topic = *ce.Message.TopicPartition.Topic
+		} else {
+			topic = "(unknown)"
+		}
+		return nil, fmt.Errorf("primary key not defined: %s", topic)
 	}
 	if ce.Key.Schema == nil || ce.Key.Schema.Fields == nil {
 		return nil, fmt.Errorf("key: $.schema.fields not found")
