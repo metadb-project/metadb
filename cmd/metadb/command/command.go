@@ -202,6 +202,9 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 		if strings.HasSuffix(semtype, ".time.ZonedTime") {
 			return TimetzType, nil
 		}
+		if strings.HasSuffix(semtype, ".data.Json") {
+			return JSONType, nil
+		}
 		return VarcharType, nil
 	case "boolean":
 		return BooleanType, nil
@@ -375,13 +378,15 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 		}
 		col.SemanticType = semtype
 		col.Data = fieldData[field]
-		var isJSON bool
-		var indented interface{}
-		indented, isJSON = IsJSONIndent(col.Data)
-		if isJSON {
-			col.DType = JSONType
+		var data interface{}
+		if col.DType == JSONType {
+			if data, err = indentJSON(col.Data.(string)); err != nil {
+				data = col.Data
+			}
+		} else {
+			data = col.Data
 		}
-		col.EncodedData = SQLEncodeData(indented, col.DType, col.SemanticType)
+		col.EncodedData = SQLEncodeData(data, col.DType, col.SemanticType)
 		if col.DTypeSize, err = convertTypeSize(col.EncodedData, ftype, col.DType); err != nil {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type size", field)
 		}
@@ -391,40 +396,18 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 	return column, nil
 }
 
-func IsJSONIndent(data interface{}) (interface{}, bool) {
-	var d interface{} = data
-	switch v := d.(type) {
-	case string:
-		var err error
-		var j map[string]interface{}
-		if err = json.Unmarshal([]byte(v), &j); err != nil {
-			return v, false
-		}
-		var jb []byte
-		if jb, err = json.MarshalIndent(j, "", "    "); err != nil {
-			return v, false
-		}
-		return string(jb), true
-	default:
-		return d, false
+func indentJSON(data string) (string, error) {
+	var err error
+	var j map[string]interface{}
+	if err = json.Unmarshal([]byte(data), &j); err != nil {
+		return "", err
 	}
+	var jb []byte
+	if jb, err = json.MarshalIndent(j, "", "    "); err != nil {
+		return "", err
+	}
+	return string(jb), nil
 }
-
-//func indentJSON(name, data string) string {
-//        if name != "jsonb" {
-//                return data
-//        }
-//        var err error
-//        var j map[string]interface{}
-//        if err = json.Unmarshal([]byte(data), &j); err != nil {
-//                return data
-//        }
-//        var jb []byte
-//        if jb, err = json.MarshalIndent(j, "", "    "); err != nil {
-//                return data
-//        }
-//        return string(jb)
-//}
 
 func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string) (*Command, error) {
 	var err error

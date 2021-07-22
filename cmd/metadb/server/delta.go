@@ -60,7 +60,6 @@ func tableSchemaFromCommand(c *command.Command) *sysdb.TableSchema {
 		cs.Name = col.Name
 		cs.DType = col.DType
 		cs.DTypeSize = col.DTypeSize
-		cs.DataSampleNull = (col.Data == nil)
 		cs.PrimaryKey = col.PrimaryKey
 		ts.Column = append(ts.Column, cs)
 	}
@@ -91,10 +90,6 @@ func findDeltaColumnSchema(tschema string, tableName string, column1 *sysdb.Colu
 	// If the types are the same and the existing type size is larger than
 	// the new one, the columns schema are compatible
 	if column1.DType == column2.DType && column1.DTypeSize >= column2.DTypeSize {
-		return nil
-	}
-	// If the old type was JSON and the new data is null, we can retain the JSON type.
-	if column1.DType == command.JSONType && column2.DataSampleNull {
 		return nil
 	}
 	// Otherwise a type or size change is required.

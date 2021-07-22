@@ -15,11 +15,10 @@ import (
 )
 
 type ColumnSchema struct {
-	Name           string
-	DType          command.DataType
-	DTypeSize      int64
-	DataSampleNull bool
-	PrimaryKey     int
+	Name       string
+	DType      command.DataType
+	DTypeSize  int64
+	PrimaryKey int
 }
 
 type TableSchema struct {
