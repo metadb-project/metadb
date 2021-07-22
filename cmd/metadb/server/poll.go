@@ -337,14 +337,14 @@ func readChangeEvent(consumer *kafka.Consumer, sourceLog *log.SourceLog) (*chang
 				// client can be reported and ignored,
 				// because the client will
 				// automatically try to recover.
-				fmt.Fprintf(os.Stderr, "%% warning: %v: %v\n", e.Code(), e)
+				log.Error("%v: %v", e.Code(), e)
 				// We could take some action if
 				// desired:
 				//if e.Code() == kafka.ErrAllBrokersDown {
 				//        // some action
 				//}
 			default:
-				fmt.Fprintf(os.Stderr, "warning: ignored %v\n", e)
+				log.Warning("ignoring: %v", e)
 			}
 		}
 	}
