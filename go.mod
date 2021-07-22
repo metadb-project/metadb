@@ -9,5 +9,5 @@ require (
 	github.com/mattn/go-isatty v0.0.13
 	github.com/mattn/go-sqlite3 v1.14.8
 	github.com/spf13/cobra v1.2.1
-	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
+	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b
 )
