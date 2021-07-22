@@ -3,7 +3,7 @@ module github.com/metadb-project/metadb
 go 1.16
 
 require (
-	github.com/confluentinc/confluent-kafka-go v1.6.1
+	github.com/confluentinc/confluent-kafka-go v1.7.0
 	github.com/fatih/color v1.10.0
 	github.com/lib/pq v1.10.1
 	github.com/mattn/go-isatty v0.0.12
