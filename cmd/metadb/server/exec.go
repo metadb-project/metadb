@@ -122,18 +122,14 @@ func execCommandData(c *command.Command, db *sql.DB) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, ""+
 		"INSERT INTO %s (\n"+
-		"        __current,\n"+
-		"        __start,\n"+
-		"        __end", util.JoinSchemaTable(c.SchemaName, c.TableName))
+		"        __start", util.JoinSchemaTable(c.SchemaName, c.TableName))
 	var col command.CommandColumn
 	for _, col = range c.Column {
 		fmt.Fprintf(&b, ",\n        \"%s\"", col.Name)
 	}
 	fmt.Fprintf(&b, "\n"+
 		"    ) VALUES (\n"+
-		"        TRUE,\n"+
-		"        '%s',\n"+
-		"        '9999-12-31 00:00:00-00'", timeNow)
+		"        '%s'", timeNow)
 	for _, col = range c.Column {
 		//fmt.Fprintf(&b, ",\n        %s", command.SQLEncodeData(col.Data, col.DType))
 		fmt.Fprintf(&b, ",\n        %s", col.EncodedData)
@@ -194,7 +190,10 @@ func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64,
 		}
 		fmt.Fprintf(&b, "%s = %s", col.Name, command.SQLEncodeData(col.Data, col.DType, col.SemanticType))
 	}
-	fmt.Fprintf(&b, " AND\n        __current = TRUE;")
+	if history {
+		fmt.Fprintf(&b, " AND\n        __current = TRUE")
+	}
+	fmt.Fprintf(&b, ";")
 	var q = b.String()
 	var id int64
 	err = tx.QueryRowContext(context.TODO(), q).Scan(&id)

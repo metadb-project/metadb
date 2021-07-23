@@ -47,10 +47,10 @@ func AddTable(schema string, table string, maindb *sql.DB) error {
 	if err = createSchemaIfNotExists(schema, maindb); err != nil {
 		return err
 	}
-	if err = createTableIfNotExists(schema, table, maindb); err != nil {
+	if err = createCurrentTableIfNotExists(schema, table, maindb); err != nil {
 		return err
 	}
-	if err = createTableIfNotExists(schema, table+"__", maindb); err != nil {
+	if err = createHistoryTableIfNotExists(schema, table, maindb); err != nil {
 		return err
 	}
 	q = fmt.Sprintf(""+
@@ -78,15 +78,45 @@ func createSchemaIfNotExists(schema string, maindb *sql.DB) error {
 	return nil
 }
 
-func createTableIfNotExists(schema string, table string, maindb *sql.DB) error {
+func createCurrentTableIfNotExists(schema string, table string, maindb *sql.DB) error {
 	var err error
 	var schemaTable = util.JoinSchemaTable(schema, table)
 	var q = fmt.Sprintf(""+
 		"CREATE TABLE IF NOT EXISTS %s (\n"+
-		"    __id BIGSERIAL PRIMARY KEY,\n"+
-		"    __current BOOLEAN,\n"+
-		"    __start timestamp with time zone,\n"+
-		"    __end timestamp with time zone\n"+
+		"    __id bigserial PRIMARY KEY,\n"+
+		"    __start timestamp with time zone NOT NULL,\n"+
+		"    __origin varchar(63) NOT NULL DEFAULT ''\n"+
+		");", schemaTable)
+	if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
+		return fmt.Errorf("%s:\n%s", err, q)
+	}
+	// Add indexes on new columns.
+	q = fmt.Sprintf("CREATE INDEX ON %s (__start);", schemaTable)
+	if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
+		log.Error("unable to create index on %s (__start);", schemaTable)
+	}
+	q = fmt.Sprintf("CREATE INDEX ON %s (__origin);", schemaTable)
+	if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
+		log.Error("unable to create index on %s (__origin);", schemaTable)
+	}
+	// Grant permissions on new table.
+	q = fmt.Sprintf("GRANT SELECT ON %s TO \"%s\";", schemaTable, option.GeneralUser)
+	if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
+		return fmt.Errorf("%s:\n%s", err, q)
+	}
+	return nil
+}
+
+func createHistoryTableIfNotExists(schema string, table string, maindb *sql.DB) error {
+	var err error
+	var schemaTable = util.JoinSchemaTable(schema, table+"__")
+	var q = fmt.Sprintf(""+
+		"CREATE TABLE IF NOT EXISTS %s (\n"+
+		"    __id bigserial PRIMARY KEY,\n"+
+		"    __current boolean NOT NULL,\n"+
+		"    __start timestamp with time zone NOT NULL,\n"+
+		"    __end timestamp with time zone NOT NULL,\n"+
+		"    __origin varchar(63) NOT NULL DEFAULT ''\n"+
 		");", schemaTable)
 	if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("%s:\n%s", err, q)
@@ -103,6 +133,10 @@ func createTableIfNotExists(schema string, table string, maindb *sql.DB) error {
 	q = fmt.Sprintf("CREATE INDEX ON %s (__end);", schemaTable)
 	if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
 		log.Error("unable to create index on %s (__end);", schemaTable)
+	}
+	q = fmt.Sprintf("CREATE INDEX ON %s (__origin);", schemaTable)
+	if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
+		log.Error("unable to create index on %s (__origin);", schemaTable)
 	}
 	// Grant permissions on new table.
 	q = fmt.Sprintf("GRANT SELECT ON %s TO \"%s\";", schemaTable, option.GeneralUser)
