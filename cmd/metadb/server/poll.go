@@ -95,9 +95,6 @@ func pollLoop(spr *sproc) error {
 			"enable.partition.eof": true,
 			"group.id":             group,
 		}
-		if spr.svr.opt.Trace {
-			config.SetKey("debug", "cgrp")
-		}
 		consumer, err = kafka.NewConsumer(config)
 		if err != nil {
 			spr.source.Status.Error()
