@@ -85,7 +85,7 @@ func createCurrentTableIfNotExists(schema string, table string, maindb *sql.DB) 
 		"CREATE TABLE IF NOT EXISTS %s (\n"+
 		"    __id bigserial PRIMARY KEY,\n"+
 		"    __start timestamp with time zone NOT NULL,\n"+
-		"    __origin varchar(63) NOT NULL DEFAULT ''\n"+
+		"    __origin varchar(63) NOT NULL\n"+
 		");", schemaTable)
 	if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("%s:\n%s", err, q)
@@ -116,7 +116,7 @@ func createHistoryTableIfNotExists(schema string, table string, maindb *sql.DB) 
 		"    __current boolean NOT NULL,\n"+
 		"    __start timestamp with time zone NOT NULL,\n"+
 		"    __end timestamp with time zone NOT NULL,\n"+
-		"    __origin varchar(63) NOT NULL DEFAULT ''\n"+
+		"    __origin varchar(63) NOT NULL\n"+
 		");", schemaTable)
 	if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("%s:\n%s", err, q)

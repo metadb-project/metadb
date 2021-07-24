@@ -161,6 +161,7 @@ type Command struct {
 	Op          Operation
 	SchemaName  string
 	TableName   string
+	Origin      string
 	Column      []CommandColumn
 	ChangeEvent *change.Event
 }
@@ -442,6 +443,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 			return nil, fmt.Errorf("unknown op value in change event: %q", *ce.Value.Payload.Op)
 		}
 	}
+	var tenants []string = []string{}
 	if ce.Value.Payload.Source != nil {
 		if ce.Value.Payload.Source.Schema != nil {
 			//if len(schemaPassFilter) > 0 && !strings.HasPrefix(*ce.Value.Payload.Source.Schema, filterPrefix) {
@@ -455,6 +457,9 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 			schema = strings.TrimPrefix(schema, "mod_")
 			schema = strings.TrimSuffix(schema, "_storage")
 			schema = strings.Replace(schema, "_mod_", "_", 1)
+			var origin string
+			origin, schema = extractOrigin(tenants, schema)
+			u.Origin = origin
 			schema = schemaPrefix + schema
 			u.SchemaName = schema
 		} else {
@@ -480,6 +485,21 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 	}
 	u.ChangeEvent = ce
 	return u, nil
+}
+
+func extractOrigin(prefixes []string, schema string) (origin, newSchema string) {
+	var g string
+	for _, g = range prefixes {
+		var gu = g + "_"
+		if strings.HasPrefix(schema, gu) {
+			origin = g
+			newSchema = strings.TrimPrefix(schema, gu)
+			return
+		}
+	}
+	origin = ""
+	newSchema = schema
+	return
 }
 
 func SQLEncodeData(data interface{}, datatype DataType, semtype string) string {

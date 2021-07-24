@@ -98,6 +98,7 @@ go build -o $bindir $v -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
 
 if $test_f; then
     echo 'build.sh: running tests' 1>&2
+    go test $v -count=1 ./cmd/metadb/command 1>&2
     go test $v -count=1 ./cmd/metadb/util 1>&2
 fi
 

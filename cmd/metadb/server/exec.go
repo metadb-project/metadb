@@ -122,14 +122,16 @@ func execCommandData(c *command.Command, db *sql.DB) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, ""+
 		"INSERT INTO %s (\n"+
-		"        __start", util.JoinSchemaTable(c.SchemaName, c.TableName))
+		"        __start,\n"+
+		"        __origin", util.JoinSchemaTable(c.SchemaName, c.TableName))
 	var col command.CommandColumn
 	for _, col = range c.Column {
 		fmt.Fprintf(&b, ",\n        \"%s\"", col.Name)
 	}
 	fmt.Fprintf(&b, "\n"+
 		"    ) VALUES (\n"+
-		"        '%s'", timeNow)
+		"        '%s',\n"+
+		"        '%s'", timeNow, c.Origin)
 	for _, col = range c.Column {
 		//fmt.Fprintf(&b, ",\n        %s", command.SQLEncodeData(col.Data, col.DType))
 		fmt.Fprintf(&b, ",\n        %s", col.EncodedData)
@@ -145,7 +147,8 @@ func execCommandData(c *command.Command, db *sql.DB) error {
 		"INSERT INTO %s (\n"+
 		"        __current,\n"+
 		"        __start,\n"+
-		"        __end", util.JoinSchemaTable(c.SchemaName, c.TableName+"__"))
+		"        __end,\n"+
+		"        __origin", util.JoinSchemaTable(c.SchemaName, c.TableName+"__"))
 	for _, col = range c.Column {
 		fmt.Fprintf(&b, ",\n        \"%s\"", col.Name)
 	}
@@ -153,7 +156,8 @@ func execCommandData(c *command.Command, db *sql.DB) error {
 		"    ) VALUES (\n"+
 		"        TRUE,\n"+
 		"        '%s',\n"+
-		"        '9999-12-31 00:00:00-00'", timeNow)
+		"        '9999-12-31 00:00:00-00',\n"+
+		"        '%s'", timeNow, c.Origin)
 	for _, col = range c.Column {
 		//fmt.Fprintf(&b, ",\n        %s", command.SQLEncodeData(col.Data, col.DType))
 		fmt.Fprintf(&b, ",\n        %s", col.EncodedData)
@@ -181,14 +185,10 @@ func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64,
 	fmt.Fprintf(&b, ""+
 		"SELECT __id\n"+
 		"    FROM %s\n"+
-		"    WHERE ", util.JoinSchemaTable(c.SchemaName, c.TableName+h))
-	var x int
+		"    WHERE __origin = '%s'", util.JoinSchemaTable(c.SchemaName, c.TableName+h), c.Origin)
 	var col command.CommandColumn
-	for x, col = range pkey {
-		if x != 0 {
-			fmt.Fprintf(&b, " AND\n        ")
-		}
-		fmt.Fprintf(&b, "%s = %s", col.Name, command.SQLEncodeData(col.Data, col.DType, col.SemanticType))
+	for _, col = range pkey {
+		fmt.Fprintf(&b, " AND\n        %s = %s", col.Name, command.SQLEncodeData(col.Data, col.DType, col.SemanticType))
 	}
 	if history {
 		fmt.Fprintf(&b, " AND\n        __current = TRUE")
