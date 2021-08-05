@@ -1,6 +1,34 @@
 package api
 
-import "github.com/metadb-project/metadb/cmd/internal/status"
+import (
+	"github.com/metadb-project/metadb/cmd/internal/status"
+)
+
+type ConfigListRequest struct {
+	Attr string
+}
+
+type ConfigListResponse struct {
+	Configs []ConfigItem
+}
+
+type ConfigItem struct {
+	Attr string
+	Val  string
+}
+
+type ConfigUpdateRequest struct {
+	Attr string
+	Val  string
+}
+
+type ConfigDeleteRequest struct {
+	Attr string
+}
+
+type ConfigDeleteResponse struct {
+	AttrNotFound bool
+}
 
 type UpdateDatabaseConnectorRequest DatabaseConnector
 
@@ -42,4 +70,8 @@ type GetStatusRequest struct {
 type GetStatusResponse struct {
 	Sources   map[string]status.Status `json:"sources"`
 	Databases map[string]status.Status `json:"databases"`
+}
+
+type EnableRequest struct {
+	Connectors []string
 }

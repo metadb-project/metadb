@@ -101,8 +101,9 @@ func openDatabase(filename string) (*sql.DB, error) {
 }
 
 func initSchema(d *sql.DB) error {
-	tx, err := database.MakeTx(d)
-	if err != nil {
+	var err error
+	var tx *sql.Tx
+	if tx, err = database.MakeTx(d); err != nil {
 		return err
 	}
 	defer tx.Rollback()
@@ -126,68 +127,72 @@ func initSchema(d *sql.DB) error {
 		return fmt.Errorf("initializing system database: writing lock: %s", err)
 	}
 
-	eout.Trace("creating schema: connect_database")
-	s = "" +
-		"CREATE TABLE connect_database (\n" +
-		"    id INTEGER PRIMARY KEY,\n" +
-		"    name TEXT UNIQUE NOT NULL,\n" +
-		"    type TEXT NOT NULL,\n" +
-		"    dbhost TEXT NOT NULL,\n" +
-		"    dbport TEXT NOT NULL,\n" +
-		"    dbname TEXT NOT NULL,\n" +
-		"    dbuser TEXT NOT NULL,\n" +
-		"    dbpassword TEXT NOT NULL,\n" +
-		"    dbsslmode TEXT NOT NULL\n" +
-		");"
-	if _, err = tx.ExecContext(context.TODO(), s); err != nil {
-		return fmt.Errorf("initializing system database: creating schema: connect_database: %s", err)
-	}
+	/*
 
-	eout.Trace("creating schema: connect_source_kafka")
-	s = "" +
-		"CREATE TABLE connect_source_kafka (\n" +
-		"    id INTEGER PRIMARY KEY,\n" +
-		"    name TEXT UNIQUE NOT NULL,\n" +
-		"    brokers TEXT NOT NULL,\n" +
-		"    group_id TEXT NOT NULL,\n" +
-		"    schema_prefix TEXT NOT NULL\n" +
-		");"
-	if _, err = tx.ExecContext(context.TODO(), s); err != nil {
-		return fmt.Errorf("initializing system database: creating schema: connect_source_kafka: %s", err)
-	}
+		eout.Trace("creating schema: connect_database")
+		s = "" +
+			"CREATE TABLE connect_database (\n" +
+			"    id INTEGER PRIMARY KEY,\n" +
+			"    name TEXT UNIQUE NOT NULL,\n" +
+			"    type TEXT NOT NULL,\n" +
+			"    dbhost TEXT NOT NULL,\n" +
+			"    dbport TEXT NOT NULL,\n" +
+			"    dbname TEXT NOT NULL,\n" +
+			"    dbuser TEXT NOT NULL,\n" +
+			"    dbpassword TEXT NOT NULL,\n" +
+			"    dbsslmode TEXT NOT NULL\n" +
+			");"
+		if _, err = tx.ExecContext(context.TODO(), s); err != nil {
+			return fmt.Errorf("initializing system database: creating schema: connect_database: %s", err)
+		}
 
-	eout.Trace("creating schema: connect_source_kafka_topic")
-	s = "" +
-		"CREATE TABLE connect_source_kafka_topic (\n" +
-		"    id INTEGER PRIMARY KEY,\n" +
-		"    source_id INTEGER NOT NULL REFERENCES connect_source_kafka (id),\n" +
-		"    topic TEXT NOT NULL\n" +
-		");"
-	if _, err = tx.ExecContext(context.TODO(), s); err != nil {
-		return fmt.Errorf("initializing system database: creating schema: connect_source_kafka_topic: %s", err)
-	}
+		eout.Trace("creating schema: connect_source_kafka")
+		s = "" +
+			"CREATE TABLE connect_source_kafka (\n" +
+			"    id INTEGER PRIMARY KEY,\n" +
+			"    name TEXT UNIQUE NOT NULL,\n" +
+			"    brokers TEXT NOT NULL,\n" +
+			"    group_id TEXT NOT NULL,\n" +
+			"    schema_prefix TEXT NOT NULL\n" +
+			");"
+		if _, err = tx.ExecContext(context.TODO(), s); err != nil {
+			return fmt.Errorf("initializing system database: creating schema: connect_source_kafka: %s", err)
+		}
 
-	eout.Trace("creating schema: connect_source_kafka_schema_pass_filter")
-	s = "" +
-		"CREATE TABLE connect_source_kafka_schema_pass_filter (\n" +
-		"    id INTEGER PRIMARY KEY,\n" +
-		"    source_id INTEGER NOT NULL REFERENCES connect_source_kafka (id),\n" +
-		"    schema_pass_filter TEXT NOT NULL\n" +
-		");"
-	if _, err = tx.ExecContext(context.TODO(), s); err != nil {
-		return fmt.Errorf("initializing system database: creating schema: connect_source_kafka_schema_pass_filter: %s", err)
-	}
+		eout.Trace("creating schema: connect_source_kafka_topic")
+		s = "" +
+			"CREATE TABLE connect_source_kafka_topic (\n" +
+			"    id INTEGER PRIMARY KEY,\n" +
+			"    source_id INTEGER NOT NULL REFERENCES connect_source_kafka (id),\n" +
+			"    topic TEXT NOT NULL\n" +
+			");"
+		if _, err = tx.ExecContext(context.TODO(), s); err != nil {
+			return fmt.Errorf("initializing system database: creating schema: connect_source_kafka_topic: %s", err)
+		}
 
-	eout.Trace("creating schema: connect_source_kafka_database")
-	s = "" +
-		"CREATE TABLE connect_source_kafka_database (\n" +
-		"    id INTEGER PRIMARY KEY,\n" +
-		"    source_id INTEGER NOT NULL REFERENCES connect_source_kafka (id),\n" +
-		"    database_id INTEGER NOT NULL REFERENCES connect_database (id)\n" +
-		");"
-	if _, err = tx.ExecContext(context.TODO(), s); err != nil {
-		return fmt.Errorf("initializing system database: creating schema: connect_source_kafka_database: %s", err)
-	}
+		eout.Trace("creating schema: connect_source_kafka_schema_pass_filter")
+		s = "" +
+			"CREATE TABLE connect_source_kafka_schema_pass_filter (\n" +
+			"    id INTEGER PRIMARY KEY,\n" +
+			"    source_id INTEGER NOT NULL REFERENCES connect_source_kafka (id),\n" +
+			"    schema_pass_filter TEXT NOT NULL\n" +
+			");"
+		if _, err = tx.ExecContext(context.TODO(), s); err != nil {
+			return fmt.Errorf("initializing system database: creating schema: connect_source_kafka_schema_pass_filter: %s", err)
+		}
+
+		eout.Trace("creating schema: connect_source_kafka_database")
+		s = "" +
+			"CREATE TABLE connect_source_kafka_database (\n" +
+			"    id INTEGER PRIMARY KEY,\n" +
+			"    source_id INTEGER NOT NULL REFERENCES connect_source_kafka (id),\n" +
+			"    database_id INTEGER NOT NULL REFERENCES connect_database (id)\n" +
+			");"
+		if _, err = tx.ExecContext(context.TODO(), s); err != nil {
+			return fmt.Errorf("initializing system database: creating schema: connect_source_kafka_database: %s", err)
+		}
+
+	*/
 
 	eout.Trace("creating schema: relation")
 	s = "" +
@@ -216,6 +221,28 @@ func initSchema(d *sql.DB) error {
 	_, err = tx.ExecContext(context.TODO(), s)
 	if err != nil {
 		return fmt.Errorf("initializing system database: creating schema: attribute: %s", err)
+	}
+
+	eout.Trace("creating schema: config")
+	s = "" +
+		"CREATE TABLE config (\n" +
+		"    attr TEXT PRIMARY KEY,\n" +
+		"    val TEXT NOT NULL\n" +
+		");"
+	_, err = tx.ExecContext(context.TODO(), s)
+	if err != nil {
+		return fmt.Errorf("initializing system database: creating schema: config: %s", err)
+	}
+
+	eout.Trace("creating schema: connector")
+	s = "" +
+		"CREATE TABLE connector (\n" +
+		"    spec TEXT PRIMARY KEY,\n" +
+		"    enabled BOOLEAN NOT NULL\n" +
+		");"
+	_, err = tx.ExecContext(context.TODO(), s)
+	if err != nil {
+		return fmt.Errorf("initializing system database: creating schema: connector: %s", err)
 	}
 
 	if err = tx.Commit(); err != nil {

@@ -416,6 +416,8 @@ func indentJSON(data string) (string, error) {
 	return string(jb), nil
 }
 
+var Tenants []string
+
 func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string) (*Command, error) {
 	var err error
 	var u = &Command{}
@@ -443,7 +445,6 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 			return nil, fmt.Errorf("unknown op value in change event: %q", *ce.Value.Payload.Op)
 		}
 	}
-	var tenants []string = []string{}
 	if ce.Value.Payload.Source != nil {
 		if ce.Value.Payload.Source.Schema != nil {
 			//if len(schemaPassFilter) > 0 && !strings.HasPrefix(*ce.Value.Payload.Source.Schema, filterPrefix) {
@@ -458,7 +459,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 			schema = strings.TrimSuffix(schema, "_storage")
 			schema = strings.Replace(schema, "_mod_", "_", 1)
 			var origin string
-			origin, schema = extractOrigin(tenants, schema)
+			origin, schema = extractOrigin(Tenants, schema)
 			u.Origin = origin
 			schema = schemaPrefix + schema
 			u.SchemaName = schema

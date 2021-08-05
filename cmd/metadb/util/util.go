@@ -1,13 +1,17 @@
 package util
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/metadb-project/metadb/cmd/metadb/log"
 )
 
 // ModePermRW is the umask "-rw-------".
@@ -122,10 +126,93 @@ func FileExists(f string) (bool, error) {
 	return false, err
 }
 
-//func CloseRows(rows *sql.Rows) {
-//        _ = rows.Close()
-//}
+func ReadRequest(w http.ResponseWriter, r *http.Request, requestStruct interface{}) bool {
+	// Authenticate user.
+	var user string
+	var ok bool
+	if user, ok = HandleBasicAuth(w, r); !ok {
+		return false
+	}
+	_ = user
+	// Read the json request.
+	var body []byte
+	var err error
+	if body, err = ioutil.ReadAll(r.Body); err != nil {
+		HandleError(w, err, http.StatusBadRequest)
+		return false
+	}
+	if err = json.Unmarshal(body, requestStruct); err != nil {
+		HandleError(w, err, http.StatusBadRequest)
+		return false
+	}
+	log.Trace("request %s %v\n", r.RemoteAddr, requestStruct)
+	return true
+}
 
-//func Rollback(tx *sql.Tx) {
-//        _ = tx.Rollback()
-//}
+func HandleBasicAuth(w http.ResponseWriter, r *http.Request) (
+	string, bool) {
+	var user, password string
+	var ok bool
+	user, password, ok = r.BasicAuth()
+	if !ok {
+		var m = "Unauthorized: Invalid HTTP Basic Authentication"
+		log.Info(m)
+		//w.Header().Set("WWW-Authenticate", "Basic")
+		http.Error(w, m, http.StatusForbidden)
+		return user, false
+	}
+	_ = password
+	var match bool = true
+	//var err error
+	//match, err = srv.storage.Authenticate(user, password)
+	//if err != nil {
+	//        var m = "Unauthorized (user '" + user + "')"
+	//        log.Println(m + ": " + err.Error())
+	//        //w.Header().Set("WWW-Authenticate", "Basic")
+	//        http.Error(w, m, http.StatusForbidden)
+	//        return user, false
+	//}
+	if !match {
+		var m = "Unauthorized (user '" + user + "'): " +
+			"Unable to authenticate username/password"
+		log.Info(m)
+		//w.Header().Set("WWW-Authenticate", "Basic")
+		http.Error(w, m, http.StatusForbidden)
+		return user, false
+	}
+	return user, true
+}
+
+func HandleError(w http.ResponseWriter, err error, statusCode int) {
+	log.Error("%s", err)
+	HTTPError(w, err, statusCode)
+}
+
+func HTTPError(w http.ResponseWriter, err error, code int) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(code)
+	var m = map[string]interface{}{
+		"status": "error",
+		//"message": fmt.Sprintf("%s: %s", http.StatusText(code), err),
+		"message": err.Error(),
+		"code":    code,
+		//"data":    "",
+	}
+	//json.NewEncoder(w).Encode(err)
+	if err = json.NewEncoder(w).Encode(m); err != nil {
+		// TODO error handling
+		_ = err
+	}
+}
+
+// SplitList splits a comma-separated list and trims white space from each element.
+func SplitList(list string) []string {
+	var sp []string = strings.Split(list, ",")
+	var i int
+	var s string
+	for i, s = range sp {
+		sp[i] = strings.TrimSpace(s)
+	}
+	return sp
+}

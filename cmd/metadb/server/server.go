@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -19,6 +18,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
+	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
 type server struct {
@@ -133,13 +133,38 @@ func setupHandlers(svr *server) http.Handler {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/databases", svr.handleDatabases)
-	mux.HandleFunc("/sources", svr.handleSources)
+	mux.HandleFunc("/config", svr.handleConfig)
+	//mux.HandleFunc("/databases", svr.handleDatabases)
+	mux.HandleFunc("/enable", svr.handleEnable)
+	//mux.HandleFunc("/sources", svr.handleSources)
 	mux.HandleFunc("/status", svr.handleStatus)
 	mux.HandleFunc("/", svr.handleDefault)
 
 	return mux
 }
+
+func (svr *server) handleConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		log.Debug("request: %s", requestString(r))
+		svr.handleConfigGet(w, r)
+		return
+	}
+	if r.Method == "POST" {
+		log.Debug("request: %s", requestString(r))
+		svr.handleConfigPost(w, r)
+		return
+	}
+	if r.Method == "DELETE" {
+		log.Debug("request: %s", requestString(r))
+		svr.handleConfigDelete(w, r)
+		return
+	}
+	var m = unsupportedMethod("/config", r)
+	log.Info(m)
+	http.Error(w, m, http.StatusMethodNotAllowed)
+}
+
+/*
 
 func (svr *server) handleDatabases(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
@@ -175,6 +200,25 @@ func (svr *server) handleSources(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, m, http.StatusMethodNotAllowed)
 }
 
+*/
+
+func (svr *server) handleEnable(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		log.Debug("request: %s", requestString(r))
+		w.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(w, "enable\r\n")
+		return
+	}
+	if r.Method == "POST" {
+		log.Debug("request: %s", requestString(r))
+		svr.handleEnablePost(w, r)
+		return
+	}
+	var m = unsupportedMethod("/enable", r)
+	log.Info(m)
+	http.Error(w, m, http.StatusMethodNotAllowed)
+}
+
 func (svr *server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		log.Debug("request: %s", requestString(r))
@@ -186,33 +230,35 @@ func (svr *server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, m, http.StatusMethodNotAllowed)
 }
 
+func (svr *server) handleConfigGet(w http.ResponseWriter, r *http.Request) {
+	// read request
+	var rq api.ConfigListRequest
+	var ok bool
+	if ok = util.ReadRequest(w, r, &rq); !ok {
+		return
+	}
+	// retrieve config
+	var rs *api.ConfigListResponse
+	var err error
+	if rs, err = sysdb.ListConfig(&rq); err != nil {
+		util.HandleError(w, err, http.StatusInternalServerError)
+		return
+	}
+	// success response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err = json.NewEncoder(w).Encode(rs); err != nil {
+		util.HandleError(w, err, http.StatusInternalServerError)
+	}
+}
+
 func (svr *server) handleStatusGet(w http.ResponseWriter, r *http.Request) {
 
-	// Authenticate user.
-	var user string
+	var p api.GetStatusRequest
 	var ok bool
-	user, ok = handleBasicAuth(w, r)
-	if !ok {
+	if ok = util.ReadRequest(w, r, &p); !ok {
 		return
 	}
-	_ = user
-	// Read the json request.
-	var body []byte
-	var err error
-	body, err = ioutil.ReadAll(r.Body)
-	if err != nil {
-		handleError(w, err, http.StatusBadRequest)
-		return
-	}
-	var p api.UpdateSourceConnectorRequest
-	err = json.Unmarshal(body, &p)
-	if err != nil {
-		handleError(w, err, http.StatusBadRequest)
-		return
-	}
-	log.Trace("request %s %v\n", r.RemoteAddr, p)
-
-	// Write source data.
 
 	var stat api.GetStatusResponse
 	stat.Databases = make(map[string]status.Status)
@@ -231,42 +277,66 @@ func (svr *server) handleStatusGet(w http.ResponseWriter, r *http.Request) {
 	// Respond with success.
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	var err error
 	if err = json.NewEncoder(w).Encode(stat); err != nil {
 		// TODO error handling
 		_ = err
 	}
 }
 
+func (svr *server) handleConfigDelete(w http.ResponseWriter, r *http.Request) {
+	// read request
+	var rq api.ConfigDeleteRequest
+	var ok bool
+	if ok = util.ReadRequest(w, r, &rq); !ok {
+		return
+	}
+	// delete config
+	var rs *api.ConfigDeleteResponse
+	var err error
+	if rs, err = sysdb.DeleteConfig(&rq); err != nil {
+		util.HandleError(w, err, http.StatusInternalServerError)
+		return
+	}
+	// success response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err = json.NewEncoder(w).Encode(rs); err != nil {
+		util.HandleError(w, err, http.StatusInternalServerError)
+	}
+}
+
+func (svr *server) handleConfigPost(w http.ResponseWriter, r *http.Request) {
+	// read request
+	var rq api.ConfigUpdateRequest
+	var ok bool
+	if ok = util.ReadRequest(w, r, &rq); !ok {
+		return
+	}
+	// write config
+	var err error
+	if err = sysdb.UpdateConfig(&rq); err != nil {
+		util.HandleError(w, err, http.StatusInternalServerError)
+		return
+	}
+	// success response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+}
+
+/*
+
 func (svr *server) handleDatabasesPost(w http.ResponseWriter, r *http.Request) {
 
-	// Authenticate user.
-	var user string
-	var ok bool
-	user, ok = handleBasicAuth(w, r)
-	if !ok {
-		return
-	}
-	_ = user
-	// Read the json request.
-	var body []byte
-	var err error
-	body, err = ioutil.ReadAll(r.Body)
-	if err != nil {
-		handleError(w, err, http.StatusBadRequest)
-		return
-	}
 	var p api.UpdateDatabaseConnectorRequest
-	err = json.Unmarshal(body, &p)
-	if err != nil {
-		handleError(w, err, http.StatusBadRequest)
+	var ok bool
+	if ok = util.ReadRequest(w, r, &p); !ok {
 		return
 	}
-	log.Trace("request %s %v\n", r.RemoteAddr, p)
 
-	// Write source data.
-
+	var err error
 	if err = sysdb.UpdateDatabaseConnector(p); err != nil {
-		handleError(w, err, http.StatusBadRequest)
+		util.HandleError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -279,34 +349,15 @@ func (svr *server) handleDatabasesPost(w http.ResponseWriter, r *http.Request) {
 
 func (svr *server) handleSourcesPost(w http.ResponseWriter, r *http.Request) {
 
-	// Authenticate user.
-	var user string
-	var ok bool
-	user, ok = handleBasicAuth(w, r)
-	if !ok {
-		return
-	}
-	_ = user
-	// Read the json request.
-	var body []byte
-	var err error
-	body, err = ioutil.ReadAll(r.Body)
-	if err != nil {
-		handleError(w, err, http.StatusBadRequest)
-		return
-	}
 	var p api.UpdateSourceConnectorRequest
-	err = json.Unmarshal(body, &p)
-	if err != nil {
-		handleError(w, err, http.StatusBadRequest)
+	var ok bool
+	if ok = util.ReadRequest(w, r, &p); !ok {
 		return
 	}
-	log.Trace("request %s %v\n", r.RemoteAddr, p)
 
-	// Write source data.
-
+	var err error
 	if err = sysdb.UpdateKafkaSource(p); err != nil {
-		handleError(w, err, http.StatusBadRequest)
+		util.HandleError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -317,64 +368,28 @@ func (svr *server) handleSourcesPost(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func handleBasicAuth(w http.ResponseWriter, r *http.Request) (
-	string, bool) {
-	var user, password string
+*/
+
+func (svr *server) handleEnablePost(w http.ResponseWriter, r *http.Request) {
+	// read request
+	var rq api.EnableRequest
 	var ok bool
-	user, password, ok = r.BasicAuth()
-	if !ok {
-		var m = "Unauthorized: Invalid HTTP Basic Authentication"
-		log.Info(m)
-		//w.Header().Set("WWW-Authenticate", "Basic")
-		http.Error(w, m, http.StatusForbidden)
-		return user, false
+	if ok = util.ReadRequest(w, r, &rq); !ok {
+		return
 	}
-	_ = password
-	var match bool = true
-	//var err error
-	//match, err = srv.storage.Authenticate(user, password)
-	//if err != nil {
-	//        var m = "Unauthorized (user '" + user + "')"
-	//        log.Println(m + ": " + err.Error())
-	//        //w.Header().Set("WWW-Authenticate", "Basic")
-	//        http.Error(w, m, http.StatusForbidden)
-	//        return user, false
-	//}
-	if !match {
-		var m = "Unauthorized (user '" + user + "'): " +
-			"Unable to authenticate username/password"
-		log.Info(m)
-		//w.Header().Set("WWW-Authenticate", "Basic")
-		http.Error(w, m, http.StatusForbidden)
-		return user, false
+	// enable
+	var err error
+	if err = sysdb.EnableConnector(&rq); err != nil {
+		util.HandleError(w, err, http.StatusBadRequest)
+		return
 	}
-	return user, true
+	// success response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 }
 
 func (svr *server) handleDefault(w http.ResponseWriter, r *http.Request) {
-	log.Error(fmt.Sprintf("unknown request: %s", requestString(r)))
-	http.Error(w, "404 page not found", http.StatusNotFound)
-}
-
-func handleError(w http.ResponseWriter, err error, statusCode int) {
-	log.Error("%s", err)
-	HTTPError(w, err, statusCode)
-}
-
-func HTTPError(w http.ResponseWriter, err error, code int) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(code)
-	var m = map[string]interface{}{
-		"status": "error",
-		//"message": fmt.Sprintf("%s: %s", http.StatusText(code), err),
-		"message": err.Error(),
-		"code":    code,
-		//"data":    "",
-	}
-	//json.NewEncoder(w).Encode(err)
-	if err = json.NewEncoder(w).Encode(m); err != nil {
-		// TODO error handling
-		_ = err
-	}
+	util.HandleError(w, fmt.Errorf("unknown request: %s", requestString(r)), http.StatusNotFound)
+	//log.Error(fmt.Sprintf("unknown request: %s", requestString(r)))
+	//http.Error(w, "404 page not found", http.StatusNotFound)
 }

@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/metadb-project/metadb/cmd/internal/color"
 	"github.com/metadb-project/metadb/cmd/internal/common"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/mdb/config"
+	"github.com/metadb-project/metadb/cmd/mdb/enable"
 	"github.com/metadb-project/metadb/cmd/mdb/option"
+	"github.com/metadb-project/metadb/cmd/mdb/status"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -50,15 +53,15 @@ func mdbMain() {
 func run(args []string) error {
 
 	var globalOpt = option.Global{}
-	var configDatabaseOpt = option.ConfigDatabase{}
-	var configSourceOpt = option.ConfigSource{}
+	var configOpt = option.Config{}
 	var statusOpt = option.Status{}
+	var enableOpt = option.Enable{}
 
-	var passwordFile string
 	var passwordPrompt bool
 
-	var cmdConfigDatabase = &cobra.Command{
-		Use: "config-database",
+	var cmdConfig = &cobra.Command{
+		Use:  "config",
+		Args: cobra.MaximumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 			if err = initColor(); err != nil {
@@ -67,74 +70,78 @@ func run(args []string) error {
 			if err = validateGlobalOptions(&globalOpt); err != nil {
 				return err
 			}
-			configDatabaseOpt.Global = globalOpt
-			if passwordFile != "" && passwordPrompt {
-				return fmt.Errorf("password file and prompt cannot be used together")
+			configOpt.Global = globalOpt
+			if len(args) > 0 {
+				configOpt.Attr = &args[0]
 			}
-			if passwordFile != "" {
-				if configDatabaseOpt.DBPassword, err = ReadPasswordFile(passwordFile); err != nil {
+			if len(args) > 1 {
+				configOpt.Val = &args[1]
+			}
+			if configOpt.Val != nil && strings.HasPrefix(*configOpt.Val, "@") {
+				var valFile = strings.TrimPrefix(*configOpt.Val, "@")
+				if *configOpt.Val, err = ValueFromFile(valFile); err != nil {
 					return err
 				}
 			}
 			if passwordPrompt {
-				if configDatabaseOpt.DBPassword, err = inputPassword("Password for database user "+configDatabaseOpt.DBUser+": ", false); err != nil {
+				if configOpt.Attr == nil {
+					return fmt.Errorf("attribute not specified")
+				}
+				if configOpt.Val != nil {
+					return fmt.Errorf("password prompt and value cannot both be specified")
+				}
+				if !strings.HasSuffix(*configOpt.Attr, "password") {
+					return fmt.Errorf("prompt is only valid for passwords")
+				}
+				var pw string
+				if pw, err = inputPassword("Password for \""+(*configOpt.Attr)+"\": ", false); err != nil {
 					return err
 				}
+				configOpt.Val = &pw
 			}
-			if err = config.ConfigDatabase(&configDatabaseOpt); err != nil {
+			if err = config.Config(&configOpt); err != nil {
 				return err
 			}
 			return nil
 		},
 	}
-	cmdConfigDatabase.SetHelpFunc(help)
-	cmdConfigDatabase.Flags().StringVar(&configDatabaseOpt.Name, "name", "", "")
-	cmdConfigDatabase.Flags().StringVar(&configDatabaseOpt.Type, "type", "", "")
-	cmdConfigDatabase.Flags().StringVar(&configDatabaseOpt.DBHost, "dbhost", "", "")
-	cmdConfigDatabase.Flags().StringVar(&configDatabaseOpt.DBPort, "dbport", "", "")
-	cmdConfigDatabase.Flags().StringVar(&configDatabaseOpt.DBName, "dbname", "", "")
-	cmdConfigDatabase.Flags().StringVar(&configDatabaseOpt.DBUser, "dbuser", "", "")
-	cmdConfigDatabase.Flags().BoolVar(&passwordPrompt, "dbpwprompt", false, "")
-	cmdConfigDatabase.Flags().StringVar(&passwordFile, "dbpwfile", "", "")
-	cmdConfigDatabase.Flags().StringVar(&configDatabaseOpt.DBSSLMode, "dbsslmode", "require", "")
-	_ = hostFlag(cmdConfigDatabase, &globalOpt.Host)
-	_ = adminPortFlag(cmdConfigDatabase, &globalOpt.AdminPort)
-	_ = verboseFlag(cmdConfigDatabase, &eout.EnableVerbose)
-	_ = traceFlag(cmdConfigDatabase, &eout.EnableTrace)
-	_ = noTLSFlag(cmdConfigDatabase, &globalOpt.NoTLS)
-	_ = skipVerifyFlag(cmdConfigDatabase, &globalOpt.TLSSkipVerify)
+	cmdConfig.SetHelpFunc(help)
+	cmdConfig.Flags().BoolVarP(&passwordPrompt, "pwprompt", "P", false, "")
+	cmdConfig.Flags().BoolVarP(&configOpt.Delete, "delete", "d", false, "")
+	cmdConfig.Flags().BoolVarP(&configOpt.List, "list", "l", false, "")
+	_ = hostFlag(cmdConfig, &globalOpt.Host)
+	_ = adminPortFlag(cmdConfig, &globalOpt.AdminPort)
+	_ = verboseFlag(cmdConfig, &eout.EnableVerbose)
+	_ = traceFlag(cmdConfig, &eout.EnableTrace)
+	_ = noTLSFlag(cmdConfig, &globalOpt.NoTLS)
+	_ = skipVerifyFlag(cmdConfig, &globalOpt.TLSSkipVerify)
 
-	var cmdConfigSource = &cobra.Command{
-		Use: "config-source",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var err error
+	var cmdEnable = &cobra.Command{
+		Use:  "enable",
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			if err = initColor(); err != nil {
-				return err
+				return
 			}
 			if err = validateGlobalOptions(&globalOpt); err != nil {
-				return err
+				return
 			}
-			configSourceOpt.Global = globalOpt
-			if err = config.ConfigSource(&configSourceOpt); err != nil {
-				return err
+			enableOpt.Global = globalOpt
+			enableOpt.Connectors = args
+			if err = enable.Enable(&enableOpt); err != nil {
+				return
 			}
-			return nil
+			err = nil
+			return
 		},
 	}
-	cmdConfigSource.SetHelpFunc(help)
-	cmdConfigSource.Flags().StringVar(&configSourceOpt.Name, "name", "", "")
-	cmdConfigSource.Flags().StringVar(&configSourceOpt.Brokers, "brokers", "", "")
-	cmdConfigSource.Flags().StringArrayVar(&configSourceOpt.Topics, "topic", []string{}, "")
-	cmdConfigSource.Flags().StringVar(&configSourceOpt.Group, "group", "", "")
-	cmdConfigSource.Flags().StringArrayVar(&configSourceOpt.SchemaPassFilter, "schema-pass-filter", []string{}, "")
-	cmdConfigSource.Flags().StringVar(&configSourceOpt.SchemaPrefix, "schema-prefix", "", "")
-	cmdConfigSource.Flags().StringArrayVar(&configSourceOpt.Databases, "database", []string{}, "")
-	_ = hostFlag(cmdConfigSource, &globalOpt.Host)
-	_ = adminPortFlag(cmdConfigSource, &globalOpt.AdminPort)
-	_ = verboseFlag(cmdConfigSource, &eout.EnableVerbose)
-	_ = traceFlag(cmdConfigSource, &eout.EnableTrace)
-	_ = noTLSFlag(cmdConfigSource, &globalOpt.NoTLS)
-	_ = skipVerifyFlag(cmdConfigSource, &globalOpt.TLSSkipVerify)
+	cmdEnable.SetHelpFunc(help)
+	_ = hostFlag(cmdEnable, &globalOpt.Host)
+	_ = adminPortFlag(cmdEnable, &globalOpt.AdminPort)
+	_ = verboseFlag(cmdEnable, &eout.EnableVerbose)
+	_ = traceFlag(cmdEnable, &eout.EnableTrace)
+	_ = noTLSFlag(cmdEnable, &globalOpt.NoTLS)
+	_ = skipVerifyFlag(cmdEnable, &globalOpt.TLSSkipVerify)
 
 	var cmdStatus = &cobra.Command{
 		Use: "status",
@@ -147,7 +154,7 @@ func run(args []string) error {
 				return err
 			}
 			statusOpt.Global = globalOpt
-			if err = config.Status(&statusOpt); err != nil {
+			if err = status.Status(&statusOpt); err != nil {
 				return err
 			}
 			return nil
@@ -207,12 +214,11 @@ func run(args []string) error {
 		DisableSuggestions: true,
 	}
 	rootCmd.SetHelpFunc(help)
-	// Redefine help flag without -h; so we can use it for
-	// something else.
+	// Redefine help flag without -h; so we can use it for something else.
 	var helpFlag bool
 	rootCmd.PersistentFlags().BoolVarP(&helpFlag, "help", "", false, "Help for mdb")
 	// Add commands.
-	rootCmd.AddCommand(cmdConfigDatabase, cmdConfigSource, cmdStatus, cmdVersion, cmdCompletion)
+	rootCmd.AddCommand(cmdConfig, cmdEnable, cmdStatus, cmdVersion, cmdCompletion)
 	var err error
 	if err = rootCmd.Execute(); err != nil {
 		return err
@@ -221,8 +227,8 @@ func run(args []string) error {
 	return nil
 }
 
-var helpConfigDatabase = "Configure database connector\n"
-var helpConfigSource = "Configure data source connector\n"
+var helpConfig = "Configure or show server settings\n"
+var helpEnable = "Enable database or source connectors\n"
 var helpStatus = "Print server status\n"
 var helpVersion = "Print mdb version\n"
 var helpCompletion = "Generate command-line completion\n"
@@ -233,66 +239,57 @@ func help(cmd *cobra.Command, commandLine []string) {
 		fmt.Printf("" +
 			"Metadb client\n" +
 			"\n" +
-			"Usage:  mdb <command> [<flags>]\n" +
+			"Usage:  mdb <command> <arguments>\n" +
 			"\n" +
 			"Commands:\n" +
-			"  config-database             - " + helpConfigDatabase +
-			"  config-source               - " + helpConfigSource +
+			"  config                      - " + helpConfig +
+			"  enable                      - " + helpEnable +
 			"  status                      - " + helpStatus +
 			"  version                     - " + helpVersion +
 			"  completion                  - " + helpCompletion +
 			"\n" +
 			"Use \"mdb help <command>\" for more information about a command.\n")
-	case "config-database":
+	case "config":
 		fmt.Printf("" +
-			helpConfigDatabase +
+			helpConfig +
 			"\n" +
-			"Usage:  mdb config-database <flags>\n" +
+			"Usage:  mdb config [<options>] [<attribute> [<value>]]\n" +
 			"\n" +
 			"Options:\n" +
-			"    --name <n>                - Name of the database connector\n" +
-			"    --type <t>                - Type of database system: \"postgresql\" or\n" +
+			"  -P, --pwprompt              - Prompt for password value\n" +
+			"  -d, --delete                - Delete value for specified attribute\n" +
+			"  -l, --list                  - List all attributes and values\n" +
+			hostFlag(nil, nil) +
+			adminPortFlag(nil, nil) +
+			verboseFlag(nil, nil) +
+			noTLSFlag(nil, nil) +
+			skipVerifyFlag(nil, nil) +
+			traceFlag(nil, nil) +
+			"\n" +
+			"Database connector attributes:\n" +
+			"  db.<name>.type              - Type of database system: \"postgresql\" or\n" +
 			"                                \"redshift\" (default \"postgresql\")\n" +
-			"    --dbhost <h>              - Host name of the database server\n" +
-			"    --dbport <p>              - TCP port the database server listens on\n" +
-			"    --dbname <d>              - Name of the database\n" +
-			"    --dbuser <u>              - User that owns the database\n" +
-			"    --dbpwprompt              - Prompt for user password\n" +
-			"    --dbpwfile <f>            - File to read user password from\n" +
-			"    --dbsslmode <m>           - SSL mode for connection to database (default:\n" +
+			"  db.<name>.host              - Host name of the database server\n" +
+			"  db.<name>.port              - TCP port the database server listens on\n" +
+			"  db.<name>.dbname            - Name of the database\n" +
+			"  db.<name>.user              - User that owns the database\n" +
+			"  db.<name>.password          - User password\n" +
+			"  db.<name>.sslmode           - SSL mode for connection to database (default:\n" +
 			"                                \"require\")\n" +
-			hostFlag(nil, nil) +
-			adminPortFlag(nil, nil) +
-			verboseFlag(nil, nil) +
-			noTLSFlag(nil, nil) +
-			skipVerifyFlag(nil, nil) +
-			traceFlag(nil, nil) +
-			"")
-	case "config-source":
-		fmt.Printf("" +
-			helpConfigSource +
 			"\n" +
-			"Usage:  mdb config-source <flags>\n" +
-			"\n" +
-			"Options:\n" +
-			"    --name <n>                - Name of the data source connector\n" +
-			"    --brokers <b1>[,<b2>...]  - Kafka bootstrap servers\n" +
-			"    --topic <t>               - Regular expression matching Kafka topics to\n" +
-			"                                read; this flag may be repeated for multiple\n" +
-			"                                expressions\n" +
-			"    --group <g>               - Kafka consumer group ID\n" +
-			"    --schema-pass-filter <f>  - Regular expression matching schema names to\n" +
-			"                                accept; this flag may be repeated for multiple\n" +
-			"                                expressions\n" +
-			"    --schema-prefix <p>       - Prefix to add to schema names\n" +
-			"    --database <d>            - Name of a database connector to associate with\n" +
+			"Source connector attributes:\n" +
+			"  src.<name>.brokers          - Kafka bootstrap servers (comma-separated list)\n" +
+			"  src.<name>.topics           - Regular expressions matching Kafka topics to\n" +
+			"                                read (comma-separated list)\n" +
+			"  src.<name>.group            - Kafka consumer group ID\n" +
+			"  src.<name>.schemapassfilter - Regular expressions matching schema names to\n" +
+			"                                accept (comma-separated list)\n" +
+			"  src.<name>.schemaprefix     - Prefix to add to schema names\n" +
+			"  src.<name>.dbs              - Names of database connectors to associate with\n" +
 			"                                this source, where data will be written\n" +
-			hostFlag(nil, nil) +
-			adminPortFlag(nil, nil) +
-			verboseFlag(nil, nil) +
-			noTLSFlag(nil, nil) +
-			skipVerifyFlag(nil, nil) +
-			traceFlag(nil, nil) +
+			"                                (comma-separated list)\n" +
+			"\n" +
+			"Use @<file> in place of <value> to read the value from a file.\n" +
 			"")
 	case "version":
 		fmt.Printf("" +
@@ -304,6 +301,24 @@ func help(cmd *cobra.Command, commandLine []string) {
 			helpStatus +
 			"\n" +
 			"Usage:  mdb status\n")
+	case "enable":
+		fmt.Printf("" +
+			helpConfig +
+			"\n" +
+			"Usage:  mdb enable [<options>] <connector>...\n" +
+			"\n" +
+			"Options:\n" +
+			hostFlag(nil, nil) +
+			adminPortFlag(nil, nil) +
+			verboseFlag(nil, nil) +
+			noTLSFlag(nil, nil) +
+			skipVerifyFlag(nil, nil) +
+			traceFlag(nil, nil) +
+			"\n" +
+			"Connectors:\n" +
+			"  db.<name>\n" +
+			"  src.<name>\n" +
+			"")
 	case "completion":
 		fmt.Printf("" +
 			helpCompletion +
@@ -324,7 +339,7 @@ func verboseFlag(cmd *cobra.Command, verbose *bool) string {
 		cmd.Flags().BoolVarP(verbose, "verbose", "v", false, "")
 	}
 	return "" +
-		"-v, --verbose                 - Enable verbose output\n"
+		"  -v, --verbose               - Enable verbose output\n"
 }
 
 func traceFlag(cmd *cobra.Command, trace *bool) string {
@@ -333,26 +348,26 @@ func traceFlag(cmd *cobra.Command, trace *bool) string {
 			cmd.Flags().BoolVar(trace, "xtrace", false, "")
 		}
 		return "" +
-			"    --xtrace                  - Enable extremely verbose output\n"
+			"      --xtrace                - Enable extremely verbose output\n"
 	}
 	return ""
 }
 
 func skipVerifyFlag(cmd *cobra.Command, skipVerify *bool) string {
 	if cmd != nil {
-		cmd.Flags().BoolVar(skipVerify, "skip-verify", false, "")
+		cmd.Flags().BoolVar(skipVerify, "skipverify", false, "")
 	}
 	return "" +
-		"    --skip-verify             - Do not verify server certificate chain and host\n" +
+		"      --skipverify            - Do not verify server certificate chain and host\n" +
 		"                                name [insecure, use for testing only]\n"
 }
 
 func noTLSFlag(cmd *cobra.Command, noTLS *bool) string {
 	if cmd != nil {
-		cmd.Flags().BoolVar(noTLS, "no-tls", false, "")
+		cmd.Flags().BoolVar(noTLS, "notls", false, "")
 	}
 	return "" +
-		"    --no-tls                  - Disable TLS in connection to Metadb server\n" +
+		"      --notls                 - Disable TLS in connection to Metadb server\n" +
 		"                                [insecure, use for testing only]\n"
 }
 
@@ -361,15 +376,15 @@ func hostFlag(cmd *cobra.Command, host *string) string {
 		cmd.Flags().StringVarP(host, "host", "h", "", "")
 	}
 	return "" +
-		"-h, --host <h>                - Metadb server host (default: 127.0.0.1)\n"
+		"  -h, --host <h>              - Metadb server host (default: 127.0.0.1)\n"
 }
 
 func adminPortFlag(cmd *cobra.Command, adminPort *string) string {
 	if cmd != nil {
-		cmd.Flags().StringVar(adminPort, "admin-port", common.DefaultAdminPort, "")
+		cmd.Flags().StringVar(adminPort, "adminport", common.DefaultAdminPort, "")
 	}
 	return "" +
-		"    --admin-port <p>          - Metadb server admin port (default: " + common.DefaultAdminPort + ")\n"
+		"      --adminport <p>         - Metadb server admin port (default: " + common.DefaultAdminPort + ")\n"
 }
 
 func validateGlobalOptions(opt *option.Global) error {
@@ -392,7 +407,7 @@ func initColor() error {
 	return nil
 }
 
-func ReadPasswordFile(filename string) (string, error) {
+func ValueFromFile(filename string) (string, error) {
 	var err error
 	var f *os.File
 	if f, err = os.Open(filename); err != nil {

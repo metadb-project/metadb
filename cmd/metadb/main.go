@@ -209,8 +209,7 @@ func run(args []string) error {
 		DisableSuggestions: true,
 	}
 	rootCmd.SetHelpFunc(help)
-	// Redefine help flag without -h; so we can use it for
-	// something else.
+	// Redefine help flag without -h; so we can use it for something else.
 	var helpFlag bool
 	rootCmd.PersistentFlags().BoolVarP(&helpFlag, "help", "", false, "Help for metadb")
 	//rootCmd.PersistentFlags().StringVar(&_, "admin", metadbAdminPort, ""+
@@ -239,7 +238,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 		fmt.Printf("" +
 			"Metadb server\n" +
 			"\n" +
-			"Usage:  metadb <command> [<flags>]\n" +
+			"Usage:  metadb <command> <arguments>\n" +
 			"\n" +
 			"Commands:\n" +
 			"  start                       - " + helpStart +
@@ -253,7 +252,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 		fmt.Printf("" +
 			helpStart +
 			"\n" +
-			"Usage:  metadb start <flags>\n" +
+			"Usage:  metadb start <options>\n" +
 			"\n" +
 			"Options:\n" +
 			dirFlag(nil, nil) +
@@ -274,7 +273,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 		fmt.Printf("" +
 			helpStop +
 			"\n" +
-			"Usage:  metadb stop <flags>\n" +
+			"Usage:  metadb stop <options>\n" +
 			"\n" +
 			"Options:\n" +
 			dirFlag(nil, nil) +
@@ -285,7 +284,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 		fmt.Printf("" +
 			helpInit +
 			"\n" +
-			"Usage:  metadb init <flags>\n" +
+			"Usage:  metadb init <options>\n" +
 			"\n" +
 			"Options:\n" +
 			dirFlag(nil, nil) +
@@ -317,7 +316,7 @@ func verboseFlag(cmd *cobra.Command, verbose *bool) string {
 		cmd.Flags().BoolVarP(verbose, "verbose", "v", false, "")
 	}
 	return "" +
-		"-v, --verbose                 - Enable verbose output\n"
+		"  -v, --verbose               - Enable verbose output\n"
 }
 
 func debugFlag(cmd *cobra.Command, debug *bool) string {
@@ -325,7 +324,7 @@ func debugFlag(cmd *cobra.Command, debug *bool) string {
 		cmd.Flags().BoolVar(debug, "debug", false, "")
 	}
 	return "" +
-		"    --debug                   - Enable detailed logging\n"
+		"      --debug                 - Enable detailed logging\n"
 }
 
 func traceFlag(cmd *cobra.Command, trace *bool) string {
@@ -334,7 +333,7 @@ func traceFlag(cmd *cobra.Command, trace *bool) string {
 			cmd.Flags().BoolVar(trace, "trace", false, "")
 		}
 		return "" +
-			"    --trace                   - Enable extremely verbose output\n"
+			"      --trace                 - Enable extremely verbose output\n"
 	}
 	return ""
 }
@@ -345,7 +344,7 @@ func noKafkaCommitFlag(cmd *cobra.Command, noKafkaCommit *bool) string {
 			cmd.Flags().BoolVar(noKafkaCommit, "nokcommit", false, "")
 		}
 		return "" +
-			"    --nokcommit               - Do not commit Kafka offsets\n"
+			"      --nokcommit             - Do not commit Kafka offsets\n"
 	}
 	return ""
 }
@@ -356,7 +355,7 @@ func logSourceFlag(cmd *cobra.Command, logfile *string) string {
 			cmd.Flags().StringVar(logfile, "logsource", "", "")
 		}
 		return "" +
-			"    --logsource <f>           - Log source messages to file\n"
+			"      --logsource <f>         - Log source messages to file\n"
 	}
 	return ""
 }
@@ -367,7 +366,7 @@ func sourceFileFlag(cmd *cobra.Command, sourcefile *string) string {
 			cmd.Flags().StringVar(sourcefile, "sourcefile", "", "")
 		}
 		return "" +
-			"    --sourcefile <f>          - Read source data from file\n"
+			"      --sourcefile <f>        - Read source data from file\n"
 	}
 	return ""
 }
@@ -378,7 +377,7 @@ func traceLogFlag(cmd *cobra.Command, trace *bool) string {
 			cmd.Flags().BoolVar(trace, "trace", false, "")
 		}
 		return "" +
-			"    --trace                   - Enable extremely detailed logging\n"
+			"      --trace                 - Enable extremely detailed logging\n"
 	}
 	return ""
 }
@@ -388,15 +387,15 @@ func listenFlag(cmd *cobra.Command, listen *string) string {
 		cmd.Flags().StringVar(listen, "listen", "", "")
 	}
 	return "" +
-		"    --listen <a>              - Address to listen on (default: 127.0.0.1)\n"
+		"      --listen <a>            - Address to listen on (default: 127.0.0.1)\n"
 }
 
 func adminPortFlag(cmd *cobra.Command, adminPort *string) string {
 	if cmd != nil {
-		cmd.Flags().StringVar(adminPort, "admin-port", common.DefaultAdminPort, "")
+		cmd.Flags().StringVar(adminPort, "adminport", common.DefaultAdminPort, "")
 	}
 	return "" +
-		"    --admin-port <p>          - Admin port to listen on (default: " + common.DefaultAdminPort + ")\n"
+		"      --adminport <p>         - Admin port to listen on (default: " + common.DefaultAdminPort + ")\n"
 }
 
 func certFlag(cmd *cobra.Command, cert *string) string {
@@ -404,7 +403,7 @@ func certFlag(cmd *cobra.Command, cert *string) string {
 		cmd.Flags().StringVar(cert, "cert", "", "")
 	}
 	return "" +
-		"    --cert <f>                - File name of server certificate, including the\n" +
+		"      --cert <f>              - File name of server certificate, including the\n" +
 		"                                CA's certificate and intermediates\n"
 }
 
@@ -413,7 +412,7 @@ func keyFlag(cmd *cobra.Command, key *string) string {
 		cmd.Flags().StringVar(key, "key", "", "")
 	}
 	return "" +
-		"    --key <f>                 - File name of server private key\n"
+		"      --key <f>               - File name of server private key\n"
 }
 
 func logFlag(cmd *cobra.Command, logfile *string) string {
@@ -421,7 +420,7 @@ func logFlag(cmd *cobra.Command, logfile *string) string {
 		cmd.Flags().StringVarP(logfile, "log", "l", "", "")
 	}
 	return "" +
-		"-l, --log <f>                 - File name for server log output\n"
+		"  -l, --log <f>               - File name for server log output\n"
 }
 
 func csvlogFlag(cmd *cobra.Command, logfile *string) string {
@@ -429,7 +428,7 @@ func csvlogFlag(cmd *cobra.Command, logfile *string) string {
 		cmd.Flags().StringVar(logfile, "csvlog", "", "")
 	}
 	return "" +
-		"    --csvlog <f>              - File name for server log CSV output\n"
+		"      --csvlog <f>            - File name for server log CSV output\n"
 }
 
 func dirFlag(cmd *cobra.Command, datadir *string) string {
@@ -437,15 +436,15 @@ func dirFlag(cmd *cobra.Command, datadir *string) string {
 		cmd.Flags().StringVarP(datadir, "dir", "D", "", "")
 	}
 	return "" +
-		"-D, --dir <d>                 - Data directory name\n"
+		"  -D, --dir <d>               - Data directory name\n"
 }
 
 func noTLSFlag(cmd *cobra.Command, noTLS *bool) string {
 	if cmd != nil {
-		cmd.Flags().BoolVar(noTLS, "no-tls", false, "")
+		cmd.Flags().BoolVar(noTLS, "notls", false, "")
 	}
 	return "" +
-		"    --no-tls                  - Disable TLS in client connections [insecure,\n" +
+		"      --notls                 - Disable TLS in client connections [insecure,\n" +
 		"                                use for testing only]\n"
 }
 

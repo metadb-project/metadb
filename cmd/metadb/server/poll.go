@@ -413,12 +413,27 @@ func waitForConfig(svr *server) (*sproc, error) {
 			svr.sources = sources
 		}
 		if len(databases) > 0 && len(sources) > 0 {
-			break
+			var dbEnabled, srcEnabled bool
+			if dbEnabled, err = sysdb.IsConnectorEnabled("db." + databases[0].Name); err != nil {
+				return nil, err
+			}
+			if srcEnabled, err = sysdb.IsConnectorEnabled("src." + sources[0].Name); err != nil {
+				return nil, err
+			}
+			if dbEnabled && srcEnabled {
+				break
+			}
 		}
 		if len(databases) > 0 && svr.opt.SourceFilename != "" {
 			sources = []*sysdb.SourceConnector{&sysdb.SourceConnector{}}
 			time.Sleep(2 * time.Second)
-			break
+			var dbEnabled bool
+			if dbEnabled, err = sysdb.IsConnectorEnabled("db." + databases[0].Name); err != nil {
+				return nil, err
+			}
+			if dbEnabled {
+				break
+			}
 		}
 		time.Sleep(2 * time.Second)
 	}

@@ -1,19 +1,131 @@
 package config
 
 import (
-	"bytes"
-	"crypto/tls"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
-	"net"
 	"net/http"
 
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
-	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/mdb/option"
+	"github.com/metadb-project/metadb/cmd/mdb/util"
 )
+
+func Config(opt *option.Config) error {
+	switch {
+	case opt.Delete:
+		if opt.Attr == nil || *opt.Attr == "" {
+			return fmt.Errorf("attribute not specified")
+		}
+		return ConfigDelete(opt)
+	case opt.List:
+		return ConfigList(opt)
+	default:
+		if opt.Attr == nil || *opt.Attr == "" {
+			return fmt.Errorf("attribute not specified")
+		}
+		if opt.Val == nil {
+			return ConfigList(opt)
+			//return fmt.Errorf("value not specified")
+		}
+		return ConfigUpdate(opt)
+	}
+}
+
+func ConfigDelete(opt *option.Config) error {
+	// convert config options to a request
+	var rq = &api.ConfigDeleteRequest{Attr: *opt.Attr}
+	// send the request
+	var httprs *http.Response
+	var err error
+	if httprs, err = util.SendRequest(opt.Global, "DELETE", "/config", rq); err != nil {
+		return err
+	}
+	// check for error response
+	if httprs.StatusCode != http.StatusOK {
+		var m string
+		if m, err = util.ReadResponseMessage(httprs); err != nil {
+			return err
+		}
+		return fmt.Errorf("%s", m)
+	}
+	// read response body
+	var rs api.ConfigDeleteResponse
+	if err = util.ReadResponse(httprs, &rs); err != nil {
+		return err
+	}
+	// print confirmation
+	if rs.AttrNotFound {
+		eout.Warning("config: attribute %q not found", rq.Attr)
+	} else {
+		eout.Info("config: deleted %q", rq.Attr)
+	}
+	return nil
+}
+
+func ConfigList(opt *option.Config) error {
+	// send the request
+	var httprs *http.Response
+	var rq *api.ConfigListRequest
+	if opt.Attr == nil {
+		rq = &api.ConfigListRequest{Attr: ""}
+	} else {
+		rq = &api.ConfigListRequest{Attr: *opt.Attr}
+	}
+	var err error
+	if httprs, err = util.SendRequest(opt.Global, "GET", "/config", rq); err != nil {
+		return err
+	}
+	// check for error response
+	if httprs.StatusCode != http.StatusOK {
+		var m string
+		if m, err = util.ReadResponseMessage(httprs); err != nil {
+			return err
+		}
+		return fmt.Errorf("%s", m)
+	}
+	// read response body
+	var rs api.ConfigListResponse
+	if err = util.ReadResponse(httprs, &rs); err != nil {
+		return err
+	}
+	// print response
+	if opt.Attr != nil {
+		if len(rs.Configs) == 0 {
+			eout.Warning("config: attribute %q not found", rq.Attr)
+		} else {
+			fmt.Printf("%q\n", rs.Configs[0].Val)
+		}
+	} else {
+		var c api.ConfigItem
+		for _, c = range rs.Configs {
+			fmt.Printf("%s %q\n", c.Attr, c.Val)
+		}
+	}
+	return nil
+}
+
+func ConfigUpdate(opt *option.Config) error {
+	// convert config options to a request
+	var rq = &api.ConfigUpdateRequest{Attr: *opt.Attr, Val: *opt.Val}
+	// send the request
+	var httprs *http.Response
+	var err error
+	if httprs, err = util.SendRequest(opt.Global, "POST", "/config", rq); err != nil {
+		return err
+	}
+	// check for error response
+	if httprs.StatusCode != http.StatusCreated {
+		var m string
+		if m, err = util.ReadResponseMessage(httprs); err != nil {
+			return err
+		}
+		return fmt.Errorf("%s", m)
+	}
+	// print response
+	eout.Info("config: updated %q", rq.Attr)
+	return nil
+}
 
 func ConfigDatabase(opt *option.ConfigDatabase) error {
 	if opt.Name == "" {
@@ -22,7 +134,6 @@ func ConfigDatabase(opt *option.ConfigDatabase) error {
 	if opt.Type == "" || opt.DBHost == "" || opt.DBName == "" || opt.DBUser == "" || opt.DBPassword == "" {
 		return fmt.Errorf("insufficient parameters to configure database connector")
 	}
-	warnNoTLS(opt.NoTLS)
 	var rq = api.UpdateDatabaseConnectorRequest{
 		Name: opt.Name,
 		Config: api.DatabaseConnectorConfig{
@@ -35,89 +146,19 @@ func ConfigDatabase(opt *option.ConfigDatabase) error {
 			DBSSLMode:  opt.DBSSLMode,
 		},
 	}
-	var rqj []byte
-	var err error
-	//if rqj, err = json.Marshal(rq); err != nil {
-	if rqj, err = json.MarshalIndent(rq, "", "    "); err != nil {
-		return err
-	}
-	//fmt.Printf("sending: %s\n", string(rqj))
 
-	var conn *tls.Conn
-	var transport *http.Transport
-	if opt.Host == "" {
-		transport = &http.Transport{}
-	} else {
-		var tlsConfig = http.DefaultTransport.(*http.Transport).TLSClientConfig
-		var tlsClientConfig *tls.Config
-		if opt.TLSSkipVerify {
-			tlsClientConfig = &tls.Config{InsecureSkipVerify: true}
-		}
-		transport = &http.Transport{
-			TLSClientConfig: tlsClientConfig,
-			DialTLS: func(network, addr string) (net.Conn, error) {
-				conn, err = tls.Dial(network, addr, tlsConfig)
-				return conn, err
-			},
-		}
-	}
-	var client = &http.Client{Transport: transport}
-	var remote string
-	if opt.Host == "" {
-		remote = "http://127.0.0.1:" + opt.AdminPort
-	} else {
-		if opt.NoTLS {
-			remote = "http://" + opt.Host + ":" + opt.AdminPort
-		} else {
-			remote = "https://" + opt.Host + ":" + opt.AdminPort
-		}
-	}
-	var httprq *http.Request
-	if httprq, err = http.NewRequest("POST", remote+"/databases", bytes.NewBuffer(rqj)); err != nil {
-		return err
-	}
-	httprq.SetBasicAuth("admin", "admin")
-	httprq.Header.Set("Content-Type", "application/json")
 	var hrs *http.Response
-	if hrs, err = client.Do(httprq); err != nil {
+	var err error
+	if hrs, err = util.SendRequest(opt.Global, "POST", "/databases", rq); err != nil {
 		return err
 	}
-	if conn != nil {
-		// verbose output
-		var v uint16 = conn.ConnectionState().Version
-		eout.Trace("protocol version: %d,%d", (v>>8)&255, v&255)
-		var s string
-		switch v {
-		case 0x0300:
-			s = "SSL (deprecated)"
-		case 0x0301:
-			s = "TLS 1.0 (deprecated)"
-		case 0x0302:
-			s = "TLS 1.1 (deprecated)"
-		case 0x0303:
-			s = "TLS 1.2"
-		case 0x0304:
-			s = "TLS 1.3"
-		default:
-			s = fmt.Sprintf("unknown version: { %d, %d }", (v>>8)&255, v&255)
-		}
-		eout.Verbose("TLS/SSL protocol: %s", s)
-	} else {
-		eout.Verbose("no TLS/SSL protocol")
-	}
-	if hrs.StatusCode != http.StatusCreated {
-		//eout.Error("status code: %d", hrs.StatusCode)
-		//if hrs.StatusCode == http.StatusUnauthorized {
-		//        fmt.Println("Server at '" + remote + "' did not accept the username/password")
-		//}
 
-		// json.NewEncoder(w).Encode(m)
-		//return responseBodyError(hrs)
-		var m map[string]interface{}
-		if err = json.NewDecoder(hrs.Body).Decode(&m); err != nil {
-			return fmt.Errorf("decoding server response: %s", err)
+	if hrs.StatusCode != http.StatusCreated {
+		var m string
+		if m, err = util.ReadResponseMessage(hrs); err != nil {
+			return err
 		}
-		return fmt.Errorf("%v", m["message"])
+		return errors.New(m)
 	}
 
 	return nil
@@ -142,7 +183,6 @@ func ConfigSource(opt *option.ConfigSource) error {
 	if len(opt.Databases) > 1 {
 		return fmt.Errorf("multiple databases are not yet supported")
 	}
-	warnNoTLS(opt.NoTLS)
 	var rq = api.UpdateSourceConnectorRequest{
 		Name: opt.Name,
 		Config: api.SourceConnectorConfig{
@@ -154,214 +194,20 @@ func ConfigSource(opt *option.ConfigSource) error {
 			Databases:        opt.Databases,
 		},
 	}
-	var rqj []byte
-	var err error
-	//if rqj, err = json.Marshal(rq); err != nil {
-	if rqj, err = json.MarshalIndent(rq, "", "    "); err != nil {
-		return err
-	}
-	//fmt.Printf("sending: %s\n", string(rqj))
 
-	var conn *tls.Conn
-	var transport *http.Transport
-	if opt.Host == "" {
-		transport = &http.Transport{}
-	} else {
-		var tlsConfig = http.DefaultTransport.(*http.Transport).TLSClientConfig
-		var tlsClientConfig *tls.Config
-		if opt.TLSSkipVerify {
-			tlsClientConfig = &tls.Config{InsecureSkipVerify: true}
-		}
-		transport = &http.Transport{
-			TLSClientConfig: tlsClientConfig,
-			DialTLS: func(network, addr string) (net.Conn, error) {
-				conn, err = tls.Dial(network, addr, tlsConfig)
-				return conn, err
-			},
-		}
-	}
-	var client = &http.Client{Transport: transport}
-	var remote string
-	if opt.Host == "" {
-		remote = "http://127.0.0.1:" + opt.AdminPort
-	} else {
-		if opt.NoTLS {
-			remote = "http://" + opt.Host + ":" + opt.AdminPort
-		} else {
-			remote = "https://" + opt.Host + ":" + opt.AdminPort
-		}
-	}
-	var httprq *http.Request
-	if httprq, err = http.NewRequest("POST", remote+"/sources", bytes.NewBuffer(rqj)); err != nil {
-		return err
-	}
-	httprq.SetBasicAuth("admin", "admin")
-	httprq.Header.Set("Content-Type", "application/json")
 	var hrs *http.Response
-	if hrs, err = client.Do(httprq); err != nil {
+	var err error
+	if hrs, err = util.SendRequest(opt.Global, "POST", "/sources", rq); err != nil {
 		return err
 	}
-	if conn != nil {
-		// verbose output
-		var v uint16 = conn.ConnectionState().Version
-		eout.Trace("protocol version: %d,%d", (v>>8)&255, v&255)
-		var s string
-		switch v {
-		case 0x0300:
-			s = "SSL (deprecated)"
-		case 0x0301:
-			s = "TLS 1.0 (deprecated)"
-		case 0x0302:
-			s = "TLS 1.1 (deprecated)"
-		case 0x0303:
-			s = "TLS 1.2"
-		case 0x0304:
-			s = "TLS 1.3"
-		default:
-			s = fmt.Sprintf("unknown version: { %d, %d }", (v>>8)&255, v&255)
-		}
-		eout.Verbose("TLS/SSL protocol: %s", s)
-	} else {
-		eout.Verbose("no TLS/SSL protocol")
-	}
+
 	if hrs.StatusCode != http.StatusCreated {
-		//eout.Error("status code: %d", hrs.StatusCode)
-		//if hrs.StatusCode == http.StatusUnauthorized {
-		//        fmt.Println("Server at '" + remote + "' did not accept the username/password")
-		//}
-
-		// json.NewEncoder(w).Encode(m)
-		//return responseBodyError(hrs)
-		var m map[string]interface{}
-		if err = json.NewDecoder(hrs.Body).Decode(&m); err != nil {
-			return fmt.Errorf("decoding server response: %s", err)
+		var m string
+		if m, err = util.ReadResponseMessage(hrs); err != nil {
+			return err
 		}
-		return fmt.Errorf("%v", m["message"])
+		return errors.New(m)
 	}
 
 	return nil
-}
-
-func Status(opt *option.Status) error {
-	warnNoTLS(opt.NoTLS)
-	var rq = api.GetStatusRequest{}
-	var rqj []byte
-	var err error
-	//if rqj, err = json.Marshal(rq); err != nil {
-	if rqj, err = json.MarshalIndent(rq, "", "    "); err != nil {
-		return err
-	}
-	//fmt.Printf("sending: %s\n", string(rqj))
-
-	var conn *tls.Conn
-	var transport *http.Transport
-	if opt.Host == "" {
-		transport = &http.Transport{}
-	} else {
-		var tlsConfig = http.DefaultTransport.(*http.Transport).TLSClientConfig
-		var tlsClientConfig *tls.Config
-		if opt.TLSSkipVerify {
-			tlsClientConfig = &tls.Config{InsecureSkipVerify: true}
-		}
-		transport = &http.Transport{
-			TLSClientConfig: tlsClientConfig,
-			DialTLS: func(network, addr string) (net.Conn, error) {
-				conn, err = tls.Dial(network, addr, tlsConfig)
-				return conn, err
-			},
-		}
-	}
-	var client = &http.Client{Transport: transport}
-	var remote string
-	if opt.Host == "" {
-		remote = "http://127.0.0.1:" + opt.AdminPort
-	} else {
-		if opt.NoTLS {
-			remote = "http://" + opt.Host + ":" + opt.AdminPort
-		} else {
-			remote = "https://" + opt.Host + ":" + opt.AdminPort
-		}
-	}
-	var httprq *http.Request
-	if httprq, err = http.NewRequest("GET", remote+"/status", bytes.NewBuffer(rqj)); err != nil {
-		return err
-	}
-	httprq.SetBasicAuth("admin", "admin")
-	httprq.Header.Set("Content-Type", "application/json")
-	var hrs *http.Response
-	if hrs, err = client.Do(httprq); err != nil {
-		return err
-	}
-	if conn != nil {
-		// verbose output
-		var v uint16 = conn.ConnectionState().Version
-		eout.Trace("protocol version: %d,%d", (v>>8)&255, v&255)
-		var s string
-		switch v {
-		case 0x0300:
-			s = "SSL (deprecated)"
-		case 0x0301:
-			s = "TLS 1.0 (deprecated)"
-		case 0x0302:
-			s = "TLS 1.1 (deprecated)"
-		case 0x0303:
-			s = "TLS 1.2"
-		case 0x0304:
-			s = "TLS 1.3"
-		default:
-			s = fmt.Sprintf("unknown version: { %d, %d }", (v>>8)&255, v&255)
-		}
-		eout.Verbose("TLS/SSL protocol: %s", s)
-	} else {
-		eout.Verbose("no TLS/SSL protocol")
-	}
-	if hrs.StatusCode != http.StatusOK {
-		//eout.Error("status code: %d", hrs.StatusCode)
-		//if hrs.StatusCode == http.StatusUnauthorized {
-		//        fmt.Println("Server at '" + remote + "' did not accept the username/password")
-		//}
-
-		// json.NewEncoder(w).Encode(m)
-		//return responseBodyError(hrs)
-		var m map[string]interface{}
-		if err = json.NewDecoder(hrs.Body).Decode(&m); err != nil {
-			return fmt.Errorf("decoding server response: %s", err)
-		}
-		return fmt.Errorf("%v", m["message"])
-	}
-
-	respbody, err := ioutil.ReadAll(hrs.Body)
-	if err != nil {
-		return err
-	}
-
-	var resp api.GetStatusResponse
-	err = json.Unmarshal(respbody, &resp)
-	if err != nil {
-		return err
-	}
-
-	//type GetStatusResponse struct {
-	//        Sources   map[string]bool `json:"sources"`
-	//        Databases map[string]bool `json:"databases"`
-	//}
-
-	//fmt.Printf("%v\n", resp)
-	var s string
-	var a status.Status
-	for s, a = range resp.Databases {
-		fmt.Printf("%-9s %-9s %s\n", "database", s, a.GetString())
-	}
-	for s, a = range resp.Sources {
-		fmt.Printf("%-9s %-9s %s\n", "source", s, a.GetString())
-	}
-	//color.Active.SprintFunc()
-
-	return nil
-}
-
-func warnNoTLS(noTLS bool) {
-	if noTLS {
-		eout.Warning("TLS disabled in connection to server")
-	}
 }

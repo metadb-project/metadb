@@ -7,6 +7,14 @@ type Global struct {
 	TLSSkipVerify bool
 }
 
+type Config struct {
+	Attr   *string
+	Val    *string
+	Delete bool
+	List   bool
+	Global
+}
+
 type ConfigDatabase struct {
 	Name       string
 	Type       string
@@ -31,5 +39,10 @@ type ConfigSource struct {
 }
 
 type Status struct {
+	Global
+}
+
+type Enable struct {
+	Connectors []string
 	Global
 }
