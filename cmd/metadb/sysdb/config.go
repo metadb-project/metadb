@@ -60,6 +60,10 @@ func UpdateConfig(rq *api.ConfigUpdateRequest) error {
 			return fmt.Errorf("modifying users not yet supported: %s", rq.Attr)
 		}
 	}
+	// TODO allow multiple db users
+	if strings.HasPrefix(rq.Attr, "db.") && strings.HasSuffix(rq.Attr, ".users") && strings.ContainsRune(rq.Val, ',') {
+		return fmt.Errorf("multiple users not yet supported: %q", rq.Val)
+	}
 
 	if err = validateAttr(rq.Attr); err != nil {
 		return fmt.Errorf("updating configuration value: %s", err)
