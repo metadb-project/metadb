@@ -45,6 +45,19 @@ func outerPollLoop(svr *server) error {
 		}
 	}
 
+	//// TMP
+	// set command.Tenants
+	var tenants string
+	if tenants, err, _ = sysdb.GetConfig("plug.reshare.tenants"); err != nil {
+		return err
+	}
+	if tenants == "" {
+		command.Tenants = []string{}
+	} else {
+		command.Tenants = util.SplitList(tenants)
+	}
+	////
+
 	log.Debug("starting stream processor")
 	if err = pollLoop(spr); err != nil {
 		log.Error("%s", err)

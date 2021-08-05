@@ -70,7 +70,7 @@ func UpdateConfig(rq *api.ConfigUpdateRequest) error {
 	if err = db.QueryRowContext(context.TODO(), q).Scan(&val); err != nil {
 		return fmt.Errorf("configuration failed: %s: %s", rq.Attr, err)
 	}
-	////
+	//// TMP
 	if rq.Attr == "plug.reshare.tenants" && rq.Val != "" {
 		command.Tenants = util.SplitList(rq.Val)
 	}
@@ -117,7 +117,7 @@ func DeleteConfig(rq *api.ConfigDeleteRequest) (*api.ConfigDeleteResponse, error
 			return nil, fmt.Errorf("configuration failed: %s: not deleted", rq.Attr)
 		}
 	}
-	////
+	//// TMP
 	if rq.Attr == "plug.reshare.tenants" {
 		command.Tenants = []string{}
 	}
