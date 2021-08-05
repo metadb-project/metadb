@@ -50,6 +50,17 @@ func UpdateConfig(rq *api.ConfigUpdateRequest) error {
 	defer mutex.Unlock()
 
 	var err error
+	// TODO allow changing db users
+	if strings.HasPrefix(rq.Attr, "db.") && strings.HasSuffix(rq.Attr, ".users") {
+		var exists bool
+		if _, err, exists = getConfig(rq.Attr); err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("modifying users not yet supported: %s", rq.Attr)
+		}
+	}
+
 	if err = validateAttr(rq.Attr); err != nil {
 		return fmt.Errorf("updating configuration value: %s", err)
 	}
@@ -83,6 +94,11 @@ func DeleteConfig(rq *api.ConfigDeleteRequest) (*api.ConfigDeleteResponse, error
 	defer mutex.Unlock()
 
 	var err error
+	// TODO allow deleting db users
+	if strings.HasPrefix(rq.Attr, "db.") && strings.HasSuffix(rq.Attr, ".users") {
+		return nil, fmt.Errorf("deleting users not yet supported: %s", rq.Attr)
+	}
+
 	if err = validateAttr(rq.Attr); err != nil {
 		return nil, fmt.Errorf("deleting configuration value: %s", err)
 	}
