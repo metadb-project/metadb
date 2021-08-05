@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -27,7 +27,7 @@ type TableSchema struct {
 
 const maximumTypeSizeIndex = 4000
 
-func AddTable(schema string, table string, maindb *sql.DB) error {
+func AddTable(schema string, table string, maindb *sql.DB, database *DatabaseConnector) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -44,13 +44,23 @@ func AddTable(schema string, table string, maindb *sql.DB) error {
 	if err != sql.ErrNoRows {
 		return fmt.Errorf("%s:\n%s", err, q)
 	}
-	if err = createSchemaIfNotExists(schema, maindb); err != nil {
+	// get db users
+	var users = []string{}
+	var u string
+	if u, err, _ = getConfig("db." + database.Name + ".users"); err != nil {
+		return fmt.Errorf("reading database users: %s", err)
+	}
+	if strings.TrimSpace(u) != "" {
+		users = util.SplitList(u)
+	}
+	// create tables
+	if err = createSchemaIfNotExists(schema, maindb, users); err != nil {
 		return err
 	}
-	if err = createCurrentTableIfNotExists(schema, table, maindb); err != nil {
+	if err = createCurrentTableIfNotExists(schema, table, maindb, users); err != nil {
 		return err
 	}
-	if err = createHistoryTableIfNotExists(schema, table, maindb); err != nil {
+	if err = createHistoryTableIfNotExists(schema, table, maindb, users); err != nil {
 		return err
 	}
 	q = fmt.Sprintf(""+
@@ -61,24 +71,32 @@ func AddTable(schema string, table string, maindb *sql.DB) error {
 	if _, err = db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("%s:\n%s", err, q)
 	}
+	q = fmt.Sprintf(""+
+		"INSERT INTO track (schemaname, tablename) VALUES ('%s', '%s')\n"+
+		"    ON CONFLICT (schemaname, tablename) DO NOTHING;", schema, table)
+	if _, err = db.ExecContext(context.TODO(), q); err != nil {
+		return fmt.Errorf("tracking table: %s.%s: %s", schema, table, err)
+	}
 	return nil
 }
 
 // database_general_user
-func createSchemaIfNotExists(schema string, maindb *sql.DB) error {
+func createSchemaIfNotExists(schema string, maindb *sql.DB, users []string) error {
 	var err error
 	var q = fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS \"%s\";", schema)
 	if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("%s:\n%s", err, q)
 	}
-	q = fmt.Sprintf("GRANT USAGE ON SCHEMA \"%s\" TO \"%s\";", schema, option.GeneralUser)
-	if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("%s:\n%s", err, q)
+	if len(users) > 0 {
+		q = fmt.Sprintf("GRANT USAGE ON SCHEMA \"%s\" TO \"%s\";", schema, users[0])
+		if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
+			log.Warning("granting permissions for users: %s", err)
+		}
 	}
 	return nil
 }
 
-func createCurrentTableIfNotExists(schema string, table string, maindb *sql.DB) error {
+func createCurrentTableIfNotExists(schema string, table string, maindb *sql.DB, users []string) error {
 	var err error
 	var schemaTable = util.JoinSchemaTable(schema, table)
 	var q = fmt.Sprintf(""+
@@ -100,14 +118,16 @@ func createCurrentTableIfNotExists(schema string, table string, maindb *sql.DB) 
 		log.Error("unable to create index on %s (__origin);", schemaTable)
 	}
 	// Grant permissions on new table.
-	q = fmt.Sprintf("GRANT SELECT ON %s TO \"%s\";", schemaTable, option.GeneralUser)
-	if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("%s:\n%s", err, q)
+	if len(users) > 0 {
+		q = fmt.Sprintf("GRANT SELECT ON %s TO \"%s\";", schemaTable, users[0])
+		if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
+			log.Warning("granting permissions for users: %s", err)
+		}
 	}
 	return nil
 }
 
-func createHistoryTableIfNotExists(schema string, table string, maindb *sql.DB) error {
+func createHistoryTableIfNotExists(schema string, table string, maindb *sql.DB, users []string) error {
 	var err error
 	var schemaTable = util.JoinSchemaTable(schema, table+"__")
 	var q = fmt.Sprintf(""+
@@ -139,9 +159,11 @@ func createHistoryTableIfNotExists(schema string, table string, maindb *sql.DB) 
 		log.Error("unable to create index on %s (__origin);", schemaTable)
 	}
 	// Grant permissions on new table.
-	q = fmt.Sprintf("GRANT SELECT ON %s TO \"%s\";", schemaTable, option.GeneralUser)
-	if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("%s:\n%s", err, q)
+	if len(users) > 0 {
+		q = fmt.Sprintf("GRANT SELECT ON %s TO \"%s\";", schemaTable, users[0])
+		if _, err = maindb.ExecContext(context.TODO(), q); err != nil {
+			log.Warning("granting permissions for users: %s", err)
+		}
 	}
 	return nil
 }

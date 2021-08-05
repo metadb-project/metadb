@@ -131,19 +131,20 @@ func ConfigDatabase(opt *option.ConfigDatabase) error {
 	if opt.Name == "" {
 		return fmt.Errorf("database connector name not specified")
 	}
-	if opt.Type == "" || opt.DBHost == "" || opt.DBName == "" || opt.DBUser == "" || opt.DBPassword == "" {
+	if opt.Type == "" || opt.DBHost == "" || opt.DBName == "" || opt.DBAdminUser == "" || opt.DBAdminPassword == "" || opt.DBUsers == "" {
 		return fmt.Errorf("insufficient parameters to configure database connector")
 	}
 	var rq = api.UpdateDatabaseConnectorRequest{
 		Name: opt.Name,
 		Config: api.DatabaseConnectorConfig{
-			Type:       opt.Type,
-			DBHost:     opt.DBHost,
-			DBPort:     opt.DBPort,
-			DBName:     opt.DBName,
-			DBUser:     opt.DBUser,
-			DBPassword: opt.DBPassword,
-			DBSSLMode:  opt.DBSSLMode,
+			Type:            opt.Type,
+			DBHost:          opt.DBHost,
+			DBPort:          opt.DBPort,
+			DBName:          opt.DBName,
+			DBAdminUser:     opt.DBAdminUser,
+			DBAdminPassword: opt.DBAdminPassword,
+			DBUsers:         opt.DBUsers,
+			DBSSLMode:       opt.DBSSLMode,
 		},
 	}
 

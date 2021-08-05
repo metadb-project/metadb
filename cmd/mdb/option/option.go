@@ -16,14 +16,15 @@ type Config struct {
 }
 
 type ConfigDatabase struct {
-	Name       string
-	Type       string
-	DBHost     string
-	DBPort     string
-	DBName     string
-	DBUser     string
-	DBPassword string
-	DBSSLMode  string
+	Name            string
+	Type            string
+	DBHost          string
+	DBPort          string
+	DBName          string
+	DBAdminUser     string
+	DBAdminPassword string
+	DBUsers         string
+	DBSSLMode       string
 	Global
 }
 

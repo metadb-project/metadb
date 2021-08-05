@@ -72,7 +72,7 @@ func pollLoop(spr *sproc) error {
 		database0.DBPort = "5432"
 	}
 	var db *sql.DB
-	if db, err = database.Open(database0.DBHost, database0.DBPort, database0.DBUser, database0.DBPassword, database0.DBName, database0.DBSSLMode); err != nil {
+	if db, err = database.Open(database0.DBHost, database0.DBPort, database0.DBAdminUser, database0.DBAdminPassword, database0.DBName, database0.DBSSLMode); err != nil {
 		return err
 	}
 	// Ping database to test connection
@@ -175,7 +175,7 @@ func pollLoop(spr *sproc) error {
 		*/
 
 		// Execute
-		if err = execCommandList(cl, spr.db[0]); err != nil {
+		if err = execCommandList(cl, spr.db[0], spr.databases[0]); err != nil {
 			////////////////////////////////////////////////////
 			log.Error("%s", err)
 			if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {

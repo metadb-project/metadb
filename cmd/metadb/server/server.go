@@ -134,9 +134,7 @@ func setupHandlers(svr *server) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/config", svr.handleConfig)
-	//mux.HandleFunc("/databases", svr.handleDatabases)
 	mux.HandleFunc("/enable", svr.handleEnable)
-	//mux.HandleFunc("/sources", svr.handleSources)
 	mux.HandleFunc("/status", svr.handleStatus)
 	mux.HandleFunc("/", svr.handleDefault)
 
@@ -163,44 +161,6 @@ func (svr *server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	log.Info(m)
 	http.Error(w, m, http.StatusMethodNotAllowed)
 }
-
-/*
-
-func (svr *server) handleDatabases(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		log.Debug("request: %s", requestString(r))
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(w, "databases\r\n")
-		return
-	}
-	if r.Method == "POST" {
-		log.Debug("request: %s", requestString(r))
-		svr.handleDatabasesPost(w, r)
-		return
-	}
-	var m = unsupportedMethod("/sources", r)
-	log.Info(m)
-	http.Error(w, m, http.StatusMethodNotAllowed)
-}
-
-func (svr *server) handleSources(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		log.Debug("request: %s", requestString(r))
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(w, "sources\r\n")
-		return
-	}
-	if r.Method == "POST" {
-		log.Debug("request: %s", requestString(r))
-		svr.handleSourcesPost(w, r)
-		return
-	}
-	var m = unsupportedMethod("/sources", r)
-	log.Info(m)
-	http.Error(w, m, http.StatusMethodNotAllowed)
-}
-
-*/
 
 func (svr *server) handleEnable(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
@@ -323,52 +283,6 @@ func (svr *server) handleConfigPost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 }
-
-/*
-
-func (svr *server) handleDatabasesPost(w http.ResponseWriter, r *http.Request) {
-
-	var p api.UpdateDatabaseConnectorRequest
-	var ok bool
-	if ok = util.ReadRequest(w, r, &p); !ok {
-		return
-	}
-
-	var err error
-	if err = sysdb.UpdateDatabaseConnector(p); err != nil {
-		util.HandleError(w, err, http.StatusBadRequest)
-		return
-	}
-
-	// Temporary - pause to allow for waitForConfig()
-	time.Sleep(2 * time.Second)
-
-	// Respond with success.
-	w.WriteHeader(http.StatusCreated)
-}
-
-func (svr *server) handleSourcesPost(w http.ResponseWriter, r *http.Request) {
-
-	var p api.UpdateSourceConnectorRequest
-	var ok bool
-	if ok = util.ReadRequest(w, r, &p); !ok {
-		return
-	}
-
-	var err error
-	if err = sysdb.UpdateKafkaSource(p); err != nil {
-		util.HandleError(w, err, http.StatusBadRequest)
-		return
-	}
-
-	// Temporary - pause to allow for waitForConfig()
-	time.Sleep(2 * time.Second)
-
-	// Respond with success.
-	w.WriteHeader(http.StatusCreated)
-}
-
-*/
 
 func (svr *server) handleEnablePost(w http.ResponseWriter, r *http.Request) {
 	// read request

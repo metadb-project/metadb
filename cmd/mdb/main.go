@@ -244,7 +244,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"Commands:\n" +
 			"  config                      - " + helpConfig +
 			"  enable                      - " + helpEnable +
-			"  status                      - " + helpStatus +
+			//"  status                      - " + helpStatus +
 			"  version                     - " + helpVersion +
 			"  completion                  - " + helpCompletion +
 			"\n" +
@@ -272,8 +272,10 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"  db.<name>.host              - Host name of the database server\n" +
 			"  db.<name>.port              - TCP port the database server listens on\n" +
 			"  db.<name>.dbname            - Name of the database\n" +
-			"  db.<name>.user              - User that owns the database\n" +
-			"  db.<name>.password          - User password\n" +
+			"  db.<name>.adminuser         - Database user that owns the database\n" +
+			"  db.<name>.adminpassword     - Password of adminuser\n" +
+			"  db.<name>.users             - Database users that should have access to\n" +
+			"                                tracked tables (comma-separated list)\n" +
 			"  db.<name>.sslmode           - SSL mode for connection to database (default:\n" +
 			"                                \"require\")\n" +
 			"\n" +
@@ -291,16 +293,6 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"\n" +
 			"Use @<file> in place of <value> to read the value from a file.\n" +
 			"")
-	case "version":
-		fmt.Printf("" +
-			helpVersion +
-			"\n" +
-			"Usage:  mdb version\n")
-	case "status":
-		fmt.Printf("" +
-			helpStatus +
-			"\n" +
-			"Usage:  mdb status\n")
 	case "enable":
 		fmt.Printf("" +
 			helpConfig +
@@ -319,6 +311,16 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"  db.<name>\n" +
 			"  src.<name>\n" +
 			"")
+	case "status":
+		fmt.Printf("" +
+			helpStatus +
+			"\n" +
+			"Usage:  mdb status\n")
+	case "version":
+		fmt.Printf("" +
+			helpVersion +
+			"\n" +
+			"Usage:  mdb version\n")
 	case "completion":
 		fmt.Printf("" +
 			helpCompletion +

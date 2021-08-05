@@ -38,13 +38,14 @@ type DatabaseConnector struct {
 }
 
 type DatabaseConnectorConfig struct {
-	Type       string `json:"type"`
-	DBHost     string `json:"dbHost"`
-	DBPort     string `json:"dbPort"`
-	DBName     string `json:"dbName"`
-	DBUser     string `json:"dbUser"`
-	DBPassword string `json:"dbPassword"`
-	DBSSLMode  string `json:"dbSSLMode"`
+	Type            string `json:"type"`
+	DBHost          string `json:"dbHost"`
+	DBPort          string `json:"dbPort"`
+	DBName          string `json:"dbName"`
+	DBAdminUser     string `json:"dbAdminUser"`
+	DBAdminPassword string `json:"dbAdminPassword"`
+	DBUsers         string `json:"dbUsers"`
+	DBSSLMode       string `json:"dbSSLMode"`
 }
 
 type UpdateSourceConnectorRequest SourceConnector

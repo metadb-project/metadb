@@ -14,11 +14,11 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func execCommandList(cl *command.CommandList, db *sql.DB) error {
+func execCommandList(cl *command.CommandList, db *sql.DB, database *sysdb.DatabaseConnector) error {
 	var err error
 	var c command.Command
 	for _, c = range cl.Cmd {
-		if err = execCommandSchema(&c, db); err != nil {
+		if err = execCommandSchema(&c, db, database); err != nil {
 			return err
 		}
 		if err = execCommandData(&c, db); err != nil {
@@ -28,14 +28,14 @@ func execCommandList(cl *command.CommandList, db *sql.DB) error {
 	return nil
 }
 
-func execCommandSchema(c *command.Command, db *sql.DB) error {
+func execCommandSchema(c *command.Command, db *sql.DB, database *sysdb.DatabaseConnector) error {
 	var err error
 	var delta *deltaSchema
 	if delta, err = findDeltaSchema(c); err != nil {
 		return err
 	}
 	// TODO can we skip adding the table if we confirm it in sysdb?
-	if err = sysdb.AddTable(c.SchemaName, c.TableName, db); err != nil {
+	if err = sysdb.AddTable(c.SchemaName, c.TableName, db, database); err != nil {
 		return err
 	}
 	if err = execDeltaSchema(delta, c.SchemaName, c.TableName, db); err != nil {
