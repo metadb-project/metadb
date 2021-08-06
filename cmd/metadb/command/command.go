@@ -478,7 +478,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 			schema = *ce.Value.Payload.Source.Schema
 			table = *ce.Value.Payload.Source.Table
 		}
-		log.Info("received delete operation which is not yet supported: schema=%q, table=%q, key=%v", schema, table, key)
+		log.Debug("received delete operation which is not yet supported: schema=%q, table=%q, key=%v", schema, table, key)
 		return nil, nil
 	}
 	if u.Column, err = extractColumns(ce); err != nil {
