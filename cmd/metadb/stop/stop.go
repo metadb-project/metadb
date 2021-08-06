@@ -24,11 +24,19 @@ func Stop(opt *option.Stop) error {
 	if !ok {
 		return fmt.Errorf("data directory not found: %s", opt.Datadir)
 	}
-	var pid int
-	if pid, err = process.ReadPIDFile(opt.Datadir); err != nil {
-		eout.Verbose("file not found: %s", util.SystemPIDFileName(opt.Datadir))
+	lockfile := util.SystemPIDFileName(opt.Datadir)
+	fexists, err := util.FileExists(lockfile)
+	if err != nil {
+		return fmt.Errorf("reading lock file %q: %s", lockfile, err)
+	}
+	if !fexists {
+		eout.Verbose("lock file %q not found", lockfile)
 		eout.Verbose("server may already have stopped")
 		return nil
+	}
+	pid, err := process.ReadPIDFile(opt.Datadir)
+	if err != nil {
+		return fmt.Errorf("reading lock file %q: %s", lockfile, err)
 	}
 	if err = syscall.Kill(pid, syscall.SIGTERM); err != nil {
 		eout.Verbose("process not found: %d", pid)

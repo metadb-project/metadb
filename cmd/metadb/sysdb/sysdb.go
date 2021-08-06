@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"sync"
 
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/internal/status"
@@ -39,7 +38,6 @@ type SourceConnector struct {
 	Status           status.Status
 }
 
-var mutex sync.Mutex
 var db *sql.DB
 
 var initialized bool
@@ -55,16 +53,13 @@ func InitCreate(filename string) error {
 }
 
 func initSysdb(filename string, create bool) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	var err error
-
 	if initialized {
 		return fmt.Errorf("initializing sysdb: already initialized")
 	}
 	var d *sql.DB
 	if create {
+		// TODO move this block to a function and defer d.Close()
 		if d, err = openDatabase(filename); err != nil {
 			return err
 		}
@@ -79,10 +74,6 @@ func initSysdb(filename string, create bool) error {
 	if d, err = openDatabase(filename); err != nil {
 		return err
 	}
-	var s = "UPDATE lock_db SET b = TRUE;"
-	if _, err = d.ExecContext(context.TODO(), s); err != nil {
-		return fmt.Errorf("opening system database: %s", err)
-	}
 	db = d
 	initialized = true
 	return nil
@@ -90,9 +81,11 @@ func initSysdb(filename string, create bool) error {
 
 func openDatabase(filename string) (*sql.DB, error) {
 	var err error
-	var dsn = "file:" + filename + "?_foreign_keys=1" +
-		"&_journal_mode=DELETE" +
-		"&_locking_mode=EXCLUSIVE" +
+	var dsn = "file:" + filename +
+		"?_busy_timeout=30000" +
+		"&_foreign_keys=on" +
+		"&_journal_mode=WAL" +
+		"&_locking_mode=NORMAL" +
 		"&_synchronous=3"
 	var d *sql.DB
 	if d, err = sql.Open("sqlite3", dsn); err != nil {
@@ -114,18 +107,6 @@ func initSchema(d *sql.DB) error {
 	var q = fmt.Sprintf("PRAGMA user_version = %d;", thisSchemaVersion)
 	if _, err = tx.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("initializing system database: writing database version: %s", err)
-	}
-
-	q = "" +
-		"CREATE TABLE lock_db (\n" +
-		"    b BOOLEAN\n" +
-		");"
-	if _, err = tx.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("initializing system database: creating schema: lock_db: %s", err)
-	}
-	q = "INSERT INTO lock_db (b) VALUES (TRUE);"
-	if _, err = tx.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("initializing system database: writing lock: %s", err)
 	}
 
 	/*

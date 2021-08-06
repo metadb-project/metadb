@@ -29,7 +29,7 @@ func SystemPIDFileName(datadir string) string {
 }
 
 func SysdbFileName(datadir string) string {
-	return filepath.Join(SystemDirName(datadir), "system.db")
+	return filepath.Join(SystemDirName(datadir), "systemdb")
 }
 
 func JoinSchemaTable(schema, table string) string {

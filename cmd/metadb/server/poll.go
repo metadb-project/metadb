@@ -433,7 +433,11 @@ func waitForConfig(svr *server) (*sproc, error) {
 			if srcEnabled, err = sysdb.IsConnectorEnabled("src." + sources[0].Name); err != nil {
 				return nil, err
 			}
-			if dbEnabled && srcEnabled {
+			var users = strings.TrimSpace(databases[0].DBUsers)
+			if users == "" {
+				log.Error("db.%s.users is undefined", databases[0].Name)
+			}
+			if dbEnabled && srcEnabled && users != "" {
 				break
 			}
 		}
@@ -444,7 +448,11 @@ func waitForConfig(svr *server) (*sproc, error) {
 			if dbEnabled, err = sysdb.IsConnectorEnabled("db." + databases[0].Name); err != nil {
 				return nil, err
 			}
-			if dbEnabled {
+			var users = strings.TrimSpace(databases[0].DBUsers)
+			if users == "" {
+				log.Error("db.%s.users is undefined", databases[0].Name)
+			}
+			if dbEnabled && users != "" {
 				break
 			}
 		}

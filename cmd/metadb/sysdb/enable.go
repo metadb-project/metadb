@@ -11,9 +11,6 @@ import (
 )
 
 func EnableConnector(rq *api.EnableRequest) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	var err error
 	// filter enabled or unconfigured connectors
 	var disabled []string
@@ -67,9 +64,6 @@ func EnableConnector(rq *api.EnableRequest) error {
 }
 
 func IsConnectorEnabled(spec string) (bool, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	return isConnectorEnabled(spec)
 }
 

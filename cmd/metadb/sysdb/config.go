@@ -12,9 +12,6 @@ import (
 )
 
 func ListConfig(rq *api.ConfigListRequest) (*api.ConfigListResponse, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	// read configs
 	var rs = &api.ConfigListResponse{}
 	var rows *sql.Rows
@@ -46,9 +43,6 @@ func ListConfig(rq *api.ConfigListRequest) (*api.ConfigListResponse, error) {
 }
 
 func UpdateConfig(rq *api.ConfigUpdateRequest) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	var err error
 	// TODO allow changing db users
 	if strings.HasPrefix(rq.Attr, "db.") && strings.HasSuffix(rq.Attr, ".users") {
@@ -94,9 +88,6 @@ func UpdateConfig(rq *api.ConfigUpdateRequest) error {
 }
 
 func DeleteConfig(rq *api.ConfigDeleteRequest) (*api.ConfigDeleteResponse, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	var err error
 	// TODO allow deleting db users
 	if strings.HasPrefix(rq.Attr, "db.") && strings.HasSuffix(rq.Attr, ".users") {
@@ -146,9 +137,6 @@ func DeleteConfig(rq *api.ConfigDeleteRequest) (*api.ConfigDeleteResponse, error
 }
 
 func GetConfig(attr string) (string, error, bool) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	return getConfig(attr)
 }
 

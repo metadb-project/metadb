@@ -28,9 +28,6 @@ type TableSchema struct {
 const maximumTypeSizeIndex = 4000
 
 func AddTable(schema string, table string, maindb *sql.DB, database *DatabaseConnector) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	var err error
 	var q = fmt.Sprintf(""+
 		"SELECT rel_name\n"+
@@ -169,9 +166,6 @@ func createHistoryTableIfNotExists(schema string, table string, maindb *sql.DB, 
 }
 
 func AddColumn(tschema string, tableName string, columnName string, newType command.DataType, newTypeSize int64, maindb *sql.DB) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	var err error
 	var schemaTable = util.JoinSchemaTable(tschema, tableName)
 	var schemaTableH = util.JoinSchemaTable(tschema, tableName+"__")
@@ -217,9 +211,6 @@ func indexName(table, column string) string {
 }
 
 func AlterColumnVarcharSize(schema string, table string, column string, datatype command.DataType, typesize int64, maindb *sql.DB) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	var err error
 	// Remove index if type size too large.
 	if typesize > maximumTypeSizeIndex {
@@ -260,9 +251,6 @@ func AlterColumnVarcharSize(schema string, table string, column string, datatype
 }
 
 func RenameColumnOldType(schema string, table string, column string, datatype command.DataType, typesize int64, maindb *sql.DB) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	var err error
 	// Find new name for old column
 	var newName string
@@ -328,9 +316,6 @@ func newNumberedColumnName(schema string, table string, column string) (string, 
 }
 
 func SelectTableSchema(schema string, table string) (*TableSchema, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	var err error
 	var q = fmt.Sprintf(""+
 		"SELECT attr_name,\n"+

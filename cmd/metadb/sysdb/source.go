@@ -5,9 +5,6 @@ import (
 )
 
 func ReadSourceConnectors() ([]*SourceConnector, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	var cmap map[string]map[string]string
 	var err error
 	if cmap, err = readConfigMap("src"); err != nil {

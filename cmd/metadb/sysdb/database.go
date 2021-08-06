@@ -1,15 +1,6 @@
 package sysdb
 
-import (
-	"strings"
-
-	"github.com/metadb-project/metadb/cmd/metadb/log"
-)
-
 func ReadDatabaseConnectors() ([]*DatabaseConnector, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	var cmap = make(map[string]map[string]string)
 	var err error
 	if cmap, err = readConfigMap("db"); err != nil {
@@ -19,10 +10,6 @@ func ReadDatabaseConnectors() ([]*DatabaseConnector, error) {
 	var name string
 	var conf map[string]string
 	for name, conf = range cmap {
-		if strings.TrimSpace(conf["users"]) == "" {
-			log.Error("db.%s.users is undefined", name)
-			continue
-		}
 		dbc = append(dbc, &DatabaseConnector{
 			Name:            name,
 			Type:            conf["type"],
