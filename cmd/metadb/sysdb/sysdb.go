@@ -79,6 +79,14 @@ func initSysdb(filename string, create bool) error {
 	return nil
 }
 
+func Close() error {
+	err := db.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func openDatabase(filename string) (*sql.DB, error) {
 	var err error
 	var dsn = "file:" + filename +

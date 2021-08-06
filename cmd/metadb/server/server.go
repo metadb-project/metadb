@@ -121,6 +121,10 @@ func runServer(svr *server) error {
 		time.Sleep(5 * time.Second)
 	}
 
+	err := sysdb.Close()
+	if err != nil {
+		log.Error("%s", err)
+	}
 	process.RemovePIDFile(svr.opt.Datadir)
 
 	return nil
