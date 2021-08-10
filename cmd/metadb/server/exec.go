@@ -7,18 +7,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/database"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func execCommandList(cl *command.CommandList, db *sql.DB, database *sysdb.DatabaseConnector) error {
+func execCommandList(cl *command.CommandList, db *sql.DB, track *cache.Track, schema *cache.Schema, database *sysdb.DatabaseConnector) error {
 	var err error
 	var c command.Command
 	for _, c = range cl.Cmd {
-		if err = execCommandSchema(&c, db, database); err != nil {
+		if err = execCommandSchema(&c, db, track, schema, database); err != nil {
 			return err
 		}
 		if err = execCommandData(&c, db); err != nil {
@@ -28,23 +30,23 @@ func execCommandList(cl *command.CommandList, db *sql.DB, database *sysdb.Databa
 	return nil
 }
 
-func execCommandSchema(c *command.Command, db *sql.DB, database *sysdb.DatabaseConnector) error {
+func execCommandSchema(c *command.Command, db *sql.DB, track *cache.Track, schema *cache.Schema, database *sysdb.DatabaseConnector) error {
 	var err error
 	var delta *deltaSchema
-	if delta, err = findDeltaSchema(c); err != nil {
+	if delta, err = findDeltaSchema(c, schema); err != nil {
 		return err
 	}
 	// TODO can we skip adding the table if we confirm it in sysdb?
-	if err = sysdb.AddTable(c.SchemaName, c.TableName, db, database); err != nil {
+	if err = addTable(&sqlx.Table{c.SchemaName, c.TableName}, &sqlx.DB{DB: db}, track, database); err != nil {
 		return err
 	}
-	if err = execDeltaSchema(delta, c.SchemaName, c.TableName, db); err != nil {
+	if err = execDeltaSchema(delta, c.SchemaName, c.TableName, db, schema); err != nil {
 		return err
 	}
 	return nil
 }
 
-func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db *sql.DB) error {
+func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db *sql.DB, schema *cache.Schema) error {
 	var err error
 	var col deltaColumnSchema
 	//if len(delta.column) == 0 {
@@ -54,7 +56,8 @@ func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db *s
 		// Is this a new column (as opposed to a modification)?
 		if col.newColumn {
 			log.Trace("table %s: new column: %s %s", util.JoinSchemaTable(tschema, tableName), col.name, command.DataTypeToSQL(col.newType, col.newTypeSize))
-			if err = sysdb.AddColumn(tschema, tableName, col.name, col.newType, col.newTypeSize, db); err != nil {
+			t := &sqlx.Table{Schema: tschema, Table: tableName}
+			if err = addColumn(t, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 				return err
 			}
 			continue
@@ -63,18 +66,19 @@ func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db *s
 		// Redshift can alter the column in place
 		if col.oldType == col.newType && col.oldType == command.VarcharType {
 			log.Trace("table %s: alter column: %s %s", util.JoinSchemaTable(tschema, tableName), col.name, command.DataTypeToSQL(col.newType, col.newTypeSize))
-			if err = sysdb.AlterColumnVarcharSize(tschema, tableName, col.name, col.newType, col.newTypeSize, db); err != nil {
+			if err = alterColumnVarcharSize(&sqlx.Table{tschema, tableName}, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 				return err
 			}
 			continue
 		}
 		// Otherwise we have a completely new type
 		log.Trace("table %s: rename column %s", util.JoinSchemaTable(tschema, tableName), col.name)
-		if err = sysdb.RenameColumnOldType(tschema, tableName, col.name, col.newType, col.newTypeSize, db); err != nil {
+		if err = renameColumnOldType(&sqlx.Table{tschema, tableName}, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 			return err
 		}
 		log.Trace("table %s: new column %s %s", util.JoinSchemaTable(tschema, tableName), col.name, command.DataTypeToSQL(col.newType, col.newTypeSize))
-		if err = sysdb.AddColumn(tschema, tableName, col.name, col.newType, col.newTypeSize, db); err != nil {
+		t := &sqlx.Table{Schema: tschema, Table: tableName}
+		if err = addColumn(t, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 			return err
 		}
 	}

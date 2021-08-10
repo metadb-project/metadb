@@ -70,8 +70,48 @@ func (d DataType) String() string {
 	case JSONType:
 		return "json"
 	default:
-		log.Error("unknown data type: %d", d)
+		log.Error("data type to string: unknown data type: %d", d)
 		return "(unknown type)"
+	}
+}
+
+func MakeDataTypeNew(dataType string, charMaxLen int64) (DataType, int64) {
+	switch dataType {
+	case "character varying":
+		return VarcharType, charMaxLen
+	case "smallint":
+		return IntegerType, 2
+	case "integer":
+		return IntegerType, 4
+	case "bigint":
+		return IntegerType, 8
+		/*
+			case 4:
+				return "real"
+			case 8:
+				return "double precision"
+		*/
+	case "real":
+		return FloatType, 4
+	case "double precision":
+		return FloatType, 8
+	case "boolean":
+		return BooleanType, 0
+	case "date":
+		return DateType, 0
+	case "time without time zone":
+		return TimeType, 0
+	case "time with time zone":
+		return TimetzType, 0
+	case "timestamp without time zone":
+		return TimestampType, 0
+	case "timestamp with time zone":
+		return TimestamptzType, 0
+	case "json":
+		return JSONType, 0
+	default:
+		log.Error("make data type new: unknown data type: %s", dataType)
+		return UnknownType, 0
 	}
 }
 
@@ -98,8 +138,52 @@ func MakeDataType(dtype string) DataType {
 	case "json":
 		return JSONType
 	default:
-		log.Error("unknown data type: %s", dtype)
+		log.Error("make data type: unknown data type: %s", dtype)
 		return UnknownType
+	}
+}
+
+func DataTypeToSQLNew(dtype DataType, typeSize int64) (string, int64) {
+	switch dtype {
+	case VarcharType:
+		return "character varying", typeSize
+	case IntegerType:
+		switch typeSize {
+		case 2:
+			return "smallint", 0
+		case 4:
+			return "integer", 0
+		case 8:
+			return "bigint", 0
+		default:
+			return "(unknown)", 0
+		}
+	case FloatType:
+		switch typeSize {
+		case 4:
+			return "real", 0
+		case 8:
+			return "double precision", 0
+		default:
+			return "(unknown)", 0
+		}
+	case BooleanType:
+		return "boolean", 0
+	case DateType:
+		return "date", 0
+	case TimeType:
+		return "time", 0
+	case TimetzType:
+		return "time with time zone", 0
+	case TimestampType:
+		return "timestamp without time zone", 0
+	case TimestamptzType:
+		return "timestamp with time zone", 0
+	case JSONType:
+		// Postgres only
+		return "json", 0
+	default:
+		return "(unknown)", 0
 	}
 }
 
@@ -210,7 +294,7 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 	case "boolean":
 		return BooleanType, nil
 	default:
-		return 0, fmt.Errorf("unknown data type: %s", coltype)
+		return 0, fmt.Errorf("convert data type: unknown data type: %s", coltype)
 	}
 }
 
@@ -261,7 +345,7 @@ func convertTypeSize(data interface{}, coltype string, datatype DataType) (int64
 	case JSONType:
 		return 0, nil
 	default:
-		return 0, fmt.Errorf("unknown data type: %s", datatype)
+		return 0, fmt.Errorf("convert type size: unknown data type: %s", datatype)
 	}
 }
 

@@ -11,6 +11,9 @@ import (
 )
 
 func EnableConnector(rq *api.EnableRequest) error {
+	sysMu.Lock()
+	defer sysMu.Unlock()
+
 	var err error
 	// filter enabled or unconfigured connectors
 	var disabled []string
@@ -64,6 +67,9 @@ func EnableConnector(rq *api.EnableRequest) error {
 }
 
 func IsConnectorEnabled(spec string) (bool, error) {
+	sysMu.Lock()
+	defer sysMu.Unlock()
+
 	return isConnectorEnabled(spec)
 }
 

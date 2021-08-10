@@ -267,8 +267,10 @@ func help(cmd *cobra.Command, commandLine []string) {
 			traceFlag(nil, nil) +
 			"\n" +
 			"Database connector attributes:\n" +
-			"  db.<name>.type              - Type of database system: \"postgresql\" or\n" +
-			"                                \"redshift\" (default \"postgresql\")\n" +
+			"  db.<name>.type              - Type of database system (must be set to\n" +
+			"                                \"postgresql\")\n" +
+			//"  db.<name>.type              - Type of database system: \"postgresql\" or\n" +
+			//"                                \"redshift\"\n" +
 			"  db.<name>.host              - Host name of the database server\n" +
 			"  db.<name>.port              - TCP port the database server listens on\n" +
 			"  db.<name>.dbname            - Name of the database\n" +

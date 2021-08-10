@@ -1,7 +1,9 @@
 package server
 
 import (
+	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
+	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 )
 
@@ -123,10 +125,10 @@ func findDeltaColumnSchema(tschema string, tableName string, column1 *sysdb.Colu
 	// return nil
 }
 
-func findDeltaSchema(c *command.Command) (*deltaSchema, error) {
+func findDeltaSchema(c *command.Command, schema *cache.Schema) (*deltaSchema, error) {
 	var err error
 	var schema1 *sysdb.TableSchema
-	if schema1, err = sysdb.SelectTableSchema(c.SchemaName, c.TableName); err != nil {
+	if schema1, err = selectTableSchema(&sqlx.Table{Schema: c.SchemaName, Table: c.TableName}, schema); err != nil {
 		return nil, err
 	}
 	var schema2 *sysdb.TableSchema = tableSchemaFromCommand(c)

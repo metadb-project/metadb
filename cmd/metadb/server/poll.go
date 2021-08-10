@@ -2,7 +2,6 @@ package server
 
 import (
 	"bufio"
-	"database/sql"
 	"fmt"
 	"os"
 	"regexp"
@@ -11,11 +10,14 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/database"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/metadata"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
+	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
@@ -71,8 +73,8 @@ func pollLoop(spr *sproc) error {
 	if database0.Type == "postgresql" && database0.DBPort == "" {
 		database0.DBPort = "5432"
 	}
-	var db *sql.DB
-	if db, err = database.Open(database0.DBHost, database0.DBPort, database0.DBAdminUser, database0.DBAdminPassword, database0.DBName, database0.DBSSLMode); err != nil {
+	db := new(sqlx.DB)
+	if db.DB, err = database.Open(database0.DBHost, database0.DBPort, database0.DBAdminUser, database0.DBAdminPassword, database0.DBName, database0.DBSSLMode); err != nil {
 		return err
 	}
 	// Ping database to test connection
@@ -81,7 +83,20 @@ func pollLoop(spr *sproc) error {
 		return fmt.Errorf("connecting to database: ping: %s", err)
 	}
 	spr.databases[0].Status.Active()
-	spr.db = append(spr.db, db)
+	spr.db = append(spr.db, db.DB)
+	// cache tracking
+	if err = metadata.Init(db); err != nil {
+		return err
+	}
+	track, err := cache.NewTrack(db)
+	if err != nil {
+		return fmt.Errorf("caching track: %s", err)
+	}
+	// cache schema
+	schema, err := cache.NewSchema(db, track)
+	if err != nil {
+		return fmt.Errorf("caching schema: %s", err)
+	}
 	// Source file
 	var sourceFile *os.File
 	var sourceFileScanner *bufio.Scanner
@@ -124,7 +139,7 @@ func pollLoop(spr *sproc) error {
 	}
 	var firstEvent = true
 	for {
-		log.Trace("(poll)")
+		//log.Trace("(poll)")
 		var cl = &command.CommandList{}
 
 		// Parse
@@ -175,7 +190,7 @@ func pollLoop(spr *sproc) error {
 		*/
 
 		// Execute
-		if err = execCommandList(cl, spr.db[0], spr.databases[0]); err != nil {
+		if err = execCommandList(cl, spr.db[0], track, schema, spr.databases[0]); err != nil {
 			////////////////////////////////////////////////////
 			log.Error("%s", err)
 			if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
@@ -434,9 +449,6 @@ func waitForConfig(svr *server) (*sproc, error) {
 				return nil, err
 			}
 			var users = strings.TrimSpace(databases[0].DBUsers)
-			if users == "" {
-				log.Error("db.%s.users is undefined", databases[0].Name)
-			}
 			if dbEnabled && srcEnabled && users != "" {
 				break
 			}
@@ -449,9 +461,6 @@ func waitForConfig(svr *server) (*sproc, error) {
 				return nil, err
 			}
 			var users = strings.TrimSpace(databases[0].DBUsers)
-			if users == "" {
-				log.Error("db.%s.users is undefined", databases[0].Name)
-			}
 			if dbEnabled && users != "" {
 				break
 			}
