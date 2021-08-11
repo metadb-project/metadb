@@ -145,13 +145,13 @@ func pollLoop(spr *sproc) error {
 		if _, err = parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.source.SchemaPrefix, sourceFileScanner, spr.sourceLog); err != nil {
 			////////////////////////////////////////////////////
 			log.Error("%s", err)
-			if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
-				_, err = consumer.Commit()
-				if err != nil {
-					log.Error("%s", err)
-					panic(err)
-				}
-			}
+			//if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
+			//        _, err = consumer.Commit()
+			//        if err != nil {
+			//                log.Error("%s", err)
+			//                panic(err)
+			//        }
+			//}
 			continue
 			////////////////////////////////////////////////////
 			// return err
@@ -183,13 +183,13 @@ func pollLoop(spr *sproc) error {
 		if err = execCommandList(cl, spr.db[0], track, schema, spr.databases[0]); err != nil {
 			////////////////////////////////////////////////////
 			log.Error("%s", err)
-			if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
-				_, err = consumer.Commit()
-				if err != nil {
-					log.Error("%s", err)
-					panic(err)
-				}
-			}
+			//if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
+			//        _, err = consumer.Commit()
+			//        if err != nil {
+			//                log.Error("%s", err)
+			//                panic(err)
+			//        }
+			//}
 			continue
 			////////////////////////////////////////////////////
 			// return err
@@ -212,7 +212,7 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 	var err error
 	var messageCount int
 	var x int
-	for x = 0; x < 1000000; x++ {
+	for x = 0; x < 100000; x++ {
 		var ce *change.Event
 		if sourceFileScanner != nil {
 			if ce, err = readChangeEventFromFile(sourceFileScanner, sourceLog); err != nil {
