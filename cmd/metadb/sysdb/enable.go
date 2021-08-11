@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/metadb-project/metadb/cmd/internal/api"
-	"github.com/metadb-project/metadb/cmd/metadb/database"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
 func EnableConnector(rq *api.EnableRequest) error {
@@ -59,7 +59,7 @@ func EnableConnector(rq *api.EnableRequest) error {
 	}
 	// start txn
 	var tx *sql.Tx
-	if tx, err = database.MakeTx(db); err != nil {
+	if tx, err = sqlx.MakeTx(db); err != nil {
 		return err
 	}
 	defer tx.Rollback()

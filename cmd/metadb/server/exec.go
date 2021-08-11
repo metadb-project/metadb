@@ -9,7 +9,6 @@ import (
 
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
-	"github.com/metadb-project/metadb/cmd/metadb/database"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
@@ -17,17 +16,58 @@ import (
 )
 
 func execCommandList(cl *command.CommandList, db *sql.DB, track *cache.Track, schema *cache.Schema, database *sysdb.DatabaseConnector) error {
-	var err error
-	var c command.Command
-	for _, c = range cl.Cmd {
-		if err = execCommandSchema(&c, db, track, schema, database); err != nil {
+	var clt []command.CommandList = partitionTxn(cl)
+	for _, cc := range clt {
+		if len(cc.Cmd) == 0 {
+			continue
+		}
+		// exec schema changes
+		if err := execCommandSchema(&cc.Cmd[0], db, track, schema, database); err != nil {
 			return err
 		}
-		if err = execCommandData(&c, db); err != nil {
-			return fmt.Errorf("%s\n%v", err, c)
+		// begin txn
+		tx, err := sqlx.MakeTx(db)
+		if err != nil {
+			return fmt.Errorf("exec: start transaction: %s", err)
+		}
+		defer tx.Rollback()
+		// exec data
+		for _, c := range cc.Cmd {
+			if err := execCommandData(&c, tx); err != nil {
+				return fmt.Errorf("%s\n%v", err, c)
+			}
+		}
+		// commit txn
+		log.Trace("commit txn")
+		if err = tx.Commit(); err != nil {
+			return fmt.Errorf("exec: commit transaction: %s", err)
+		}
+		// log confirmation
+		for _, c := range cc.Cmd {
+			logDebugCommand(&c)
 		}
 	}
 	return nil
+}
+
+func partitionTxn(cl *command.CommandList) []command.CommandList {
+	var clt []command.CommandList
+	newcl := new(command.CommandList)
+	var c, lastc command.Command
+	for _, c = range cl.Cmd {
+		if !c.SchemaEquals(&lastc) {
+			if len(newcl.Cmd) > 0 {
+				clt = append(clt, *newcl)
+				newcl = new(command.CommandList)
+			}
+		}
+		newcl.Cmd = append(newcl.Cmd, c)
+		lastc = c
+	}
+	if len(newcl.Cmd) > 0 {
+		clt = append(clt, *newcl)
+	}
+	return clt
 }
 
 func execCommandSchema(c *command.Command, db *sql.DB, track *cache.Track, schema *cache.Schema, database *sysdb.DatabaseConnector) error {
@@ -85,13 +125,8 @@ func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db *s
 	return nil
 }
 
-func execCommandData(c *command.Command, db *sql.DB) error {
+func execCommandData(c *command.Command, tx *sql.Tx) error {
 	var err error
-	var tx *sql.Tx
-	if tx, err = database.MakeTx(db); err != nil {
-		return err
-	}
-	defer tx.Rollback()
 	var timeNow string = time.Now().Format(time.RFC3339)
 	// Check if a current version of the row exists
 	var idc int64
@@ -170,10 +205,6 @@ func execCommandData(c *command.Command, db *sql.DB) error {
 	q = b.String()
 	if _, err = tx.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("%s:\n%s", err, q)
-	}
-	// Commit
-	if err = tx.Commit(); err != nil {
-		return err
 	}
 	return nil
 }

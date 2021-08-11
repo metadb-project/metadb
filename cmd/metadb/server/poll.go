@@ -138,20 +138,13 @@ func pollLoop(spr *sproc) error {
 		spr.source.Status.Active()
 	}
 	var firstEvent = true
-	lastErr := ""
 	for {
-		//log.Trace("(poll)")
 		var cl = &command.CommandList{}
 
 		// Parse
 		if _, err = parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.source.SchemaPrefix, sourceFileScanner, spr.sourceLog); err != nil {
 			////////////////////////////////////////////////////
-			// avoid repeating "primary key not defined" errors consecutively
-			if !strings.Contains(err.Error(), "primary key not defined") || err.Error() != lastErr {
-				log.Error("%s", err)
-			}
-			lastErr = err.Error()
-
+			log.Error("%s", err)
 			if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
 				_, err = consumer.Commit()
 				if err != nil {
@@ -162,15 +155,6 @@ func pollLoop(spr *sproc) error {
 			continue
 			////////////////////////////////////////////////////
 			// return err
-		}
-		if len(cl.Cmd) == 0 {
-			if sourceFileScanner != nil {
-				log.Info("finished processing source file")
-				log.Info("shutting down")
-				process.SetStop()
-				return nil
-			}
-			continue
 		}
 		if firstEvent {
 			firstEvent = false
@@ -228,13 +212,16 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 	var err error
 	var messageCount int
 	var x int
-	for x = 0; x < 1; x++ {
+	for x = 0; x < 1000000; x++ {
 		var ce *change.Event
 		if sourceFileScanner != nil {
 			if ce, err = readChangeEventFromFile(sourceFileScanner, sourceLog); err != nil {
 				return 0, err
 			}
-			if ce == nil {
+			if ce == nil && len(cl.Cmd) == 0 {
+				log.Info("finished processing source file")
+				log.Info("shutting down")
+				process.SetStop()
 				break
 			}
 		} else {
@@ -246,16 +233,17 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 				break
 			}
 		}
-		var c *command.Command
-		if c, err = command.NewCommand(ce, schemaPassFilter, schemaPrefix); err != nil {
-			return 0, err
+		c, err := command.NewCommand(ce, schemaPassFilter, schemaPrefix)
+		if err != nil {
+			log.Error("parse: %s", err)
+			continue
 		}
 		if c == nil {
 			continue
 		}
 		messageCount++
 		//log.Trace("%#v", c)
-		logDebugCommand(c)
+		//logDebugCommand(c)
 		// var txn = &CommandTxn{}
 		// txn.Cmd = append(txn.Cmd, *c)
 		// cq.Txn = append(cq.Txn, *txn)

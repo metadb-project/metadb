@@ -9,7 +9,7 @@ import (
 
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/internal/status"
-	"github.com/metadb-project/metadb/cmd/metadb/database"
+	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -110,7 +110,7 @@ func openDatabase(filename string) (*sql.DB, error) {
 func initSchema(d *sql.DB) error {
 	var err error
 	var tx *sql.Tx
-	if tx, err = database.MakeTx(d); err != nil {
+	if tx, err = sqlx.MakeTx(d); err != nil {
 		return err
 	}
 	defer tx.Rollback()

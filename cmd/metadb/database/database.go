@@ -1,7 +1,6 @@
 package database
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 
@@ -19,20 +18,6 @@ func Open(host, port, user, password, dbname, sslmode string) (*sql.DB, error) {
 		return nil, err
 	}
 	return db, nil
-}
-
-// MakeTx creates a new transaction.  Use "defer tx.Rollback()" to
-// ensure proper clean up.
-func MakeTx(db *sql.DB) (*sql.Tx, error) {
-	tx, err := db.BeginTx(context.TODO(),
-		&sql.TxOptions{
-			Isolation: sql.LevelSerializable,
-			ReadOnly:  false,
-		})
-	if err != nil {
-		return nil, fmt.Errorf("starting database transaction: %v", err)
-	}
-	return tx, nil
 }
 
 //func OpenMain(conf *config.System) (*sql.DB, error) {

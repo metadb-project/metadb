@@ -231,6 +231,15 @@ func DataTypeToSQL(dtype DataType, typeSize int64) string {
 	}
 }
 
+type Command struct {
+	Op          Operation
+	SchemaName  string
+	TableName   string
+	Origin      string
+	Column      []CommandColumn
+	ChangeEvent *change.Event
+}
+
 type CommandColumn struct {
 	Name         string
 	DType        DataType
@@ -241,13 +250,16 @@ type CommandColumn struct {
 	PrimaryKey   int
 }
 
-type Command struct {
-	Op          Operation
-	SchemaName  string
-	TableName   string
-	Origin      string
-	Column      []CommandColumn
-	ChangeEvent *change.Event
+func (c *Command) SchemaEquals(o *Command) bool {
+	if c.Op != o.Op || c.SchemaName != o.SchemaName || c.TableName != o.TableName {
+		return false
+	}
+	for i, col := range c.Column {
+		if col.Name != o.Column[i].Name || col.DType != o.Column[i].DType || col.DTypeSize != o.Column[i].DTypeSize || col.SemanticType != o.Column[i].SemanticType || col.PrimaryKey != o.Column[i].PrimaryKey {
+			return false
+		}
+	}
+	return true
 }
 
 func (c Command) String() string {
@@ -502,6 +514,7 @@ func indentJSON(data string) (string, error) {
 
 var Tenants []string
 
+// Returns nil, nil in some cases.
 func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string) (*Command, error) {
 	var err error
 	var u = &Command{}

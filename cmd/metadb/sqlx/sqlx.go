@@ -1,9 +1,19 @@
 package sqlx
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 )
+
+// MakeTx creates a new transaction.
+func MakeTx(db *sql.DB) (*sql.Tx, error) {
+	tx, err := db.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
+}
 
 type DB struct {
 	*sql.DB
