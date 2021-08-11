@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/metadb/database"
@@ -39,6 +40,19 @@ func EnableConnector(rq *api.EnableRequest) error {
 		if !enabled {
 			disabled = append(disabled, c)
 		}
+		////
+		// TMP check for db.<name>.users
+		if strings.HasPrefix(c, "db.") && !strings.HasSuffix(c, ".") {
+			attr := c + ".users"
+			users, err, _ := getConfig(attr)
+			if err != nil {
+				return fmt.Errorf("reading configuration: %s: %s", attr, err)
+			}
+			if strings.TrimSpace(users) == "" {
+				return fmt.Errorf("%s.users is undefined", c)
+			}
+		}
+		////
 	}
 	if len(disabled) == 0 {
 		return nil

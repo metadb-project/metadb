@@ -138,6 +138,7 @@ func pollLoop(spr *sproc) error {
 		spr.source.Status.Active()
 	}
 	var firstEvent = true
+	lastErr := ""
 	for {
 		//log.Trace("(poll)")
 		var cl = &command.CommandList{}
@@ -145,7 +146,12 @@ func pollLoop(spr *sproc) error {
 		// Parse
 		if _, err = parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.source.SchemaPrefix, sourceFileScanner, spr.sourceLog); err != nil {
 			////////////////////////////////////////////////////
-			log.Error("%s", err)
+			// avoid repeating "primary key not defined" errors consecutively
+			if !strings.Contains(err.Error(), "primary key not defined") || err.Error() != lastErr {
+				log.Error("%s", err)
+			}
+			lastErr = err.Error()
+
 			if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
 				_, err = consumer.Commit()
 				if err != nil {
