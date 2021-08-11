@@ -142,7 +142,8 @@ func pollLoop(spr *sproc) error {
 		var cl = &command.CommandList{}
 
 		// Parse
-		if _, err = parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.source.SchemaPrefix, sourceFileScanner, spr.sourceLog); err != nil {
+		eventReadCount, err := parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.source.SchemaPrefix, sourceFileScanner, spr.sourceLog)
+		if err != nil {
 			////////////////////////////////////////////////////
 			log.Error("%s", err)
 			//if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
@@ -195,11 +196,13 @@ func pollLoop(spr *sproc) error {
 			// return err
 		}
 
-		if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
+		if eventReadCount > 0 && sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
 			_, err = consumer.Commit()
 			if err != nil {
-				log.Error("%s", err)
-				panic(err)
+				//if err.(kafka.Error).Code() == kafka.ErrNoOffset {
+				//        log.Warning("kafka: %s", err)
+				//}
+				log.Warning("kafka: %s", err)
 			}
 		}
 
@@ -210,7 +213,7 @@ func pollLoop(spr *sproc) error {
 
 func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter []*regexp.Regexp, schemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
 	var err error
-	var messageCount int
+	var eventReadCount int
 	var x int
 	for x = 0; x < 100000; x++ {
 		var ce *change.Event
@@ -233,6 +236,10 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 				break
 			}
 		}
+		if ce == nil {
+			break
+		}
+		eventReadCount++
 		c, err := command.NewCommand(ce, schemaPassFilter, schemaPrefix)
 		if err != nil {
 			log.Error("parse: %s", err)
@@ -241,7 +248,6 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 		if c == nil {
 			continue
 		}
-		messageCount++
 		//log.Trace("%#v", c)
 		//logDebugCommand(c)
 		// var txn = &CommandTxn{}
@@ -249,7 +255,7 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 		// cq.Txn = append(cq.Txn, *txn)
 		cl.Cmd = append(cl.Cmd, *c)
 	}
-	return messageCount, nil
+	return eventReadCount, nil
 }
 
 func readChangeEventFromFile(sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (*change.Event, error) {
