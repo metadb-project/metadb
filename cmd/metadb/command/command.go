@@ -246,20 +246,9 @@ type CommandColumn struct {
 	DTypeSize    int64
 	SemanticType string
 	Data         interface{}
-	EncodedData  interface{}
-	PrimaryKey   int
-}
-
-func (c *Command) SchemaEquals(o *Command) bool {
-	if c.Op != o.Op || c.SchemaName != o.SchemaName || c.TableName != o.TableName {
-		return false
-	}
-	for i, col := range c.Column {
-		if col.Name != o.Column[i].Name || col.DType != o.Column[i].DType || col.DTypeSize != o.Column[i].DTypeSize || col.SemanticType != o.Column[i].SemanticType || col.PrimaryKey != o.Column[i].PrimaryKey {
-			return false
-		}
-	}
-	return true
+	//EncodedData  interface{}
+	EncodedData string
+	PrimaryKey  int
 }
 
 func (c Command) String() string {
@@ -516,9 +505,13 @@ var Tenants []string
 
 // Returns nil, nil in some cases.
 func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string) (*Command, error) {
+	if ce == nil {
+		return nil, fmt.Errorf("missing change event")
+	}
 	var err error
-	var u = &Command{}
-	if ce == nil || ce.Value == nil || ce.Value.Payload == nil {
+	var c = new(Command)
+	c.ChangeEvent = ce
+	if ce.Value == nil || ce.Value.Payload == nil {
 		var name string
 		var key interface{}
 		if ce != nil && ce.Key != nil {
@@ -528,19 +521,20 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 		log.Trace("possible tombstone event: missing value payload in change event: schema=%q, key=%v", name, key)
 		return nil, nil
 	}
-	if ce.Value.Payload.Op != nil {
-		switch *ce.Value.Payload.Op {
-		case "c":
-			u.Op = MergeOp
-		case "r":
-			u.Op = MergeOp
-		case "u":
-			u.Op = MergeOp
-		case "d":
-			u.Op = DeleteOp
-		default:
-			return nil, fmt.Errorf("unknown op value in change event: %q", *ce.Value.Payload.Op)
-		}
+	if ce.Value.Payload.Op == nil {
+		return nil, fmt.Errorf("missing value payload op")
+	}
+	switch *ce.Value.Payload.Op {
+	case "c":
+		c.Op = MergeOp
+	case "r":
+		c.Op = MergeOp
+	case "u":
+		c.Op = MergeOp
+	case "d":
+		c.Op = DeleteOp
+	default:
+		return nil, fmt.Errorf("unknown op value in change event: %q", *ce.Value.Payload.Op)
 	}
 	if ce.Value.Payload.Source != nil {
 		if ce.Value.Payload.Source.Schema != nil {
@@ -557,32 +551,75 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 			schema = strings.Replace(schema, "_mod_", "_", 1)
 			var origin string
 			origin, schema = extractOrigin(Tenants, schema)
-			u.Origin = origin
+			c.Origin = origin
 			schema = schemaPrefix + schema
-			u.SchemaName = schema
+			c.SchemaName = schema
 		} else {
-			u.SchemaName = ""
+			c.SchemaName = ""
 		}
-		u.TableName = *ce.Value.Payload.Source.Table
+		c.TableName = *ce.Value.Payload.Source.Table
 	}
-	if u.Op == DeleteOp {
-		var schema, table string
-		var key interface{}
-		if ce != nil && ce.Key != nil {
-			key = ce.Key.Payload
+	if c.Op == DeleteOp {
+		switch {
+		case ce.Key == nil:
+			return nil, fmt.Errorf("delete: missing event key: %v", ce.Key)
+		case ce.Key.Schema == nil:
+			return nil, fmt.Errorf("delete: missing event key schema: %v", ce.Key)
+		case ce.Key.Schema.Fields == nil:
+			return nil, fmt.Errorf("delete: missing event key schema fields: %v", ce.Key)
+		case ce.Key.Payload == nil:
+			return nil, fmt.Errorf("delete: missing event key payload: %v", ce.Key)
 		}
-		if ce.Value.Payload.Source != nil {
-			schema = *ce.Value.Payload.Source.Schema
-			table = *ce.Value.Payload.Source.Table
+		fields := ce.Key.Schema.Fields
+		payload := ce.Key.Payload
+		for i, m := range fields {
+			attr, ok := m["field"].(string)
+			if !ok {
+				return nil, fmt.Errorf("delete: unexpected type: key schema field: %v", m["field"])
+			}
+			var semtype string
+			if m["name"] != nil {
+				semtype, ok = m["name"].(string)
+				if !ok {
+					return nil, fmt.Errorf("delete: unexpected type: key schema name: %v", m["name"])
+				}
+			}
+			dt, ok := m["type"].(string)
+			if !ok {
+				return nil, fmt.Errorf("delete: unexpected type: key schema type: %v", m["type"])
+			}
+			dtype, err := convertDataType(dt, semtype)
+			if err != nil {
+				return nil, fmt.Errorf("delete: unknown key schema type: %v", m["type"])
+			}
+			data := payload[attr]
+			if dtype == JSONType {
+				d, err := indentJSON(data.(string))
+				if err == nil {
+					data = d
+				}
+			}
+			edata := SQLEncodeData(data, dtype, semtype)
+			typesize, err := convertTypeSize(edata, dt, dtype)
+			if err != nil {
+				return nil, fmt.Errorf("delete: unknown type size: %v", data)
+			}
+			c.Column = append(c.Column, CommandColumn{
+				Name:         attr,
+				DType:        dtype,
+				DTypeSize:    typesize,
+				SemanticType: semtype,
+				Data:         data,
+				EncodedData:  edata,
+				PrimaryKey:   i + 1,
+			})
 		}
-		log.Debug("received delete operation which is not yet supported: schema=%q, table=%q, key=%v", schema, table, key)
-		return nil, nil
+		return c, nil
 	}
-	if u.Column, err = extractColumns(ce); err != nil {
+	if c.Column, err = extractColumns(ce); err != nil {
 		return nil, err
 	}
-	u.ChangeEvent = ce
-	return u, nil
+	return c, nil
 }
 
 func extractOrigin(prefixes []string, schema string) (origin, newSchema string) {

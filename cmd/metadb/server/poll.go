@@ -414,7 +414,7 @@ func primaryKeyColumns(column []command.CommandColumn) []command.CommandColumn {
 		}
 	}
 	sort.Slice(pkey, func(i, j int) bool {
-		return pkey[i].PrimaryKey > pkey[j].PrimaryKey
+		return pkey[i].PrimaryKey < pkey[j].PrimaryKey
 	})
 	return pkey
 }

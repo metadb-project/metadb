@@ -55,7 +55,7 @@ func partitionTxn(cl *command.CommandList) []command.CommandList {
 	newcl := new(command.CommandList)
 	var c, lastc command.Command
 	for _, c = range cl.Cmd {
-		if !c.SchemaEquals(&lastc) {
+		if requiresSchemaChanges(&c, &lastc) {
 			if len(newcl.Cmd) > 0 {
 				clt = append(clt, *newcl)
 				newcl = new(command.CommandList)
@@ -70,7 +70,25 @@ func partitionTxn(cl *command.CommandList) []command.CommandList {
 	return clt
 }
 
+func requiresSchemaChanges(c, o *command.Command) bool {
+	if c.Op == command.DeleteOp && o.Op == command.DeleteOp {
+		return false
+	}
+	if c.Op != o.Op || c.SchemaName != o.SchemaName || c.TableName != o.TableName {
+		return true
+	}
+	for i, col := range c.Column {
+		if col.Name != o.Column[i].Name || col.DType != o.Column[i].DType || col.DTypeSize != o.Column[i].DTypeSize || col.SemanticType != o.Column[i].SemanticType || col.PrimaryKey != o.Column[i].PrimaryKey {
+			return true
+		}
+	}
+	return false
+}
+
 func execCommandSchema(c *command.Command, db *sql.DB, track *cache.Track, schema *cache.Schema, database *sysdb.DatabaseConnector) error {
+	if c.Op == command.DeleteOp {
+		return nil
+	}
 	var err error
 	var delta *deltaSchema
 	if delta, err = findDeltaSchema(c, schema); err != nil {
@@ -126,6 +144,9 @@ func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db *s
 }
 
 func execCommandData(c *command.Command, tx *sql.Tx) error {
+	if c.Op == command.DeleteOp {
+		return execDeleteData(c, tx)
+	}
 	var err error
 	var timeNow string = time.Now().Format(time.RFC3339)
 	// Check if a current version of the row exists
@@ -207,6 +228,47 @@ func execCommandData(c *command.Command, tx *sql.Tx) error {
 		return fmt.Errorf("%s:\n%s", err, q)
 	}
 	return nil
+}
+
+func execDeleteData(c *command.Command, tx *sql.Tx) error {
+	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
+	// current table
+	// subselect a single record
+	var b strings.Builder
+	b.WriteString("(SELECT __id FROM " + t.SQL() + " WHERE")
+	addColumnsToSelect(&b, c.Column)
+	b.WriteString(" LIMIT 1)")
+	// delete the record
+	_, err := tx.ExecContext(context.TODO(), "DELETE FROM "+t.SQL()+" WHERE __id="+b.String())
+	if err != nil {
+		return err
+	}
+	// history table
+	// subselect matching current record in history table
+	b.Reset()
+	b.WriteString("(SELECT __id FROM " + t.History().SQL() + " WHERE")
+	addColumnsToSelect(&b, c.Column)
+	b.WriteString(" AND __current LIMIT 1)")
+	// mark as not current
+	_, err = tx.ExecContext(context.TODO(),
+		"UPDATE "+t.History().SQL()+" SET __current=FALSE, __end=$1 WHERE __id="+b.String(), time.Now().Format(time.RFC3339))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func addColumnsToSelect(b *strings.Builder, column []command.CommandColumn) {
+	for i, c := range column {
+		if i != 0 {
+			b.WriteString(" AND")
+		}
+		if c.DType == command.JSONType {
+			b.WriteString(" " + c.Name + "::text=" + c.EncodedData + "::text")
+		} else {
+			b.WriteString(" " + c.Name + "=" + c.EncodedData)
+		}
+	}
 }
 
 func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64, error) {
