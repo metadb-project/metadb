@@ -215,7 +215,7 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 	var err error
 	var eventReadCount int
 	var x int
-	for x = 0; x < 100000; x++ {
+	for x = 0; x < 10000; x++ {
 		var ce *change.Event
 		if sourceFileScanner != nil {
 			if ce, err = readChangeEventFromFile(sourceFileScanner, sourceLog); err != nil {
