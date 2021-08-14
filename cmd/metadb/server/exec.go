@@ -158,20 +158,14 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
 	now := time.Now().Format(time.RFC3339)
 	// current table
-	// subselect a single record
+	// delete the record
 	var b strings.Builder
-	b.WriteString("(SELECT __id FROM " + t.SQL() + " WHERE __origin='" + c.Origin + "'")
+	b.WriteString("DELETE FROM " + t.SQL() + " WHERE __id=(SELECT __id FROM " + t.SQL() + " WHERE __origin='" + c.Origin + "'")
 	if ok := wherePKDataEqual(&b, c.Column); !ok {
 		return nil
 	}
-	b.WriteString(" LIMIT 1)")
-	// delete the record
-	_, err := tx.ExecContext(context.TODO(), "DELETE FROM "+t.SQL()+" WHERE __id="+b.String())
-	if err != nil {
-		return err
-	}
+	b.WriteString(" LIMIT 1);\n")
 	// insert new record
-	b.Reset()
 	b.WriteString("INSERT INTO " + t.SQL() + " (__start,__origin")
 	for _, c := range c.Column {
 		b.WriteString(",\"" + c.Name + "\"")
@@ -180,36 +174,25 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 	for _, c := range c.Column {
 		b.WriteString("," + c.EncodedData)
 	}
-	b.WriteString(")")
-	if _, err = tx.ExecContext(context.TODO(), b.String()); err != nil {
-		return err
-	}
+	b.WriteString(");\n")
 	// history table
-	// subselect matching current record in history table
-	b.Reset()
-	b.WriteString("(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
+	// select matching current record in history table and mark as not current
+	b.WriteString("UPDATE " + t.History().SQL() + " SET __current=FALSE,__end='" + now + "' WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
 	if ok := wherePKDataEqual(&b, c.Column); !ok {
 		return nil
 	}
-	b.WriteString(" AND __current LIMIT 1)")
-	// mark as not current
-	_, err = tx.ExecContext(context.TODO(),
-		"UPDATE "+t.History().SQL()+" SET __current=FALSE,__end=$1 WHERE __id="+b.String(), now)
-	if err != nil {
-		return err
-	}
+	b.WriteString(" AND __current LIMIT 1);\n")
 	// insert new record
-	b.Reset()
-	b.WriteString("INSERT INTO " + t.History().SQL() + " (__current,__start,__end,__origin")
+	b.WriteString("INSERT INTO " + t.History().SQL() + "(__current,__start,__end,__origin")
 	for _, c := range c.Column {
 		b.WriteString(",\"" + c.Name + "\"")
 	}
-	b.WriteString(") VALUES (TRUE,'" + now + "','9999-12-31 00:00:00-00','" + c.Origin + "'")
+	b.WriteString(")VALUES(TRUE,'" + now + "','9999-12-31 00:00:00-00','" + c.Origin + "'")
 	for _, c := range c.Column {
 		b.WriteString("," + c.EncodedData)
 	}
-	b.WriteString(")")
-	if _, err = tx.ExecContext(context.TODO(), b.String()); err != nil {
+	b.WriteString(");")
+	if _, err := tx.ExecContext(context.TODO(), b.String()); err != nil {
 		return err
 	}
 	return nil
@@ -219,29 +202,21 @@ func execDeleteData(c *command.Command, tx *sql.Tx) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
 	now := time.Now().Format(time.RFC3339)
 	// current table
-	// subselect a single record
-	var b strings.Builder
-	b.WriteString("(SELECT __id FROM " + t.SQL() + " WHERE __origin='" + c.Origin + "'")
-	if ok := wherePKDataEqual(&b, c.Column); !ok {
-		return nil
-	}
-	b.WriteString(" LIMIT 1)")
 	// delete the record
-	_, err := tx.ExecContext(context.TODO(), "DELETE FROM "+t.SQL()+" WHERE __id="+b.String())
-	if err != nil {
-		return err
-	}
-	// history table
-	// subselect matching current record in history table
-	b.Reset()
-	b.WriteString("(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
+	var b strings.Builder
+	b.WriteString("DELETE FROM " + t.SQL() + " WHERE __id=(SELECT __id FROM " + t.SQL() + " WHERE __origin='" + c.Origin + "'")
 	if ok := wherePKDataEqual(&b, c.Column); !ok {
 		return nil
 	}
-	b.WriteString(" AND __current LIMIT 1)")
-	// mark as not current
-	_, err = tx.ExecContext(context.TODO(),
-		"UPDATE "+t.History().SQL()+" SET __current=FALSE,__end=$1 WHERE __id="+b.String(), now)
+	b.WriteString(" LIMIT 1);")
+	// history table
+	// subselect matching current record in history table and mark as not current
+	b.WriteString("UPDATE " + t.History().SQL() + " SET __current=FALSE,__end='" + now + "' WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
+	if ok := wherePKDataEqual(&b, c.Column); !ok {
+		return nil
+	}
+	b.WriteString(" AND __current LIMIT 1);")
+	_, err := tx.ExecContext(context.TODO(), b.String())
 	if err != nil {
 		return err
 	}
