@@ -144,99 +144,87 @@ func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db *s
 }
 
 func execCommandData(c *command.Command, tx *sql.Tx) error {
-	if c.Op == command.DeleteOp {
+	switch c.Op {
+	case command.MergeOp:
+		return execMergeData(c, tx)
+	case command.DeleteOp:
 		return execDeleteData(c, tx)
+	default:
+		return fmt.Errorf("unknown command op: %v", c.Op)
 	}
-	var err error
-	var timeNow string = time.Now().Format(time.RFC3339)
-	// Check if a current version of the row exists
-	var idc int64
-	if idc, err = checkRowExistsCurrent(c, tx, false); err != nil {
-		return err
-	}
-	var idh int64
-	if idh, err = checkRowExistsCurrent(c, tx, true); err != nil {
-		return err
-	}
-	// If exists, delete row in current table
-	if idc != 0 {
-		var q = fmt.Sprintf(""+
-			"DELETE FROM %s\n"+
-			"    WHERE __id = %d;", util.JoinSchemaTable(c.SchemaName, c.TableName), idc)
-		if _, err = tx.ExecContext(context.TODO(), q); err != nil {
-			return fmt.Errorf("%s:\n%s", err, q)
-		}
-	}
-	// If exists, set __current to false in history table
-	if idh != 0 {
-		var q = fmt.Sprintf(""+
-			"UPDATE %s\n"+
-			"    SET __current = FALSE,\n"+
-			"        __end = '%s'\n"+
-			"    WHERE __id = %d;", util.JoinSchemaTable(c.SchemaName, c.TableName+"__"), timeNow, idh)
-		if _, err = tx.ExecContext(context.TODO(), q); err != nil {
-			return fmt.Errorf("%s:\n%s", err, q)
-		}
-	}
-	// Insert into current table
+}
+
+func execMergeData(c *command.Command, tx *sql.Tx) error {
+	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
+	now := time.Now().Format(time.RFC3339)
+	// current table
+	// subselect a single record
 	var b strings.Builder
-	fmt.Fprintf(&b, ""+
-		"INSERT INTO %s (\n"+
-		"        __start,\n"+
-		"        __origin", util.JoinSchemaTable(c.SchemaName, c.TableName))
-	var col command.CommandColumn
-	for _, col = range c.Column {
-		fmt.Fprintf(&b, ",\n        \"%s\"", col.Name)
+	b.WriteString("(SELECT __id FROM " + t.SQL() + " WHERE __origin='" + c.Origin + "'")
+	if ok := wherePKDataEqual(&b, c.Column); !ok {
+		return nil
 	}
-	fmt.Fprintf(&b, "\n"+
-		"    ) VALUES (\n"+
-		"        '%s',\n"+
-		"        '%s'", timeNow, c.Origin)
-	for _, col = range c.Column {
-		//fmt.Fprintf(&b, ",\n        %s", command.SQLEncodeData(col.Data, col.DType))
-		fmt.Fprintf(&b, ",\n        %s", col.EncodedData)
+	b.WriteString(" LIMIT 1)")
+	// delete the record
+	_, err := tx.ExecContext(context.TODO(), "DELETE FROM "+t.SQL()+" WHERE __id="+b.String())
+	if err != nil {
+		return err
 	}
-	fmt.Fprintf(&b, "\n    );")
-	var q = b.String()
-	if _, err = tx.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("%s:\n%s", err, q)
-	}
-	// Insert into history table
+	// insert new record
 	b.Reset()
-	fmt.Fprintf(&b, ""+
-		"INSERT INTO %s (\n"+
-		"        __current,\n"+
-		"        __start,\n"+
-		"        __end,\n"+
-		"        __origin", util.JoinSchemaTable(c.SchemaName, c.TableName+"__"))
-	for _, col = range c.Column {
-		fmt.Fprintf(&b, ",\n        \"%s\"", col.Name)
+	b.WriteString("INSERT INTO " + t.SQL() + " (__start,__origin")
+	for _, c := range c.Column {
+		b.WriteString(",\"" + c.Name + "\"")
 	}
-	fmt.Fprintf(&b, "\n"+
-		"    ) VALUES (\n"+
-		"        TRUE,\n"+
-		"        '%s',\n"+
-		"        '9999-12-31 00:00:00-00',\n"+
-		"        '%s'", timeNow, c.Origin)
-	for _, col = range c.Column {
-		//fmt.Fprintf(&b, ",\n        %s", command.SQLEncodeData(col.Data, col.DType))
-		fmt.Fprintf(&b, ",\n        %s", col.EncodedData)
+	b.WriteString(") VALUES ('" + now + "','" + c.Origin + "'")
+	for _, c := range c.Column {
+		b.WriteString("," + c.EncodedData)
 	}
-	fmt.Fprintf(&b, "\n    );")
-	q = b.String()
-	if _, err = tx.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("%s:\n%s", err, q)
+	b.WriteString(")")
+	if _, err = tx.ExecContext(context.TODO(), b.String()); err != nil {
+		return err
+	}
+	// history table
+	// subselect matching current record in history table
+	b.Reset()
+	b.WriteString("(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
+	if ok := wherePKDataEqual(&b, c.Column); !ok {
+		return nil
+	}
+	b.WriteString(" AND __current LIMIT 1)")
+	// mark as not current
+	_, err = tx.ExecContext(context.TODO(),
+		"UPDATE "+t.History().SQL()+" SET __current=FALSE,__end=$1 WHERE __id="+b.String(), now)
+	if err != nil {
+		return err
+	}
+	// insert new record
+	b.Reset()
+	b.WriteString("INSERT INTO " + t.History().SQL() + " (__current,__start,__end,__origin")
+	for _, c := range c.Column {
+		b.WriteString(",\"" + c.Name + "\"")
+	}
+	b.WriteString(") VALUES (TRUE,'" + now + "','9999-12-31 00:00:00-00','" + c.Origin + "'")
+	for _, c := range c.Column {
+		b.WriteString("," + c.EncodedData)
+	}
+	b.WriteString(")")
+	if _, err = tx.ExecContext(context.TODO(), b.String()); err != nil {
+		return err
 	}
 	return nil
 }
 
 func execDeleteData(c *command.Command, tx *sql.Tx) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
+	now := time.Now().Format(time.RFC3339)
 	// current table
 	// subselect a single record
 	var b strings.Builder
-	b.WriteString("(SELECT __id FROM " + t.SQL() + " WHERE")
-	addColumnsToSelect(&b, c.Column)
+	b.WriteString("(SELECT __id FROM " + t.SQL() + " WHERE __origin='" + c.Origin + "'")
+	if ok := wherePKDataEqual(&b, c.Column); !ok {
+		return nil
+	}
 	b.WriteString(" LIMIT 1)")
 	// delete the record
 	_, err := tx.ExecContext(context.TODO(), "DELETE FROM "+t.SQL()+" WHERE __id="+b.String())
@@ -246,29 +234,38 @@ func execDeleteData(c *command.Command, tx *sql.Tx) error {
 	// history table
 	// subselect matching current record in history table
 	b.Reset()
-	b.WriteString("(SELECT __id FROM " + t.History().SQL() + " WHERE")
-	addColumnsToSelect(&b, c.Column)
+	b.WriteString("(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
+	if ok := wherePKDataEqual(&b, c.Column); !ok {
+		return nil
+	}
 	b.WriteString(" AND __current LIMIT 1)")
 	// mark as not current
 	_, err = tx.ExecContext(context.TODO(),
-		"UPDATE "+t.History().SQL()+" SET __current=FALSE, __end=$1 WHERE __id="+b.String(), time.Now().Format(time.RFC3339))
+		"UPDATE "+t.History().SQL()+" SET __current=FALSE,__end=$1 WHERE __id="+b.String(), now)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func addColumnsToSelect(b *strings.Builder, column []command.CommandColumn) {
-	for i, c := range column {
-		if i != 0 {
+func wherePKDataEqual(b *strings.Builder, columns []command.CommandColumn) bool {
+	first := true
+	for _, c := range columns {
+		if c.PrimaryKey != 0 {
 			b.WriteString(" AND")
-		}
-		if c.DType == command.JSONType {
-			b.WriteString(" " + c.Name + "::text=" + c.EncodedData + "::text")
-		} else {
-			b.WriteString(" " + c.Name + "=" + c.EncodedData)
+			if c.DType == command.JSONType {
+				b.WriteString(" " + c.Name + "::text=" + c.EncodedData + "::text")
+			} else {
+				b.WriteString(" " + c.Name + "=" + c.EncodedData)
+			}
+			first = false
 		}
 	}
+	if first {
+		log.Error("command missing primary key")
+		return false
+	}
+	return true
 }
 
 func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64, error) {
