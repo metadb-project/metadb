@@ -89,14 +89,14 @@ func (e EventKey) String() string {
 }
 
 type EventPayloadSource struct {
-	Version   *string `json:"version"`
-	Connector *string `json:"connector"`
-	Name      *string `json:"name"`
-	TsMs      *int64  `json:"ts_ms"`
-	Snapshot  *string `json:"snapshot"`
-	DB        *string `json:"db"`
-	Schema    *string `json:"schema"`
-	Table     *string `json:"table"`
+	Version   *string  `json:"version"`
+	Connector *string  `json:"connector"`
+	Name      *string  `json:"name"`
+	TsMs      *float64 `json:"ts_ms"`
+	Snapshot  *string  `json:"snapshot"`
+	DB        *string  `json:"db"`
+	Schema    *string  `json:"schema"`
+	Table     *string  `json:"table"`
 }
 
 type EventValueSchema struct {

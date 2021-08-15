@@ -232,12 +232,13 @@ func DataTypeToSQL(dtype DataType, typeSize int64) string {
 }
 
 type Command struct {
-	Op          Operation
-	SchemaName  string
-	TableName   string
-	Origin      string
-	Column      []CommandColumn
-	ChangeEvent *change.Event
+	Op              Operation
+	SchemaName      string
+	TableName       string
+	Origin          string
+	Column          []CommandColumn
+	ChangeEvent     *change.Event
+	SourceTimestamp string
 }
 
 type CommandColumn struct {
@@ -536,29 +537,35 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 	default:
 		return nil, fmt.Errorf("unknown op value in change event: %q", *ce.Value.Payload.Op)
 	}
-	if ce.Value.Payload.Source != nil {
-		if ce.Value.Payload.Source.Schema != nil {
-			//if len(schemaPassFilter) > 0 && !strings.HasPrefix(*ce.Value.Payload.Source.Schema, filterPrefix) {
-			if len(schemaPassFilter) > 0 && !util.MatchRegexps(schemaPassFilter, *ce.Value.Payload.Source.Schema) {
-				log.Trace("filter: reject: %s", *ce.Value.Payload.Source.Schema)
-				return nil, nil
-			}
-			// TODO the mapping is currently hardcoded
-			var schema string = strings.TrimPrefix(*ce.Value.Payload.Source.Schema, "dbz_")
-			schema = strings.TrimPrefix(schema, "reports_dev_")
-			schema = strings.TrimPrefix(schema, "mod_")
-			schema = strings.TrimSuffix(schema, "_storage")
-			schema = strings.Replace(schema, "_mod_", "_", 1)
-			var origin string
-			origin, schema = extractOrigin(Tenants, schema)
-			c.Origin = origin
-			schema = schemaPrefix + schema
-			c.SchemaName = schema
-		} else {
-			c.SchemaName = ""
-		}
-		c.TableName = *ce.Value.Payload.Source.Table
+	if ce.Value.Payload.Source == nil {
+		return nil, fmt.Errorf("missing value payload source: %v", ce.Value.Payload)
 	}
+	if ce.Value.Payload.Source.TsMs == nil {
+		return nil, fmt.Errorf("missing value payload source timestamp: %v", ce.Value.Payload.Source)
+	}
+	// convert ts_ms to string
+	i, f := math.Modf(*ce.Value.Payload.Source.TsMs / 1000)
+	c.SourceTimestamp = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000000") + "Z"
+	if ce.Value.Payload.Source.Schema != nil {
+		if len(schemaPassFilter) > 0 && !util.MatchRegexps(schemaPassFilter, *ce.Value.Payload.Source.Schema) {
+			log.Trace("filter: reject: %s", *ce.Value.Payload.Source.Schema)
+			return nil, nil
+		}
+		// TODO the mapping is currently hardcoded
+		var schema string = strings.TrimPrefix(*ce.Value.Payload.Source.Schema, "dbz_")
+		schema = strings.TrimPrefix(schema, "reports_dev_")
+		schema = strings.TrimPrefix(schema, "mod_")
+		schema = strings.TrimSuffix(schema, "_storage")
+		schema = strings.Replace(schema, "_mod_", "_", 1)
+		var origin string
+		origin, schema = extractOrigin(Tenants, schema)
+		c.Origin = origin
+		schema = schemaPrefix + schema
+		c.SchemaName = schema
+	} else {
+		c.SchemaName = ""
+	}
+	c.TableName = *ce.Value.Payload.Source.Table
 	if c.Op == DeleteOp {
 		switch {
 		case ce.Key == nil:

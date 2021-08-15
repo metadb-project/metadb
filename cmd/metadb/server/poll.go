@@ -248,11 +248,6 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 		if c == nil {
 			continue
 		}
-		//log.Trace("%#v", c)
-		//logDebugCommand(c)
-		// var txn = &CommandTxn{}
-		// txn.Cmd = append(txn.Cmd, *c)
-		// cq.Txn = append(cq.Txn, *txn)
 		cl.Cmd = append(cl.Cmd, *c)
 	}
 	return eventReadCount, nil

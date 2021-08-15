@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
@@ -156,7 +155,6 @@ func execCommandData(c *command.Command, tx *sql.Tx) error {
 
 func execMergeData(c *command.Command, tx *sql.Tx) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
-	now := time.Now().Format(time.RFC3339)
 	// current table
 	// delete the record
 	var b strings.Builder
@@ -170,14 +168,14 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 	for _, c := range c.Column {
 		b.WriteString(",\"" + c.Name + "\"")
 	}
-	b.WriteString(") VALUES ('" + now + "','" + c.Origin + "'")
+	b.WriteString(") VALUES ('" + c.SourceTimestamp + "','" + c.Origin + "'")
 	for _, c := range c.Column {
 		b.WriteString("," + c.EncodedData)
 	}
 	b.WriteString(");\n")
 	// history table
 	// select matching current record in history table and mark as not current
-	b.WriteString("UPDATE " + t.History().SQL() + " SET __current=FALSE,__end='" + now + "' WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
+	b.WriteString("UPDATE " + t.History().SQL() + " SET __current=FALSE,__end='" + c.SourceTimestamp + "' WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
 	if ok := wherePKDataEqual(&b, c.Column); !ok {
 		return nil
 	}
@@ -187,7 +185,7 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 	for _, c := range c.Column {
 		b.WriteString(",\"" + c.Name + "\"")
 	}
-	b.WriteString(")VALUES(TRUE,'" + now + "','9999-12-31 00:00:00-00','" + c.Origin + "'")
+	b.WriteString(")VALUES(TRUE,'" + c.SourceTimestamp + "','9999-12-31 00:00:00Z','" + c.Origin + "'")
 	for _, c := range c.Column {
 		b.WriteString("," + c.EncodedData)
 	}
@@ -200,7 +198,6 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 
 func execDeleteData(c *command.Command, tx *sql.Tx) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
-	now := time.Now().Format(time.RFC3339)
 	// current table
 	// delete the record
 	var b strings.Builder
@@ -211,7 +208,7 @@ func execDeleteData(c *command.Command, tx *sql.Tx) error {
 	b.WriteString(" LIMIT 1);")
 	// history table
 	// subselect matching current record in history table and mark as not current
-	b.WriteString("UPDATE " + t.History().SQL() + " SET __current=FALSE,__end='" + now + "' WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
+	b.WriteString("UPDATE " + t.History().SQL() + " SET __current=FALSE,__end='" + c.SourceTimestamp + "' WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
 	if ok := wherePKDataEqual(&b, c.Column); !ok {
 		return nil
 	}
