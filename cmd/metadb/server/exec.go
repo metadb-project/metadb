@@ -164,11 +164,17 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 	}
 	b.WriteString(" LIMIT 1);\n")
 	// insert new record
-	b.WriteString("INSERT INTO " + t.SQL() + " (__start,__origin")
+	b.WriteString("INSERT INTO " + t.SQL() + "(__start")
+	if c.Origin != "" {
+		b.WriteString(",__origin")
+	}
 	for _, c := range c.Column {
 		b.WriteString(",\"" + c.Name + "\"")
 	}
-	b.WriteString(") VALUES ('" + c.SourceTimestamp + "','" + c.Origin + "'")
+	b.WriteString(")VALUES('" + c.SourceTimestamp + "'")
+	if c.Origin != "" {
+		b.WriteString(",'" + c.Origin + "'")
+	}
 	for _, c := range c.Column {
 		b.WriteString("," + c.EncodedData)
 	}
@@ -181,11 +187,17 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 	}
 	b.WriteString(" AND __current LIMIT 1);\n")
 	// insert new record
-	b.WriteString("INSERT INTO " + t.History().SQL() + "(__current,__start,__end,__origin")
+	b.WriteString("INSERT INTO " + t.History().SQL() + "(__current,__start,__end")
+	if c.Origin != "" {
+		b.WriteString(",__origin")
+	}
 	for _, c := range c.Column {
 		b.WriteString(",\"" + c.Name + "\"")
 	}
-	b.WriteString(")VALUES(TRUE,'" + c.SourceTimestamp + "','9999-12-31 00:00:00Z','" + c.Origin + "'")
+	b.WriteString(")VALUES(TRUE,'" + c.SourceTimestamp + "','9999-12-31 00:00:00Z'")
+	if c.Origin != "" {
+		b.WriteString(",'" + c.Origin + "'")
+	}
 	for _, c := range c.Column {
 		b.WriteString("," + c.EncodedData)
 	}

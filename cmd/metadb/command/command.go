@@ -247,9 +247,8 @@ type CommandColumn struct {
 	DTypeSize    int64
 	SemanticType string
 	Data         interface{}
-	//EncodedData  interface{}
-	EncodedData string
-	PrimaryKey  int
+	EncodedData  string
+	PrimaryKey   int
 }
 
 func (c Command) String() string {

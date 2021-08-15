@@ -115,7 +115,7 @@ func initSchema(d *sql.DB) error {
 	}
 	defer tx.Rollback()
 
-	var thisSchemaVersion int = 1
+	var thisSchemaVersion int = 2
 	eout.Trace("writing database version: %d", thisSchemaVersion)
 	var q = fmt.Sprintf("PRAGMA user_version = %d;", thisSchemaVersion)
 	if _, err = tx.ExecContext(context.TODO(), q); err != nil {

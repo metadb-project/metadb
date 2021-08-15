@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-clean_f='false'
+fast_f='false'
 test_f='false'
 testsa_f='false'
 verbose_f='false'
@@ -11,7 +11,7 @@ usage() {
     echo 'Usage:  build.sh [<flags>]'
     echo ''
     echo 'Flags:'
-    echo '-c                            - Remove executables before building'
+    echo '-f                            - "Fast" build (do not remove executables)'
     echo '-h                            - Help'
     echo '-t                            - Run tests'
     echo '-T                            - Run tests and all static analysis, requires:'
@@ -25,10 +25,11 @@ usage() {
     echo '-v                            - Enable verbose output'
 }
 
-while getopts 'Tchtv' flag; do
+while getopts 'Tcfhtv' flag; do
     case "${flag}" in
         T) testsa_f='true' ;;
-        c) clean_f='true' ;;
+        c) ;;
+        f) fast_f='true' ;;
         h) usage
             exit 1 ;;
         t) test_f='true' ;;
@@ -55,7 +56,7 @@ fi
 
 bindir=bin
 
-if $clean_f; then
+if ! $fast_f; then
     echo 'build.sh: removing executables' 1>&2
     rm -f ./$bindir/metadb ./$bindir/mdb
 fi
