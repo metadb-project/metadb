@@ -99,19 +99,15 @@ func createHistoryTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users []strin
 		"CREATE TABLE IF NOT EXISTS " + historyTableSQL + " (\n" +
 		"    __id bigserial PRIMARY KEY,\n" +
 		"    __cf boolean NOT NULL DEFAULT TRUE,\n" +
-		"    __current boolean NOT NULL,\n" +
 		"    __start timestamp with time zone NOT NULL,\n" +
 		"    __end timestamp with time zone NOT NULL,\n" +
+		"    __current boolean NOT NULL,\n" +
 		"    __origin varchar(63) NOT NULL DEFAULT ''\n" +
 		");"
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating history table: %s", err)
 	}
 	// add indexes on new columns
-	q = "CREATE INDEX ON " + historyTableSQL + " (__current);"
-	if _, err := db.ExecContext(context.TODO(), q); err != nil {
-		log.Error("unable to create index on " + historyTableSQL + " (__current);")
-	}
 	q = "CREATE INDEX ON " + historyTableSQL + " (__start);"
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
 		log.Error("unable to create index on " + historyTableSQL + " (__start);")
@@ -119,6 +115,10 @@ func createHistoryTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users []strin
 	q = "CREATE INDEX ON " + historyTableSQL + " (__end);"
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
 		log.Error("unable to create index on " + historyTableSQL + " (__end);")
+	}
+	q = "CREATE INDEX ON " + historyTableSQL + " (__current);"
+	if _, err := db.ExecContext(context.TODO(), q); err != nil {
+		log.Error("unable to create index on " + historyTableSQL + " (__current);")
 	}
 	q = "CREATE INDEX ON " + historyTableSQL + " (__origin);"
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
