@@ -162,9 +162,9 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 	}
 	if ident {
 		if cf == "false" {
-			return updateRowCF(c, tx, &t, id, false)
+			return updateRowCF(c, tx, &t, id)
 		}
-		return updateRowCF(c, tx, &t, id, true)
+		return nil
 	}
 	// current table
 	// delete the record
@@ -217,19 +217,17 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 	return nil
 }
 
-func updateRowCF(c *command.Command, tx *sql.Tx, t *sqlx.Table, id string, historyOnly bool) error {
+func updateRowCF(c *command.Command, tx *sql.Tx, t *sqlx.Table, id string) error {
 	var b strings.Builder
-	if !historyOnly {
-		// current table
-		b.WriteString("UPDATE " + t.SQL() + " SET __cf=TRUE WHERE __id='" + id + "';")
-	}
+	// current table
+	b.WriteString("UPDATE " + t.SQL() + " SET __cf=TRUE WHERE __id='" + id + "';")
 	// history table
 	// select matching current record in history table
 	b.WriteString("UPDATE " + t.History().SQL() + " SET __cf=TRUE WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(&b, c.Column); err != nil {
 		return err
 	}
-	b.WriteString(" AND NOT __cf AND __current LIMIT 1);")
+	b.WriteString(" AND __current LIMIT 1);")
 	if _, err := tx.ExecContext(context.TODO(), b.String()); err != nil {
 		return err
 	}
