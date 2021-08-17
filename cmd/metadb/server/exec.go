@@ -155,14 +155,23 @@ func execCommandData(c *command.Command, tx *sql.Tx) error {
 
 func execMergeData(c *command.Command, tx *sql.Tx) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
+	// Check if current record is identical
+	ident, id, cf, err := isCurrentIdentical(c, tx, &t)
+	if err != nil {
+		return err
+	}
+	if ident {
+		if cf == "false" {
+			return updateRowCF(c, tx, &t, id, false)
+		}
+		return updateRowCF(c, tx, &t, id, true)
+	}
 	// current table
 	// delete the record
 	var b strings.Builder
-	b.WriteString("DELETE FROM " + t.SQL() + " WHERE __id=(SELECT __id FROM " + t.SQL() + " WHERE __origin='" + c.Origin + "'")
-	if ok := wherePKDataEqual(&b, c.Column); !ok {
-		return nil
+	if id != "" {
+		b.WriteString("DELETE FROM " + t.SQL() + " WHERE __id='" + id + "';")
 	}
-	b.WriteString(" LIMIT 1);\n")
 	// insert new record
 	b.WriteString("INSERT INTO " + t.SQL() + "(__start")
 	if c.Origin != "" {
@@ -178,14 +187,14 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 	for _, c := range c.Column {
 		b.WriteString("," + c.EncodedData)
 	}
-	b.WriteString(");\n")
+	b.WriteString(");")
 	// history table
 	// select matching current record in history table and mark as not current
 	b.WriteString("UPDATE " + t.History().SQL() + " SET __current=FALSE,__end='" + c.SourceTimestamp + "' WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
-	if ok := wherePKDataEqual(&b, c.Column); !ok {
-		return nil
+	if err := wherePKDataEqual(&b, c.Column); err != nil {
+		return err
 	}
-	b.WriteString(" AND __current LIMIT 1);\n")
+	b.WriteString(" AND __current LIMIT 1);")
 	// insert new record
 	b.WriteString("INSERT INTO " + t.History().SQL() + "(__current,__start,__end")
 	if c.Origin != "" {
@@ -208,21 +217,118 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 	return nil
 }
 
+func updateRowCF(c *command.Command, tx *sql.Tx, t *sqlx.Table, id string, historyOnly bool) error {
+	var b strings.Builder
+	if !historyOnly {
+		// current table
+		b.WriteString("UPDATE " + t.SQL() + " SET __cf=TRUE WHERE __id='" + id + "';")
+	}
+	// history table
+	// select matching current record in history table
+	b.WriteString("UPDATE " + t.History().SQL() + " SET __cf=TRUE WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
+	if err := wherePKDataEqual(&b, c.Column); err != nil {
+		return err
+	}
+	b.WriteString(" AND NOT __cf AND __current LIMIT 1);")
+	if _, err := tx.ExecContext(context.TODO(), b.String()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func isCurrentIdentical(c *command.Command, tx *sql.Tx, t *sqlx.Table) (bool, string, string, error) {
+	var b strings.Builder
+	b.WriteString("SELECT * FROM " + t.SQL() + " WHERE __origin='" + c.Origin + "'")
+	if err := wherePKDataEqual(&b, c.Column); err != nil {
+		return false, "", "", err
+	}
+	b.WriteString(" LIMIT 1")
+	rows, err := tx.QueryContext(context.TODO(), b.String())
+	if err != nil {
+		return false, "", "", err
+	}
+	cols, err := rows.Columns()
+	if err != nil {
+		return false, "", "", err
+	}
+	ptrs := make([]interface{}, len(cols))
+	results := make([][]byte, len(cols))
+	for i := range results {
+		ptrs[i] = &results[i]
+	}
+	defer rows.Close()
+	var id, cf string
+	attrs := make(map[string]*string)
+	if rows.Next() {
+		if err = rows.Scan(ptrs...); err != nil {
+			return false, "", "", err
+		}
+		for i, r := range results {
+			if r != nil {
+				attr := cols[i]
+				val := string(r)
+				switch attr {
+				case "__id":
+					id = val
+				case "__cf":
+					cf = val
+				case "__start":
+				case "__end":
+				case "__current":
+				case "__origin":
+				default:
+					v := new(string)
+					*v = val
+					attrs[attr] = v
+				}
+			}
+		}
+	} else {
+		return false, "", "", nil
+	}
+	for _, col := range c.Column {
+		var cdata interface{}
+		var ddata *string
+		var cdatas, ddatas string
+		cdata = col.Data
+		if cdata != nil {
+			cdatas = fmt.Sprintf("%v", cdata)
+		}
+		ddata = attrs[col.Name]
+		if ddata != nil {
+			ddatas = *ddata
+		}
+		if (cdata == nil && ddata != nil) || (cdata != nil && ddata == nil) {
+			return false, id, cf, nil
+		}
+		if cdata != nil && ddata != nil && cdatas != ddatas {
+			return false, id, cf, nil
+		}
+		delete(attrs, col.Name)
+	}
+	for _, v := range attrs {
+		if v != nil {
+			return false, id, cf, nil
+		}
+	}
+	return true, id, cf, nil
+}
+
 func execDeleteData(c *command.Command, tx *sql.Tx) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
 	// current table
 	// delete the record
 	var b strings.Builder
 	b.WriteString("DELETE FROM " + t.SQL() + " WHERE __id=(SELECT __id FROM " + t.SQL() + " WHERE __origin='" + c.Origin + "'")
-	if ok := wherePKDataEqual(&b, c.Column); !ok {
-		return nil
+	if err := wherePKDataEqual(&b, c.Column); err != nil {
+		return err
 	}
 	b.WriteString(" LIMIT 1);")
 	// history table
 	// subselect matching current record in history table and mark as not current
 	b.WriteString("UPDATE " + t.History().SQL() + " SET __current=FALSE,__end='" + c.SourceTimestamp + "' WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
-	if ok := wherePKDataEqual(&b, c.Column); !ok {
-		return nil
+	if err := wherePKDataEqual(&b, c.Column); err != nil {
+		return err
 	}
 	b.WriteString(" AND __current LIMIT 1);")
 	_, err := tx.ExecContext(context.TODO(), b.String())
@@ -232,7 +338,7 @@ func execDeleteData(c *command.Command, tx *sql.Tx) error {
 	return nil
 }
 
-func wherePKDataEqual(b *strings.Builder, columns []command.CommandColumn) bool {
+func wherePKDataEqual(b *strings.Builder, columns []command.CommandColumn) error {
 	first := true
 	for _, c := range columns {
 		if c.PrimaryKey != 0 {
@@ -246,10 +352,9 @@ func wherePKDataEqual(b *strings.Builder, columns []command.CommandColumn) bool 
 		}
 	}
 	if first {
-		log.Error("command missing primary key")
-		return false
+		return fmt.Errorf("command missing primary key")
 	}
-	return true
+	return nil
 }
 
 func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64, error) {
@@ -283,39 +388,3 @@ func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64,
 	}
 	return 0, fmt.Errorf("%s:\n%s", err, q)
 }
-
-// func commandPrimaryKey(column []CommandColumn) []ColumnSchema {
-// 	var pk []ColumnSchema
-// 	var c CommandColumn
-// 	for _, c = range column {
-// 		if c.PrimaryKey > 0 {
-// 			pk = append(
-// 				pk,
-// 				ColumnSchema{
-// 					Name:       c.Name,
-// 					Type:       c.Type,
-// 					TypeSize:   c.TypeSize,
-// 					PrimaryKey: c.PrimaryKey,
-// 				})
-// 		}
-// 	}
-// 	sort.Slice(pkey, func(i, j int) bool {
-// 		return pkey[i].PrimaryKey > pkey[j].PrimaryKey
-// 	})
-// 	return pk
-// }
-
-// func execCommandTxn(txn *CommandTxn, db *sql.DB) error {
-// 	var err error
-// 	if err = execCommandSchema(&txn.Cmd[0], svr); err != nil {
-// 		return err
-// 	}
-// 	var cmd Command
-// 	for _, cmd = range txn.Cmd {
-// 		_ = cmd
-// 		if err = execCommandData(&cmd, svr); err != nil {
-// 			return err
-// 		}
-// 	}
-// 	return nil
-// }
