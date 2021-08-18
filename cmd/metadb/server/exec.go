@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
@@ -14,14 +15,14 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func execCommandList(cl *command.CommandList, db *sql.DB, track *cache.Track, schema *cache.Schema, database *sysdb.DatabaseConnector) error {
-	var clt []command.CommandList = partitionTxn(cl)
+func execCommandList(cl *command.CommandList, db *sql.DB, track *cache.Track, cschema *cache.Schema, database *sysdb.DatabaseConnector) error {
+	var clt []command.CommandList = partitionTxn(cl, cschema)
 	for _, cc := range clt {
 		if len(cc.Cmd) == 0 {
 			continue
 		}
 		// exec schema changes
-		if err := execCommandSchema(&cc.Cmd[0], db, track, schema, database); err != nil {
+		if err := execCommandSchema(&cc.Cmd[0], db, track, cschema, database); err != nil {
 			return err
 		}
 		// begin txn
@@ -32,6 +33,19 @@ func execCommandList(cl *command.CommandList, db *sql.DB, track *cache.Track, sc
 		defer tx.Rollback()
 		// exec data
 		for _, c := range cc.Cmd {
+			// Extra check of varchar sizes to ensure size was adjusted and avoid silent data loss
+			// due to optimization errors
+			for _, col := range c.Column {
+				if col.DType == command.VarcharType {
+					schemaCol := cschema.Column(&sqlx.Column{c.SchemaName, c.TableName, col.Name})
+					if schemaCol != nil && col.DTypeSize > schemaCol.CharMaxLen {
+						// TODO Factor fatal error exit into function
+						log.Fatal("internal error: schema varchar size not adjusted: %d > %d", col.DTypeSize, schemaCol.CharMaxLen)
+						os.Exit(-1)
+					}
+				}
+			}
+			// Execute data part of command
 			if err := execCommandData(&c, tx); err != nil {
 				return fmt.Errorf("%s\n%v", err, c)
 			}
@@ -49,12 +63,14 @@ func execCommandList(cl *command.CommandList, db *sql.DB, track *cache.Track, sc
 	return nil
 }
 
-func partitionTxn(cl *command.CommandList) []command.CommandList {
+func partitionTxn(cl *command.CommandList, cschema *cache.Schema) []command.CommandList {
 	var clt []command.CommandList
 	newcl := new(command.CommandList)
 	var c, lastc command.Command
 	for _, c = range cl.Cmd {
-		if requiresSchemaChanges(&c, &lastc) {
+		var req bool
+		req = requiresSchemaChanges(&c, &lastc, cschema)
+		if req {
 			if len(newcl.Cmd) > 0 {
 				clt = append(clt, *newcl)
 				newcl = new(command.CommandList)
@@ -69,16 +85,34 @@ func partitionTxn(cl *command.CommandList) []command.CommandList {
 	return clt
 }
 
-func requiresSchemaChanges(c, o *command.Command) bool {
+func requiresSchemaChanges(c, o *command.Command, cschema *cache.Schema) bool {
 	if c.Op == command.DeleteOp && o.Op == command.DeleteOp {
 		return false
 	}
 	if c.Op != o.Op || c.SchemaName != o.SchemaName || c.TableName != o.TableName {
 		return true
 	}
+	if len(c.Column) != len(o.Column) {
+		return true
+	}
 	for i, col := range c.Column {
-		if col.Name != o.Column[i].Name || col.DType != o.Column[i].DType || col.DTypeSize != o.Column[i].DTypeSize || col.SemanticType != o.Column[i].SemanticType || col.PrimaryKey != o.Column[i].PrimaryKey {
+		cc := sqlx.Column{c.SchemaName, c.TableName, col.Name}
+		if col.Name != o.Column[i].Name || col.DType != o.Column[i].DType || col.SemanticType != o.Column[i].SemanticType || col.PrimaryKey != o.Column[i].PrimaryKey {
 			return true
+		}
+		if col.DType == command.VarcharType {
+			// Special case for varchar
+			schemaCol := cschema.Column(&cc)
+			if schemaCol == nil {
+				return true
+			}
+			if col.DTypeSize > schemaCol.CharMaxLen {
+				return true
+			}
+		} else {
+			if col.DTypeSize != o.Column[i].DTypeSize {
+				return true
+			}
 		}
 	}
 	return false

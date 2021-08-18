@@ -81,3 +81,11 @@ func (s *Schema) TableSchema(table *sqlx.Table) map[string]ColumnSchema {
 	}
 	return ts
 }
+
+func (s *Schema) Column(column *sqlx.Column) *ColumnSchema {
+	cs, ok := s.columns[*column]
+	if ok {
+		return &cs
+	}
+	return nil
+}
