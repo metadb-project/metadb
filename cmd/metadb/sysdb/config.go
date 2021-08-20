@@ -218,3 +218,12 @@ func validateAttr(attr string) error {
 	}
 	return nil
 }
+
+func setConfig(attr, val string) error {
+	_, err := db.ExecContext(context.TODO(),
+		"INSERT INTO config (attr, val) VALUES ('"+attr+"', '"+val+"') ON CONFLICT (attr) DO UPDATE SET val='"+val+"'")
+	if err != nil {
+		return fmt.Errorf("writing configuration: %s: %s", attr, err)
+	}
+	return nil
+}

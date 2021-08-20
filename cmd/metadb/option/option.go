@@ -4,7 +4,6 @@ package option
 var GeneralUser = "metadb"
 
 type Global struct {
-	NOP bool // Placeholder
 }
 
 type Init struct {
@@ -31,6 +30,18 @@ type Server struct {
 type Stop struct {
 	Global
 	Datadir string
+}
+
+type Reset struct {
+	Global
+	Datadir   string
+	Connector string
+}
+
+type Clean struct {
+	Global
+	Datadir   string
+	Connector string
 }
 
 type Upgrade struct {

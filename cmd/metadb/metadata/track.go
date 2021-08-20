@@ -9,7 +9,7 @@ import (
 
 func TrackRead(db *sqlx.DB) (map[sqlx.Table]bool, error) {
 	tables := make(map[sqlx.Table]bool)
-	q := "SELECT schemaname, tablename FROM metadb.track;"
+	q := "SELECT schemaname, tablename FROM metadb.track"
 	rows, err := db.QueryContext(context.TODO(), q)
 	if err != nil {
 		return nil, err

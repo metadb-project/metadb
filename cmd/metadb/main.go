@@ -7,9 +7,11 @@ import (
 	"github.com/metadb-project/metadb/cmd/internal/color"
 	"github.com/metadb-project/metadb/cmd/internal/common"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
+	"github.com/metadb-project/metadb/cmd/metadb/clean"
 	"github.com/metadb-project/metadb/cmd/metadb/initsys"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
+	"github.com/metadb-project/metadb/cmd/metadb/reset"
 	"github.com/metadb-project/metadb/cmd/metadb/server"
 	"github.com/metadb-project/metadb/cmd/metadb/stop"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
@@ -52,6 +54,8 @@ func run(args []string) error {
 	var initOpt = option.Init{}
 	var serverOpt = option.Server{}
 	var stopOpt = option.Stop{}
+	var resetOpt = option.Reset{}
+	var cleanOpt = option.Clean{}
 	//var upgradeOpt = option.Upgrade{}
 	var logfile, csvlogfile string
 
@@ -137,6 +141,48 @@ func run(args []string) error {
 	_ = verboseFlag(cmdStop, &eout.EnableVerbose)
 	_ = traceFlag(cmdStop, &eout.EnableTrace)
 
+	var cmdReset = &cobra.Command{
+		Use:  "reset",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var err error
+			if err = initColor(); err != nil {
+				return err
+			}
+			resetOpt.Global = globalOpt
+			resetOpt.Connector = args[0]
+			if err = reset.Reset(&resetOpt); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+	cmdReset.SetHelpFunc(help)
+	_ = dirFlag(cmdReset, &resetOpt.Datadir)
+	_ = verboseFlag(cmdReset, &eout.EnableVerbose)
+	_ = traceFlag(cmdReset, &eout.EnableTrace)
+
+	var cmdClean = &cobra.Command{
+		Use:  "clean",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var err error
+			if err = initColor(); err != nil {
+				return err
+			}
+			cleanOpt.Global = globalOpt
+			cleanOpt.Connector = args[0]
+			if err = clean.Clean(&cleanOpt); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+	cmdClean.SetHelpFunc(help)
+	_ = dirFlag(cmdClean, &cleanOpt.Datadir)
+	_ = verboseFlag(cmdClean, &eout.EnableVerbose)
+	_ = traceFlag(cmdClean, &eout.EnableTrace)
+
 	/*
 		var cmdUpgrade = &cobra.Command{
 			Use: "upgrade",
@@ -217,7 +263,7 @@ func run(args []string) error {
 	//rootCmd.PersistentFlags().StringVar(&_, "client", metadbClientPort, ""+
 	//        "client port")
 	// Add commands.
-	rootCmd.AddCommand(cmdStart, cmdStop /* cmdUpgrade, */, cmdInit, cmdVersion, cmdCompletion)
+	rootCmd.AddCommand(cmdStart, cmdStop /* cmdUpgrade, */, cmdInit, cmdReset, cmdClean, cmdVersion, cmdCompletion)
 	var err error
 	if err = rootCmd.Execute(); err != nil {
 		return err
@@ -229,6 +275,8 @@ func run(args []string) error {
 var helpStart = "Start server\n"
 var helpStop = "Shutdown server\n"
 var helpInit = "Initialize new Metadb instance\n"
+var helpReset = "Reset database for new snapshot\n"
+var helpClean = "Remove data from previous reset\n"
 var helpVersion = "Print metadb version\n"
 var helpCompletion = "Generate command-line completion\n"
 
@@ -244,6 +292,8 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"  start                       - " + helpStart +
 			"  stop                        - " + helpStop +
 			"  init                        - " + helpInit +
+			"  reset                       - " + helpReset +
+			"  clean                       - " + helpClean +
 			"  version                     - " + helpVersion +
 			"  completion                  - " + helpCompletion +
 			"\n" +
@@ -285,6 +335,28 @@ func help(cmd *cobra.Command, commandLine []string) {
 			helpInit +
 			"\n" +
 			"Usage:  metadb init <options>\n" +
+			"\n" +
+			"Options:\n" +
+			dirFlag(nil, nil) +
+			verboseFlag(nil, nil) +
+			traceFlag(nil, nil) +
+			"")
+	case "reset":
+		fmt.Printf("" +
+			helpReset +
+			"\n" +
+			"Usage:  metadb reset <options> <connector>\n" +
+			"\n" +
+			"Options:\n" +
+			dirFlag(nil, nil) +
+			verboseFlag(nil, nil) +
+			traceFlag(nil, nil) +
+			"")
+	case "clean":
+		fmt.Printf("" +
+			helpClean +
+			"\n" +
+			"Usage:  metadb clean <options> <connector>\n" +
 			"\n" +
 			"Options:\n" +
 			dirFlag(nil, nil) +

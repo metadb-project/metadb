@@ -226,7 +226,7 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 	b.WriteString(");")
 	// history table
 	// select matching current record in history table and mark as not current
-	b.WriteString("UPDATE " + t.History().SQL() + " SET __end='" + c.SourceTimestamp + "',__current=FALSE WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __current AND __origin='" + c.Origin + "'")
+	b.WriteString("UPDATE " + t.History().SQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __current AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(&b, c.Column); err != nil {
 		return err
 	}
@@ -360,7 +360,7 @@ func execDeleteData(c *command.Command, tx *sql.Tx) error {
 	b.WriteString(" LIMIT 1);")
 	// history table
 	// subselect matching current record in history table and mark as not current
-	b.WriteString("UPDATE " + t.History().SQL() + " SET __cf=TRUE,__current=FALSE,__end='" + c.SourceTimestamp + "' WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __current AND __origin='" + c.Origin + "'")
+	b.WriteString("UPDATE " + t.History().SQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __current AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(&b, c.Column); err != nil {
 		return err
 	}

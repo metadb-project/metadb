@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/metadb-project/metadb/cmd/internal/api"
+	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
@@ -100,4 +101,68 @@ func isConnectorEnabled(spec string) (bool, error) {
 		return enabled, nil
 	}
 
+}
+
+func DisableSourceConnectors() error {
+	sysMu.Lock()
+	defer sysMu.Unlock()
+
+	// Disable connectors
+	if _, err := db.ExecContext(context.TODO(), "UPDATE connector SET enabled=FALSE WHERE spec LIKE 'src.%'"); err != nil {
+		return err
+	}
+	// Get list of source connectors
+	specs, err := sourceConnectors()
+	if err != nil {
+		return err
+	}
+	eout.Info("disabled source connectors: %s", strings.Join(specs, " "))
+	// Remove topics and group from source config
+	for _, spec := range specs {
+		// Topics
+		topicsAttr := spec + ".topics"
+		_, err, ok := getConfig(topicsAttr)
+		if err != nil {
+			return err
+		}
+		if ok {
+			if setConfig(topicsAttr, ""); err != nil {
+				return err
+			}
+		}
+		eout.Info("cleared configuration: %s", topicsAttr)
+		// Group
+		groupAttr := spec + ".group"
+		_, err, ok = getConfig(topicsAttr)
+		if err != nil {
+			return err
+		}
+		if ok {
+			if setConfig(groupAttr, ""); err != nil {
+				return err
+			}
+		}
+		eout.Info("cleared configuration: %s", groupAttr)
+	}
+	return nil
+}
+
+func sourceConnectors() ([]string, error) {
+	var specs []string
+	rows, err := db.QueryContext(context.TODO(), "SELECT spec FROM connector WHERE spec LIKE 'src.%'")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var spec string
+		if err := rows.Scan(&spec); err != nil {
+			return nil, err
+		}
+		specs = append(specs, spec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return specs, nil
 }
