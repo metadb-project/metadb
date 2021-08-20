@@ -16,7 +16,7 @@ func TestCSVToSQLBasic(t *testing.T) {
 
 func TestCSVToSQLNone(t *testing.T) {
 	var csv = ""
-	var wantSQL = ""
+	var wantSQL = "''"
 	var gotSQL string
 	gotSQL = CSVToSQL(csv)
 	if gotSQL != wantSQL {

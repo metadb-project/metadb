@@ -85,11 +85,7 @@ func VacuumAnalyze(db *DB, table *Table) error {
 }
 
 func CSVToSQL(csv string) string {
-	trim := strings.TrimSpace(csv)
-	if trim == "" {
-		return ""
-	}
-	list := strings.Split(trim, ",")
+	list := strings.Split(csv, ",")
 	var b strings.Builder
 	for i, s := range list {
 		if i != 0 {
