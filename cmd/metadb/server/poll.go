@@ -387,16 +387,19 @@ func logDebugCommand(c *command.Command) {
 	}
 	var pkey []command.CommandColumn = primaryKeyColumns(c.Column)
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s: %s (", c.Op, schemaTable)
-	var x int
-	var col command.CommandColumn
-	for x, col = range pkey {
-		if x > 0 {
-			fmt.Fprintf(&b, ", ")
+	fmt.Fprintf(&b, "%s: %s", c.Op, schemaTable)
+	if c.Op != command.TruncateOp {
+		fmt.Fprintf(&b, " (")
+		var x int
+		var col command.CommandColumn
+		for x, col = range pkey {
+			if x > 0 {
+				fmt.Fprintf(&b, ", ")
+			}
+			fmt.Fprintf(&b, "%s=%v", col.Name, col.Data)
 		}
-		fmt.Fprintf(&b, "%s=%v", col.Name, col.Data)
+		fmt.Fprintf(&b, ")")
 	}
-	fmt.Fprintf(&b, ")")
 	log.Debug("%s", b.String())
 }
 

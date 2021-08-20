@@ -18,6 +18,7 @@ type Operation int
 const (
 	MergeOp Operation = iota
 	DeleteOp
+	TruncateOp
 )
 
 func (o Operation) String() string {
@@ -26,6 +27,8 @@ func (o Operation) String() string {
 		return "merge"
 	case DeleteOp:
 		return "delete"
+	case TruncateOp:
+		return "truncate"
 	default:
 		return "(unknown)"
 	}
@@ -533,6 +536,8 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 		c.Op = MergeOp
 	case "d":
 		c.Op = DeleteOp
+	case "t":
+		c.Op = TruncateOp
 	default:
 		return nil, fmt.Errorf("unknown op value in change event: %q", *ce.Value.Payload.Op)
 	}
@@ -565,6 +570,9 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 		c.SchemaName = ""
 	}
 	c.TableName = *ce.Value.Payload.Source.Table
+	if c.Op == TruncateOp {
+		return c, nil
+	}
 	if c.Op == DeleteOp {
 		switch {
 		case ce.Key == nil:

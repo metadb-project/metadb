@@ -86,7 +86,7 @@ func partitionTxn(cl *command.CommandList, cschema *cache.Schema) []command.Comm
 }
 
 func requiresSchemaChanges(c, o *command.Command, cschema *cache.Schema) bool {
-	if c.Op == command.DeleteOp && o.Op == command.DeleteOp {
+	if c.Op == command.DeleteOp || c.Op == command.TruncateOp {
 		return false
 	}
 	if c.Op != o.Op || c.SchemaName != o.SchemaName || c.TableName != o.TableName {
@@ -182,6 +182,8 @@ func execCommandData(c *command.Command, tx *sql.Tx) error {
 		return execMergeData(c, tx)
 	case command.DeleteOp:
 		return execDeleteData(c, tx)
+	case command.TruncateOp:
+		return execTruncateData(c, tx)
 	default:
 		return fmt.Errorf("unknown command op: %v", c.Op)
 	}
@@ -224,20 +226,20 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 	b.WriteString(");")
 	// history table
 	// select matching current record in history table and mark as not current
-	b.WriteString("UPDATE " + t.History().SQL() + " SET __current=FALSE,__end='" + c.SourceTimestamp + "' WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
+	b.WriteString("UPDATE " + t.History().SQL() + " SET __end='" + c.SourceTimestamp + "',__current=FALSE WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __current AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(&b, c.Column); err != nil {
 		return err
 	}
-	b.WriteString(" AND __current LIMIT 1);")
+	b.WriteString(" LIMIT 1);")
 	// insert new record
-	b.WriteString("INSERT INTO " + t.History().SQL() + "(__current,__start,__end")
+	b.WriteString("INSERT INTO " + t.History().SQL() + "(__start,__end,__current")
 	if c.Origin != "" {
 		b.WriteString(",__origin")
 	}
 	for _, c := range c.Column {
 		b.WriteString(",\"" + c.Name + "\"")
 	}
-	b.WriteString(")VALUES(TRUE,'" + c.SourceTimestamp + "','9999-12-31 00:00:00Z'")
+	b.WriteString(")VALUES('" + c.SourceTimestamp + "','9999-12-31 00:00:00Z',TRUE")
 	if c.Origin != "" {
 		b.WriteString(",'" + c.Origin + "'")
 	}
@@ -257,11 +259,11 @@ func updateRowCF(c *command.Command, tx *sql.Tx, t *sqlx.Table, id string) error
 	b.WriteString("UPDATE " + t.SQL() + " SET __cf=TRUE WHERE __id='" + id + "';")
 	// history table
 	// select matching current record in history table
-	b.WriteString("UPDATE " + t.History().SQL() + " SET __cf=TRUE WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
+	b.WriteString("UPDATE " + t.History().SQL() + " SET __cf=TRUE WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __current AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(&b, c.Column); err != nil {
 		return err
 	}
-	b.WriteString(" AND __current LIMIT 1);")
+	b.WriteString(" LIMIT 1);")
 	if _, err := tx.ExecContext(context.TODO(), b.String()); err != nil {
 		return err
 	}
@@ -358,11 +360,25 @@ func execDeleteData(c *command.Command, tx *sql.Tx) error {
 	b.WriteString(" LIMIT 1);")
 	// history table
 	// subselect matching current record in history table and mark as not current
-	b.WriteString("UPDATE " + t.History().SQL() + " SET __current=FALSE,__end='" + c.SourceTimestamp + "' WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __origin='" + c.Origin + "'")
+	b.WriteString("UPDATE " + t.History().SQL() + " SET __cf=TRUE,__current=FALSE,__end='" + c.SourceTimestamp + "' WHERE __id=(SELECT __id FROM " + t.History().SQL() + " WHERE __current AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(&b, c.Column); err != nil {
 		return err
 	}
-	b.WriteString(" AND __current LIMIT 1);")
+	b.WriteString(" LIMIT 1);")
+	_, err := tx.ExecContext(context.TODO(), b.String())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func execTruncateData(c *command.Command, tx *sql.Tx) error {
+	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
+	// Current table: delete all records from origin
+	var b strings.Builder
+	b.WriteString("DELETE FROM " + t.SQL() + " WHERE __origin='" + c.Origin + "';")
+	// History table: mark as not current
+	b.WriteString("UPDATE " + t.History().SQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "';")
 	_, err := tx.ExecContext(context.TODO(), b.String())
 	if err != nil {
 		return err
