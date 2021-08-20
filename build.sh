@@ -101,6 +101,7 @@ fi
 if $test_f || $testsa_f; then
     echo 'build.sh: running tests' 1>&2
     go test $v -vet=off -count=1 ./cmd/metadb/command 1>&2
+    go test $v -vet=off -count=1 ./cmd/metadb/sqlx 1>&2
     go test $v -vet=off -count=1 ./cmd/metadb/util 1>&2
 fi
 

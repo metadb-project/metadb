@@ -158,6 +158,8 @@ func run(args []string) error {
 		},
 	}
 	cmdReset.SetHelpFunc(help)
+	cmdReset.Flags().StringVar(&resetOpt.Origins, "origin", "", "")
+	_ = cmdReset.MarkFlagRequired("origin")
 	_ = dirFlag(cmdReset, &resetOpt.Datadir)
 	_ = verboseFlag(cmdReset, &eout.EnableVerbose)
 	_ = traceFlag(cmdReset, &eout.EnableTrace)
@@ -179,6 +181,8 @@ func run(args []string) error {
 		},
 	}
 	cmdClean.SetHelpFunc(help)
+	cmdClean.Flags().StringVar(&cleanOpt.Origins, "origin", "", "")
+	_ = cmdClean.MarkFlagRequired("origin")
 	_ = dirFlag(cmdClean, &cleanOpt.Datadir)
 	_ = verboseFlag(cmdClean, &eout.EnableVerbose)
 	_ = traceFlag(cmdClean, &eout.EnableTrace)
@@ -348,6 +352,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"Usage:  metadb reset <options> <connector>\n" +
 			"\n" +
 			"Options:\n" +
+			"      --origin <o>            - Origins to reset (comma-separated list)\n" +
 			dirFlag(nil, nil) +
 			verboseFlag(nil, nil) +
 			traceFlag(nil, nil) +
@@ -359,6 +364,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"Usage:  metadb clean <options> <connector>\n" +
 			"\n" +
 			"Options:\n" +
+			"      --origin <o>            - Origins to clean (comma-separated list)\n" +
 			dirFlag(nil, nil) +
 			verboseFlag(nil, nil) +
 			traceFlag(nil, nil) +

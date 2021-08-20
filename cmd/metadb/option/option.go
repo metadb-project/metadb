@@ -35,12 +35,14 @@ type Stop struct {
 type Reset struct {
 	Global
 	Datadir   string
+	Origins   string
 	Connector string
 }
 
 type Clean struct {
 	Global
 	Datadir   string
+	Origins   string
 	Connector string
 }
 

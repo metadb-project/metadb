@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 func Open(dsn *DataSourceName) (*DB, error) {
@@ -81,4 +82,20 @@ func VacuumAnalyze(db *DB, table *Table) error {
 		return err
 	}
 	return nil
+}
+
+func CSVToSQL(csv string) string {
+	trim := strings.TrimSpace(csv)
+	if trim == "" {
+		return ""
+	}
+	list := strings.Split(trim, ",")
+	var b strings.Builder
+	for i, s := range list {
+		if i != 0 {
+			b.WriteString(",")
+		}
+		b.WriteString("'" + strings.TrimSpace(s) + "'")
+	}
+	return b.String()
 }

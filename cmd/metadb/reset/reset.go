@@ -21,7 +21,7 @@ func Reset(opt *option.Reset) error {
 		return fmt.Errorf("invalid database connector: %s", opt.Connector)
 	}
 	// Ask for confirmation
-	fmt.Fprintf(os.Stderr, "metadb: reset all current data in %q? ", opt.Connector)
+	fmt.Fprintf(os.Stderr, "metadb: reset current data in %q? ", opt.Connector)
 	var confirm string
 	_, err := fmt.Scanln(&confirm)
 	if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
@@ -59,13 +59,14 @@ func Reset(opt *option.Reset) error {
 	sort.Slice(tables, func(i, j int) bool {
 		return tables[i].String() < tables[j].String()
 	})
+	origins := sqlx.CSVToSQL(opt.Origins)
 	for _, t := range tables {
 		eout.Info("resetting: %s", t.String())
-		_, err := db.ExecContext(context.TODO(), "UPDATE "+t.SQL()+" SET __cf=FALSE WHERE __cf")
+		_, err := db.ExecContext(context.TODO(), "UPDATE "+t.SQL()+" SET __cf=FALSE WHERE __cf AND __origin IN ("+origins+")")
 		if err != nil {
 			return err
 		}
-		_, err = db.ExecContext(context.TODO(), "UPDATE "+t.History().SQL()+" SET __cf=FALSE WHERE __cf AND __current")
+		_, err = db.ExecContext(context.TODO(), "UPDATE "+t.History().SQL()+" SET __cf=FALSE WHERE __cf AND __current AND __origin IN ("+origins+")")
 		if err != nil {
 			return err
 		}

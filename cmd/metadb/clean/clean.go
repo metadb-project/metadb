@@ -22,7 +22,7 @@ func Clean(opt *option.Clean) error {
 		return fmt.Errorf("invalid database connector: %s", opt.Connector)
 	}
 	// Ask for confirmation
-	fmt.Fprintf(os.Stderr, "metadb: remove all reset data in %q? ", opt.Connector)
+	fmt.Fprintf(os.Stderr, "metadb: remove old data in %q? ", opt.Connector)
 	var confirm string
 	_, err := fmt.Scanln(&confirm)
 	if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
@@ -54,13 +54,14 @@ func Clean(opt *option.Clean) error {
 	sort.Slice(tables, func(i, j int) bool {
 		return tables[i].String() < tables[j].String()
 	})
+	origins := sqlx.CSVToSQL(opt.Origins)
 	for _, t := range tables {
 		eout.Info("cleaning: %s", t.String())
-		_, err := db.ExecContext(context.TODO(), "DELETE FROM "+t.SQL()+" WHERE NOT __cf")
+		_, err := db.ExecContext(context.TODO(), "DELETE FROM "+t.SQL()+" WHERE NOT __cf AND __origin IN ("+origins+")")
 		if err != nil {
 			return err
 		}
-		_, err = db.ExecContext(context.TODO(), "UPDATE "+t.History().SQL()+" SET __cf=TRUE,__end='"+now+"',__current=FALSE WHERE NOT __cf AND __current")
+		_, err = db.ExecContext(context.TODO(), "UPDATE "+t.History().SQL()+" SET __cf=TRUE,__end='"+now+"',__current=FALSE WHERE NOT __cf AND __current AND __origin IN ("+origins+")")
 		if err != nil {
 			return err
 		}
