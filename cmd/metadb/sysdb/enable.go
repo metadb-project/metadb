@@ -18,7 +18,7 @@ func EnableConnector(rq *api.EnableRequest) error {
 
 	var err error
 	// filter enabled or unconfigured connectors
-	var disabled []string
+	var conn []string
 	var c string
 	for _, c = range rq.Connectors {
 		// validate that spec exists in config
@@ -39,7 +39,7 @@ func EnableConnector(rq *api.EnableRequest) error {
 			return err
 		}
 		if !enabled {
-			disabled = append(disabled, c)
+			conn = append(conn, c)
 		}
 		////
 		// TMP check for db.<name>.users
@@ -55,7 +55,7 @@ func EnableConnector(rq *api.EnableRequest) error {
 		}
 		////
 	}
-	if len(disabled) == 0 {
+	if len(conn) == 0 {
 		return nil
 	}
 	// start txn
@@ -65,11 +65,11 @@ func EnableConnector(rq *api.EnableRequest) error {
 	}
 	defer tx.Rollback()
 	// enable connectors
-	for _, c = range disabled {
+	for _, c = range conn {
 		log.Info("enabling connector: %s", c)
 		var q = fmt.Sprintf(""+
-			"INSERT INTO connector (spec, enabled) VALUES ('%s', TRUE)\n"+
-			"    ON CONFLICT (spec) DO UPDATE SET enabled = TRUE;", c)
+			"INSERT INTO connector (spec,enabled) VALUES ('%s',TRUE)\n"+
+			"    ON CONFLICT (spec) DO UPDATE SET enabled=TRUE;", c)
 		if _, err = tx.ExecContext(context.TODO(), q); err != nil {
 			return fmt.Errorf("enabling: %s: %s", c, err)
 		}
@@ -77,6 +77,62 @@ func EnableConnector(rq *api.EnableRequest) error {
 	// commit
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("enabling connectors: committing changes: %s", err)
+	}
+	return nil
+}
+
+func DisableConnector(rq *api.DisableRequest) error {
+	sysMu.Lock()
+	defer sysMu.Unlock()
+
+	var err error
+	// filter disabled or unconfigured connectors
+	var conn []string
+	var c string
+	for _, c = range rq.Connectors {
+		// validate that spec exists in config
+		var q = fmt.Sprintf("SELECT 1 FROM config WHERE attr LIKE '%s.%%' LIMIT 1;", c)
+		var i int64
+		err = db.QueryRowContext(context.TODO(), q).Scan(&i)
+		switch {
+		case err == sql.ErrNoRows:
+			return fmt.Errorf("configuration not found for connector: %s", c)
+		case err != nil:
+			return fmt.Errorf("reading connection configuration: %s: %s", c, err)
+		default:
+			// NOP
+		}
+		// remove from list if already disabled
+		var enabled bool
+		if enabled, err = isConnectorEnabled(c); err != nil {
+			return err
+		}
+		if enabled {
+			conn = append(conn, c)
+		}
+	}
+	if len(conn) == 0 {
+		return nil
+	}
+	// start txn
+	var tx *sql.Tx
+	if tx, err = sqlx.MakeTx(db); err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	// enable connectors
+	for _, c = range conn {
+		log.Info("disabling connector: %s", c)
+		var q = fmt.Sprintf(""+
+			"INSERT INTO connector (spec,enabled) VALUES ('%s',FALSE)\n"+
+			"    ON CONFLICT (spec) DO UPDATE SET enabled=FALSE;", c)
+		if _, err = tx.ExecContext(context.TODO(), q); err != nil {
+			return fmt.Errorf("disabling: %s: %s", c, err)
+		}
+	}
+	// commit
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("disabling connectors: committing changes: %s", err)
 	}
 	return nil
 }

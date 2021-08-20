@@ -13,6 +13,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/internal/common"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/mdb/config"
+	"github.com/metadb-project/metadb/cmd/mdb/disable"
 	"github.com/metadb-project/metadb/cmd/mdb/enable"
 	"github.com/metadb-project/metadb/cmd/mdb/option"
 	"github.com/metadb-project/metadb/cmd/mdb/status"
@@ -56,6 +57,7 @@ func run(args []string) error {
 	var configOpt = option.Config{}
 	var statusOpt = option.Status{}
 	var enableOpt = option.Enable{}
+	var disableOpt = option.Disable{}
 
 	var passwordPrompt bool
 
@@ -143,6 +145,33 @@ func run(args []string) error {
 	_ = noTLSFlag(cmdEnable, &globalOpt.NoTLS)
 	_ = skipVerifyFlag(cmdEnable, &globalOpt.TLSSkipVerify)
 
+	var cmdDisable = &cobra.Command{
+		Use:  "disable",
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			if err = initColor(); err != nil {
+				return
+			}
+			if err = validateGlobalOptions(&globalOpt); err != nil {
+				return
+			}
+			disableOpt.Global = globalOpt
+			disableOpt.Connectors = args
+			if err = disable.Disable(&disableOpt); err != nil {
+				return
+			}
+			err = nil
+			return
+		},
+	}
+	cmdDisable.SetHelpFunc(help)
+	_ = hostFlag(cmdDisable, &globalOpt.Host)
+	_ = adminPortFlag(cmdDisable, &globalOpt.AdminPort)
+	_ = verboseFlag(cmdDisable, &eout.EnableVerbose)
+	_ = traceFlag(cmdDisable, &eout.EnableTrace)
+	_ = noTLSFlag(cmdDisable, &globalOpt.NoTLS)
+	_ = skipVerifyFlag(cmdDisable, &globalOpt.TLSSkipVerify)
+
 	var cmdStatus = &cobra.Command{
 		Use: "status",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -218,7 +247,7 @@ func run(args []string) error {
 	var helpFlag bool
 	rootCmd.PersistentFlags().BoolVarP(&helpFlag, "help", "", false, "Help for mdb")
 	// Add commands.
-	rootCmd.AddCommand(cmdConfig, cmdEnable, cmdStatus, cmdVersion, cmdCompletion)
+	rootCmd.AddCommand(cmdConfig, cmdEnable, cmdDisable, cmdStatus, cmdVersion, cmdCompletion)
 	var err error
 	if err = rootCmd.Execute(); err != nil {
 		return err
@@ -229,6 +258,7 @@ func run(args []string) error {
 
 var helpConfig = "Configure or show server settings\n"
 var helpEnable = "Enable database or source connectors\n"
+var helpDisable = "Disable database or source connectors\n"
 var helpStatus = "Print server status\n"
 var helpVersion = "Print mdb version\n"
 var helpCompletion = "Generate command-line completion\n"
@@ -244,6 +274,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"Commands:\n" +
 			"  config                      - " + helpConfig +
 			"  enable                      - " + helpEnable +
+			"  disable                     - " + helpDisable +
 			//"  status                      - " + helpStatus +
 			"  version                     - " + helpVersion +
 			"  completion                  - " + helpCompletion +
@@ -300,6 +331,24 @@ func help(cmd *cobra.Command, commandLine []string) {
 			helpConfig +
 			"\n" +
 			"Usage:  mdb enable [<options>] <connector>...\n" +
+			"\n" +
+			"Options:\n" +
+			hostFlag(nil, nil) +
+			adminPortFlag(nil, nil) +
+			verboseFlag(nil, nil) +
+			noTLSFlag(nil, nil) +
+			skipVerifyFlag(nil, nil) +
+			traceFlag(nil, nil) +
+			"\n" +
+			"Connectors:\n" +
+			"  db.<name>\n" +
+			"  src.<name>\n" +
+			"")
+	case "disable":
+		fmt.Printf("" +
+			helpConfig +
+			"\n" +
+			"Usage:  mdb disable [<options>] <connector>...\n" +
 			"\n" +
 			"Options:\n" +
 			hostFlag(nil, nil) +

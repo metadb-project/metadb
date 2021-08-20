@@ -183,6 +183,7 @@ func setupHandlers(svr *server) http.Handler {
 
 	mux.HandleFunc("/config", svr.handleConfig)
 	mux.HandleFunc("/enable", svr.handleEnable)
+	mux.HandleFunc("/disable", svr.handleDisable)
 	mux.HandleFunc("/status", svr.handleStatus)
 	mux.HandleFunc("/", svr.handleDefault)
 
@@ -223,6 +224,23 @@ func (svr *server) handleEnable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var m = unsupportedMethod("/enable", r)
+	log.Info(m)
+	http.Error(w, m, http.StatusMethodNotAllowed)
+}
+
+func (svr *server) handleDisable(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		log.Debug("request: %s", requestString(r))
+		w.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(w, "disable\r\n")
+		return
+	}
+	if r.Method == "POST" {
+		log.Debug("request: %s", requestString(r))
+		svr.handleDisablePost(w, r)
+		return
+	}
+	var m = unsupportedMethod("/disable", r)
 	log.Info(m)
 	http.Error(w, m, http.StatusMethodNotAllowed)
 }
@@ -342,6 +360,24 @@ func (svr *server) handleEnablePost(w http.ResponseWriter, r *http.Request) {
 	// enable
 	var err error
 	if err = sysdb.EnableConnector(&rq); err != nil {
+		util.HandleError(w, err, http.StatusBadRequest)
+		return
+	}
+	// success response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (svr *server) handleDisablePost(w http.ResponseWriter, r *http.Request) {
+	// read request
+	var rq api.DisableRequest
+	var ok bool
+	if ok = util.ReadRequest(w, r, &rq); !ok {
+		return
+	}
+	// disable
+	var err error
+	if err = sysdb.DisableConnector(&rq); err != nil {
 		util.HandleError(w, err, http.StatusBadRequest)
 		return
 	}

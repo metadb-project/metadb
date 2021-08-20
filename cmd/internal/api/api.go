@@ -76,3 +76,7 @@ type GetStatusResponse struct {
 type EnableRequest struct {
 	Connectors []string
 }
+
+type DisableRequest struct {
+	Connectors []string
+}

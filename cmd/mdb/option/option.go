@@ -47,3 +47,8 @@ type Enable struct {
 	Connectors []string
 	Global
 }
+
+type Disable struct {
+	Connectors []string
+	Global
+}
