@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -122,6 +121,7 @@ func pollLoop(spr *sproc) error {
 			"enable.auto.commit":   false,
 			"enable.partition.eof": true,
 			"group.id":             group,
+			"max.poll.interval.ms": 900000,
 		}
 		consumer, err = kafka.NewConsumer(config)
 		if err != nil {
@@ -162,23 +162,26 @@ func pollLoop(spr *sproc) error {
 			log.Info("receiving data")
 		}
 
-		/*
-			// Rewrite
-			if err = rewriteCommandList(cl, svr); err != nil {
-				////////////////////////////////////////////////////
-				log.Info("skipping non-rewriteable command: %s", err)
-				if sourceFileScanner == nil && !svr.opt.NoKafkaCommit {
-					_, err = consumer.Commit()
-					if err != nil {
-						log.Error("%s", err)
-						panic(err)
-					}
-				}
-				continue
-				////////////////////////////////////////////////////
-				// return err
-			}
-		*/
+		// Rewrite
+		before := len(cl.Cmd)
+		if err = rewriteCommandList(cl, spr.db[0], track, schema, spr.databases[0], spr.svr.opt.RewriteJSON); err != nil {
+			log.Error("%s", err)
+			//log.Info("skipping non-rewriteable command: %s", err)
+			//if sourceFileScanner == nil && !svr.opt.NoKafkaCommit {
+			//        _, err = consumer.Commit()
+			//        if err != nil {
+			//                log.Error("%s", err)
+			//                panic(err)
+			//        }
+			//}
+			continue
+			////////////////////////////////////////////////////
+			// return err
+		}
+		after := len(cl.Cmd)
+		if before != after {
+			log.Trace("%d commands added by rewrite", after-before)
+		}
 
 		// Execute
 		if err = execCommandList(cl, spr.db[0], track, schema, spr.databases[0]); err != nil {
@@ -385,7 +388,7 @@ func logDebugCommand(c *command.Command) {
 	} else {
 		schemaTable = c.SchemaName + "." + c.TableName
 	}
-	var pkey []command.CommandColumn = primaryKeyColumns(c.Column)
+	var pkey []command.CommandColumn = command.PrimaryKeyColumns(c.Column)
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s: %s", c.Op, schemaTable)
 	if c.Op != command.TruncateOp {
@@ -401,20 +404,6 @@ func logDebugCommand(c *command.Command) {
 		fmt.Fprintf(&b, ")")
 	}
 	log.Debug("%s", b.String())
-}
-
-func primaryKeyColumns(column []command.CommandColumn) []command.CommandColumn {
-	var pkey []command.CommandColumn
-	var col command.CommandColumn
-	for _, col = range column {
-		if col.PrimaryKey > 0 {
-			pkey = append(pkey, col)
-		}
-	}
-	sort.Slice(pkey, func(i, j int) bool {
-		return pkey[i].PrimaryKey < pkey[j].PrimaryKey
-	})
-	return pkey
 }
 
 // TODO waitForConfig is not currently using the source-database mapping.

@@ -29,7 +29,7 @@ func TrackRead(db *sqlx.DB) (map[sqlx.Table]bool, error) {
 }
 
 func TrackWrite(db *sqlx.DB, table *sqlx.Table) error {
-	q := "INSERT INTO metadb.track (schemaname, tablename) VALUES ('" + table.Schema + "', '" + table.Table + "')"
+	q := "INSERT INTO metadb.track(schemaname,tablename,parentschema,parenttable)VALUES('" + table.Schema + "','" + table.Table + "','','')"
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("insert: %v: %s", table, err)
 	}

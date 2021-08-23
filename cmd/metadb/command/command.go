@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -193,7 +195,11 @@ func DataTypeToSQLNew(dtype DataType, typeSize int64) (string, int64) {
 func DataTypeToSQL(dtype DataType, typeSize int64) string {
 	switch dtype {
 	case VarcharType:
-		return fmt.Sprintf("varchar(%d)", typeSize)
+		ts := typeSize
+		if ts < 1 {
+			ts = 1
+		}
+		return fmt.Sprintf("varchar(%d)", ts)
 	case IntegerType:
 		switch typeSize {
 		case 2:
@@ -238,6 +244,7 @@ type Command struct {
 	Op              Operation
 	SchemaName      string
 	TableName       string
+	ParentTable     sqlx.Table
 	Origin          string
 	Column          []CommandColumn
 	ChangeEvent     *change.Event
@@ -329,11 +336,7 @@ func convertTypeSize(data interface{}, coltype string, datatype DataType) (int64
 		if s, ok = data.(string); !ok {
 			return 0, fmt.Errorf("internal error: varchar data %q not string type", data)
 		}
-		var lenS int64 = int64(len(s))
-		if lenS == 0 {
-			return 1, nil
-		}
-		return lenS, nil
+		return int64(len(s)), nil
 	case BooleanType:
 		return 0, nil
 	case DateType:
@@ -694,4 +697,17 @@ func SQLEncodeData(data interface{}, datatype DataType, semtype string) string {
 	default:
 		return fmt.Sprintf("(unknown:%T)", data)
 	}
+}
+
+func PrimaryKeyColumns(columns []CommandColumn) []CommandColumn {
+	var pkey []CommandColumn
+	for _, col := range columns {
+		if col.PrimaryKey != 0 {
+			pkey = append(pkey, col)
+		}
+	}
+	sort.Slice(pkey, func(i, j int) bool {
+		return pkey[i].PrimaryKey < pkey[j].PrimaryKey
+	})
+	return pkey
 }

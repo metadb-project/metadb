@@ -37,7 +37,7 @@ var decodeCamelCaseTests = []struct {
 func TestDecodeCamelCase(t *testing.T) {
 	for _, tt := range decodeCamelCaseTests {
 		t.Run(tt.in, func(t *testing.T) {
-			s, err := decodeCamelCase(tt.in)
+			s, err := DecodeCamelCase(tt.in)
 			if s != tt.out {
 				t.Errorf("got %q, %v; want %q, %v",
 					s, err, tt.out, error(nil))
@@ -49,7 +49,7 @@ func TestDecodeCamelCase(t *testing.T) {
 func BenchmarkDecodeCamelCase(b *testing.B) {
 	for x := 0; x < b.N; x++ {
 		for _, tt := range decodeCamelCaseTests {
-			_, _ = decodeCamelCase(tt.in)
+			_, _ = DecodeCamelCase(tt.in)
 		}
 	}
 }

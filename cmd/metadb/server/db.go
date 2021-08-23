@@ -18,6 +18,9 @@ import (
 )
 
 func addTable(table *sqlx.Table, db *sqlx.DB, track *cache.Track, database *sysdb.DatabaseConnector) error {
+	if table.Schema == "folio_users" && table.Table == "groups_j" {
+		log.P("addTable(%s)", table.String())
+	}
 	// if tracked, then assume the table exists
 	if track.Contains(table) {
 		return nil
@@ -44,6 +47,9 @@ func addTable(table *sqlx.Table, db *sqlx.DB, track *cache.Track, database *sysd
 	// track new table
 	if err = track.Add(table); err != nil {
 		return err
+	}
+	if table.Schema == "folio_users" && table.Table == "groups_j" {
+		log.P("-> done")
 	}
 	return nil
 }

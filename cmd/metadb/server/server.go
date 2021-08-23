@@ -97,6 +97,9 @@ func isServerRunning(datadir string) (bool, int, error) {
 
 func runServer(svr *server) error {
 	log.Info("starting Metadb %s", svr.opt.MetadbVersion)
+	if svr.opt.RewriteJSON {
+		log.Info("enabled JSON rewriting")
+	}
 	if svr.opt.NoTLS {
 		log.Warning("TLS disabled for all client connections")
 	}

@@ -25,6 +25,7 @@ type Server struct {
 	TLSKey         string
 	NoTLS          bool
 	MetadbVersion  string
+	RewriteJSON    bool
 }
 
 type Stop struct {

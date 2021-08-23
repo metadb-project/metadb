@@ -1,10 +1,11 @@
 #!/bin/sh
 set -e
 
-fast_f='false'
-test_f='false'
-testsa_f='false'
-verbose_f='false'
+fast='false'
+json=''
+runtest='false'
+runalltest='false'
+verbose='false'
 
 usage() {
     echo ''
@@ -13,8 +14,9 @@ usage() {
     echo 'Flags:'
     echo '-f                            - "Fast" build (do not remove executables)'
     echo '-h                            - Help'
+    echo '-J                            - Build with JSON transformation enabled'
     echo '-t                            - Run tests'
-    echo '-T                            - Run tests and all static analysis, requires:'
+    echo '-T                            - Run tests and all static analyses, requires:'
     echo '                                     honnef.co/go/tools/cmd/staticcheck@latest'
     echo '                                     github.com/kisielk/errcheck'
     echo '                                     gitlab.com/opennota/check/cmd/aligncheck'
@@ -25,15 +27,16 @@ usage() {
     echo '-v                            - Enable verbose output'
 }
 
-while getopts 'Tcfhtv' flag; do
+while getopts 'JTcfhtv' flag; do
     case "${flag}" in
-        T) testsa_f='true' ;;
+        T) runalltest='true' ;;
         c) ;;
-        f) fast_f='true' ;;
+        f) fast='true' ;;
+        J) json='-X main.rewriteJSON=1' ;;
         h) usage
             exit 1 ;;
-        t) test_f='true' ;;
-        v) verbose_f='true' ;;
+        t) runtest='true' ;;
+        v) verbose='true' ;;
         *) usage
             exit 1 ;;
     esac
@@ -50,13 +53,13 @@ for arg; do
     exit 1
 done
 
-if $verbose_f; then
+if $verbose; then
     v='-v'
 fi
 
 bindir=bin
 
-if ! $fast_f; then
+if ! $fast; then
     echo 'build.sh: removing executables' 1>&2
     rm -f ./$bindir/metadb ./$bindir/mdb
 fi
@@ -67,11 +70,11 @@ version=`git describe --tags --always`
 
 mkdir -p $bindir
 
-go build -o $bindir $v -ldflags "-X main.metadbVersion=$version" ./cmd/metadb
+go build -o $bindir $v -ldflags "-X main.metadbVersion=$version $json" ./cmd/metadb
 go build -o $bindir $v -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
 
-if $testsa_f; then
-    echo 'build.sh: running all static analysis' 1>&2
+if $runalltest; then
+    echo 'build.sh: running all static analyses' 1>&2
     echo 'vet' 1>&2
     go vet $v ./cmd/metadb 1>&2
     go vet $v ./cmd/mdb 1>&2
@@ -98,7 +101,7 @@ if $testsa_f; then
     deadcode -test ./cmd/mdb 1>&2
 fi
 
-if $test_f || $testsa_f; then
+if $runtest || $runalltest; then
     echo 'build.sh: running tests' 1>&2
     go test $v -vet=off -count=1 ./cmd/metadb/command 1>&2
     go test $v -vet=off -count=1 ./cmd/metadb/sqlx 1>&2

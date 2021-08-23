@@ -411,7 +411,7 @@ func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64,
 		h = "__"
 	}
 	var err error
-	var pkey []command.CommandColumn = primaryKeyColumns(c.Column)
+	var pkey []command.CommandColumn = command.PrimaryKeyColumns(c.Column)
 	var b strings.Builder
 	fmt.Fprintf(&b, ""+
 		"SELECT __id\n"+

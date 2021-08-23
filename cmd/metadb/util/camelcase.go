@@ -6,11 +6,11 @@ import (
 	"unicode"
 )
 
-// decodeCamelCase parses a camel case string into all-lowercase words
+// DecodeCamelCase parses a camel case string into all-lowercase words
 // separated by underscores.  A sequence of uppercase letters is interpreted
 // as a word, except that the last uppercase letter of a sequence is
 // considered the start of a new word if it is followed by a lowercase letter.
-func decodeCamelCase(s string) (string, error) {
+func DecodeCamelCase(s string) (string, error) {
 	var b strings.Builder
 	// c1, c2, and c3 are a sliding window of rune triples.
 	var c1, c2, c3 rune
@@ -110,7 +110,7 @@ var decodeCamelCaseAltRegexp = regexp.MustCompile(
 */
 
 // decodeCamelCaseAlt is a more recent implementation that performs
-// the same task as the function decodeCamelCase, except that it is
+// the same task as the function DecodeCamelCase, except that it is
 // much simpler, using regular expressions (also 10X slower).
 /*
 func decodeCamelCaseAlt(s string) (string, error) {

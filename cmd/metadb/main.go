@@ -24,6 +24,9 @@ var program = "metadb"
 // metadbVersion is defined at build time via -ldflags.
 var metadbVersion string = "(unknown version)"
 
+// rewriteJSON is defined at build time via -ldflags.
+var rewriteJSON string = "0"
+
 var colorMode string
 var devMode bool
 
@@ -100,6 +103,7 @@ func run(args []string) error {
 			//        serverOpt.AdminPort = metadbAdminPort
 			//}
 			serverOpt.MetadbVersion = metadbVersion
+			serverOpt.RewriteJSON = (rewriteJSON == "1")
 			if err = server.Start(&serverOpt); err != nil {
 				return logFatal(err, logf, csvlogf)
 			}
