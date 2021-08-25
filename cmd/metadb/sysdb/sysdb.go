@@ -115,7 +115,7 @@ func initSchema(d *sql.DB) error {
 	}
 	defer tx.Rollback()
 
-	var thisSchemaVersion int = 3
+	var thisSchemaVersion int = 4
 	eout.Trace("writing database version: %d", thisSchemaVersion)
 	var q = fmt.Sprintf("PRAGMA user_version = %d;", thisSchemaVersion)
 	if _, err = tx.ExecContext(context.TODO(), q); err != nil {
@@ -227,6 +227,18 @@ func initSchema(d *sql.DB) error {
 	_, err = tx.ExecContext(context.TODO(), q)
 	if err != nil {
 		return fmt.Errorf("initializing system database: creating schema: config: %s", err)
+	}
+
+	eout.Trace("creating schema: userperm")
+	q = "" +
+		"CREATE TABLE userperm (\n" +
+		"    username TEXT PRIMARY KEY,\n" +
+		"    tables TEXT NOT NULL,\n" +
+		"    dbupdated BOOLEAN NOT NULL\n" +
+		");"
+	_, err = tx.ExecContext(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("initializing system database: creating schema: userperm: %s", err)
 	}
 
 	eout.Trace("creating schema: connector")

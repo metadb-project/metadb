@@ -15,6 +15,14 @@ type Config struct {
 	Global
 }
 
+type User struct {
+	Name   *string
+	Tables *string
+	Delete bool
+	List   bool
+	Global
+}
+
 type ConfigDatabase struct {
 	Name            string
 	Type            string

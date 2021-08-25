@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
@@ -14,62 +13,45 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func addTable(table *sqlx.Table, db *sqlx.DB, track *cache.Track, database *sysdb.DatabaseConnector) error {
-	if table.Schema == "folio_users" && table.Table == "groups_j" {
-		log.P("addTable(%s)", table.String())
-	}
+func addTable(table *sqlx.Table, db *sqlx.DB, track *cache.Track, users *cache.Users, database *sysdb.DatabaseConnector) error {
 	// if tracked, then assume the table exists
 	if track.Contains(table) {
 		return nil
 	}
-	// get db users
-	users := []string{}
-	u, err, _ := sysdb.GetConfig("db." + database.Name + ".users")
-	if err != nil {
-		return fmt.Errorf("reading database users: %s", err)
-	}
-	if strings.TrimSpace(u) != "" {
-		users = util.SplitList(u)
-	}
 	// create tables
-	if err = createSchemaIfNotExists(table.Schema, db, users); err != nil {
+	if err := createSchemaIfNotExists(table, db, users); err != nil {
 		return err
 	}
-	if err = createCurrentTableIfNotExists(table, db, users); err != nil {
+	if err := createCurrentTableIfNotExists(table, db, users); err != nil {
 		return err
 	}
-	if err = createHistoryTableIfNotExists(table, db, users); err != nil {
+	if err := createHistoryTableIfNotExists(table, db, users); err != nil {
 		return err
 	}
 	// track new table
-	if err = track.Add(table); err != nil {
+	if err := track.Add(table); err != nil {
 		return err
-	}
-	if table.Schema == "folio_users" && table.Table == "groups_j" {
-		log.P("-> done")
 	}
 	return nil
 }
 
-// database_general_user
-func createSchemaIfNotExists(schema string, db *sqlx.DB, users []string) error {
-	q := "CREATE SCHEMA IF NOT EXISTS \"" + schema + "\";"
+func createSchemaIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.Users) error {
+	q := "CREATE SCHEMA IF NOT EXISTS \"" + table.Schema + "\";"
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("%s:\n%s", err, q)
 	}
-	if len(users) > 0 {
-		q = fmt.Sprintf("GRANT USAGE ON SCHEMA \"%s\" TO \"%s\";", schema, users[0])
+	for _, u := range users.WithPerm(table) {
+		q = fmt.Sprintf("GRANT USAGE ON SCHEMA \"%s\" TO \"%s\";", table.Schema, u)
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Warning("granting permissions for users: %s", err)
+			log.Warning("granting permissions for user: %s", err)
 		}
 	}
 	return nil
 }
 
-func createCurrentTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users []string) error {
+func createCurrentTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.Users) error {
 	q := "" +
 		"CREATE TABLE IF NOT EXISTS " + table.SQL() + " (\n" +
 		"    __id bigserial PRIMARY KEY,\n" +
@@ -90,16 +72,16 @@ func createCurrentTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users []strin
 		log.Error("unable to create index on " + table.SQL() + " (__origin);")
 	}
 	// grant permissions on new table
-	if len(users) > 0 {
-		q = "GRANT SELECT ON " + table.SQL() + " TO \"" + users[0] + "\";"
+	for _, u := range users.WithPerm(table) {
+		q = "GRANT SELECT ON " + table.SQL() + " TO \"" + u + "\";"
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Warning("granting permissions for users: %s", err)
+			log.Warning("granting permissions for user: %s", err)
 		}
 	}
 	return nil
 }
 
-func createHistoryTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users []string) error {
+func createHistoryTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.Users) error {
 	historyTableSQL := table.History().SQL()
 	q := "" +
 		"CREATE TABLE IF NOT EXISTS " + historyTableSQL + " (\n" +
@@ -131,10 +113,10 @@ func createHistoryTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users []strin
 		log.Error("unable to create index on " + historyTableSQL + " (__origin);")
 	}
 	// grant permissions on new table
-	if len(users) > 0 {
-		q = fmt.Sprintf("GRANT SELECT ON " + historyTableSQL + " TO \"" + users[0] + "\";")
+	for _, u := range users.WithPerm(table) {
+		q = fmt.Sprintf("GRANT SELECT ON " + historyTableSQL + " TO \"" + u + "\";")
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Warning("granting permissions for users: %s", err)
+			log.Warning("granting permissions for user: %s", err)
 		}
 	}
 	return nil

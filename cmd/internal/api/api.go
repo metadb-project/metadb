@@ -30,6 +30,32 @@ type ConfigDeleteResponse struct {
 	AttrNotFound bool
 }
 
+type UserListRequest struct {
+	Name string
+}
+
+type UserListResponse struct {
+	Users []UserItem
+}
+
+type UserItem struct {
+	Name   string
+	Tables string
+}
+
+type UserUpdateRequest struct {
+	Name   string
+	Tables string
+}
+
+type UserDeleteRequest struct {
+	Name string
+}
+
+type UserDeleteResponse struct {
+	NameNotFound bool
+}
+
 type UpdateDatabaseConnectorRequest DatabaseConnector
 
 type DatabaseConnector struct {

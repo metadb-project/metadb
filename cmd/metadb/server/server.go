@@ -188,6 +188,7 @@ func setupHandlers(svr *server) http.Handler {
 	mux.HandleFunc("/enable", svr.handleEnable)
 	mux.HandleFunc("/disable", svr.handleDisable)
 	mux.HandleFunc("/status", svr.handleStatus)
+	mux.HandleFunc("/user", svr.handleUser)
 	mux.HandleFunc("/", svr.handleDefault)
 
 	return mux
@@ -210,6 +211,27 @@ func (svr *server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var m = unsupportedMethod("/config", r)
+	log.Info(m)
+	http.Error(w, m, http.StatusMethodNotAllowed)
+}
+
+func (svr *server) handleUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		log.Debug("request: %s", requestString(r))
+		svr.handleUserGet(w, r)
+		return
+	}
+	if r.Method == "POST" {
+		log.Debug("request: %s", requestString(r))
+		svr.handleUserPost(w, r)
+		return
+	}
+	if r.Method == "DELETE" {
+		log.Debug("request: %s", requestString(r))
+		svr.handleUserDelete(w, r)
+		return
+	}
+	var m = unsupportedMethod("/user", r)
 	log.Info(m)
 	http.Error(w, m, http.StatusMethodNotAllowed)
 }
@@ -281,6 +303,28 @@ func (svr *server) handleConfigGet(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (svr *server) handleUserGet(w http.ResponseWriter, r *http.Request) {
+	// read request
+	var rq api.UserListRequest
+	var ok bool
+	if ok = util.ReadRequest(w, r, &rq); !ok {
+		return
+	}
+	// retrieve user
+	var rs *api.UserListResponse
+	var err error
+	if rs, err = sysdb.ListUser(&rq); err != nil {
+		util.HandleError(w, err, http.StatusInternalServerError)
+		return
+	}
+	// success response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err = json.NewEncoder(w).Encode(rs); err != nil {
+		util.HandleError(w, err, http.StatusInternalServerError)
+	}
+}
+
 func (svr *server) handleStatusGet(w http.ResponseWriter, r *http.Request) {
 
 	var p api.GetStatusRequest
@@ -335,6 +379,28 @@ func (svr *server) handleConfigDelete(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (svr *server) handleUserDelete(w http.ResponseWriter, r *http.Request) {
+	// read request
+	var rq api.UserDeleteRequest
+	var ok bool
+	if ok = util.ReadRequest(w, r, &rq); !ok {
+		return
+	}
+	// delete user
+	var rs *api.UserDeleteResponse
+	var err error
+	if rs, err = sysdb.DeleteUser(&rq); err != nil {
+		util.HandleError(w, err, http.StatusInternalServerError)
+		return
+	}
+	// success response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err = json.NewEncoder(w).Encode(rs); err != nil {
+		util.HandleError(w, err, http.StatusInternalServerError)
+	}
+}
+
 func (svr *server) handleConfigPost(w http.ResponseWriter, r *http.Request) {
 	// read request
 	var rq api.ConfigUpdateRequest
@@ -345,6 +411,24 @@ func (svr *server) handleConfigPost(w http.ResponseWriter, r *http.Request) {
 	// write config
 	var err error
 	if err = sysdb.UpdateConfig(&rq); err != nil {
+		util.HandleError(w, err, http.StatusInternalServerError)
+		return
+	}
+	// success response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (svr *server) handleUserPost(w http.ResponseWriter, r *http.Request) {
+	// read request
+	var rq api.UserUpdateRequest
+	var ok bool
+	if ok = util.ReadRequest(w, r, &rq); !ok {
+		return
+	}
+	// write user
+	var err error
+	if err = sysdb.UpdateUser(&rq); err != nil {
 		util.HandleError(w, err, http.StatusInternalServerError)
 		return
 	}

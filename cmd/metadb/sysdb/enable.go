@@ -43,16 +43,16 @@ func EnableConnector(rq *api.EnableRequest) error {
 		}
 		////
 		// TMP check for db.<name>.users
-		if strings.HasPrefix(c, "db.") && !strings.HasSuffix(c, ".") {
-			attr := c + ".users"
-			users, err, _ := getConfig(attr)
-			if err != nil {
-				return fmt.Errorf("reading configuration: %s: %s", attr, err)
-			}
-			if strings.TrimSpace(users) == "" {
-				return fmt.Errorf("%s.users is undefined", c)
-			}
-		}
+		//if strings.HasPrefix(c, "db.") && !strings.HasSuffix(c, ".") {
+		//        attr := c + ".users"
+		//        users, err, _ := getConfig(attr)
+		//        if err != nil {
+		//                return fmt.Errorf("reading configuration: %s: %s", attr, err)
+		//        }
+		//        if strings.TrimSpace(users) == "" {
+		//                return fmt.Errorf("%s.users is undefined", c)
+		//        }
+		//}
 		////
 	}
 	if len(conn) == 0 {

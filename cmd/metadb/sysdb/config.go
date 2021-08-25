@@ -52,13 +52,14 @@ func UpdateConfig(rq *api.ConfigUpdateRequest) error {
 	var err error
 	// TODO allow changing db users
 	if strings.HasPrefix(rq.Attr, "db.") && strings.HasSuffix(rq.Attr, ".users") {
-		var exists bool
-		if _, err, exists = getConfig(rq.Attr); err != nil {
-			return err
-		}
-		if exists {
-			return fmt.Errorf("modifying users not yet supported: %s", rq.Attr)
-		}
+		//var exists bool
+		//if _, err, exists = getConfig(rq.Attr); err != nil {
+		//        return err
+		//}
+		//if exists {
+		//        return fmt.Errorf("modifying users not yet supported: %s", rq.Attr)
+		//}
+		return fmt.Errorf("the users setting is no longer supported; see \"mdb help user\"")
 	}
 	// TODO allow multiple db users
 	if strings.HasPrefix(rq.Attr, "db.") && strings.HasSuffix(rq.Attr, ".users") && strings.ContainsRune(rq.Val, ',') {

@@ -25,6 +25,16 @@ func (t *Track) Contains(table *sqlx.Table) bool {
 	return t.tables[*table]
 }
 
+func (t *Track) All() []sqlx.Table {
+	var a []sqlx.Table
+	for table, b := range t.tables {
+		if b {
+			a = append(a, table)
+		}
+	}
+	return a
+}
+
 func (t *Track) Add(table *sqlx.Table) error {
 	t.tables[*table] = true
 	if err := metadata.TrackWrite(t.db, table); err != nil {

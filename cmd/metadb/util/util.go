@@ -12,6 +12,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
 // ModePermRW is the umask "-rw-------".
@@ -19,6 +20,20 @@ const ModePermRW = 0600
 
 // ModePermRWX is the umask "-rwx------".
 const ModePermRWX = 0700
+
+type RegexList struct {
+	String string
+	Regex  []*regexp.Regexp
+}
+
+func UserPerm(relist *RegexList, table *sqlx.Table) bool {
+	for _, re := range relist.Regex {
+		if re.MatchString(table.String()) {
+			return true
+		}
+	}
+	return false
+}
 
 func SystemDirName(datadir string) string {
 	return filepath.Join(datadir, "system")

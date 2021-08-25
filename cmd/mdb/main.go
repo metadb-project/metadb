@@ -17,6 +17,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/mdb/enable"
 	"github.com/metadb-project/metadb/cmd/mdb/option"
 	"github.com/metadb-project/metadb/cmd/mdb/status"
+	"github.com/metadb-project/metadb/cmd/mdb/user"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -55,6 +56,7 @@ func run(args []string) error {
 
 	var globalOpt = option.Global{}
 	var configOpt = option.Config{}
+	var userOpt = option.User{}
 	var statusOpt = option.Status{}
 	var enableOpt = option.Enable{}
 	var disableOpt = option.Disable{}
@@ -117,6 +119,40 @@ func run(args []string) error {
 	_ = traceFlag(cmdConfig, &eout.EnableTrace)
 	_ = noTLSFlag(cmdConfig, &globalOpt.NoTLS)
 	_ = skipVerifyFlag(cmdConfig, &globalOpt.TLSSkipVerify)
+
+	var cmdUser = &cobra.Command{
+		Use:  "user",
+		Args: cobra.MaximumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var err error
+			if err = initColor(); err != nil {
+				return err
+			}
+			if err = validateGlobalOptions(&globalOpt); err != nil {
+				return err
+			}
+			userOpt.Global = globalOpt
+			if len(args) > 0 {
+				userOpt.Name = &args[0]
+			}
+			if len(args) > 1 {
+				userOpt.Tables = &args[1]
+			}
+			if err = user.User(&userOpt); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+	cmdUser.SetHelpFunc(help)
+	cmdUser.Flags().BoolVarP(&userOpt.Delete, "delete", "d", false, "")
+	cmdUser.Flags().BoolVarP(&userOpt.List, "list", "l", false, "")
+	_ = hostFlag(cmdUser, &globalOpt.Host)
+	_ = adminPortFlag(cmdUser, &globalOpt.AdminPort)
+	_ = verboseFlag(cmdUser, &eout.EnableVerbose)
+	_ = traceFlag(cmdUser, &eout.EnableTrace)
+	_ = noTLSFlag(cmdUser, &globalOpt.NoTLS)
+	_ = skipVerifyFlag(cmdUser, &globalOpt.TLSSkipVerify)
 
 	var cmdEnable = &cobra.Command{
 		Use:  "enable",
@@ -247,7 +283,7 @@ func run(args []string) error {
 	var helpFlag bool
 	rootCmd.PersistentFlags().BoolVarP(&helpFlag, "help", "", false, "Help for mdb")
 	// Add commands.
-	rootCmd.AddCommand(cmdConfig, cmdEnable, cmdDisable, cmdStatus, cmdVersion, cmdCompletion)
+	rootCmd.AddCommand(cmdConfig, cmdUser, cmdEnable, cmdDisable, cmdStatus, cmdVersion, cmdCompletion)
 	var err error
 	if err = rootCmd.Execute(); err != nil {
 		return err
@@ -257,6 +293,7 @@ func run(args []string) error {
 }
 
 var helpConfig = "Configure or show server settings\n"
+var helpUser = "Configure or show database user permissions\n"
 var helpEnable = "Enable database or source connectors\n"
 var helpDisable = "Disable database or source connectors\n"
 var helpStatus = "Print server status\n"
@@ -273,6 +310,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"\n" +
 			"Commands:\n" +
 			"  config                      - " + helpConfig +
+			"  user                        - " + helpUser +
 			"  enable                      - " + helpEnable +
 			"  disable                     - " + helpDisable +
 			//"  status                      - " + helpStatus +
@@ -307,8 +345,6 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"  db.<name>.dbname            - Name of the database\n" +
 			"  db.<name>.adminuser         - Database user that owns the database\n" +
 			"  db.<name>.adminpassword     - Password of adminuser\n" +
-			"  db.<name>.users             - Database users that should have access to\n" +
-			"                                tracked tables (comma-separated list)\n" +
 			"  db.<name>.sslmode           - SSL mode for connection to database (default:\n" +
 			"                                \"require\")\n" +
 			"\n" +
@@ -325,6 +361,22 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"                                (comma-separated list)\n" +
 			"\n" +
 			"Use @<file> in place of <value> to read the value from a file.\n" +
+			"")
+	case "user":
+		fmt.Printf("" +
+			helpUser +
+			"\n" +
+			"Usage:  mdb user [<options>] [<username> [<tables>]]\n" +
+			"\n" +
+			"Options:\n" +
+			"  -d, --delete                - Delete specified user permissions\n" +
+			"  -l, --list                  - List all user permissions\n" +
+			hostFlag(nil, nil) +
+			adminPortFlag(nil, nil) +
+			verboseFlag(nil, nil) +
+			noTLSFlag(nil, nil) +
+			skipVerifyFlag(nil, nil) +
+			traceFlag(nil, nil) +
 			"")
 	case "enable":
 		fmt.Printf("" +

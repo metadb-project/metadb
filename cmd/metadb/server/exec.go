@@ -15,14 +15,14 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func execCommandList(cl *command.CommandList, db *sql.DB, track *cache.Track, cschema *cache.Schema, database *sysdb.DatabaseConnector) error {
+func execCommandList(cl *command.CommandList, db *sql.DB, track *cache.Track, cschema *cache.Schema, users *cache.Users, database *sysdb.DatabaseConnector) error {
 	var clt []command.CommandList = partitionTxn(cl, cschema)
 	for _, cc := range clt {
 		if len(cc.Cmd) == 0 {
 			continue
 		}
 		// exec schema changes
-		if err := execCommandSchema(&cc.Cmd[0], db, track, cschema, database); err != nil {
+		if err := execCommandSchema(&cc.Cmd[0], db, track, cschema, users, database); err != nil {
 			return err
 		}
 		// begin txn
@@ -118,7 +118,7 @@ func requiresSchemaChanges(c, o *command.Command, cschema *cache.Schema) bool {
 	return false
 }
 
-func execCommandSchema(c *command.Command, db *sql.DB, track *cache.Track, schema *cache.Schema, database *sysdb.DatabaseConnector) error {
+func execCommandSchema(c *command.Command, db *sql.DB, track *cache.Track, schema *cache.Schema, users *cache.Users, database *sysdb.DatabaseConnector) error {
 	if c.Op == command.DeleteOp {
 		return nil
 	}
@@ -128,7 +128,7 @@ func execCommandSchema(c *command.Command, db *sql.DB, track *cache.Track, schem
 		return err
 	}
 	// TODO can we skip adding the table if we confirm it in sysdb?
-	if err = addTable(&sqlx.Table{c.SchemaName, c.TableName}, &sqlx.DB{DB: db}, track, database); err != nil {
+	if err = addTable(&sqlx.Table{c.SchemaName, c.TableName}, &sqlx.DB{DB: db}, track, users, database); err != nil {
 		return err
 	}
 	if err = execDeltaSchema(delta, c.SchemaName, c.TableName, db, schema); err != nil {

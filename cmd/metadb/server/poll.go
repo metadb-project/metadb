@@ -83,7 +83,7 @@ func pollLoop(spr *sproc) error {
 	}
 	spr.databases[0].Status.Active()
 	spr.db = append(spr.db, db.DB)
-	// cache tracking
+	// Cache tracking
 	if err = metadata.Init(db); err != nil {
 		return err
 	}
@@ -91,10 +91,19 @@ func pollLoop(spr *sproc) error {
 	if err != nil {
 		return fmt.Errorf("caching track: %s", err)
 	}
-	// cache schema
+	// Cache schema
 	schema, err := cache.NewSchema(db, track)
 	if err != nil {
 		return fmt.Errorf("caching schema: %s", err)
+	}
+	// Update user permissions in database
+	if err = sysdb.UpdateUserPerms(db, track.All()); err != nil {
+		return err
+	}
+	// Cache users
+	users, err := cache.NewUsers()
+	if err != nil {
+		return fmt.Errorf("caching users: %s", err)
 	}
 	// Source file
 	var sourceFile *os.File
@@ -184,7 +193,7 @@ func pollLoop(spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cl, spr.db[0], track, schema, spr.databases[0]); err != nil {
+		if err = execCommandList(cl, spr.db[0], track, schema, users, spr.databases[0]); err != nil {
 			////////////////////////////////////////////////////
 			log.Error("%s", err)
 			//if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
@@ -435,8 +444,8 @@ func waitForConfig(svr *server) (*sproc, error) {
 			if srcEnabled, err = sysdb.IsConnectorEnabled("src." + sources[0].Name); err != nil {
 				return nil, err
 			}
-			var users = strings.TrimSpace(databases[0].DBUsers)
-			if dbEnabled && srcEnabled && users != "" {
+			//var users = strings.TrimSpace(databases[0].DBUsers)
+			if dbEnabled && srcEnabled {
 				break
 			}
 		}
@@ -447,8 +456,8 @@ func waitForConfig(svr *server) (*sproc, error) {
 			if dbEnabled, err = sysdb.IsConnectorEnabled("db." + databases[0].Name); err != nil {
 				return nil, err
 			}
-			var users = strings.TrimSpace(databases[0].DBUsers)
-			if dbEnabled && users != "" {
+			//var users = strings.TrimSpace(databases[0].DBUsers)
+			if dbEnabled {
 				break
 			}
 		}
