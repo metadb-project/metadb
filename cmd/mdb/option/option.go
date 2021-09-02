@@ -16,10 +16,12 @@ type Config struct {
 }
 
 type User struct {
-	Name   *string
-	Tables *string
-	Delete bool
-	List   bool
+	Name     *string
+	Tables   *string
+	Create   bool
+	Password string
+	Delete   bool
+	List     bool
 	Global
 }
 

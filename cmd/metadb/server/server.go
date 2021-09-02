@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
+	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
@@ -426,15 +428,66 @@ func (svr *server) handleUserPost(w http.ResponseWriter, r *http.Request) {
 	if ok = util.ReadRequest(w, r, &rq); !ok {
 		return
 	}
+	// Create user
+	if rq.Create {
+		if err := svr.createUser(&rq); err != nil {
+			util.HandleError(w, err, http.StatusInternalServerError)
+			return
+		}
+	}
 	// write user
-	var err error
-	if err = sysdb.UpdateUser(&rq); err != nil {
+	if err := sysdb.UpdateUser(&rq); err != nil {
 		util.HandleError(w, err, http.StatusInternalServerError)
 		return
 	}
 	// success response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (svr *server) createUser(rq *api.UserUpdateRequest) error {
+	for _, dbc := range svr.databases {
+		dbsuper, err := sqlx.Open(&sqlx.DataSourceName{
+			Host:     dbc.DBHost,
+			Port:     dbc.DBPort,
+			DBName:   dbc.DBName,
+			User:     dbc.DBSuperUser,
+			Password: dbc.DBSuperPassword,
+			SSLMode:  dbc.DBSSLMode,
+		})
+		defer dbsuper.Close()
+		if err := dbsuper.Ping(); err != nil {
+			return err
+		}
+		if err != nil {
+			return fmt.Errorf("user: create: %s", err)
+		}
+		if _, err := dbsuper.ExecContext(context.TODO(), "CREATE USER \""+rq.Name+"\" PASSWORD '"+rq.Password+"'"); err != nil {
+			return fmt.Errorf("unable to create user %q: %s", rq.Name, err)
+		}
+		db, err := sqlx.Open(&sqlx.DataSourceName{
+			Host:     dbc.DBHost,
+			Port:     dbc.DBPort,
+			DBName:   dbc.DBName,
+			User:     dbc.DBAdminUser,
+			Password: dbc.DBAdminPassword,
+			SSLMode:  dbc.DBSSLMode,
+		})
+		defer db.Close()
+		if err := db.Ping(); err != nil {
+			return err
+		}
+		if err != nil {
+			return fmt.Errorf("user: create: %s", err)
+		}
+		if _, err := db.ExecContext(context.TODO(), "CREATE SCHEMA \"u"+rq.Name+"\""); err != nil {
+			return fmt.Errorf("unable to create schema for user %q: %s", rq.Name, err)
+		}
+		if _, err := db.ExecContext(context.TODO(), "GRANT CREATE, USAGE ON SCHEMA \"u"+rq.Name+"\" TO \""+rq.Name+"\""); err != nil {
+			log.Warning("unable to grant permissions on schema for user %q: %s", rq.Name, err)
+		}
+	}
+	return nil
 }
 
 func (svr *server) handleEnablePost(w http.ResponseWriter, r *http.Request) {
