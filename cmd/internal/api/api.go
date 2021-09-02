@@ -44,8 +44,10 @@ type UserItem struct {
 }
 
 type UserUpdateRequest struct {
-	Name   string
-	Tables string
+	Name     string
+	Tables   string
+	Create   bool
+	Password string
 }
 
 type UserDeleteRequest struct {

@@ -138,6 +138,13 @@ func run(args []string) error {
 			if len(args) > 1 {
 				userOpt.Tables = &args[1]
 			}
+			if userOpt.Create {
+				var pw string
+				if pw, err = inputPassword("Password for \""+(*userOpt.Name)+"\": ", false); err != nil {
+					return err
+				}
+				userOpt.Password = pw
+			}
 			if err = user.User(&userOpt); err != nil {
 				return err
 			}
@@ -145,6 +152,7 @@ func run(args []string) error {
 		},
 	}
 	cmdUser.SetHelpFunc(help)
+	cmdUser.Flags().BoolVarP(&userOpt.Create, "create", "c", false, "")
 	cmdUser.Flags().BoolVarP(&userOpt.Delete, "delete", "d", false, "")
 	cmdUser.Flags().BoolVarP(&userOpt.List, "list", "l", false, "")
 	_ = hostFlag(cmdUser, &globalOpt.Host)
@@ -345,6 +353,8 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"  db.<name>.dbname            - Name of the database\n" +
 			"  db.<name>.adminuser         - Database user that owns the database\n" +
 			"  db.<name>.adminpassword     - Password of adminuser\n" +
+			"  db.<name>.superuser         - Database superuser\n" +
+			"  db.<name>.superpassword     - Password of superuser\n" +
 			"  db.<name>.sslmode           - SSL mode for connection to database (default:\n" +
 			"                                \"require\")\n" +
 			"\n" +
@@ -369,6 +379,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"Usage:  mdb user [<options>] [<username> [<tables>]]\n" +
 			"\n" +
 			"Options:\n" +
+			"  -c, --create                - Create database user\n" +
 			"  -d, --delete                - Delete specified user permissions\n" +
 			"  -l, --list                  - List all user permissions\n" +
 			hostFlag(nil, nil) +

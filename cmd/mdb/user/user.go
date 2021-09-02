@@ -105,7 +105,12 @@ func UserList(opt *option.User) error {
 
 func UserUpdate(opt *option.User) error {
 	// convert options to a request
-	var rq = &api.UserUpdateRequest{Name: *opt.Name, Tables: *opt.Tables}
+	var rq = &api.UserUpdateRequest{
+		Name:     *opt.Name,
+		Tables:   *opt.Tables,
+		Create:   opt.Create,
+		Password: opt.Password,
+	}
 	// send the request
 	var httprs *http.Response
 	var err error
@@ -121,6 +126,10 @@ func UserUpdate(opt *option.User) error {
 		return fmt.Errorf("%s", m)
 	}
 	// print response
-	eout.Info("user: updated %q", rq.Name)
+	if opt.Create {
+		eout.Info("user: created %q", rq.Name)
+	} else {
+		eout.Info("user: updated %q", rq.Name)
+	}
 	return nil
 }

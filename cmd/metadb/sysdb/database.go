@@ -53,6 +53,8 @@ func ReadDatabaseConnectors() ([]*DatabaseConnector, error) {
 			DBName:          conf["dbname"],
 			DBAdminUser:     conf["adminuser"],
 			DBAdminPassword: conf["adminpassword"],
+			DBSuperUser:     conf["superuser"],
+			DBSuperPassword: conf["superpassword"],
 			DBUsers:         conf["users"],
 			DBSSLMode:       conf["sslmode"],
 		})
