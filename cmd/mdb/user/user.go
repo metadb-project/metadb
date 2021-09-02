@@ -131,5 +131,6 @@ func UserUpdate(opt *option.User) error {
 	} else {
 		eout.Info("user: updated %q", rq.Name)
 	}
+	eout.Info("user: restart server to update all permissions")
 	return nil
 }
