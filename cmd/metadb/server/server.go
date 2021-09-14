@@ -480,10 +480,10 @@ func (svr *server) createUser(rq *api.UserUpdateRequest) error {
 		if err != nil {
 			return fmt.Errorf("user: create: %s", err)
 		}
-		if _, err := db.ExecContext(context.TODO(), "CREATE SCHEMA \"u"+rq.Name+"\""); err != nil {
+		if _, err := db.ExecContext(context.TODO(), "CREATE SCHEMA \""+rq.Name+"\""); err != nil {
 			return fmt.Errorf("unable to create schema for user %q: %s", rq.Name, err)
 		}
-		if _, err := db.ExecContext(context.TODO(), "GRANT CREATE, USAGE ON SCHEMA \"u"+rq.Name+"\" TO \""+rq.Name+"\""); err != nil {
+		if _, err := db.ExecContext(context.TODO(), "GRANT CREATE, USAGE ON SCHEMA \""+rq.Name+"\" TO \""+rq.Name+"\""); err != nil {
 			log.Warning("unable to grant permissions on schema for user %q: %s", rq.Name, err)
 		}
 	}
