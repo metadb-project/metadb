@@ -14,7 +14,7 @@ func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.
 	if err := json.Unmarshal([]byte(column.Data.(string)), &obj); err != nil {
 		return err
 	}
-	if err := rewriteObject(cl, cmd, column, db, 1, obj, cmd.TableName+"_j"); err != nil {
+	if err := rewriteObject(cl, cmd, column, db, 1, obj, cmd.TableName+"__t"); err != nil {
 		return err
 	}
 	return nil
@@ -36,9 +36,9 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, column *comman
 		if err != nil {
 			return err
 		}
-		if pkcolsmap[name] {
-			n = "j_" + n
-		}
+		//if pkcolsmap[name] {
+		//        n = "j_" + n
+		//}
 		//log.P("TYPE: %T, VALUE: %v", value, value)
 		if value == nil {
 			// TODO store null value
@@ -46,9 +46,9 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, column *comman
 		}
 		switch v := value.(type) {
 		case []interface{}:
-			if err := rewriteArray(cl, cmd, column, db, level+1, n, v, table+"_"+n); err != nil {
-				return err
-			}
+			//if err := rewriteArray(cl, cmd, column, db, level+1, n, v, table+"_"+n); err != nil {
+			//        return err
+			//}
 		case bool:
 			cols = append(cols, command.CommandColumn{
 				Name:         n,
@@ -70,9 +70,9 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, column *comman
 				PrimaryKey:   0,
 			})
 		case map[string]interface{}:
-			if err := rewriteObject(cl, cmd, column, db, level+1, v, table+"_"+n); err != nil {
-				return err
-			}
+			//if err := rewriteObject(cl, cmd, column, db, level+1, v, table+"_"+n); err != nil {
+			//        return err
+			//}
 		case string:
 			cols = append(cols, command.CommandColumn{
 				Name:         n,
