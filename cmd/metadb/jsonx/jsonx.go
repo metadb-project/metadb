@@ -36,9 +36,10 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, column *comman
 		if err != nil {
 			return err
 		}
-		//if pkcolsmap[name] {
-		//        n = "j_" + n
-		//}
+		if pkcolsmap[name] {
+			//n = "j_" + n
+			continue
+		}
 		//log.P("TYPE: %T, VALUE: %v", value, value)
 		if value == nil {
 			// TODO store null value
