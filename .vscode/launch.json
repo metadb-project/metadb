@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "metadb",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "cmd/metadb"
+        },
+        {
+            "name": "mdb",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "cmd/mdb"
+        }
+    ]
+}
