@@ -6,7 +6,9 @@
             "type": "go",
             "request": "launch",
             "mode": "debug",
-            "program": "cmd/metadb"
+            "preLaunchTask": "basictest",
+            "program": "cmd/metadb",
+            "args": ["start", "--adminport", "8990", "-D", "./_tmp_metadb_test_/data", "--debug"]
         },
         {
             "name": "mdb",
