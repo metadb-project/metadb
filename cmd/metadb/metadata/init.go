@@ -38,7 +38,9 @@ func Init(db *sqlx.DB, metadbVersion string) error {
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating table metadb.track: %s", err)
 	}
-	q = "INSERT INTO metadb.version (metadb_version, database_version) VALUES ('" + metadbVersionString(metadbVersion) + "', 1)"
+	// The database version is hardcoded at the moment, but it needs to be
+	// synchronized with sysdb.
+	q = "INSERT INTO metadb.version (metadb_version, database_version) VALUES ('" + metadbVersionString(metadbVersion) + "', 4)"
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("writing to table metadb.version: %s", err)
 	}
