@@ -84,7 +84,7 @@ func pollLoop(spr *sproc) error {
 	spr.databases[0].Status.Active()
 	spr.db = append(spr.db, db.DB)
 	// Cache tracking
-	if err = metadata.Init(db); err != nil {
+	if err = metadata.Init(db, spr.svr.opt.MetadbVersion); err != nil {
 		return err
 	}
 	track, err := cache.NewTrack(db)
