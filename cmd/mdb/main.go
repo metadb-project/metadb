@@ -34,7 +34,7 @@ var colorInitialized bool
 
 func main() {
 	colorMode = os.Getenv("METADB_COLOR")
-	devMode = (os.Getenv("METADB_DEV") == "on")
+	devMode = os.Getenv("METADB_DEV") == "on"
 	mdbMain()
 }
 
@@ -43,7 +43,7 @@ func mdbMain() {
 	eout.Init(program)
 	// Run
 	var err error
-	if err = run(os.Args); err != nil {
+	if err = run(); err != nil {
 		if !colorInitialized {
 			color.NeverColor()
 		}
@@ -52,7 +52,7 @@ func mdbMain() {
 	}
 }
 
-func run(args []string) error {
+func run() error {
 
 	var globalOpt = option.Global{}
 	var configOpt = option.Config{}
@@ -309,6 +309,7 @@ var helpVersion = "Print mdb version\n"
 var helpCompletion = "Generate command-line completion\n"
 
 func help(cmd *cobra.Command, commandLine []string) {
+	_ = commandLine
 	switch cmd.Use {
 	case "mdb":
 		fmt.Printf("" +

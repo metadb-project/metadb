@@ -1,7 +1,7 @@
 package option
 
 // temporary definitions
-var GeneralUser = "metadb"
+//var GeneralUser = "metadb"
 
 type Global struct {
 }

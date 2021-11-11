@@ -11,54 +11,63 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
-	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func execCommandList(cl *command.CommandList, db *sql.DB, track *cache.Track, cschema *cache.Schema, users *cache.Users, database *sysdb.DatabaseConnector) error {
+func execCommandList(cl *command.CommandList, db *sql.DB, track *cache.Track, cschema *cache.Schema, users *cache.Users) error {
 	var clt []command.CommandList = partitionTxn(cl, cschema)
 	for _, cc := range clt {
 		if len(cc.Cmd) == 0 {
 			continue
 		}
 		// exec schema changes
-		if err := execCommandSchema(&cc.Cmd[0], db, track, cschema, users, database); err != nil {
+		if err := execCommandSchema(&cc.Cmd[0], db, track, cschema, users); err != nil {
 			return err
 		}
-		// begin txn
-		tx, err := sqlx.MakeTx(db)
+		err := execCommandListData(db, cc, cschema)
 		if err != nil {
-			return fmt.Errorf("exec: start transaction: %s", err)
-		}
-		defer tx.Rollback()
-		// exec data
-		for _, c := range cc.Cmd {
-			// Extra check of varchar sizes to ensure size was adjusted and avoid silent data loss
-			// due to optimization errors
-			for _, col := range c.Column {
-				if col.DType == command.VarcharType {
-					schemaCol := cschema.Column(&sqlx.Column{c.SchemaName, c.TableName, col.Name})
-					if schemaCol != nil && col.DTypeSize > schemaCol.CharMaxLen {
-						// TODO Factor fatal error exit into function
-						log.Fatal("internal error: schema varchar size not adjusted: %d > %d", col.DTypeSize, schemaCol.CharMaxLen)
-						os.Exit(-1)
-					}
-				}
-			}
-			// Execute data part of command
-			if err := execCommandData(&c, tx); err != nil {
-				return fmt.Errorf("%s\n%v", err, c)
-			}
-		}
-		// commit txn
-		log.Trace("commit txn")
-		if err = tx.Commit(); err != nil {
-			return fmt.Errorf("exec: commit transaction: %s", err)
+			return err
 		}
 		// log confirmation
 		for _, c := range cc.Cmd {
 			logDebugCommand(&c)
 		}
+	}
+	return nil
+}
+
+func execCommandListData(db *sql.DB, cc command.CommandList, cschema *cache.Schema) error {
+	// Begin txn
+	tx, err := sqlx.MakeTx(db)
+	if err != nil {
+		return fmt.Errorf("exec: start transaction: %s", err)
+	}
+	defer func(tx *sql.Tx) {
+		_ = tx.Rollback()
+	}(tx)
+	// Exec data
+	for _, c := range cc.Cmd {
+		// Extra check of varchar sizes to ensure size was adjusted and avoid silent data loss
+		// due to optimization errors
+		for _, col := range c.Column {
+			if col.DType == command.VarcharType {
+				schemaCol := cschema.Column(&sqlx.Column{c.SchemaName, c.TableName, col.Name})
+				if schemaCol != nil && col.DTypeSize > schemaCol.CharMaxLen {
+					// TODO Factor fatal error exit into function
+					log.Fatal("internal error: schema varchar size not adjusted: %d > %d", col.DTypeSize, schemaCol.CharMaxLen)
+					os.Exit(-1)
+				}
+			}
+		}
+		// Execute data part of command
+		if err := execCommandData(&c, tx); err != nil {
+			return fmt.Errorf("%s\n%v", err, c)
+		}
+	}
+	// Commit txn
+	log.Trace("commit txn")
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("exec: commit transaction: %s", err)
 	}
 	return nil
 }
@@ -118,7 +127,7 @@ func requiresSchemaChanges(c, o *command.Command, cschema *cache.Schema) bool {
 	return false
 }
 
-func execCommandSchema(c *command.Command, db *sql.DB, track *cache.Track, schema *cache.Schema, users *cache.Users, database *sysdb.DatabaseConnector) error {
+func execCommandSchema(c *command.Command, db *sql.DB, track *cache.Track, schema *cache.Schema, users *cache.Users) error {
 	if c.Op == command.DeleteOp {
 		return nil
 	}
@@ -128,7 +137,7 @@ func execCommandSchema(c *command.Command, db *sql.DB, track *cache.Track, schem
 		return err
 	}
 	// TODO can we skip adding the table if we confirm it in sysdb?
-	if err = addTable(&sqlx.Table{c.SchemaName, c.TableName}, &sqlx.DB{DB: db}, track, users, database); err != nil {
+	if err = addTable(&sqlx.Table{c.SchemaName, c.TableName}, &sqlx.DB{DB: db}, track, users); err != nil {
 		return err
 	}
 	if err = execDeltaSchema(delta, c.SchemaName, c.TableName, db, schema); err != nil {
@@ -290,7 +299,9 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, t *sqlx.Table) (bool, st
 	for i := range results {
 		ptrs[i] = &results[i]
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
 	var id, cf string
 	attrs := make(map[string]*string)
 	if rows.Next() {
@@ -405,7 +416,7 @@ func wherePKDataEqual(b *strings.Builder, columns []command.CommandColumn) error
 	return nil
 }
 
-func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64, error) {
+/*func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64, error) {
 	var h string
 	if history {
 		h = "__"
@@ -413,18 +424,18 @@ func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64,
 	var err error
 	var pkey []command.CommandColumn = command.PrimaryKeyColumns(c.Column)
 	var b strings.Builder
-	fmt.Fprintf(&b, ""+
+	_, _ = fmt.Fprintf(&b, ""+
 		"SELECT __id\n"+
 		"    FROM %s\n"+
 		"    WHERE __origin = '%s'", util.JoinSchemaTable(c.SchemaName, c.TableName+h), c.Origin)
 	var col command.CommandColumn
 	for _, col = range pkey {
-		fmt.Fprintf(&b, " AND\n        %s = %s", col.Name, command.SQLEncodeData(col.Data, col.DType, col.SemanticType))
+		_, _ = fmt.Fprintf(&b, " AND\n        %s = %s", col.Name, command.SQLEncodeData(col.Data, col.DType, col.SemanticType))
 	}
 	if history {
-		fmt.Fprintf(&b, " AND\n        __current = TRUE")
+		_, _ = fmt.Fprintf(&b, " AND\n        __current = TRUE")
 	}
-	fmt.Fprintf(&b, ";")
+	_, _ = fmt.Fprintf(&b, ";")
 	var q = b.String()
 	var id int64
 	err = tx.QueryRowContext(context.TODO(), q).Scan(&id)
@@ -436,3 +447,4 @@ func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64,
 	}
 	return 0, fmt.Errorf("%s:\n%s", err, q)
 }
+*/

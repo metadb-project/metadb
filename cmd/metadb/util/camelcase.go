@@ -48,7 +48,7 @@ func decodeCamelCaseTriple(c1, c2, c3 rune, b *strings.Builder) error {
 	var writeBreak bool = false
 	switch {
 	// First check triples that include zeros.
-	case (c2 == 0):
+	case c2 == 0:
 		return nil
 	case (c1 == 0) && (c2 != 0) && (c3 != 0):
 		fallthrough

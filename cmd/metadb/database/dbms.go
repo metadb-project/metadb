@@ -12,16 +12,17 @@ type System interface {
 	RedshiftKeys(string, string) string
 }
 
-func SelectDBMSType(dbms string) (System, error) {
+/*func SelectDBMSType(dbms string) (System, error) {
 	switch dbms {
 	case "postgresql":
 		return Postgres{}, nil
 	case "redshift":
 		return Redshift{}, nil
 	default:
-		return nil, fmt.Errorf("Unknown database type: %s", dbms)
+		return nil, fmt.Errorf("unknown database type: %s", dbms)
 	}
 }
+*/
 
 type Postgres struct {
 }
@@ -38,7 +39,7 @@ func (p Postgres) EncodeStringConst(s string) string {
 	return encodeString(s, true)
 }
 
-func (p Postgres) RedshiftKeys(distkey string, sortkey string) string {
+func (p Postgres) RedshiftKeys( /*distkey string, sortkey string*/ ) string {
 	return ""
 }
 

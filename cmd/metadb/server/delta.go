@@ -78,7 +78,7 @@ func getColumnSchema(tschema *sysdb.TableSchema, columnName string) *sysdb.Colum
 	return nil
 }
 
-func findDeltaColumnSchema(tschema string, tableName string, column1 *sysdb.ColumnSchema, column2 *sysdb.ColumnSchema, delta *deltaSchema) error {
+func findDeltaColumnSchema(column1 *sysdb.ColumnSchema, column2 *sysdb.ColumnSchema, delta *deltaSchema) error {
 	// If column does not exist, create a new one
 	if column1 == nil {
 		delta.column = append(delta.column, deltaColumnSchema{
@@ -136,7 +136,7 @@ func findDeltaSchema(c *command.Command, schema *cache.Schema) (*deltaSchema, er
 	var col2 sysdb.ColumnSchema
 	for _, col2 = range schema2.Column {
 		var col1 *sysdb.ColumnSchema = getColumnSchema(schema1, col2.Name)
-		if err = findDeltaColumnSchema(c.SchemaName, c.TableName, col1, &col2, delta); err != nil {
+		if err = findDeltaColumnSchema(col1, &col2, delta); err != nil {
 			return nil, err
 		}
 	}

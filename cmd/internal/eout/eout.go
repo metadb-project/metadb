@@ -16,13 +16,13 @@ func Init(program string) {
 
 func Error(format string, v ...interface{}) {
 	locus()
-	color.Error.Fprint(std, "error: ")
+	_, _ = color.Error.Fprint(std, "error: ")
 	message(format, v...)
 }
 
 func Warning(format string, v ...interface{}) {
 	locus()
-	color.Warning.Fprint(std, "warning: ")
+	_, _ = color.Warning.Fprint(std, "warning: ")
 	message(format, v...)
 }
 
@@ -46,18 +46,19 @@ func Trace(format string, v ...interface{}) {
 	message(format, v...)
 }
 
-func P(format string, v ...interface{}) {
+/*func P(format string, v ...interface{}) {
 	locus()
-	color.P.Fprint(std, "print:")
+	_, _ = color.P.Fprint(std, "print:")
 	message(" "+format, v...)
 }
+*/
 
 func locus() {
-	color.Locus.Fprint(std, fmt.Sprintf("%s: ", prog))
+	_, _ = color.Locus.Fprint(std, fmt.Sprintf("%s: ", prog))
 }
 
 func message(format string, v ...interface{}) {
-	fmt.Fprintf(std, format+"\n", v...)
+	_, _ = fmt.Fprintf(std, format+"\n", v...)
 }
 
 var std *os.File = os.Stderr

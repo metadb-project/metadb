@@ -12,7 +12,8 @@ var Locus *color.Color = color.New(color.FgWhite, color.Bold)
 var Warning *color.Color = color.New(color.FgMagenta, color.Bold)
 var Error *color.Color = color.New(color.FgRed, color.Bold)
 var Fatal *color.Color = color.New(color.FgWhite, color.Bold, color.BgRed)
-var P *color.Color = color.New(color.FgWhite, color.Bold, color.BgBlue)
+
+//var P *color.Color = color.New(color.FgWhite, color.Bold, color.BgBlue)
 
 func AlwaysColor() {
 	color.NoColor = false

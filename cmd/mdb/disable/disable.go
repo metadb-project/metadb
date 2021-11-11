@@ -12,7 +12,7 @@ import (
 )
 
 func Disable(opt *option.Disable) error {
-	var rq = &api.DisableRequest{opt.Connectors}
+	var rq = &api.DisableRequest{Connectors: opt.Connectors}
 	// send the request
 	var httprs *http.Response
 	var err error

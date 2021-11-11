@@ -1,7 +1,6 @@
 package jsonx
 
 import (
-	"database/sql"
 	"encoding/json"
 
 	"github.com/metadb-project/metadb/cmd/metadb/command"
@@ -9,18 +8,18 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.CommandColumn, db *sql.DB) error {
+func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.CommandColumn) error {
 	var obj map[string]interface{}
 	if err := json.Unmarshal([]byte(column.Data.(string)), &obj); err != nil {
 		return err
 	}
-	if err := rewriteObject(cl, cmd, column, db, 1, obj, cmd.TableName+"__t"); err != nil {
+	if err := rewriteObject(cl, cmd, 1, obj, cmd.TableName+"__t"); err != nil {
 		return err
 	}
 	return nil
 }
 
-func rewriteObject(cl *command.CommandList, cmd *command.Command, column *command.CommandColumn, db *sql.DB, level int, obj map[string]interface{}, table string) error {
+func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj map[string]interface{}, table string) error {
 	if level > 2 {
 		return nil
 	}
@@ -103,7 +102,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, column *comman
 	return nil
 }
 
-func rewriteArray(cl *command.CommandList, cmd *command.Command, column *command.CommandColumn, db *sql.DB, level int, aname string, adata []interface{}, table string) error {
+/*func rewriteArray(cl *command.CommandList, cmd *command.Command, column *command.CommandColumn, db *sql.DB, level int, aname string, adata []interface{}, table string) error {
 	if level > 2 {
 		return nil
 	}
@@ -156,3 +155,4 @@ func rewriteArray(cl *command.CommandList, cmd *command.Command, column *command
 	}
 	return nil
 }
+*/

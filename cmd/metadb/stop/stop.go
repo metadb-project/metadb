@@ -49,7 +49,7 @@ func Stop(opt *option.Stop) error {
 		n++
 		if n > 600 {
 			if eout.EnableTrace {
-				fmt.Fprintf(os.Stderr, " failed\n")
+				_, _ = fmt.Fprintf(os.Stderr, " failed\n")
 			}
 			return fmt.Errorf("server does not shut down")
 		}
@@ -67,7 +67,7 @@ func Stop(opt *option.Stop) error {
 			switch errno {
 			case syscall.EPERM:
 				if n%10 == 0 && eout.EnableTrace {
-					fmt.Fprintf(os.Stderr, ".")
+					_, _ = fmt.Fprintf(os.Stderr, ".")
 				}
 				time.Sleep(100 * time.Millisecond)
 				continue
@@ -76,12 +76,12 @@ func Stop(opt *option.Stop) error {
 			}
 		}
 		if n%10 == 0 && eout.EnableTrace {
-			fmt.Fprintf(os.Stderr, ".")
+			_, _ = fmt.Fprintf(os.Stderr, ".")
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 	if eout.EnableTrace {
-		fmt.Fprintf(os.Stderr, " done\n")
+		_, _ = fmt.Fprintf(os.Stderr, " done\n")
 	}
 	eout.Verbose("server stopped")
 	return nil

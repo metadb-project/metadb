@@ -5,13 +5,11 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/metadb-project/metadb/cmd/internal/eout"
+	"github.com/metadb-project/metadb/cmd/mdb/option"
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
-
-	"github.com/metadb-project/metadb/cmd/internal/eout"
-	"github.com/metadb-project/metadb/cmd/mdb/option"
 )
 
 // TODO duplicate
@@ -20,11 +18,11 @@ const ModePermRW = 0600
 
 // TODO duplicate
 // ModePermRWX is the umask "-rwx------".
-const ModePermRWX = 0700
+//const ModePermRWX = 0700
 
 // TODO duplicate
 // FileExists returns true if f is an existing file or directory.
-func FileExists(f string) (bool, error) {
+/*func FileExists(f string) (bool, error) {
 	_, err := os.Stat(f)
 	if err == nil {
 		return true, nil
@@ -34,6 +32,7 @@ func FileExists(f string) (bool, error) {
 	}
 	return false, err
 }
+*/
 
 func SendRequest(opt option.Global, method, url string, requestStruct interface{}) (*http.Response, error) {
 	WarnNoTLS(opt.NoTLS)

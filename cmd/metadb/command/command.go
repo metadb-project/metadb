@@ -120,6 +120,7 @@ func MakeDataTypeNew(dataType string, charMaxLen int64) (DataType, int64) {
 	}
 }
 
+/*
 func MakeDataType(dtype string) DataType {
 	switch dtype {
 	case "varchar":
@@ -147,6 +148,7 @@ func MakeDataType(dtype string) DataType {
 		return UnknownType
 	}
 }
+*/
 
 func DataTypeToSQLNew(dtype DataType, typeSize int64) (string, int64) {
 	switch dtype {
@@ -639,19 +641,17 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 	return c, nil
 }
 
-func extractOrigin(prefixes []string, schema string) (origin, newSchema string) {
-	var g string
-	for _, g = range prefixes {
-		var gu = g + "_"
-		if strings.HasPrefix(schema, gu) {
-			origin = g
-			newSchema = strings.TrimPrefix(schema, gu)
-			return
+func extractOrigin(prefixes []string, schema string) (string, string) {
+	if prefixes != nil {
+		var g string
+		for _, g = range prefixes {
+			var gu = g + "_"
+			if strings.HasPrefix(schema, gu) {
+				return g, strings.TrimPrefix(schema, gu)
+			}
 		}
 	}
-	origin = ""
-	newSchema = schema
-	return
+	return "", schema
 }
 
 func SQLEncodeData(data interface{}, datatype DataType, semtype string) string {

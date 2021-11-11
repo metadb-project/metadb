@@ -15,7 +15,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 )
 
-func addTable(table *sqlx.Table, db *sqlx.DB, track *cache.Track, users *cache.Users, database *sysdb.DatabaseConnector) error {
+func addTable(table *sqlx.Table, db *sqlx.DB, track *cache.Track, users *cache.Users) error {
 	// if tracked, then assume the table exists
 	if track.Contains(table) {
 		return nil

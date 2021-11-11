@@ -73,7 +73,7 @@ func initSysdb(filename string, create bool) error {
 		if err = initSchema(d); err != nil {
 			return err
 		}
-		d.Close()
+		_ = d.Close()
 		if err = os.Chmod(filename, util.ModePermRW); err != nil {
 			return err
 		}
@@ -115,7 +115,9 @@ func initSchema(d *sql.DB) error {
 	if tx, err = sqlx.MakeTx(d); err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func(tx *sql.Tx) {
+		_ = tx.Rollback()
+	}(tx)
 
 	var thisSchemaVersion int = 4
 	eout.Trace("writing database version: %d", thisSchemaVersion)

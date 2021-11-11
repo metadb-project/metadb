@@ -103,7 +103,7 @@ func Trace(format string, v ...interface{}) {
 	printf(nil, "TRACE", format, v...)
 }
 
-func P(format string, v ...interface{}) {
+/*func P(format string, v ...interface{}) {
 	if DisableColor {
 		//std.log.Printf("PRINT: "+format, v...)
 		printf(nil, "PRINT", format, v...)
@@ -113,6 +113,7 @@ func P(format string, v ...interface{}) {
 		printf(color.P, "PRINT", format, v...)
 	}
 }
+*/
 
 func printf(c *fcolor.Color, level string, format string, v ...interface{}) {
 	var msg = fmt.Sprintf(format, v...)

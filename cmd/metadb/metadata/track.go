@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
@@ -14,7 +15,9 @@ func TrackRead(db *sqlx.DB) (map[sqlx.Table]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
 	for rows.Next() {
 		var schema, table string
 		if err := rows.Scan(&schema, &table); err != nil {

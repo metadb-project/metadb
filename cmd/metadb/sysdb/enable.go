@@ -4,10 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
-
 	"github.com/metadb-project/metadb/cmd/internal/api"
-	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
@@ -63,7 +60,9 @@ func EnableConnector(rq *api.EnableRequest) error {
 	if tx, err = sqlx.MakeTx(db); err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func(tx *sql.Tx) {
+		_ = tx.Rollback()
+	}(tx)
 	// enable connectors
 	for _, c = range conn {
 		log.Info("enabling connector: %s", c)
@@ -119,7 +118,9 @@ func DisableConnector(rq *api.DisableRequest) error {
 	if tx, err = sqlx.MakeTx(db); err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func(tx *sql.Tx) {
+		_ = tx.Rollback()
+	}(tx)
 	// enable connectors
 	for _, c = range conn {
 		log.Info("disabling connector: %s", c)
@@ -159,7 +160,7 @@ func isConnectorEnabled(spec string) (bool, error) {
 
 }
 
-func DisableSourceConnectors() error {
+/*func DisableSourceConnectors() error {
 	sysMu.Lock()
 	defer sysMu.Unlock()
 
@@ -182,7 +183,7 @@ func DisableSourceConnectors() error {
 			return err
 		}
 		if ok {
-			if setConfig(topicsAttr, ""); err != nil {
+			if err := setConfig(topicsAttr, ""); err != nil {
 				return err
 			}
 		}
@@ -194,7 +195,7 @@ func DisableSourceConnectors() error {
 			return err
 		}
 		if ok {
-			if setConfig(groupAttr, ""); err != nil {
+			if err := setConfig(groupAttr, ""); err != nil {
 				return err
 			}
 		}
@@ -202,14 +203,17 @@ func DisableSourceConnectors() error {
 	}
 	return nil
 }
+*/
 
-func sourceConnectors() ([]string, error) {
+/*func sourceConnectors() ([]string, error) {
 	var specs []string
 	rows, err := db.QueryContext(context.TODO(), "SELECT spec FROM connector WHERE spec LIKE 'src.%'")
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
 	for rows.Next() {
 		var spec string
 		if err := rows.Scan(&spec); err != nil {
@@ -222,3 +226,4 @@ func sourceConnectors() ([]string, error) {
 	}
 	return specs, nil
 }
+*/

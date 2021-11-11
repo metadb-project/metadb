@@ -21,7 +21,7 @@ func Reset(opt *option.Reset) error {
 		return fmt.Errorf("invalid database connector: %s", opt.Connector)
 	}
 	// Ask for confirmation
-	fmt.Fprintf(os.Stderr, "metadb: reset current data in %q? ", opt.Connector)
+	_, _ = fmt.Fprintf(os.Stderr, "metadb: reset current data in %q? ", opt.Connector)
 	var confirm string
 	_, err := fmt.Scanln(&confirm)
 	if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {

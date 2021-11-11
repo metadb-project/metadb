@@ -34,7 +34,7 @@ var colorInitialized bool
 
 func main() {
 	colorMode = os.Getenv("METADB_COLOR")
-	devMode = (os.Getenv("METADB_DEV") == "on")
+	devMode = os.Getenv("METADB_DEV") == "on"
 	metadbMain()
 }
 
@@ -43,7 +43,7 @@ func metadbMain() {
 	eout.Init(program)
 	// Run
 	var err error
-	if err = run(os.Args); err != nil {
+	if err = run(); err != nil {
 		if !colorInitialized {
 			color.NeverColor()
 		}
@@ -52,7 +52,7 @@ func metadbMain() {
 	}
 }
 
-func run(args []string) error {
+func run() error {
 	var globalOpt = option.Global{}
 	var initOpt = option.Init{}
 	var serverOpt = option.Server{}
@@ -103,7 +103,7 @@ func run(args []string) error {
 			//        serverOpt.AdminPort = metadbAdminPort
 			//}
 			serverOpt.MetadbVersion = metadbVersion
-			serverOpt.RewriteJSON = (rewriteJSON == "1")
+			serverOpt.RewriteJSON = rewriteJSON == "1"
 			if err = server.Start(&serverOpt); err != nil {
 				return logFatal(err, logf, csvlogf)
 			}
@@ -289,6 +289,7 @@ var helpVersion = "Print metadb version\n"
 var helpCompletion = "Generate command-line completion\n"
 
 func help(cmd *cobra.Command, commandLine []string) {
+	_ = commandLine
 	switch cmd.Use {
 	case "metadb":
 		fmt.Printf("" +
@@ -604,10 +605,10 @@ func validateServerOptions(opt *option.Server) error {
 func logFatal(err error, logf, csvlogf *os.File) error {
 	log.Fatal("%s", err)
 	if logf != nil {
-		logf.Close()
+		_ = logf.Close()
 	}
 	if csvlogf != nil {
-		csvlogf.Close()
+		_ = csvlogf.Close()
 	}
 	return fmt.Errorf("server stopped: %s", err)
 }

@@ -112,7 +112,9 @@ func pollLoop(spr *sproc) error {
 		if sourceFile, err = os.Open(spr.svr.opt.SourceFilename); err != nil {
 			return err
 		}
-		defer sourceFile.Close()
+		defer func(sourceFile *os.File) {
+			_ = sourceFile.Close()
+		}(sourceFile)
 		sourceFileScanner = bufio.NewScanner(sourceFile)
 		sourceFileScanner.Buffer(make([]byte, 0, 10000000), 10000000)
 	}
@@ -137,7 +139,9 @@ func pollLoop(spr *sproc) error {
 			spr.source.Status.Error()
 			return err
 		}
-		defer consumer.Close()
+		defer func(consumer *kafka.Consumer) {
+			_ = consumer.Close()
+		}(consumer)
 		//err = consumer.SubscribeTopics([]string{"^" + topicPrefix + "[.].*"}, nil)
 		err = consumer.SubscribeTopics(topics, nil)
 		if err != nil {
@@ -173,7 +177,7 @@ func pollLoop(spr *sproc) error {
 
 		// Rewrite
 		before := len(cl.Cmd)
-		if err = rewriteCommandList(cl, spr.db[0], track, schema, spr.databases[0], spr.svr.opt.RewriteJSON); err != nil {
+		if err = rewriteCommandList(cl, spr.svr.opt.RewriteJSON); err != nil {
 			log.Error("%s", err)
 			//log.Info("skipping non-rewriteable command: %s", err)
 			//if sourceFileScanner == nil && !svr.opt.NoKafkaCommit {
@@ -193,7 +197,7 @@ func pollLoop(spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cl, spr.db[0], track, schema, users, spr.databases[0]); err != nil {
+		if err = execCommandList(cl, spr.db[0], track, schema, users); err != nil {
 			////////////////////////////////////////////////////
 			log.Error("%s", err)
 			//if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
@@ -399,18 +403,18 @@ func logDebugCommand(c *command.Command) {
 	}
 	var pkey []command.CommandColumn = command.PrimaryKeyColumns(c.Column)
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s: %s", c.Op, schemaTable)
+	_, _ = fmt.Fprintf(&b, "%s: %s", c.Op, schemaTable)
 	if c.Op != command.TruncateOp {
-		fmt.Fprintf(&b, " (")
+		_, _ = fmt.Fprintf(&b, " (")
 		var x int
 		var col command.CommandColumn
 		for x, col = range pkey {
 			if x > 0 {
-				fmt.Fprintf(&b, ", ")
+				_, _ = fmt.Fprintf(&b, ", ")
 			}
-			fmt.Fprintf(&b, "%s=%v", col.Name, col.Data)
+			_, _ = fmt.Fprintf(&b, "%s=%v", col.Name, col.Data)
 		}
-		fmt.Fprintf(&b, ")")
+		_, _ = fmt.Fprintf(&b, ")")
 	}
 	log.Debug("%s", b.String())
 }
@@ -450,7 +454,7 @@ func waitForConfig(svr *server) (*sproc, error) {
 			}
 		}
 		if len(databases) > 0 && svr.opt.SourceFilename != "" {
-			sources = []*sysdb.SourceConnector{&sysdb.SourceConnector{}}
+			sources = []*sysdb.SourceConnector{{}}
 			time.Sleep(2 * time.Second)
 			var dbEnabled bool
 			if dbEnabled, err = sysdb.IsConnectorEnabled("db." + databases[0].Name); err != nil {

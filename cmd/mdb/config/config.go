@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -127,6 +126,7 @@ func ConfigUpdate(opt *option.Config) error {
 	return nil
 }
 
+/*
 func ConfigDatabase(opt *option.ConfigDatabase) error {
 	if opt.Name == "" {
 		return fmt.Errorf("database connector name not specified")
@@ -164,7 +164,9 @@ func ConfigDatabase(opt *option.ConfigDatabase) error {
 
 	return nil
 }
+*/
 
+/*
 func ConfigSource(opt *option.ConfigSource) error {
 	if opt.Name == "" {
 		return fmt.Errorf("source connector name not specified")
@@ -212,3 +214,4 @@ func ConfigSource(opt *option.ConfigSource) error {
 
 	return nil
 }
+*/

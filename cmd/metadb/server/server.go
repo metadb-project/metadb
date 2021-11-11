@@ -176,6 +176,10 @@ func unsupportedMethod(path string, r *http.Request) string {
 	return fmt.Sprintf("%s: unsupported method: %s", path, r.Method)
 }
 
+func errorWritingResponse(r *http.Request) string {
+	return fmt.Sprintf("%s: error writing HTTP response", r.Method)
+}
+
 func requestString(r *http.Request) string {
 	var remoteHost, remotePort string
 	remoteHost, remotePort, _ = net.SplitHostPort(r.RemoteAddr)
@@ -242,7 +246,11 @@ func (svr *server) handleEnable(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		log.Debug("request: %s", requestString(r))
 		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(w, "enable\r\n")
+		_, err := fmt.Fprintf(w, "enable\r\n")
+		if err != nil {
+			http.Error(w, errorWritingResponse(r), http.StatusInternalServerError)
+			return
+		}
 		return
 	}
 	if r.Method == "POST" {
@@ -259,7 +267,11 @@ func (svr *server) handleDisable(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		log.Debug("request: %s", requestString(r))
 		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(w, "disable\r\n")
+		_, err := fmt.Fprintf(w, "disable\r\n")
+		if err != nil {
+			http.Error(w, errorWritingResponse(r), http.StatusInternalServerError)
+			return
+		}
 		return
 	}
 	if r.Method == "POST" {
@@ -447,45 +459,57 @@ func (svr *server) handleUserPost(w http.ResponseWriter, r *http.Request) {
 
 func (svr *server) createUser(rq *api.UserUpdateRequest) error {
 	for _, dbc := range svr.databases {
-		dbsuper, err := sqlx.Open(&sqlx.DataSourceName{
-			Host:     dbc.DBHost,
-			Port:     dbc.DBPort,
-			DBName:   dbc.DBName,
-			User:     dbc.DBSuperUser,
-			Password: dbc.DBSuperPassword,
-			SSLMode:  dbc.DBSSLMode,
-		})
-		defer dbsuper.Close()
-		if err := dbsuper.Ping(); err != nil {
+		err := createUserInDB(rq, dbc)
+		if err != nil {
 			return err
 		}
-		if err != nil {
-			return fmt.Errorf("user: create: %s", err)
-		}
-		if _, err := dbsuper.ExecContext(context.TODO(), "CREATE USER \""+rq.Name+"\" PASSWORD '"+rq.Password+"'"); err != nil {
-			return fmt.Errorf("unable to create user %q: %s", rq.Name, err)
-		}
-		db, err := sqlx.Open(&sqlx.DataSourceName{
-			Host:     dbc.DBHost,
-			Port:     dbc.DBPort,
-			DBName:   dbc.DBName,
-			User:     dbc.DBAdminUser,
-			Password: dbc.DBAdminPassword,
-			SSLMode:  dbc.DBSSLMode,
-		})
-		defer db.Close()
-		if err := db.Ping(); err != nil {
-			return err
-		}
-		if err != nil {
-			return fmt.Errorf("user: create: %s", err)
-		}
-		if _, err := db.ExecContext(context.TODO(), "CREATE SCHEMA \""+rq.Name+"\""); err != nil {
-			return fmt.Errorf("unable to create schema for user %q: %s", rq.Name, err)
-		}
-		if _, err := db.ExecContext(context.TODO(), "GRANT CREATE, USAGE ON SCHEMA \""+rq.Name+"\" TO \""+rq.Name+"\""); err != nil {
-			log.Warning("unable to grant permissions on schema for user %q: %s", rq.Name, err)
-		}
+	}
+	return nil
+}
+
+func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) error {
+	dbsuper, err := sqlx.Open(&sqlx.DataSourceName{
+		Host:     dbc.DBHost,
+		Port:     dbc.DBPort,
+		DBName:   dbc.DBName,
+		User:     dbc.DBSuperUser,
+		Password: dbc.DBSuperPassword,
+		SSLMode:  dbc.DBSSLMode,
+	})
+	defer func(dbsuper *sqlx.DB) {
+		_ = dbsuper.Close()
+	}(dbsuper)
+	if err := dbsuper.Ping(); err != nil {
+		return err
+	}
+	if err != nil {
+		return fmt.Errorf("user: create: %s", err)
+	}
+	if _, err := dbsuper.ExecContext(context.TODO(), "CREATE USER \""+rq.Name+"\" PASSWORD '"+rq.Password+"'"); err != nil {
+		return fmt.Errorf("unable to create user %q: %s", rq.Name, err)
+	}
+	db, err := sqlx.Open(&sqlx.DataSourceName{
+		Host:     dbc.DBHost,
+		Port:     dbc.DBPort,
+		DBName:   dbc.DBName,
+		User:     dbc.DBAdminUser,
+		Password: dbc.DBAdminPassword,
+		SSLMode:  dbc.DBSSLMode,
+	})
+	defer func(db *sqlx.DB) {
+		_ = db.Close()
+	}(db)
+	if err := db.Ping(); err != nil {
+		return err
+	}
+	if err != nil {
+		return fmt.Errorf("user: create: %s", err)
+	}
+	if _, err := db.ExecContext(context.TODO(), "CREATE SCHEMA \""+rq.Name+"\""); err != nil {
+		return fmt.Errorf("unable to create schema for user %q: %s", rq.Name, err)
+	}
+	if _, err := db.ExecContext(context.TODO(), "GRANT CREATE, USAGE ON SCHEMA \""+rq.Name+"\" TO \""+rq.Name+"\""); err != nil {
+		log.Warning("unable to grant permissions on schema for user %q: %s", rq.Name, err)
 	}
 	return nil
 }

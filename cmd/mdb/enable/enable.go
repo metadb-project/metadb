@@ -12,7 +12,7 @@ import (
 )
 
 func Enable(opt *option.Enable) error {
-	var rq = &api.EnableRequest{opt.Connectors}
+	var rq = &api.EnableRequest{Connectors: opt.Connectors}
 	// send the request
 	var httprs *http.Response
 	var err error

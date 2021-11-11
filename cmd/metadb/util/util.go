@@ -77,13 +77,13 @@ func CompileRegexps(strs []string) []*regexp.Regexp {
 
 func KafkaMessageString(m *kafka.Message) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "topic partition = %s\n", m.TopicPartition)
-	fmt.Fprintf(&b, "key = %s\n", m.Key)
-	fmt.Fprintf(&b, "value = %s\n", m.Value)
-	fmt.Fprintf(&b, "timestamp = %s\n", m.Timestamp)
-	fmt.Fprintf(&b, "timestamp type = %s\n", m.TimestampType)
-	fmt.Fprintf(&b, "opaque = %s\n", m.Opaque)
-	fmt.Fprintf(&b, "headers = %s\n", m.Headers)
+	_, _ = fmt.Fprintf(&b, "topic partition = %s\n", m.TopicPartition)
+	_, _ = fmt.Fprintf(&b, "key = %s\n", m.Key)
+	_, _ = fmt.Fprintf(&b, "value = %s\n", m.Value)
+	_, _ = fmt.Fprintf(&b, "timestamp = %s\n", m.Timestamp)
+	_, _ = fmt.Fprintf(&b, "timestamp type = %s\n", m.TimestampType)
+	_, _ = fmt.Fprintf(&b, "opaque = %s\n", m.Opaque)
+	_, _ = fmt.Fprintf(&b, "headers = %s\n", m.Headers)
 	return b.String()
 }
 
@@ -164,8 +164,7 @@ func ReadRequest(w http.ResponseWriter, r *http.Request, requestStruct interface
 	return true
 }
 
-func HandleBasicAuth(w http.ResponseWriter, r *http.Request) (
-	string, bool) {
+func HandleBasicAuth(w http.ResponseWriter, r *http.Request) (string, bool) {
 	var user, password string
 	var ok bool
 	user, password, ok = r.BasicAuth()
@@ -177,7 +176,7 @@ func HandleBasicAuth(w http.ResponseWriter, r *http.Request) (
 		return user, false
 	}
 	_ = password
-	var match bool = true
+	//var match bool
 	//var err error
 	//match, err = srv.storage.Authenticate(user, password)
 	//if err != nil {
@@ -187,14 +186,14 @@ func HandleBasicAuth(w http.ResponseWriter, r *http.Request) (
 	//        http.Error(w, m, http.StatusForbidden)
 	//        return user, false
 	//}
-	if !match {
-		var m = "Unauthorized (user '" + user + "'): " +
-			"Unable to authenticate username/password"
-		log.Info(m)
-		//w.Header().Set("WWW-Authenticate", "Basic")
-		http.Error(w, m, http.StatusForbidden)
-		return user, false
-	}
+	/*	if !match {
+			var m = "Unauthorized (user '" + user + "'): " + "Unable to authenticate username/password"
+			log.Info(m)
+			//w.Header().Set("WWW-Authenticate", "Basic")
+			http.Error(w, m, http.StatusForbidden)
+			return user, false
+		}
+	*/
 	return user, true
 }
 

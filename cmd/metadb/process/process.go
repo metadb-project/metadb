@@ -44,7 +44,9 @@ func WritePIDFile(datadir string) error {
 	if f, err = os.OpenFile(util.SystemPIDFileName(datadir), os.O_RDWR|os.O_CREATE, util.ModePermRW); err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(f)
 	if _, err = f.WriteString(fmt.Sprintf("%d\n", os.Getpid())); err != nil {
 		return err
 	}
@@ -52,10 +54,10 @@ func WritePIDFile(datadir string) error {
 }
 
 func RemovePIDFile(datadir string) {
-	os.Remove(util.SystemPIDFileName(datadir))
+	_ = os.Remove(util.SystemPIDFileName(datadir))
 }
 
-func PIDFileExists(datadir string) (bool, error) {
+/*func PIDFileExists(datadir string) (bool, error) {
 	var err error
 	var e bool
 	if e, err = util.FileExists(util.SystemPIDFileName(datadir)); err != nil {
@@ -63,3 +65,4 @@ func PIDFileExists(datadir string) (bool, error) {
 	}
 	return e, nil
 }
+*/

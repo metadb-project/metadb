@@ -2,6 +2,7 @@ package sysdb
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"regexp"
 	"sort"
@@ -105,7 +106,9 @@ func userRead(notUpdatedOnly bool) (map[string]*util.RegexList, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
 	for rows.Next() {
 		var username, tables string
 		var dbupdated bool

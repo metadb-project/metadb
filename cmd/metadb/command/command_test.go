@@ -29,7 +29,7 @@ func TestExtractOriginNoMatch(t *testing.T) {
 }
 
 func TestExtractOriginEmptyPrefixes(t *testing.T) {
-	var prefixes = []string{}
+	var prefixes []string
 	var schema = "reshare_west_inventory"
 	var wantOrigin = ""
 	var wantNewSchema = "reshare_west_inventory"
@@ -53,7 +53,7 @@ func TestExtractOriginEmptySchema(t *testing.T) {
 }
 
 func TestExtractOriginEmpty(t *testing.T) {
-	var prefixes = []string{}
+	var prefixes []string
 	var schema = ""
 	var wantOrigin = ""
 	var wantNewSchema = ""

@@ -31,7 +31,9 @@ func ListConfig(rq *api.ConfigListRequest) (*api.ConfigListResponse, error) {
 	if rows, err = db.QueryContext(context.TODO(), s); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
 	for rows.Next() {
 		var r api.ConfigItem
 		if err = rows.Scan(&r.Attr, &r.Val); err != nil {
@@ -180,7 +182,9 @@ func readConfigMap(prefix string) (map[string]map[string]string, error) {
 	if rows, err = db.QueryContext(context.TODO(), q); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
 	for rows.Next() {
 		var attr, val string
 		if err = rows.Scan(&attr, &val); err != nil {
@@ -220,7 +224,7 @@ func validateAttr(attr string) error {
 	return nil
 }
 
-func setConfig(attr, val string) error {
+/*func setConfig(attr, val string) error {
 	_, err := db.ExecContext(context.TODO(),
 		"INSERT INTO config (attr, val) VALUES ('"+attr+"', '"+val+"') ON CONFLICT (attr) DO UPDATE SET val='"+val+"'")
 	if err != nil {
@@ -228,3 +232,4 @@ func setConfig(attr, val string) error {
 	}
 	return nil
 }
+*/

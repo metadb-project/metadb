@@ -31,7 +31,9 @@ func NewSchema(db *sqlx.DB, track *Track) (*Schema, error) {
 	if err != nil {
 		return nil, fmt.Errorf("querying database schema: %s", err)
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
 	for rows.Next() {
 		var schemaName, tableName, columnName, dataType string
 		var charMaxLenNull sql.NullInt64
@@ -64,7 +66,7 @@ func (s *Schema) Delete(column *sqlx.Column) {
 
 func (s *Schema) TableColumns(table *sqlx.Table) []string {
 	var columns []string
-	for k, _ := range s.columns {
+	for k := range s.columns {
 		if k.Schema == table.Schema && k.Table == table.Table {
 			columns = append(columns, k.Column)
 		}
