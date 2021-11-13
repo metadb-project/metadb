@@ -361,6 +361,8 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"\n" +
 			"Source connector attributes:\n" +
 			"  src.<name>.brokers          - Kafka bootstrap servers (comma-separated list)\n" +
+			"  src.<name>.security         - Security protocol: \"ssl\" or \"plaintext\"\n" +
+			"                                (default: \"ssl\")\n" +
 			"  src.<name>.topics           - Regular expressions matching Kafka topics to\n" +
 			"                                read (comma-separated list)\n" +
 			"  src.<name>.group            - Kafka consumer group ID\n" +

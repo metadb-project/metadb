@@ -14,9 +14,14 @@ func ReadSourceConnectors() ([]*SourceConnector, error) {
 	var name string
 	var conf map[string]string
 	for name, conf = range cmap {
+		security := conf["security"]
+		if security == "" {
+			security = "ssl"
+		}
 		src = append(src, &SourceConnector{
 			Name:             name,
 			Brokers:          conf["brokers"],
+			Security:         security,
 			Topics:           util.SplitList(conf["topics"]),
 			Group:            conf["group"],
 			SchemaPassFilter: util.SplitList(conf["schemapassfilter"]),

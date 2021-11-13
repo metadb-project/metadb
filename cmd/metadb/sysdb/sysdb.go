@@ -33,6 +33,7 @@ type SourceConnector struct {
 	ID               int64
 	Name             string
 	Brokers          string
+	Security         string
 	Topics           []string
 	Group            string
 	SchemaPassFilter []string

@@ -133,7 +133,7 @@ func pollLoop(spr *sproc) error {
 			"enable.partition.eof": true,
 			"group.id":             group,
 			"max.poll.interval.ms": 900000,
-			"security.protocol":    "ssl",
+			"security.protocol":    spr.source.Security,
 		}
 		consumer, err = kafka.NewConsumer(config)
 		if err != nil {
