@@ -244,4 +244,4 @@ func indexName(table, column string) string {
 	return table + "_" + column + "_idx"
 }
 
-const maximumTypeSizeIndex = 4000
+const maximumTypeSizeIndex = 2500
