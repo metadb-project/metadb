@@ -32,11 +32,11 @@ func Reset(opt *option.Reset) error {
 		return fmt.Errorf("initializing system database: %s", err)
 	}
 	// Open database
-	dsn, err := sysdb.ReadDataSourceName(opt.Connector)
+	dbtype, dsn, err := sysdb.ReadDataSource(opt.Connector)
 	if err != nil {
 		return err
 	}
-	db, err := sqlx.Open(dsn)
+	db, err := sqlx.Open(dbtype, dsn)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func Reset(opt *option.Reset) error {
 		}
 	*/
 	// Get list of tables
-	tmap, err := metadata.TrackRead(db)
+	tmap, err := metadata.TrackRead(*db)
 	if err != nil {
 		return err
 	}

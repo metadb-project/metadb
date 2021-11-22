@@ -8,7 +8,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-func Init(db *sqlx.DB, metadbVersion string) error {
+func Init(db sqlx.DB, metadbVersion string) error {
 	// Check if initialized
 	var dbver int64
 	err := db.QueryRowContext(context.TODO(), "SELECT database_version FROM metadb.version LIMIT 1").Scan(&dbver)

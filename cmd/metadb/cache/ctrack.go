@@ -9,10 +9,10 @@ import (
 
 type Track struct {
 	tables map[sqlx.Table]bool
-	db     *sqlx.DB
+	db     sqlx.DB
 }
 
-func NewTrack(db *sqlx.DB) (*Track, error) {
+func NewTrack(db sqlx.DB) (*Track, error) {
 	// read tracking tables
 	tables, err := metadata.TrackRead(db)
 	if err != nil {

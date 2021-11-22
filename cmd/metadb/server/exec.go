@@ -14,7 +14,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func execCommandList(cl *command.CommandList, db *sql.DB, track *cache.Track, cschema *cache.Schema, users *cache.Users) error {
+func execCommandList(cl *command.CommandList, db sqlx.DB, track *cache.Track, cschema *cache.Schema, users *cache.Users) error {
 	var clt []command.CommandList = partitionTxn(cl, cschema)
 	for _, cc := range clt {
 		if len(cc.Cmd) == 0 {
@@ -36,9 +36,9 @@ func execCommandList(cl *command.CommandList, db *sql.DB, track *cache.Track, cs
 	return nil
 }
 
-func execCommandListData(db *sql.DB, cc command.CommandList, cschema *cache.Schema) error {
+func execCommandListData(db sqlx.DB, cc command.CommandList, cschema *cache.Schema) error {
 	// Begin txn
-	tx, err := sqlx.MakeTx(db)
+	tx, err := sqlx.MakeTx(db.DB)
 	if err != nil {
 		return fmt.Errorf("exec: start transaction: %s", err)
 	}
@@ -51,7 +51,7 @@ func execCommandListData(db *sql.DB, cc command.CommandList, cschema *cache.Sche
 		// due to optimization errors
 		for _, col := range c.Column {
 			if col.DType == command.VarcharType {
-				schemaCol := cschema.Column(&sqlx.Column{c.SchemaName, c.TableName, col.Name})
+				schemaCol := cschema.Column(sqlx.NewColumn(c.SchemaName, c.TableName, col.Name))
 				if schemaCol != nil && col.DTypeSize > schemaCol.CharMaxLen {
 					// TODO Factor fatal error exit into function
 					log.Fatal("internal error: schema varchar size not adjusted: %d > %d", col.DTypeSize, schemaCol.CharMaxLen)
@@ -105,7 +105,7 @@ func requiresSchemaChanges(c, o *command.Command, cschema *cache.Schema) bool {
 		return true
 	}
 	for i, col := range c.Column {
-		cc := sqlx.Column{c.SchemaName, c.TableName, col.Name}
+		cc := sqlx.Column{Schema: c.SchemaName, Table: c.TableName, Column: col.Name}
 		if col.Name != o.Column[i].Name || col.DType != o.Column[i].DType || col.SemanticType != o.Column[i].SemanticType || col.PrimaryKey != o.Column[i].PrimaryKey {
 			return true
 		}
@@ -127,7 +127,7 @@ func requiresSchemaChanges(c, o *command.Command, cschema *cache.Schema) bool {
 	return false
 }
 
-func execCommandSchema(c *command.Command, db *sql.DB, track *cache.Track, schema *cache.Schema, users *cache.Users) error {
+func execCommandSchema(c *command.Command, db sqlx.DB, track *cache.Track, schema *cache.Schema, users *cache.Users) error {
 	if c.Op == command.DeleteOp {
 		return nil
 	}
@@ -137,7 +137,7 @@ func execCommandSchema(c *command.Command, db *sql.DB, track *cache.Track, schem
 		return err
 	}
 	// TODO can we skip adding the table if we confirm it in sysdb?
-	if err = addTable(&sqlx.Table{c.SchemaName, c.TableName}, &sqlx.DB{DB: db}, track, users); err != nil {
+	if err = addTable(sqlx.NewTable(c.SchemaName, c.TableName), db, track, users); err != nil {
 		return err
 	}
 	if err = execDeltaSchema(delta, c.SchemaName, c.TableName, db, schema); err != nil {
@@ -146,7 +146,7 @@ func execCommandSchema(c *command.Command, db *sql.DB, track *cache.Track, schem
 	return nil
 }
 
-func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db *sql.DB, schema *cache.Schema) error {
+func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db sqlx.DB, schema *cache.Schema) error {
 	var err error
 	var col deltaColumnSchema
 	//if len(delta.column) == 0 {
@@ -166,14 +166,14 @@ func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db *s
 		// Redshift can alter the column in place
 		if col.oldType == col.newType && col.oldType == command.VarcharType {
 			log.Trace("table %s: alter column: %s %s", util.JoinSchemaTable(tschema, tableName), col.name, command.DataTypeToSQL(col.newType, col.newTypeSize))
-			if err = alterColumnVarcharSize(&sqlx.Table{tschema, tableName}, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
+			if err = alterColumnVarcharSize(sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 				return err
 			}
 			continue
 		}
 		// Otherwise we have a completely new type
 		log.Trace("table %s: rename column %s", util.JoinSchemaTable(tschema, tableName), col.name)
-		if err = renameColumnOldType(&sqlx.Table{tschema, tableName}, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
+		if err = renameColumnOldType(sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 			return err
 		}
 		log.Trace("table %s: new column %s %s", util.JoinSchemaTable(tschema, tableName), col.name, command.DataTypeToSQL(col.newType, col.newTypeSize))

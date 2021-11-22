@@ -87,35 +87,36 @@ func KafkaMessageString(m *kafka.Message) string {
 	return b.String()
 }
 
-func PostgresEncodeString(str string, e bool) string {
-	var b strings.Builder
-	if e {
-		b.WriteRune('E')
-	}
-	b.WriteRune('\'')
-	for _, c := range str {
-		switch c {
-		case '\\':
-			b.WriteString("\\\\")
-		case '\'':
-			b.WriteString("''")
-		case '\b':
-			b.WriteString("\\b")
-		case '\f':
-			b.WriteString("\\f")
-		case '\n':
-			b.WriteString("\\n")
-		case '\r':
-			b.WriteString("\\r")
-		case '\t':
-			b.WriteString("\\t")
-		default:
-			b.WriteRune(c)
-		}
-	}
-	b.WriteRune('\'')
-	return b.String()
-}
+// deprecated
+//func PostgresEncodeString(str string, e bool) string {
+//	var b strings.Builder
+//	if e {
+//		b.WriteRune('E')
+//	}
+//	b.WriteRune('\'')
+//	for _, c := range str {
+//		switch c {
+//		case '\\':
+//			b.WriteString("\\\\")
+//		case '\'':
+//			b.WriteString("''")
+//		case '\b':
+//			b.WriteString("\\b")
+//		case '\f':
+//			b.WriteString("\\f")
+//		case '\n':
+//			b.WriteString("\\n")
+//		case '\r':
+//			b.WriteString("\\r")
+//		case '\t':
+//			b.WriteString("\\t")
+//		default:
+//			b.WriteRune(c)
+//		}
+//	}
+//	b.WriteRune('\'')
+//	return b.String()
+//}
 
 //func RequireFileExists(filename string) error {
 //        var err error

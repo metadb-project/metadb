@@ -5,23 +5,23 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+
+	_ "github.com/lib/pq"
 )
 
-func Open(dsn *DataSourceName) (*DB, error) {
-	db, err := sql.Open("postgres", "host="+dsn.Host+" port="+dsn.Port+" user="+dsn.User+" password="+dsn.Password+" dbname="+dsn.DBName+" sslmode="+dsn.SSLMode)
-	if err != nil {
-		return nil, err
+func Open(dbtype, dataSourceName string) (*DB, error) {
+	switch dbtype {
+	case "postgresql":
+		return OpenPostgres(dataSourceName)
+	case "redshift":
+		return OpenRedshift(dataSourceName)
+	default:
+		return nil, fmt.Errorf("unknown database type: %s", dbtype)
 	}
-	return &DB{db}, nil
 }
 
-type DataSourceName struct {
-	Host     string
-	Port     string
-	DBName   string
-	User     string
-	Password string
-	SSLMode  string
+func PostgresDSN(host, port, dbname, user, password, sslmode string) string {
+	return "host=" + host + " port=" + port + " user=" + user + " password=" + password + " dbname=" + dbname + " sslmode=" + sslmode
 }
 
 // MakeTx creates a new transaction.
@@ -35,6 +35,7 @@ func MakeTx(db *sql.DB) (*sql.Tx, error) {
 
 type DB struct {
 	*sql.DB
+	Type DBType
 }
 
 type Table struct {
@@ -42,10 +43,23 @@ type Table struct {
 	Table  string
 }
 
+func NewTable(schema, table string) *Table {
+	return &Table{Schema: schema,
+		Table: table,
+	}
+}
+
 type Column struct {
 	Schema string
 	Table  string
 	Column string
+}
+
+func NewColumn(schema, table, column string) *Column {
+	return &Column{Schema: schema,
+		Table:  table,
+		Column: column,
+	}
 }
 
 func (t *Table) String() string {

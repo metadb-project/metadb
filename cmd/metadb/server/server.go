@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -30,7 +29,7 @@ type server struct {
 }
 
 type sproc struct {
-	db               []*sql.DB
+	db               []*sqlx.DB
 	schemaPassFilter []*regexp.Regexp
 	source           *sysdb.SourceConnector
 	databases        []*sysdb.DatabaseConnector
@@ -468,14 +467,7 @@ func (svr *server) createUser(rq *api.UserUpdateRequest) error {
 }
 
 func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) error {
-	dbsuper, err := sqlx.Open(&sqlx.DataSourceName{
-		Host:     dbc.DBHost,
-		Port:     dbc.DBPort,
-		DBName:   dbc.DBName,
-		User:     dbc.DBSuperUser,
-		Password: dbc.DBSuperPassword,
-		SSLMode:  dbc.DBSSLMode,
-	})
+	dbsuper, err := sqlx.Open(dbc.Type, sqlx.PostgresDSN(dbc.DBHost, dbc.DBPort, dbc.DBName, dbc.DBSuperUser, dbc.DBSuperPassword, dbc.DBSSLMode))
 	defer func(dbsuper *sqlx.DB) {
 		_ = dbsuper.Close()
 	}(dbsuper)
@@ -488,14 +480,7 @@ func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) err
 	if _, err := dbsuper.ExecContext(context.TODO(), "CREATE USER \""+rq.Name+"\" PASSWORD '"+rq.Password+"'"); err != nil {
 		return fmt.Errorf("unable to create user %q: %s", rq.Name, err)
 	}
-	db, err := sqlx.Open(&sqlx.DataSourceName{
-		Host:     dbc.DBHost,
-		Port:     dbc.DBPort,
-		DBName:   dbc.DBName,
-		User:     dbc.DBAdminUser,
-		Password: dbc.DBAdminPassword,
-		SSLMode:  dbc.DBSSLMode,
-	})
+	db, err := sqlx.Open(dbc.Type, sqlx.PostgresDSN(dbc.DBHost, dbc.DBPort, dbc.DBName, dbc.DBAdminUser, dbc.DBAdminPassword, dbc.DBSSLMode))
 	defer func(db *sqlx.DB) {
 		_ = db.Close()
 	}(db)

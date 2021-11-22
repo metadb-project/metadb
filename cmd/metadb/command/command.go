@@ -393,7 +393,7 @@ func extractPrimaryKey(ce *change.Event) (map[string]int, error) {
 	return primaryKey, nil
 }
 
-func extractColumns(ce *change.Event) ([]CommandColumn, error) {
+func extractColumns(ce *change.Event, dbt sqlx.DBType) ([]CommandColumn, error) {
 	var err error
 	var ok bool
 	// Extract field data from payload
@@ -486,7 +486,7 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 		} else {
 			data = col.Data
 		}
-		col.EncodedData = SQLEncodeData(data, col.DType, col.SemanticType)
+		col.EncodedData = SQLEncodeData(data, col.DType, col.SemanticType, dbt)
 		if col.DTypeSize, err = convertTypeSize(col.EncodedData, ftype, col.DType); err != nil {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type size", field)
 		}
@@ -512,7 +512,7 @@ func indentJSON(data string) (string, error) {
 var Tenants []string
 
 // Returns nil, nil in some cases.
-func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string) (*Command, error) {
+func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string, dbt sqlx.DBType) (*Command, error) {
 	if ce == nil {
 		return nil, fmt.Errorf("missing change event")
 	}
@@ -620,7 +620,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 					data = d
 				}
 			}
-			edata := SQLEncodeData(data, dtype, semtype)
+			edata := SQLEncodeData(data, dtype, semtype, dbt)
 			typesize, err := convertTypeSize(edata, dt, dtype)
 			if err != nil {
 				return nil, fmt.Errorf("delete: unknown type size: %v", data)
@@ -637,7 +637,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 		}
 		return c, nil
 	}
-	if c.Column, err = extractColumns(ce); err != nil {
+	if c.Column, err = extractColumns(ce, dbt); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -656,7 +656,7 @@ func extractOrigin(prefixes []string, schema string) (string, string) {
 	return "", schema
 }
 
-func SQLEncodeData(data interface{}, datatype DataType, semtype string) string {
+func SQLEncodeData(data interface{}, datatype DataType, semtype string, dbt sqlx.DBType) string {
 	if data == nil {
 		return "NULL"
 	}
@@ -665,7 +665,8 @@ func SQLEncodeData(data interface{}, datatype DataType, semtype string) string {
 		if datatype == TimestamptzType || datatype == TimetzType {
 			return "'" + v + "'"
 		}
-		return util.PostgresEncodeString(v, true)
+		//return util.PostgresEncodeString(v, true)
+		return dbt.EncodeString(v)
 	case int:
 		return fmt.Sprintf("%d", v)
 	case int64:

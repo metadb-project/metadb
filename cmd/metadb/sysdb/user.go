@@ -14,7 +14,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func UpdateUserPerms(adb *sqlx.DB, tables []sqlx.Table) error {
+func UpdateUserPerms(adb sqlx.DB, tables []sqlx.Table) error {
 	sysMu.Lock()
 	defer sysMu.Unlock()
 

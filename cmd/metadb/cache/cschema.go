@@ -18,7 +18,7 @@ type ColumnSchema struct {
 	CharMaxLen int64
 }
 
-func NewSchema(db *sqlx.DB, track *Track) (*Schema, error) {
+func NewSchema(db sqlx.DB, track *Track) (*Schema, error) {
 	columns := make(map[sqlx.Column]ColumnSchema)
 	// read schema from database
 	q := "" +

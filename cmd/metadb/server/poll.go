@@ -12,7 +12,6 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
-	"github.com/metadb-project/metadb/cmd/metadb/database"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/metadata"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
@@ -69,11 +68,11 @@ func outerPollLoop(svr *server) error {
 func pollLoop(spr *sproc) error {
 	var err error
 	var database0 *sysdb.DatabaseConnector = spr.databases[0]
-	if database0.Type == "postgresql" && database0.DBPort == "" {
-		database0.DBPort = "5432"
-	}
-	db := new(sqlx.DB)
-	if db.DB, err = database.Open(database0.DBHost, database0.DBPort, database0.DBAdminUser, database0.DBAdminPassword, database0.DBName, database0.DBSSLMode); err != nil {
+	//if database0.Type == "postgresql" && database0.DBPort == "" {
+	//	database0.DBPort = "5432"
+	//}
+	db, err := sqlx.Open(database0.Type, sqlx.PostgresDSN(database0.DBHost, database0.DBPort, database0.DBName, database0.DBAdminUser, database0.DBAdminPassword, database0.DBSSLMode))
+	if err != nil {
 		return err
 	}
 	// Ping database to test connection
@@ -82,22 +81,22 @@ func pollLoop(spr *sproc) error {
 		return fmt.Errorf("connecting to database: ping: %s", err)
 	}
 	spr.databases[0].Status.Active()
-	spr.db = append(spr.db, db.DB)
+	spr.db = append(spr.db, db)
 	// Cache tracking
-	if err = metadata.Init(db, spr.svr.opt.MetadbVersion); err != nil {
+	if err = metadata.Init(*db, spr.svr.opt.MetadbVersion); err != nil {
 		return err
 	}
-	track, err := cache.NewTrack(db)
+	track, err := cache.NewTrack(*db)
 	if err != nil {
 		return fmt.Errorf("caching track: %s", err)
 	}
 	// Cache schema
-	schema, err := cache.NewSchema(db, track)
+	schema, err := cache.NewSchema(*db, track)
 	if err != nil {
 		return fmt.Errorf("caching schema: %s", err)
 	}
 	// Update user permissions in database
-	if err = sysdb.UpdateUserPerms(db, track.All()); err != nil {
+	if err = sysdb.UpdateUserPerms(*db, track.All()); err != nil {
 		return err
 	}
 	// Cache users
@@ -132,6 +131,8 @@ func pollLoop(spr *sproc) error {
 			"enable.auto.commit":   false,
 			"enable.partition.eof": true,
 			"group.id":             group,
+			// TODO - Slow updates can trigger:
+			// Local: Maximum application poll interval (max.poll.interval.ms) exceeded: Application maximum poll interval (900000ms) exceeded by 350ms
 			"max.poll.interval.ms": 900000,
 			"security.protocol":    spr.source.Security,
 		}
@@ -156,7 +157,8 @@ func pollLoop(spr *sproc) error {
 		var cl = &command.CommandList{}
 
 		// Parse
-		eventReadCount, err := parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.source.SchemaPrefix, sourceFileScanner, spr.sourceLog)
+		eventReadCount, err := parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.source.SchemaPrefix,
+			sourceFileScanner, spr.sourceLog, db.Type)
 		if err != nil {
 			////////////////////////////////////////////////////
 			log.Error("%s", err)
@@ -178,7 +180,7 @@ func pollLoop(spr *sproc) error {
 
 		// Rewrite
 		before := len(cl.Cmd)
-		if err = rewriteCommandList(cl, spr.svr.opt.RewriteJSON); err != nil {
+		if err = rewriteCommandList(cl, spr.svr.opt.RewriteJSON, db.Type); err != nil {
 			log.Error("%s", err)
 			//log.Info("skipping non-rewriteable command: %s", err)
 			//if sourceFileScanner == nil && !svr.opt.NoKafkaCommit {
@@ -198,7 +200,7 @@ func pollLoop(spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cl, spr.db[0], track, schema, users); err != nil {
+		if err = execCommandList(cl, *(spr.db[0]), track, schema, users); err != nil {
 			////////////////////////////////////////////////////
 			log.Error("%s", err)
 			//if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
@@ -228,7 +230,8 @@ func pollLoop(spr *sproc) error {
 	}
 }
 
-func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter []*regexp.Regexp, schemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
+func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter []*regexp.Regexp,
+	schemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog, dbt sqlx.DBType) (int, error) {
 	var err error
 	var eventReadCount int
 	var x int
@@ -257,7 +260,7 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 			break
 		}
 		eventReadCount++
-		c, err := command.NewCommand(ce, schemaPassFilter, schemaPrefix)
+		c, err := command.NewCommand(ce, schemaPassFilter, schemaPrefix, dbt)
 		if err != nil {
 			log.Error("parse: %s", err)
 			continue
