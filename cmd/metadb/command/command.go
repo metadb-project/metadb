@@ -479,8 +479,9 @@ func extractColumns(ce *change.Event, dbt sqlx.DBType) ([]CommandColumn, error) 
 		col.SemanticType = semtype
 		col.Data = fieldData[field]
 		var data interface{}
-		if col.DType == JSONType {
-			if data, err = indentJSON(col.Data.(string)); err != nil {
+		if col.DType == JSONType && col.Data != nil {
+			data, err = indentJSON(col.Data.(string))
+			if err != nil {
 				data = col.Data
 			}
 		} else {
