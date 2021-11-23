@@ -8,8 +8,10 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.CommandColumn,
-	dbt sqlx.DBType) error {
+func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.CommandColumn, dbt sqlx.DBType) error {
+	if column.Data == nil {
+		return nil
+	}
 	var obj map[string]interface{}
 	if err := json.Unmarshal([]byte(column.Data.(string)), &obj); err != nil {
 		return err
