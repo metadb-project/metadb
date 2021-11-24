@@ -53,8 +53,11 @@ func Start(opt *option.Server) error {
 	}
 
 	var svr = &server{opt: opt}
-	// TODO check that database version is up to date
-	// (validateDatabaseLatestVersion)
+	// Check that database version is compatible
+	err = sysdb.ValidateSysdbVersion()
+	if err != nil {
+		return err
+	}
 	if err = runServer(svr); err != nil {
 		return err
 	}

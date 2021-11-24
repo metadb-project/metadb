@@ -98,6 +98,11 @@ func pollLoop(spr *sproc) error {
 		spr.databases[0].Status.Error()
 		return fmt.Errorf("connecting to database: ping: %s", err)
 	}
+	// Check that database version is compatible
+	err = metadata.ValidateDatabaseVersion(db)
+	if err != nil {
+		return err
+	}
 	spr.databases[0].Status.Active()
 	spr.db = append(spr.db, db)
 	// Cache tracking

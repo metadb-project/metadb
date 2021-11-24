@@ -15,6 +15,8 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
+const DatabaseVersion = 4
+
 // ModePermRW is the umask "-rw-------".
 const ModePermRW = 0600
 

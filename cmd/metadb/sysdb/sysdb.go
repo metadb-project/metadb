@@ -4,13 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"sync"
-
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"os"
+	"sync"
 )
 
 type DatabaseConnector struct {
@@ -120,9 +119,8 @@ func initSchema(d *sql.DB) error {
 		_ = tx.Rollback()
 	}(tx)
 
-	var thisSchemaVersion int = 4
-	eout.Trace("writing database version: %d", thisSchemaVersion)
-	var q = fmt.Sprintf("PRAGMA user_version = %d;", thisSchemaVersion)
+	eout.Trace("writing database version: %d", util.DatabaseVersion)
+	var q = fmt.Sprintf("PRAGMA user_version = %d;", util.DatabaseVersion)
 	if _, err = tx.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("initializing system database: writing database version: %s", err)
 	}
@@ -275,4 +273,29 @@ func initSchema(d *sql.DB) error {
 		return fmt.Errorf("initializing system database: committing changes: %s", err)
 	}
 	return nil
+}
+
+func ValidateSysdbVersion() error {
+	sysMu.Lock()
+	defer sysMu.Unlock()
+
+	q := "PRAGMA user_version"
+	var userVersion int64
+	err := db.QueryRowContext(context.TODO(), q).Scan(&userVersion)
+	switch {
+	case err == sql.ErrNoRows:
+		return fmt.Errorf("unable to query pragma user_version")
+	case err != nil:
+		return fmt.Errorf("querying pragma user_version: %s", err)
+	default:
+		if userVersion == util.DatabaseVersion {
+			return nil
+		} else {
+			m := fmt.Sprintf("data directory incompatible with server (%d != %d)", userVersion, util.DatabaseVersion)
+			if userVersion < util.DatabaseVersion {
+				m = m + ": upgrade using \"metadb upgrade\""
+			}
+			return fmt.Errorf("%s", m)
+		}
+	}
 }
