@@ -91,8 +91,15 @@ func run() error {
 				return err
 			}
 			upgradeOpt.Global = globalOpt
+			if err = sysdb.Init(util.SysdbFileName(upgradeOpt.Datadir)); err != nil {
+				return err
+			}
 			if err = upgrade.Upgrade(&upgradeOpt); err != nil {
 				return err
+			}
+			err = sysdb.Close()
+			if err != nil {
+				log.Error("%s", err)
 			}
 			return nil
 		},

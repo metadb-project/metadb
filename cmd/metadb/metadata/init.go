@@ -4,9 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
-
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
+	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
 func Init(db sqlx.DB, metadbVersion string) error {
@@ -64,23 +63,30 @@ func metadbVersionString(metadbVersion string) string {
 }
 
 func ValidateDatabaseVersion(db *sqlx.DB) error {
+	dbversion, err := GetDatabaseVersion(db)
+	if err != nil {
+		return err
+	}
+	if dbversion != util.DatabaseVersion {
+		m := fmt.Sprintf("database incompatible with server (%d != %d)", dbversion, util.DatabaseVersion)
+		if dbversion < util.DatabaseVersion {
+			m = m + ": upgrade using \"metadb upgrade\""
+		}
+		return fmt.Errorf("%s", m)
+	}
+	return nil
+}
+
+func GetDatabaseVersion(db *sqlx.DB) (int64, error) {
 	q := "SELECT dbversion FROM metadb.init"
-	var databaseVersion int64
-	err := db.QueryRowContext(context.TODO(), q).Scan(&databaseVersion)
+	var dbversion int64
+	err := db.QueryRowContext(context.TODO(), q).Scan(&dbversion)
 	switch {
 	case err == sql.ErrNoRows:
-		return fmt.Errorf("unable to query dbversion")
+		return 0, fmt.Errorf("unable to query dbversion")
 	case err != nil:
-		return fmt.Errorf("querying dbversion: %s", err)
+		return 0, fmt.Errorf("querying dbversion: %s", err)
 	default:
-		if databaseVersion == util.DatabaseVersion {
-			return nil
-		} else {
-			m := fmt.Sprintf("database incompatible with server (%d != %d)", databaseVersion, util.DatabaseVersion)
-			if databaseVersion < util.DatabaseVersion {
-				m = m + ": upgrade using \"metadb upgrade\""
-			}
-			return fmt.Errorf("%s", m)
-		}
+		return dbversion, nil
 	}
 }

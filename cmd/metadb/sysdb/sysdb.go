@@ -279,23 +279,41 @@ func ValidateSysdbVersion() error {
 	sysMu.Lock()
 	defer sysMu.Unlock()
 
+	dbversion, err := getSysdbVersion()
+	if err != nil {
+		return err
+	}
+	if dbversion != util.DatabaseVersion {
+		m := fmt.Sprintf("data directory incompatible with server (%d != %d)", dbversion, util.DatabaseVersion)
+		if dbversion < util.DatabaseVersion {
+			m = m + ": upgrade using \"metadb upgrade\""
+		}
+		return fmt.Errorf("%s", m)
+	}
+	return nil
+}
+
+func GetSysdbVersion() (int64, error) {
+	sysMu.Lock()
+	defer sysMu.Unlock()
+
+	dbversion, err := getSysdbVersion()
+	if err != nil {
+		return 0, err
+	}
+	return dbversion, nil
+}
+
+func getSysdbVersion() (int64, error) {
 	q := "PRAGMA user_version"
-	var userVersion int64
-	err := db.QueryRowContext(context.TODO(), q).Scan(&userVersion)
+	var dbversion int64
+	err := db.QueryRowContext(context.TODO(), q).Scan(&dbversion)
 	switch {
 	case err == sql.ErrNoRows:
-		return fmt.Errorf("unable to query pragma user_version")
+		return 0, fmt.Errorf("unable to query pragma user_version")
 	case err != nil:
-		return fmt.Errorf("querying pragma user_version: %s", err)
+		return 0, fmt.Errorf("querying pragma user_version: %s", err)
 	default:
-		if userVersion == util.DatabaseVersion {
-			return nil
-		} else {
-			m := fmt.Sprintf("data directory incompatible with server (%d != %d)", userVersion, util.DatabaseVersion)
-			if userVersion < util.DatabaseVersion {
-				m = m + ": upgrade using \"metadb upgrade\""
-			}
-			return fmt.Errorf("%s", m)
-		}
+		return dbversion, nil
 	}
 }
