@@ -32,8 +32,8 @@ func Init(db *sqlx.DB, metadbVersion string) error {
 	}
 	q = "" +
 		"CREATE TABLE IF NOT EXISTS metadb.init (\n" +
-		"    version VARCHAR(255) NOT NULL,\n" +
-		"    dbversion BIGINT NOT NULL\n" +
+		"    version VARCHAR(80) NOT NULL,\n" +
+		"    dbversion INTEGER NOT NULL\n" +
 		");"
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating table metadb.track: %s", err)
