@@ -11,6 +11,11 @@ type Init struct {
 	Datadir string
 }
 
+type Upgrade struct {
+	Global
+	Datadir string
+}
+
 type Server struct {
 	Global
 	Debug          bool
@@ -45,9 +50,4 @@ type Clean struct {
 	Datadir   string
 	Origins   string
 	Connector string
-}
-
-type Upgrade struct {
-	Global
-	Datadir string
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/server"
 	"github.com/metadb-project/metadb/cmd/metadb/stop"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
+	"github.com/metadb-project/metadb/cmd/metadb/upgrade"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"github.com/spf13/cobra"
 )
@@ -55,6 +56,7 @@ func metadbMain() {
 func run() error {
 	var globalOpt = option.Global{}
 	var initOpt = option.Init{}
+	var upgradeOpt = option.Upgrade{}
 	var serverOpt = option.Server{}
 	var stopOpt = option.Stop{}
 	var resetOpt = option.Reset{}
@@ -80,6 +82,25 @@ func run() error {
 	_ = dirFlag(cmdInit, &initOpt.Datadir)
 	_ = verboseFlag(cmdInit, &eout.EnableVerbose)
 	_ = traceFlag(cmdInit, &eout.EnableTrace)
+
+	var cmdUpgrade = &cobra.Command{
+		Use: "upgrade",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var err error
+			if err = initColor(); err != nil {
+				return err
+			}
+			upgradeOpt.Global = globalOpt
+			if err = upgrade.Upgrade(&upgradeOpt); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+	cmdUpgrade.SetHelpFunc(help)
+	_ = dirFlag(cmdUpgrade, &upgradeOpt.Datadir)
+	_ = verboseFlag(cmdUpgrade, &eout.EnableVerbose)
+	_ = traceFlag(cmdUpgrade, &eout.EnableTrace)
 
 	var cmdStart = &cobra.Command{
 		Use: "start",
@@ -195,32 +216,6 @@ func run() error {
 	_ = verboseFlag(cmdClean, &eout.EnableVerbose)
 	_ = traceFlag(cmdClean, &eout.EnableTrace)
 
-	/*
-		var cmdUpgrade = &cobra.Command{
-			Use: "upgrade",
-			//Short: "Upgrade database to the current version",
-			RunE: func(cmd *cobra.Command, args []string) error {
-				var err error
-				if err = initColor(); err != nil {
-					return err
-				}
-				upgradeOpt.Global = globalOpt
-				//if err = runUpgradeDatabase(&upgradeOpt); err != nil {
-				//        return err
-				//}
-				return nil
-			},
-		}
-		cmdUpgrade.Flags().SortFlags = false
-		cmdUpgrade.Flags().StringVarP(&upgradeOpt.Datadir, "dir", "D", "", ""+
-			"Data directory name")
-		cmdUpgrade.Flags().BoolVarP(&eout.EnableVerbose, "verbose", "v", false,
-			"Enable verbose output")
-		cmdUpgrade.Flags().BoolVar(&eout.EnableTrace, "xtrace", false,
-			"Enable extremely verbose output")
-		_ = cmdUpgrade.Flags().MarkHidden("xtrace")
-	*/
-
 	var cmdVersion = &cobra.Command{
 		Use: "version",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -275,7 +270,7 @@ func run() error {
 	//rootCmd.PersistentFlags().StringVar(&_, "client", metadbClientPort, ""+
 	//        "client port")
 	// Add commands.
-	rootCmd.AddCommand(cmdStart, cmdStop /* cmdUpgrade, */, cmdInit, cmdReset, cmdClean, cmdVersion, cmdCompletion)
+	rootCmd.AddCommand(cmdStart, cmdStop, cmdInit, cmdUpgrade, cmdReset, cmdClean, cmdVersion, cmdCompletion)
 	var err error
 	if err = rootCmd.Execute(); err != nil {
 		return err
@@ -287,6 +282,7 @@ func run() error {
 var helpStart = "Start server\n"
 var helpStop = "Shutdown server\n"
 var helpInit = "Initialize new Metadb instance\n"
+var helpUpgrade = "Upgrade a Metadb instance to the current version\n"
 var helpReset = "Reset database for new snapshot\n"
 var helpClean = "Remove data from previous reset\n"
 var helpVersion = "Print metadb version\n"
@@ -305,6 +301,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"  start                       - " + helpStart +
 			"  stop                        - " + helpStop +
 			"  init                        - " + helpInit +
+			//"  upgrade                     - " + helpUpgrade +
 			"  reset                       - " + helpReset +
 			"  clean                       - " + helpClean +
 			"  version                     - " + helpVersion +
@@ -348,6 +345,17 @@ func help(cmd *cobra.Command, commandLine []string) {
 			helpInit +
 			"\n" +
 			"Usage:  metadb init <options>\n" +
+			"\n" +
+			"Options:\n" +
+			dirFlag(nil, nil) +
+			verboseFlag(nil, nil) +
+			traceFlag(nil, nil) +
+			"")
+	case "upgrade":
+		fmt.Printf("" +
+			helpUpgrade +
+			"\n" +
+			"Usage:  metadb upgrade <options>\n" +
 			"\n" +
 			"Options:\n" +
 			dirFlag(nil, nil) +
