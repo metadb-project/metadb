@@ -38,7 +38,7 @@ func execCommandList(cl *command.CommandList, db sqlx.DB, track *cache.Track, cs
 
 func execCommandListData(db sqlx.DB, cc command.CommandList, cschema *cache.Schema) error {
 	// Begin txn
-	tx, err := sqlx.MakeTx(db.DB)
+	tx, err := sqlx.OldMakeTx(db.DB)
 	if err != nil {
 		return fmt.Errorf("exec: start transaction: %s", err)
 	}

@@ -1,6 +1,8 @@
 package upgrade
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/metadata"
@@ -10,33 +12,102 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
+type databaseState struct {
+	tx   *sql.Tx
+	db   *sqlx.DB
+	name string
+	dbc  *sysdb.DatabaseConnector
+}
+
 func Upgrade(opt *option.Upgrade) error {
 	// Require that a data directory be specified.
 	if opt.Datadir == "" {
 		return fmt.Errorf("data directory not specified")
 	}
+	// Open sysdb
+	dsnsys := "file:" + util.SysdbFileName(opt.Datadir) + sysdb.OpenOptions
+	dbsys, err := sql.Open("sqlite3", dsnsys)
+	if err != nil {
+		return err
+	}
+	defer func(dbsys *sql.DB) {
+		_ = dbsys.Close()
+	}(dbsys)
+	txsys, err := dbsys.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return err
+	}
+	defer func(txsys *sql.Tx) {
+		_ = txsys.Rollback()
+	}(txsys)
+	// Open databases
+	dbcs, err := sysdb.ReadDatabaseConnectors()
+	if err != nil {
+		return err
+	}
+	dbstate := make([]databaseState, 0)
+	for _, dbc := range dbcs {
+		name := "db." + dbc.Name
+		db, err := sqlx.Open(dbc.Type,
+			sqlx.PostgresDSN(dbc.DBHost, dbc.DBPort, dbc.DBName, dbc.DBAdminUser, dbc.DBAdminPassword, dbc.DBSSLMode))
+		if err != nil {
+			return err
+		}
+		defer func(db *sqlx.DB) {
+			_ = db.Close()
+		}(db)
+		if err = db.Ping(); err != nil {
+			return err
+		}
+		tx, err := sqlx.MakeTx(db)
+		if err != nil {
+			return err
+		}
+		defer func(tx *sql.Tx) {
+			_ = tx.Rollback()
+		}(tx)
+		dbst := databaseState{
+			tx:   tx,
+			db:   db,
+			name: name,
+			dbc:  dbc,
+		}
+		dbstate = append(dbstate, dbst)
+	}
+	// Upgrade sysdb
 	var upgraded bool
-	up, err := upgradeSysdb()
+	up, err := upgradeSysdb(txsys)
 	if err != nil {
 		return err
 	}
 	if up {
 		upgraded = true
 	}
-	up, err = upgradeDatabases()
+	// Upgrade databases
+	up, err = upgradeDatabases(dbstate)
 	if err != nil {
 		return err
 	}
 	if up {
 		upgraded = true
 	}
+	// Commit all
+	if err = txsys.Commit(); err != nil {
+		return err
+	}
+	for _, dbst := range dbstate {
+		if err = dbst.tx.Commit(); err != nil {
+			return err
+		}
+	}
+	// Write message if nothing was upgraded
 	if !upgraded {
 		eout.Info("databases are up to date")
 	}
 	return nil
 }
 
-func upgradeSysdb() (bool, error) {
+func upgradeSysdb(tx *sql.Tx) (bool, error) {
 	dbversion, err := sysdb.GetSysdbVersion()
 	if err != nil {
 		return false, err
@@ -47,18 +118,29 @@ func upgradeSysdb() (bool, error) {
 	if dbversion > util.DatabaseVersion {
 		return false, fmt.Errorf("data directory version incompatible with server (%d > %d)", dbversion, util.DatabaseVersion)
 	}
-
+	if err = upgradeSysdbAll(dbversion); err != nil {
+		return false, err
+	}
 	return true, nil
 }
 
-func upgradeDatabases() (bool, error) {
-	dbcs, err := sysdb.ReadDatabaseConnectors()
-	if err != nil {
-		return false, err
+type sysdbOpt struct {
+}
+
+type upgradeFunc func(p []byte) (n int, err error)
+
+func upgradeSysdbAll(dbversion int64) error {
+	for v := dbversion + 1; v <= util.DatabaseVersion; v++ {
+		// database_upgrades[v](&opt);
 	}
+
+	return nil
+}
+
+func upgradeDatabases(dbstate []databaseState) (bool, error) {
 	var upgraded bool
-	for _, dbc := range dbcs {
-		up, err := upgradeDatabase(dbc)
+	for _, dbst := range dbstate {
+		up, err := upgradeDatabase(dbst)
 		if err != nil {
 			return false, err
 		}
@@ -69,28 +151,17 @@ func upgradeDatabases() (bool, error) {
 	return upgraded, nil
 }
 
-func upgradeDatabase(dbc *sysdb.DatabaseConnector) (bool, error) {
-	dbcname := "db." + dbc.Name
-	db, err := sqlx.Open(dbc.Type,
-		sqlx.PostgresDSN(dbc.DBHost, dbc.DBPort, dbc.DBName, dbc.DBAdminUser, dbc.DBAdminPassword, dbc.DBSSLMode))
-	defer func(db *sqlx.DB) {
-		_ = db.Close()
-	}(db)
+func upgradeDatabase(dbst databaseState) (bool, error) {
+	dbversion, err := metadata.GetDatabaseVersion(dbst.db)
 	if err != nil {
-		return false, fmt.Errorf("%s: %s", dbcname, err)
-	}
-	if err = db.Ping(); err != nil {
-		return false, fmt.Errorf("%s: %s", dbcname, err)
-	}
-	dbversion, err := metadata.GetDatabaseVersion(db)
-	if err != nil {
-		return false, fmt.Errorf("%s: %s", dbcname, err)
+		return false, fmt.Errorf("%s: %s", dbst.name, err)
 	}
 	if dbversion == util.DatabaseVersion {
 		return false, nil
 	}
 	if dbversion > util.DatabaseVersion {
-		return false, fmt.Errorf("%s: database version incompatible with server (%d > %d)", dbcname, dbversion, util.DatabaseVersion)
+		return false, fmt.Errorf("%s: database version incompatible with server (%d > %d)",
+			dbst.name, dbversion, util.DatabaseVersion)
 	}
 
 	return true, nil

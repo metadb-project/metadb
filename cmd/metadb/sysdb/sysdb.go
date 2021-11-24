@@ -94,14 +94,15 @@ func Close() error {
 	return nil
 }
 
+const OpenOptions = "?_busy_timeout=30000" +
+	"&_foreign_keys=on" +
+	"&_journal_mode=WAL" +
+	"&_locking_mode=NORMAL" +
+	"&_synchronous=3"
+
 func openDatabase(filename string) (*sql.DB, error) {
 	var err error
-	var dsn = "file:" + filename +
-		"?_busy_timeout=30000" +
-		"&_foreign_keys=on" +
-		"&_journal_mode=WAL" +
-		"&_locking_mode=NORMAL" +
-		"&_synchronous=3"
+	var dsn = "file:" + filename + OpenOptions
 	var d *sql.DB
 	if d, err = sql.Open("sqlite3", dsn); err != nil {
 		return nil, err
@@ -112,7 +113,7 @@ func openDatabase(filename string) (*sql.DB, error) {
 func initSchema(d *sql.DB) error {
 	var err error
 	var tx *sql.Tx
-	if tx, err = sqlx.MakeTx(d); err != nil {
+	if tx, err = sqlx.OldMakeTx(d); err != nil {
 		return err
 	}
 	defer func(tx *sql.Tx) {

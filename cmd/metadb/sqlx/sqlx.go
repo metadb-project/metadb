@@ -24,8 +24,15 @@ func PostgresDSN(host, port, dbname, user, password, sslmode string) string {
 	return "host=" + host + " port=" + port + " user=" + user + " password=" + password + " dbname=" + dbname + " sslmode=" + sslmode
 }
 
-// MakeTx creates a new transaction.
-func MakeTx(db *sql.DB) (*sql.Tx, error) {
+func MakeTx(db *DB) (*sql.Tx, error) {
+	tx, err := db.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
+}
+
+func OldMakeTx(db *sql.DB) (*sql.Tx, error) {
 	tx, err := db.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return nil, err
