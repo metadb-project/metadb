@@ -107,6 +107,10 @@ func run() error {
 			if err = server.Start(&serverOpt); err != nil {
 				return logFatal(err, logf, csvlogf)
 			}
+			err = sysdb.Close()
+			if err != nil {
+				log.Error("%s", err)
+			}
 			log.Info("server is shut down")
 			return nil
 		},
