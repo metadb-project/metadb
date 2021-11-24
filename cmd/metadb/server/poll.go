@@ -21,23 +21,41 @@ import (
 )
 
 func goPollLoop(svr *server) {
-	var err error
-	if err = outerPollLoop(svr); err != nil {
-		log.Fatal("%s", err)
-		os.Exit(1)
-	}
-}
-
-func outerPollLoop(svr *server) error {
-	var err error
 	if svr.opt.NoKafkaCommit {
 		log.Info("Kafka commits disabled")
 	}
 	// For now, we support only one source
-	var spr *sproc
-	if spr, err = waitForConfig(svr); err != nil {
-		return err
+	spr, err := waitForConfig(svr)
+	if err != nil {
+		log.Fatal("%s", err)
+		os.Exit(1)
 	}
+	for true {
+		err := launchPollLoop(svr, spr)
+		if err == nil {
+			break
+		}
+		spr.source.Status.Error()
+		spr.databases[0].Status.Error()
+		log.Info("server sleeping")
+		time.Sleep(1 * time.Hour)
+		log.Info("restarting server")
+	}
+}
+
+func launchPollLoop(svr *server, spr *sproc) (reterr error) {
+	defer func() {
+		if r := recover(); r != nil {
+			reterr = fmt.Errorf("%v", r)
+			log.Fatal("%s", reterr)
+		}
+	}()
+	reterr = outerPollLoop(svr, spr)
+	return
+}
+
+func outerPollLoop(svr *server, spr *sproc) error {
+	var err error
 	// Set up source log
 	if svr.opt.LogSource != "" {
 		if spr.sourceLog, err = log.NewSourceLog(svr.opt.LogSource); err != nil {

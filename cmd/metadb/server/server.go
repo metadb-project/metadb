@@ -58,6 +58,7 @@ func Start(opt *option.Server) error {
 	if err = runServer(svr); err != nil {
 		return err
 	}
+	process.RemovePIDFile(svr.opt.Datadir)
 	return nil
 }
 
@@ -104,7 +105,14 @@ func runServer(svr *server) error {
 	if svr.opt.NoTLS {
 		log.Warning("TLS disabled for all client connections")
 	}
+	return launchServer(svr)
+}
 
+func launchServer(svr *server) error {
+	return mainServer(svr)
+}
+
+func mainServer(svr *server) error {
 	var sigc = make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGTERM)
 	go func() {
@@ -124,12 +132,6 @@ func runServer(svr *server) error {
 		}
 		time.Sleep(5 * time.Second)
 	}
-
-	err := sysdb.Close()
-	if err != nil {
-		log.Error("%s", err)
-	}
-	process.RemovePIDFile(svr.opt.Datadir)
 
 	return nil
 }
