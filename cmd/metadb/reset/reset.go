@@ -62,11 +62,13 @@ func Reset(opt *option.Reset) error {
 	origins := sqlx.CSVToSQL(opt.Origins)
 	for _, t := range tables {
 		eout.Info("resetting: %s", t.String())
-		_, err := db.ExecContext(context.TODO(), "UPDATE "+t.SQL()+" SET __cf=FALSE WHERE __cf AND __origin IN ("+origins+")")
+		q := "UPDATE " + t.SQL() + " SET __cf=FALSE WHERE __cf AND __origin IN (" + origins + ")"
+		_, err := db.ExecContext(context.TODO(), q)
 		if err != nil {
 			return err
 		}
-		_, err = db.ExecContext(context.TODO(), "UPDATE "+t.History().SQL()+" SET __cf=FALSE WHERE __cf AND __current AND __origin IN ("+origins+")")
+		q = "UPDATE " + t.History().SQL() + " SET __cf=FALSE WHERE __cf AND __current AND __origin IN (" + origins + ")"
+		_, err = db.ExecContext(context.TODO(), q)
 		if err != nil {
 			return err
 		}

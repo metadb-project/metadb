@@ -57,16 +57,18 @@ func Clean(opt *option.Clean) error {
 	origins := sqlx.CSVToSQL(opt.Origins)
 	for _, t := range tables {
 		eout.Info("cleaning: %s", t.String())
-		_, err := db.ExecContext(context.TODO(), "DELETE FROM "+t.SQL()+" WHERE NOT __cf AND __origin IN ("+origins+")")
+		q := "DELETE FROM " + t.SQL() + " WHERE NOT __cf AND __origin IN (" + origins + ")"
+		_, err := db.ExecContext(context.TODO(), q)
 		if err != nil {
 			return err
 		}
-		_, err = db.ExecContext(context.TODO(), "UPDATE "+t.History().SQL()+" SET __cf=TRUE,__end='"+now+"',__current=FALSE WHERE NOT __cf AND __current AND __origin IN ("+origins+")")
+		q = "UPDATE " + t.History().SQL() + " SET __cf=TRUE,__end='" + now + "',__current=FALSE WHERE NOT __cf AND __current AND __origin IN (" + origins + ")"
+		_, err = db.ExecContext(context.TODO(), q)
 		if err != nil {
 			return err
 		}
 		// Any non-current historical data can be set to __cf=TRUE
-		q := "UPDATE " + t.History().SQL() + " SET __cf=TRUE WHERE NOT __cf AND __origin IN (" + origins + ")"
+		q = "UPDATE " + t.History().SQL() + " SET __cf=TRUE WHERE NOT __cf AND __origin IN (" + origins + ")"
 		_, err = db.ExecContext(context.TODO(), q)
 		if err != nil {
 			return err
