@@ -65,6 +65,12 @@ func Clean(opt *option.Clean) error {
 		if err != nil {
 			return err
 		}
+		// Any non-current historical data can be set to __cf=TRUE
+		q := "UPDATE " + t.History().SQL() + " SET __cf=TRUE WHERE NOT __cf AND __origin IN (" + origins + ")"
+		_, err = db.ExecContext(context.TODO(), q)
+		if err != nil {
+			return err
+		}
 		if err = sqlx.VacuumAnalyze(db, &t); err != nil {
 			return err
 		}
