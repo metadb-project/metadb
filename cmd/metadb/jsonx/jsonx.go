@@ -2,6 +2,7 @@ package jsonx
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
@@ -12,12 +13,15 @@ func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.
 	if column.Data == nil {
 		return nil
 	}
+	// TODO - JSON data is not necessarily a JSON object; it could be any valid JSON data type
+	// Unmarshal into interface{} and send that to a function rewriteData()
+	// which tests for each kind of JSON-derived type.
 	var obj map[string]interface{}
 	if err := json.Unmarshal([]byte(column.Data.(string)), &obj); err != nil {
-		return err
+		return fmt.Errorf("rewrite json: %s", err)
 	}
 	if err := rewriteObject(cl, cmd, 1, obj, cmd.TableName+"__t", dbt); err != nil {
-		return err
+		return fmt.Errorf("rewrite json: %s", err)
 	}
 	return nil
 }
@@ -27,7 +31,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 	if level > 2 {
 		return nil
 	}
-	var cols []command.CommandColumn
+	cols := make([]command.CommandColumn, 0)
 	pkcols := command.PrimaryKeyColumns(cmd.Column)
 	pkcolsmap := make(map[string]bool)
 	for _, col := range pkcols {
