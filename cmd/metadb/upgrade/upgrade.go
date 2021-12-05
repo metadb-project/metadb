@@ -48,8 +48,16 @@ func Upgrade(opt *option.Upgrade) error {
 	dbstate := make([]databaseState, 0)
 	for _, dbc := range dbcs {
 		name := "db." + dbc.Name
-		db, err := sqlx.Open(dbc.Type,
-			sqlx.PostgresDSN(dbc.DBHost, dbc.DBPort, dbc.DBName, dbc.DBAdminUser, dbc.DBAdminPassword, dbc.DBSSLMode))
+		dsn := &sqlx.DSN{
+			Host:     dbc.DBHost,
+			Port:     dbc.DBPort,
+			User:     dbc.DBAdminUser,
+			Password: dbc.DBAdminPassword,
+			DBName:   dbc.DBName,
+			SSLMode:  dbc.DBSSLMode,
+			Account:  dbc.DBAccount,
+		}
+		db, err := sqlx.Open(dbc.Type, dsn)
 		if err != nil {
 			return err
 		}

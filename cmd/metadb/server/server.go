@@ -472,7 +472,16 @@ func (svr *server) createUser(rq *api.UserUpdateRequest) error {
 }
 
 func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) error {
-	dbsuper, err := sqlx.Open(dbc.Type, sqlx.PostgresDSN(dbc.DBHost, dbc.DBPort, dbc.DBName, dbc.DBSuperUser, dbc.DBSuperPassword, dbc.DBSSLMode))
+	dsn := &sqlx.DSN{
+		Host:     dbc.DBHost,
+		Port:     dbc.DBPort,
+		User:     dbc.DBSuperUser,
+		Password: dbc.DBSuperPassword,
+		DBName:   dbc.DBName,
+		SSLMode:  dbc.DBSSLMode,
+		Account:  dbc.DBAccount,
+	}
+	dbsuper, err := sqlx.Open(dbc.Type, dsn)
 	defer func(dbsuper *sqlx.DB) {
 		_ = dbsuper.Close()
 	}(dbsuper)
@@ -485,7 +494,16 @@ func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) err
 	if _, err := dbsuper.ExecContext(context.TODO(), "CREATE USER \""+rq.Name+"\" PASSWORD '"+rq.Password+"'"); err != nil {
 		return fmt.Errorf("unable to create user %q: %s", rq.Name, err)
 	}
-	db, err := sqlx.Open(dbc.Type, sqlx.PostgresDSN(dbc.DBHost, dbc.DBPort, dbc.DBName, dbc.DBAdminUser, dbc.DBAdminPassword, dbc.DBSSLMode))
+	dsn = &sqlx.DSN{
+		Host:     dbc.DBHost,
+		Port:     dbc.DBPort,
+		User:     dbc.DBAdminUser,
+		Password: dbc.DBAdminPassword,
+		DBName:   dbc.DBName,
+		SSLMode:  dbc.DBSSLMode,
+		Account:  dbc.DBAccount,
+	}
+	db, err := sqlx.Open(dbc.Type, dsn)
 	defer func(db *sqlx.DB) {
 		_ = db.Close()
 	}(db)

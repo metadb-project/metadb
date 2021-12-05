@@ -42,6 +42,7 @@ const (
 	UnknownType = iota
 	VarcharType
 	IntegerType
+	NumberType
 	FloatType
 	BooleanType
 	DateType
@@ -58,6 +59,8 @@ func (d DataType) String() string {
 		return "varchar"
 	case IntegerType:
 		return "integer"
+	case NumberType:
+		return "number"
 	case FloatType:
 		return "float"
 	case BooleanType:
@@ -81,8 +84,10 @@ func (d DataType) String() string {
 }
 
 func MakeDataTypeNew(dataType string, charMaxLen int64) (DataType, int64) {
-	switch dataType {
+	switch strings.ToLower(dataType) {
 	case "character varying":
+		fallthrough
+	case "text":
 		return VarcharType, charMaxLen
 	case "smallint":
 		return IntegerType, 2
@@ -96,6 +101,8 @@ func MakeDataTypeNew(dataType string, charMaxLen int64) (DataType, int64) {
 			case 8:
 				return "double precision"
 		*/
+	case "number":
+		return NumberType, 38
 	case "real":
 		return FloatType, 4
 	case "double precision":
@@ -109,8 +116,12 @@ func MakeDataTypeNew(dataType string, charMaxLen int64) (DataType, int64) {
 	case "time with time zone":
 		return TimetzType, 0
 	case "timestamp without time zone":
+		fallthrough
+	case "timestamp_ntz":
 		return TimestampType, 0
 	case "timestamp with time zone":
+		fallthrough
+	case "timestamp_tz":
 		return TimestamptzType, 0
 	case "json":
 		return JSONType, 0
@@ -162,6 +173,8 @@ func DataTypeToSQLNew(dtype DataType, typeSize int64) (string, int64) {
 			return "integer", 0
 		case 8:
 			return "bigint", 0
+		case 38:
+			return "number", 0
 		default:
 			return "(unknown)", 0
 		}
@@ -210,6 +223,8 @@ func DataTypeToSQL(dtype DataType, typeSize int64) string {
 			return "integer"
 		case 8:
 			return "bigint"
+		case 38:
+			return "number"
 		default:
 			return "(unknown)"
 		}
@@ -330,6 +345,8 @@ func convertTypeSize(data interface{}, coltype string, datatype DataType) (int64
 		default:
 			return 0, fmt.Errorf("internal error: unexpected type %q", coltype)
 		}
+	case NumberType:
+		return 38, nil
 	case VarcharType:
 		if data == nil {
 			return 1, nil

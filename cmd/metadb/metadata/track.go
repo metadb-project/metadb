@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 

@@ -25,6 +25,7 @@ type DatabaseConnector struct {
 	DBSuperPassword string
 	DBUsers         string
 	DBSSLMode       string
+	DBAccount       string
 	Status          status.Status
 }
 

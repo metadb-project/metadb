@@ -17,6 +17,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/upgrade"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"github.com/snowflakedb/gosnowflake"
 	"github.com/spf13/cobra"
 )
 
@@ -36,6 +37,7 @@ var colorInitialized bool
 func main() {
 	colorMode = os.Getenv("METADB_COLOR")
 	devMode = os.Getenv("METADB_DEV") == "on"
+	_ = gosnowflake.GetLogger().SetLogLevel("panic")
 	metadbMain()
 }
 

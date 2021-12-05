@@ -8,7 +8,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func Init(db sqlx.DB, metadbVersion string) error {
+func Init(db *sqlx.DB, metadbVersion string) error {
 	// Check if initialized
 	var dbver int64
 	err := db.QueryRowContext(context.TODO(), "SELECT dbversion FROM metadb.init LIMIT 1").Scan(&dbver)
@@ -19,6 +19,12 @@ func Init(db sqlx.DB, metadbVersion string) error {
 		// NOP: database not initialized
 	default:
 		// Database already initialized
+		// Check that database version is compatible
+		err = ValidateDatabaseVersion(db)
+		if err != nil {
+			return err
+		}
+		// Set Metadb version
 		q := "UPDATE metadb.init SET version = '" + metadbVersionString(metadbVersion) + "'"
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
 			return fmt.Errorf("updating table metadb.init: %s", err)

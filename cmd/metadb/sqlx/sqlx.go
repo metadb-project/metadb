@@ -7,10 +7,23 @@ import (
 	"strings"
 
 	_ "github.com/lib/pq"
+	_ "github.com/snowflakedb/gosnowflake"
 )
 
-func Open(dbtype, dataSourceName string) (*DB, error) {
+type DSN struct {
+	Host     string
+	Port     string
+	User     string
+	Password string
+	DBName   string
+	SSLMode  string
+	Account  string
+}
+
+func Open(dbtype string, dataSourceName *DSN) (*DB, error) {
 	switch dbtype {
+	case "snowflake":
+		return OpenSnowflake(dataSourceName)
 	case "postgresql":
 		return OpenPostgres(dataSourceName)
 	case "redshift":
@@ -20,12 +33,8 @@ func Open(dbtype, dataSourceName string) (*DB, error) {
 	}
 }
 
-func PostgresDSN(host, port, dbname, user, password, sslmode string) string {
-	return "host=" + host + " port=" + port + " user=" + user + " password=" + password + " dbname=" + dbname + " sslmode=" + sslmode
-}
-
 func MakeTx(db *DB) (*sql.Tx, error) {
-	tx, err := db.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelSerializable})
+	tx, err := db.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelDefault})
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +42,7 @@ func MakeTx(db *DB) (*sql.Tx, error) {
 }
 
 func OldMakeTx(db *sql.DB) (*sql.Tx, error) {
-	tx, err := db.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelSerializable})
+	tx, err := db.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelDefault})
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +83,7 @@ func (t *Table) String() string {
 }
 
 func (t *Table) SQL() string {
-	return fmt.Sprintf("%q.%q", t.Schema, t.Table)
+	return fmt.Sprintf("%s.%s", t.Schema, t.Table)
 }
 
 func (t *Table) History() *Table {

@@ -89,7 +89,16 @@ func pollLoop(spr *sproc) error {
 	//if database0.Type == "postgresql" && database0.DBPort == "" {
 	//	database0.DBPort = "5432"
 	//}
-	db, err := sqlx.Open(database0.Type, sqlx.PostgresDSN(database0.DBHost, database0.DBPort, database0.DBName, database0.DBAdminUser, database0.DBAdminPassword, database0.DBSSLMode))
+	dsn := &sqlx.DSN{
+		Host:     database0.DBHost,
+		Port:     database0.DBPort,
+		User:     database0.DBAdminUser,
+		Password: database0.DBAdminPassword,
+		DBName:   database0.DBName,
+		SSLMode:  database0.DBSSLMode,
+		Account:  database0.DBAccount,
+	}
+	db, err := sqlx.Open(database0.Type, dsn)
 	if err != nil {
 		return err
 	}
@@ -98,15 +107,10 @@ func pollLoop(spr *sproc) error {
 		spr.databases[0].Status.Error()
 		return fmt.Errorf("connecting to database: ping: %s", err)
 	}
-	// Check that database version is compatible
-	err = metadata.ValidateDatabaseVersion(db)
-	if err != nil {
-		return err
-	}
 	spr.databases[0].Status.Active()
 	spr.db = append(spr.db, db)
 	// Cache tracking
-	if err = metadata.Init(*db, spr.svr.opt.MetadbVersion); err != nil {
+	if err = metadata.Init(db, spr.svr.opt.MetadbVersion); err != nil {
 		return err
 	}
 	track, err := cache.NewTrack(*db)
@@ -223,7 +227,7 @@ func pollLoop(spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cl, *(spr.db[0]), track, schema, users); err != nil {
+		if err = execCommandList(cl, spr.db[0], track, schema, users); err != nil {
 			////////////////////////////////////////////////////
 			log.Error("%s", err)
 			//if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {

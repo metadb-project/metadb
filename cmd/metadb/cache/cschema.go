@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
@@ -24,9 +25,9 @@ func NewSchema(db sqlx.DB, track *Track) (*Schema, error) {
 	q := "" +
 		"SELECT table_schema, table_name, column_name, data_type, character_maximum_length\n" +
 		"    FROM information_schema.columns\n" +
-		"    WHERE table_schema NOT IN ('information_schema', 'pg_catalog') AND\n" +
-		"          table_name NOT LIKE '%\\_\\_' AND\n" +
-		"          column_name NOT IN ('__id', '__start', '__origin');"
+		"    WHERE lower(table_schema) NOT IN ('information_schema', 'pg_catalog') AND\n" +
+		"          right(table_name, 2) <> '__' AND\n" +
+		"          lower(column_name) NOT IN ('__id', '__start', '__origin');"
 	rows, err := db.QueryContext(context.TODO(), q)
 	if err != nil {
 		return nil, fmt.Errorf("querying database schema: %s", err)
@@ -35,15 +36,18 @@ func NewSchema(db sqlx.DB, track *Track) (*Schema, error) {
 		_ = rows.Close()
 	}(rows)
 	for rows.Next() {
-		var schemaName, tableName, columnName, dataType string
+		var schema, table, column, dataType string
 		var charMaxLenNull sql.NullInt64
-		if err := rows.Scan(&schemaName, &tableName, &columnName, &dataType, &charMaxLenNull); err != nil {
+		if err := rows.Scan(&schema, &table, &column, &dataType, &charMaxLenNull); err != nil {
 			return nil, fmt.Errorf("reading data from database schema: %s", err)
 		}
 		var charMaxLen int64
 		if charMaxLenNull.Valid {
 			charMaxLen = charMaxLenNull.Int64
 		}
+		schemaName := strings.ToLower(schema)
+		tableName := strings.ToLower(table)
+		columnName := strings.ToLower(column)
 		if !track.Contains(&sqlx.Table{Schema: schemaName, Table: tableName}) {
 			continue
 		}

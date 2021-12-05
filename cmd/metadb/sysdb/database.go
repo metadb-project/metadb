@@ -2,39 +2,51 @@ package sysdb
 
 import "github.com/metadb-project/metadb/cmd/metadb/sqlx"
 
-func ReadDataSource(spec string) (string, string, error) {
+func ReadDataSource(spec string) (string, *sqlx.DSN, error) {
 	sysMu.Lock()
 	defer sysMu.Unlock()
 
 	var err error
 	host, err, _ := getConfig(spec + ".host")
 	if err != nil {
-		return "", "", err
+		return "", nil, err
 	}
 	port, err, _ := getConfig(spec + ".port")
 	if err != nil {
-		return "", "", err
+		return "", nil, err
 	}
 	dbname, err, _ := getConfig(spec + ".dbname")
 	if err != nil {
-		return "", "", err
+		return "", nil, err
 	}
 	user, err, _ := getConfig(spec + ".adminuser")
 	if err != nil {
-		return "", "", err
+		return "", nil, err
 	}
 	password, err, _ := getConfig(spec + ".adminpassword")
 	if err != nil {
-		return "", "", err
+		return "", nil, err
 	}
 	sslmode, err, _ := getConfig(spec + ".sslmode")
 	if err != nil {
-		return "", "", err
+		return "", nil, err
 	}
-	dsn := sqlx.PostgresDSN(host, port, dbname, user, password, sslmode)
+	account, err, _ := getConfig(spec + ".account")
+	if err != nil {
+		return "", nil, err
+	}
+	dsn := &sqlx.DSN{
+		Host:     host,
+		Port:     port,
+		User:     user,
+		Password: password,
+		DBName:   dbname,
+		SSLMode:  sslmode,
+		Account:  account,
+	}
 	dbtype, err, _ := getConfig(spec + ".type")
 	if err != nil {
-		return "", "", err
+		return "", nil, err
 	}
 	return dbtype, dsn, nil
 }
@@ -61,6 +73,7 @@ func ReadDatabaseConnectors() ([]*DatabaseConnector, error) {
 			DBSuperPassword: conf["superpassword"],
 			DBUsers:         conf["users"],
 			DBSSLMode:       conf["sslmode"],
+			DBAccount:       conf["account"],
 		})
 	}
 	return dbc, nil

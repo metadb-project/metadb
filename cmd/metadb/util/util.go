@@ -51,9 +51,9 @@ func SysdbFileName(datadir string) string {
 
 func JoinSchemaTable(schema, table string) string {
 	if schema == "" {
-		return fmt.Sprintf("\"%s\"", table)
+		return fmt.Sprintf("%s", table)
 	} else {
-		return fmt.Sprintf("\"%s\".\"%s\"", schema, table)
+		return fmt.Sprintf("%s.%s", schema, table)
 	}
 }
 

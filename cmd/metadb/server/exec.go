@@ -4,17 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"strings"
-
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"github.com/snowflakedb/gosnowflake"
+	"os"
+	"strings"
 )
 
-func execCommandList(cl *command.CommandList, db sqlx.DB, track *cache.Track, cschema *cache.Schema, users *cache.Users) error {
+func execCommandList(cl *command.CommandList, db *sqlx.DB, track *cache.Track, cschema *cache.Schema, users *cache.Users) error {
 	var clt []command.CommandList = partitionTxn(cl, cschema)
 	for _, cc := range clt {
 		if len(cc.Cmd) == 0 {
@@ -36,7 +36,7 @@ func execCommandList(cl *command.CommandList, db sqlx.DB, track *cache.Track, cs
 	return nil
 }
 
-func execCommandListData(db sqlx.DB, cc command.CommandList, cschema *cache.Schema) error {
+func execCommandListData(db *sqlx.DB, cc command.CommandList, cschema *cache.Schema) error {
 	// Begin txn
 	tx, err := sqlx.OldMakeTx(db.DB)
 	if err != nil {
@@ -60,7 +60,7 @@ func execCommandListData(db sqlx.DB, cc command.CommandList, cschema *cache.Sche
 			}
 		}
 		// Execute data part of command
-		if err := execCommandData(&c, tx); err != nil {
+		if err := execCommandData(&c, tx, db); err != nil {
 			return fmt.Errorf("%s\n%v", err, c)
 		}
 	}
@@ -127,7 +127,7 @@ func requiresSchemaChanges(c, o *command.Command, cschema *cache.Schema) bool {
 	return false
 }
 
-func execCommandSchema(c *command.Command, db sqlx.DB, track *cache.Track, schema *cache.Schema, users *cache.Users) error {
+func execCommandSchema(c *command.Command, db *sqlx.DB, track *cache.Track, schema *cache.Schema, users *cache.Users) error {
 	if c.Op == command.DeleteOp {
 		return nil
 	}
@@ -146,7 +146,7 @@ func execCommandSchema(c *command.Command, db sqlx.DB, track *cache.Track, schem
 	return nil
 }
 
-func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db sqlx.DB, schema *cache.Schema) error {
+func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db *sqlx.DB, schema *cache.Schema) error {
 	var err error
 	var col deltaColumnSchema
 	//if len(delta.column) == 0 {
@@ -185,20 +185,20 @@ func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db sq
 	return nil
 }
 
-func execCommandData(c *command.Command, tx *sql.Tx) error {
+func execCommandData(c *command.Command, tx *sql.Tx, db *sqlx.DB) error {
 	switch c.Op {
 	case command.MergeOp:
-		return execMergeData(c, tx)
+		return execMergeData(c, tx, db)
 	case command.DeleteOp:
-		return execDeleteData(c, tx)
+		return execDeleteData(c, tx, db)
 	case command.TruncateOp:
-		return execTruncateData(c, tx)
+		return execTruncateData(c, tx, db)
 	default:
 		return fmt.Errorf("unknown command op: %v", c.Op)
 	}
 }
 
-func execMergeData(c *command.Command, tx *sql.Tx) error {
+func execMergeData(c *command.Command, tx *sql.Tx, db *sqlx.DB) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
 	// Check if current record is identical
 	ident, id, cf, err := isCurrentIdentical(c, tx, &t)
@@ -207,15 +207,17 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 	}
 	if ident {
 		if cf == "false" {
-			return updateRowCF(c, tx, &t, id)
+			return updateRowCF(c, tx, db, &t, id)
 		}
 		return nil
 	}
+	stcount := 3
 	// current table
 	// delete the record
 	var b strings.Builder
 	if id != "" {
 		b.WriteString("DELETE FROM " + t.SQL() + " WHERE __id='" + id + "';")
+		stcount += 1
 	}
 	// insert new record
 	b.WriteString("INSERT INTO " + t.SQL() + "(__start")
@@ -223,7 +225,7 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 		b.WriteString(",__origin")
 	}
 	for _, c := range c.Column {
-		b.WriteString(",\"" + c.Name + "\"")
+		b.WriteString("," + c.Name)
 	}
 	b.WriteString(")VALUES('" + c.SourceTimestamp + "'")
 	if c.Origin != "" {
@@ -246,7 +248,7 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 		b.WriteString(",__origin")
 	}
 	for _, c := range c.Column {
-		b.WriteString(",\"" + c.Name + "\"")
+		b.WriteString("," + c.Name)
 	}
 	b.WriteString(")VALUES('" + c.SourceTimestamp + "','9999-12-31 00:00:00Z',TRUE")
 	if c.Origin != "" {
@@ -256,13 +258,17 @@ func execMergeData(c *command.Command, tx *sql.Tx) error {
 		b.WriteString("," + c.EncodedData)
 	}
 	b.WriteString(");")
-	if _, err := tx.ExecContext(context.TODO(), b.String()); err != nil {
+	ctx, err := multiStatementContext(db.Type, stcount)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, b.String()); err != nil {
 		return err
 	}
 	return nil
 }
 
-func updateRowCF(c *command.Command, tx *sql.Tx, t *sqlx.Table, id string) error {
+func updateRowCF(c *command.Command, tx *sql.Tx, db *sqlx.DB, t *sqlx.Table, id string) error {
 	var b strings.Builder
 	// current table
 	b.WriteString("UPDATE " + t.SQL() + " SET __cf=TRUE WHERE __id='" + id + "';")
@@ -273,7 +279,11 @@ func updateRowCF(c *command.Command, tx *sql.Tx, t *sqlx.Table, id string) error
 		return err
 	}
 	b.WriteString(" LIMIT 1);")
-	if _, err := tx.ExecContext(context.TODO(), b.String()); err != nil {
+	ctx, err := multiStatementContext(db.Type, 2)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, b.String()); err != nil {
 		return err
 	}
 	return nil
@@ -359,7 +369,7 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, t *sqlx.Table) (bool, st
 	return true, id, cf, nil
 }
 
-func execDeleteData(c *command.Command, tx *sql.Tx) error {
+func execDeleteData(c *command.Command, tx *sql.Tx, db *sqlx.DB) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
 	// current table
 	// delete the record
@@ -376,25 +386,46 @@ func execDeleteData(c *command.Command, tx *sql.Tx) error {
 		return err
 	}
 	b.WriteString(" LIMIT 1);")
-	_, err := tx.ExecContext(context.TODO(), b.String())
+	ctx, err := multiStatementContext(db.Type, 2)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, b.String())
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func execTruncateData(c *command.Command, tx *sql.Tx) error {
+func execTruncateData(c *command.Command, tx *sql.Tx, db *sqlx.DB) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
 	// Current table: delete all records from origin
 	var b strings.Builder
 	b.WriteString("DELETE FROM " + t.SQL() + " WHERE __origin='" + c.Origin + "';")
 	// History table: mark as not current
 	b.WriteString("UPDATE " + t.History().SQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "';")
-	_, err := tx.ExecContext(context.TODO(), b.String())
+	ctx, err := multiStatementContext(db.Type, 2)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, b.String())
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func multiStatementContext(dbtype sqlx.DBType, count int) (context.Context, error) {
+	switch dbtype.(type) {
+	case *sqlx.Snowflake:
+		ctx, err := gosnowflake.WithMultiStatement(context.Background(), count)
+		if err != nil {
+			return nil, err
+		}
+		return ctx, nil
+	default:
+		return context.TODO(), nil
+	}
 }
 
 func wherePKDataEqual(b *strings.Builder, columns []command.CommandColumn) error {

@@ -91,6 +91,7 @@ func findDeltaColumnSchema(column1 *sysdb.ColumnSchema, column2 *sysdb.ColumnSch
 	}
 	// If the types are the same and the existing type size is larger than
 	// the new one, the columns schema are compatible
+	// TODO - A simple equality comparison does not work for Snowflake's NUMBER type.
 	if column1.DType == column2.DType && column1.DTypeSize >= column2.DTypeSize {
 		return nil
 	}
