@@ -22,11 +22,11 @@ func execCommandList(cl *command.CommandList, db *sqlx.DB, track *cache.Track, c
 		}
 		// exec schema changes
 		if err := execCommandSchema(&cc.Cmd[0], db, track, cschema, users); err != nil {
-			return err
+			return fmt.Errorf("schema: %s", err)
 		}
 		err := execCommandListData(db, cc, cschema)
 		if err != nil {
-			return err
+			return fmt.Errorf("data: %s", err)
 		}
 		// log confirmation
 		for _, c := range cc.Cmd {
@@ -40,7 +40,7 @@ func execCommandListData(db *sqlx.DB, cc command.CommandList, cschema *cache.Sch
 	// Begin txn
 	tx, err := sqlx.OldMakeTx(db.DB)
 	if err != nil {
-		return fmt.Errorf("exec: start transaction: %s", err)
+		return fmt.Errorf("start transaction: %s", err)
 	}
 	defer func(tx *sql.Tx) {
 		_ = tx.Rollback()
@@ -67,7 +67,7 @@ func execCommandListData(db *sqlx.DB, cc command.CommandList, cschema *cache.Sch
 	// Commit txn
 	log.Trace("commit txn")
 	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("exec: commit transaction: %s", err)
+		return fmt.Errorf("commit transaction: %s", err)
 	}
 	return nil
 }

@@ -22,7 +22,7 @@ func rewriteCommand(cl *command.CommandList, c *command.Command, rewriteJSON boo
 	for _, col := range c.Column {
 		if rewriteJSON && col.DType == command.JSONType {
 			if err := jsonx.RewriteJSON(cl, c, &col, dbt); err != nil {
-				return err
+				return fmt.Errorf("rewriting json data: %s", err)
 			}
 		}
 	}

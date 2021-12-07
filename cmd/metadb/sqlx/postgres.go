@@ -44,14 +44,9 @@ func (d *Postgres) CreateIndex(name string, table *Table, columns []string) stri
 		if i != 0 {
 			clist.WriteString(",")
 		}
-		clist.WriteString("\"" + c + "\"")
+		clist.WriteString(c)
 	}
 	return "CREATE INDEX " + name + " ON " + table.SQL() + "(" + clist.String() + ")"
-	//_, err := d.ExecContext(context.TODO(), q)
-	//if err != nil {
-	//	log.Error("unable to create index on " + table.SQL() + " (" + colstr + ")")
-	//}
-	//return nil
 }
 
 func (d *Postgres) JSONType() string {

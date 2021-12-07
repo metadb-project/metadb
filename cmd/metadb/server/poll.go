@@ -37,9 +37,7 @@ func goPollLoop(svr *server) {
 		}
 		spr.source.Status.Error()
 		spr.databases[0].Status.Error()
-		log.Info("server sleeping")
-		time.Sleep(1 * time.Hour)
-		log.Info("restarting server")
+		time.Sleep(24 * time.Hour)
 	}
 }
 
@@ -79,6 +77,7 @@ func outerPollLoop(svr *server, spr *sproc) error {
 	log.Debug("starting stream processor")
 	if err = pollLoop(spr); err != nil {
 		log.Error("%s", err)
+		return err
 	}
 	return nil
 }
@@ -187,18 +186,7 @@ func pollLoop(spr *sproc) error {
 		eventReadCount, err := parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.source.SchemaPrefix,
 			sourceFileScanner, spr.sourceLog, db.Type)
 		if err != nil {
-			////////////////////////////////////////////////////
-			log.Error("%s", err)
-			//if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
-			//        _, err = consumer.Commit()
-			//        if err != nil {
-			//                log.Error("%s", err)
-			//                panic(err)
-			//        }
-			//}
-			continue
-			////////////////////////////////////////////////////
-			// return err
+			return fmt.Errorf("parser: %s", err)
 		}
 		if firstEvent {
 			firstEvent = false
@@ -208,18 +196,7 @@ func pollLoop(spr *sproc) error {
 		// Rewrite
 		before := len(cl.Cmd)
 		if err = rewriteCommandList(cl, spr.svr.opt.RewriteJSON, db.Type); err != nil {
-			log.Error("%s", err)
-			//log.Info("skipping non-rewriteable command: %s", err)
-			//if sourceFileScanner == nil && !svr.opt.NoKafkaCommit {
-			//        _, err = consumer.Commit()
-			//        if err != nil {
-			//                log.Error("%s", err)
-			//                panic(err)
-			//        }
-			//}
-			continue
-			////////////////////////////////////////////////////
-			// return err
+			return fmt.Errorf("rewriter: %s", err)
 		}
 		after := len(cl.Cmd)
 		if before != after {
@@ -228,18 +205,7 @@ func pollLoop(spr *sproc) error {
 
 		// Execute
 		if err = execCommandList(cl, spr.db[0], track, schema, users); err != nil {
-			////////////////////////////////////////////////////
-			log.Error("%s", err)
-			//if sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
-			//        _, err = consumer.Commit()
-			//        if err != nil {
-			//                log.Error("%s", err)
-			//                panic(err)
-			//        }
-			//}
-			continue
-			////////////////////////////////////////////////////
-			// return err
+			return fmt.Errorf("executor: %s", err)
 		}
 
 		if eventReadCount > 0 && sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
@@ -248,7 +214,7 @@ func pollLoop(spr *sproc) error {
 				//if err.(kafka.Error).Code() == kafka.ErrNoOffset {
 				//        log.Warning("kafka: %s", err)
 				//}
-				log.Warning("kafka: %s", err)
+				return fmt.Errorf("kafka commit: %s", err)
 			}
 		}
 
@@ -266,7 +232,7 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 		var ce *change.Event
 		if sourceFileScanner != nil {
 			if ce, err = readChangeEventFromFile(sourceFileScanner, sourceLog); err != nil {
-				return 0, err
+				return 0, fmt.Errorf("reading change event from file: %s", err)
 			}
 			if ce == nil && len(cl.Cmd) == 0 {
 				log.Info("finished processing source file")
@@ -277,7 +243,7 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 		} else {
 			var partitionEOF bool
 			if ce, partitionEOF, err = readChangeEvent(consumer, sourceLog); err != nil {
-				return 0, err
+				return 0, fmt.Errorf("reading change event: %s", err)
 			}
 			if partitionEOF {
 				break
@@ -289,8 +255,7 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 		eventReadCount++
 		c, err := command.NewCommand(ce, schemaPassFilter, schemaPrefix, dbt)
 		if err != nil {
-			log.Error("parse: %s", err)
-			continue
+			return 0, fmt.Errorf("parsing command: %s", err)
 		}
 		if c == nil {
 			continue

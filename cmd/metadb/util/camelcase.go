@@ -20,9 +20,7 @@ func DecodeCamelCase(s string) (string, error) {
 		c3 = c
 		err := decodeCamelCaseTriple(c1, c2, c3, &b)
 		if err != nil {
-			return "",
-				fmt.Errorf("error decoding camel case: %v",
-					err)
+			return "", fmt.Errorf("decoding \"%s\": %s", s, err)
 		}
 	}
 	// Decode last character.
@@ -31,9 +29,7 @@ func DecodeCamelCase(s string) (string, error) {
 	c3 = 0
 	err := decodeCamelCaseTriple(c1, c2, c3, &b)
 	if err != nil {
-		return "",
-			fmt.Errorf("error decoding camel case: %v",
-				err)
+		return "", fmt.Errorf("decoding \"%s\": %s", s, err)
 	}
 	return b.String(), nil
 }
@@ -45,7 +41,7 @@ func decodeCamelCaseTriple(c1, c2, c3 rune, b *strings.Builder) error {
 	var c2u = unicode.IsUpper(c2)
 	var c3u = unicode.IsUpper(c3)
 	var write rune = 0
-	var writeBreak bool = false
+	var writeBreak = false
 	switch {
 	// First check triples that include zeros.
 	case c2 == 0:
@@ -92,12 +88,12 @@ func decodeCamelCaseTriple(c1, c2, c3 rune, b *strings.Builder) error {
 	if writeBreak {
 		_, err := b.WriteRune('_')
 		if err != nil {
-			return err
+			return fmt.Errorf("writing rune: %s", err)
 		}
 	}
 	_, err := b.WriteRune(write)
 	if err != nil {
-		return err
+		return fmt.Errorf("writing rune: %s", err)
 	}
 	return nil
 }

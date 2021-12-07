@@ -51,9 +51,8 @@ func Init(filename string) error {
 	return initSysdb(filename, false)
 }
 
-// Init and create: call this instead of Init() when creating a new
-// database.
 func InitCreate(filename string) error {
+	// Init and create: call this instead of Init() when creating a new database.
 	return initSysdb(filename, true)
 }
 

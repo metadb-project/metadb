@@ -83,7 +83,7 @@ func (t *Table) String() string {
 }
 
 func (t *Table) SQL() string {
-	return fmt.Sprintf("%s.%s", t.Schema, t.Table)
+	return t.String()
 }
 
 func (t *Table) History() *Table {

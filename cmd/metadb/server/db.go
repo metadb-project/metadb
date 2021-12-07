@@ -57,7 +57,7 @@ func createCurrentTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.
 		"    __cf boolean NOT NULL DEFAULT TRUE,\n" +
 		"    __start timestamp with time zone NOT NULL,\n" +
 		"    __origin varchar(63) NOT NULL DEFAULT ''\n" +
-		");"
+		")"
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating current table: %s", err)
 	}
@@ -66,11 +66,11 @@ func createCurrentTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.
 	if db.Type.SupportsIndexes() {
 		q = db.Type.CreateIndex("", table, []string{"__start"})
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Error("unable to create index on " + table.SQL() + " (__start);")
+			log.Error("unable to create index on " + table.String() + " (__start)")
 		}
 		q = db.Type.CreateIndex("", table, []string{"__origin"})
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Error("unable to create index on " + table.SQL() + " (__origin);")
+			log.Error("unable to create index on " + table.String() + " (__origin)")
 		}
 	}
 
@@ -85,43 +85,43 @@ func createCurrentTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.
 }
 
 func createHistoryTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.Users) error {
-	historyTableSQL := table.History().SQL()
+	historyTable := table.History()
 	q := "" +
-		"CREATE TABLE IF NOT EXISTS " + historyTableSQL + " (\n" +
+		"CREATE TABLE IF NOT EXISTS " + historyTable.SQL() + " (\n" +
 		"    __id bigint " + db.Type.Identity() + " PRIMARY KEY,\n" +
 		"    __cf boolean NOT NULL DEFAULT TRUE,\n" +
 		"    __start timestamp with time zone NOT NULL,\n" +
 		"    __end timestamp with time zone NOT NULL,\n" +
 		"    __current boolean NOT NULL,\n" +
 		"    __origin varchar(63) NOT NULL DEFAULT ''\n" +
-		");"
+		")"
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating history table: %s", err)
 	}
 	// add indexes on new columns
 
 	if db.Type.SupportsIndexes() {
-		q = db.Type.CreateIndex("", table, []string{"__start"})
+		q = db.Type.CreateIndex("", historyTable, []string{"__start"})
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Error("unable to create index on " + historyTableSQL + " (__start);")
+			log.Error("unable to create index on " + historyTable.String() + " (__start)")
 		}
-		q = db.Type.CreateIndex("", table, []string{"__end"})
+		q = db.Type.CreateIndex("", historyTable, []string{"__end"})
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Error("unable to create index on " + historyTableSQL + " (__end);")
+			log.Error("unable to create index on " + historyTable.String() + " (__end)")
 		}
-		q = db.Type.CreateIndex("", table, []string{"__current"})
+		q = db.Type.CreateIndex("", historyTable, []string{"__current"})
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Error("unable to create index on " + historyTableSQL + " (__current);")
+			log.Error("unable to create index on " + historyTable.String() + " (__current)")
 		}
-		q = db.Type.CreateIndex("", table, []string{"__origin"})
+		q = db.Type.CreateIndex("", historyTable, []string{"__origin"})
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Error("unable to create index on " + historyTableSQL + " (__origin);")
+			log.Error("unable to create index on " + historyTable.String() + " (__origin)")
 		}
 	}
 
 	// grant permissions on new table
 	for _, u := range users.WithPerm(table) {
-		q = fmt.Sprintf("GRANT SELECT ON " + historyTableSQL + " TO \"" + u + "\";")
+		q = fmt.Sprintf("GRANT SELECT ON " + historyTable.SQL() + " TO \"" + u + "\"")
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
 			log.Warning("granting permissions for user: %s", err)
 		}

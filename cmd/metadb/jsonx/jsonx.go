@@ -41,7 +41,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 	for name, value := range obj {
 		n, err := util.DecodeCamelCase(name)
 		if err != nil {
-			return err
+			return fmt.Errorf("converting from camel case: %s: %v", err, obj)
 		}
 		if pkcolsmap[name] {
 			//n = "j_" + n

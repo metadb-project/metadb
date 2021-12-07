@@ -529,8 +529,8 @@ func indentJSON(data string) (string, error) {
 
 var Tenants []string
 
-// Returns nil, nil in some cases.
 func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string, dbt sqlx.DBType) (*Command, error) {
+	// Note: this function returns nil, nil in some cases.
 	if ce == nil {
 		return nil, fmt.Errorf("missing change event")
 	}
