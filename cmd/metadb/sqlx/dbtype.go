@@ -19,6 +19,7 @@ import (
 type DBType interface {
 	String() string
 	EncodeString(string) string
+	Id(string) string
 	Identity() string
 	SupportsIndexes() bool
 	CreateIndex(string, *Table, []string) string

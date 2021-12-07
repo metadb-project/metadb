@@ -279,7 +279,7 @@ type CommandColumn struct {
 }
 
 func (c Command) String() string {
-	return fmt.Sprintf("command = %s %s (%v)\nevent =\n%v", c.Op, util.JoinSchemaTable(c.SchemaName, c.TableName), c.Column, c.ChangeEvent)
+	return fmt.Sprintf("command = %s %s.%s (%v)\nevent =\n%v", c.Op, c.SchemaName, c.TableName, c.Column, c.ChangeEvent)
 }
 
 type CommandList struct {

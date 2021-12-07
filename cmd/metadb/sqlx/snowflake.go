@@ -24,6 +24,10 @@ func (d *Snowflake) EncodeString(s string) string {
 	return encodeStringPostgres(s, false)
 }
 
+func (d *Snowflake) Id(identifier string) string {
+	return identifier
+}
+
 func (d *Snowflake) Identity() string {
 	return "IDENTITY"
 }

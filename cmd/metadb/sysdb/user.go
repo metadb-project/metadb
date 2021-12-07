@@ -27,17 +27,17 @@ func UpdateUserPerms(adb sqlx.DB, tables []sqlx.Table) error {
 			if re.String == "" {
 				// Revoke
 				_, _ = adb.ExecContext(context.TODO(), "REVOKE USAGE ON SCHEMA \""+t.Schema+"\" FROM \""+u+"\"")
-				_, _ = adb.ExecContext(context.TODO(), "REVOKE SELECT ON "+t.SQL()+" FROM \""+u+"\"")
-				_, _ = adb.ExecContext(context.TODO(), "REVOKE SELECT ON "+t.History().SQL()+" FROM \""+u+"\"")
+				_, _ = adb.ExecContext(context.TODO(), "REVOKE SELECT ON "+t.Id(adb.Type)+" FROM \""+u+"\"")
+				_, _ = adb.ExecContext(context.TODO(), "REVOKE SELECT ON "+t.History().Id(adb.Type)+" FROM \""+u+"\"")
 			} else {
 				// Grant if regex matches
 				if util.UserPerm(re, &t) {
 					_, _ = adb.ExecContext(context.TODO(), "GRANT USAGE ON SCHEMA \""+t.Schema+"\" TO \""+u+"\"")
-					_, _ = adb.ExecContext(context.TODO(), "GRANT SELECT ON "+t.SQL()+" TO \""+u+"\"")
-					_, _ = adb.ExecContext(context.TODO(), "GRANT SELECT ON "+t.History().SQL()+" TO \""+u+"\"")
+					_, _ = adb.ExecContext(context.TODO(), "GRANT SELECT ON "+t.Id(adb.Type)+" TO \""+u+"\"")
+					_, _ = adb.ExecContext(context.TODO(), "GRANT SELECT ON "+t.History().Id(adb.Type)+" TO \""+u+"\"")
 				} else {
-					_, _ = adb.ExecContext(context.TODO(), "REVOKE SELECT ON "+t.SQL()+" FROM \""+u+"\"")
-					_, _ = adb.ExecContext(context.TODO(), "REVOKE SELECT ON "+t.History().SQL()+" FROM \""+u+"\"")
+					_, _ = adb.ExecContext(context.TODO(), "REVOKE SELECT ON "+t.Id(adb.Type)+" FROM \""+u+"\"")
+					_, _ = adb.ExecContext(context.TODO(), "REVOKE SELECT ON "+t.History().Id(adb.Type)+" FROM \""+u+"\"")
 				}
 			}
 

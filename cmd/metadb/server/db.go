@@ -37,12 +37,12 @@ func addTable(table *sqlx.Table, db *sqlx.DB, track *cache.Track, users *cache.U
 }
 
 func createSchemaIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.Users) error {
-	q := "CREATE SCHEMA IF NOT EXISTS " + table.Schema
+	q := "CREATE SCHEMA IF NOT EXISTS " + db.Type.Id(table.Schema)
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("%s:\n%s", err, q)
 	}
 	for _, u := range users.WithPerm(table) {
-		q = fmt.Sprintf("GRANT USAGE ON SCHEMA %s TO %s", table.Schema, u)
+		q = fmt.Sprintf("GRANT USAGE ON SCHEMA %s TO %s", db.Type.Id(table.Schema), u)
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
 			log.Warning("granting permissions for user: %s", err)
 		}
@@ -52,7 +52,7 @@ func createSchemaIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.Users)
 
 func createCurrentTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.Users) error {
 	q := "" +
-		"CREATE TABLE IF NOT EXISTS " + table.SQL() + " (\n" +
+		"CREATE TABLE IF NOT EXISTS " + table.Id(db.Type) + " (\n" +
 		"    __id bigint " + db.Type.Identity() + " PRIMARY KEY,\n" +
 		"    __cf boolean NOT NULL DEFAULT TRUE,\n" +
 		"    __start timestamp with time zone NOT NULL,\n" +
@@ -76,7 +76,7 @@ func createCurrentTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.
 
 	// grant permissions on new table
 	for _, u := range users.WithPerm(table) {
-		q = "GRANT SELECT ON " + table.SQL() + " TO " + u
+		q = "GRANT SELECT ON " + table.Id(db.Type) + " TO " + u
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
 			log.Warning("granting permissions for user: %s", err)
 		}
@@ -87,7 +87,7 @@ func createCurrentTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.
 func createHistoryTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.Users) error {
 	historyTable := table.History()
 	q := "" +
-		"CREATE TABLE IF NOT EXISTS " + historyTable.SQL() + " (\n" +
+		"CREATE TABLE IF NOT EXISTS " + historyTable.Id(db.Type) + " (\n" +
 		"    __id bigint " + db.Type.Identity() + " PRIMARY KEY,\n" +
 		"    __cf boolean NOT NULL DEFAULT TRUE,\n" +
 		"    __start timestamp with time zone NOT NULL,\n" +
@@ -121,7 +121,7 @@ func createHistoryTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.
 
 	// grant permissions on new table
 	for _, u := range users.WithPerm(table) {
-		q = fmt.Sprintf("GRANT SELECT ON " + historyTable.SQL() + " TO \"" + u + "\"")
+		q = fmt.Sprintf("GRANT SELECT ON " + historyTable.Id(db.Type) + " TO \"" + u + "\"")
 		if _, err := db.ExecContext(context.TODO(), q); err != nil {
 			log.Warning("granting permissions for user: %s", err)
 		}
@@ -131,13 +131,13 @@ func createHistoryTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.
 
 func addColumn(table *sqlx.Table, columnName string, newType command.DataType, newTypeSize int64, db *sqlx.DB, schema *cache.Schema) error {
 	// alter table schema in database
-	q := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table.SQL(), columnName, command.DataTypeToSQL(newType, newTypeSize))
+	q := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table.Id(db.Type), db.Type.Id(columnName), command.DataTypeToSQL(newType, newTypeSize))
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("adding column %q in %q: %s", columnName, table.SQL(), err)
+		return fmt.Errorf("adding column %q in %q: %s", columnName, table.Id(db.Type), err)
 	}
-	q = fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table.History().SQL(), columnName, command.DataTypeToSQL(newType, newTypeSize))
+	q = fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table.History().Id(db.Type), db.Type.Id(columnName), command.DataTypeToSQL(newType, newTypeSize))
 	if _, err := db.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("adding column %q in %q: %s", columnName, table.History().SQL(), err)
+		return fmt.Errorf("adding column %q in %q: %s", columnName, table.History().Id(db.Type), err)
 	}
 	// add index on new column
 	if newType != command.JSONType && newTypeSize <= maximumTypeSizeIndex {
@@ -179,13 +179,13 @@ func alterColumnVarcharSize(table *sqlx.Table, column string, datatype command.D
 	// alter table
 	var q = fmt.Sprintf(""+
 		"ALTER TABLE %s\n"+
-		"    ALTER COLUMN %s TYPE %s", table.SQL(), column, command.DataTypeToSQL(datatype, typesize))
+		"    ALTER COLUMN %s TYPE %s", table.Id(db.Type), db.Type.Id(column), command.DataTypeToSQL(datatype, typesize))
 	if _, err = db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("%s:\n%s", err, q)
 	}
 	q = fmt.Sprintf(""+
 		"ALTER TABLE %s\n"+
-		"    ALTER COLUMN %s TYPE %s", table.History().SQL(), column, command.DataTypeToSQL(datatype, typesize))
+		"    ALTER COLUMN %s TYPE %s", table.History().Id(db.Type), db.Type.Id(column), command.DataTypeToSQL(datatype, typesize))
 	if _, err = db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("%s:\n%s", err, q)
 	}
@@ -203,11 +203,11 @@ func renameColumnOldType(table *sqlx.Table, column string, datatype command.Data
 		return err
 	}
 	// Rename
-	var q = fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s", table.SQL(), column, newName)
+	var q = fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s", table.Id(db.Type), db.Type.Id(column), newName)
 	if _, err = db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("%s:\n%s", err, q)
 	}
-	q = fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s", table.History().SQL(), column, newName)
+	q = fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s", table.History().Id(db.Type), db.Type.Id(column), newName)
 	if _, err = db.ExecContext(context.TODO(), q); err != nil {
 		return fmt.Errorf("%s:\n%s", err, q)
 	}

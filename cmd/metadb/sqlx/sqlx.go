@@ -82,8 +82,8 @@ func (t *Table) String() string {
 	return t.Schema + "." + t.Table
 }
 
-func (t *Table) SQL() string {
-	return t.String()
+func (t *Table) Id(dbt DBType) string {
+	return dbt.Id(t.Schema) + "." + dbt.Id(t.Table)
 }
 
 func (t *Table) History() *Table {
@@ -95,19 +95,19 @@ func (t *Table) HistoryTable() string {
 }
 
 func VacuumAnalyze(db *DB, table *Table) error {
-	_, err := db.ExecContext(context.TODO(), "VACUUM "+table.SQL())
+	_, err := db.ExecContext(context.TODO(), "VACUUM "+table.Id(db.Type))
 	if err != nil {
 		return err
 	}
-	_, err = db.ExecContext(context.TODO(), "ANALYZE "+table.SQL())
+	_, err = db.ExecContext(context.TODO(), "ANALYZE "+table.Id(db.Type))
 	if err != nil {
 		return err
 	}
-	_, err = db.ExecContext(context.TODO(), "VACUUM "+table.History().SQL())
+	_, err = db.ExecContext(context.TODO(), "VACUUM "+table.History().Id(db.Type))
 	if err != nil {
 		return err
 	}
-	_, err = db.ExecContext(context.TODO(), "ANALYZE "+table.History().SQL())
+	_, err = db.ExecContext(context.TODO(), "ANALYZE "+table.History().Id(db.Type))
 	if err != nil {
 		return err
 	}

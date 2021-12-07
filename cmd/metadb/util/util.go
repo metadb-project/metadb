@@ -49,14 +49,6 @@ func SysdbFileName(datadir string) string {
 	return filepath.Join(SystemDirName(datadir), "systemdb")
 }
 
-func JoinSchemaTable(schema, table string) string {
-	if schema == "" {
-		return fmt.Sprintf("%s", table)
-	} else {
-		return fmt.Sprintf("%s.%s", schema, table)
-	}
-}
-
 func MatchRegexps(res []*regexp.Regexp, s string) bool {
 	var re *regexp.Regexp
 	for _, re = range res {
