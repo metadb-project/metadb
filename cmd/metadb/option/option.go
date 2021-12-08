@@ -42,6 +42,7 @@ type Reset struct {
 	Global
 	Datadir   string
 	Origins   string
+	Force     bool
 	Connector string
 }
 
@@ -49,5 +50,6 @@ type Clean struct {
 	Global
 	Datadir   string
 	Origins   string
+	Force     bool
 	Connector string
 }

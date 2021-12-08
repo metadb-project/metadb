@@ -199,6 +199,7 @@ func run() error {
 	cmdReset.Flags().StringVar(&resetOpt.Origins, "origin", "", "")
 	_ = cmdReset.MarkFlagRequired("origin")
 	_ = dirFlag(cmdReset, &resetOpt.Datadir)
+	_ = forceFlag(cmdReset, &resetOpt.Force)
 	_ = verboseFlag(cmdReset, &eout.EnableVerbose)
 	_ = traceFlag(cmdReset, &eout.EnableTrace)
 
@@ -222,6 +223,7 @@ func run() error {
 	cmdClean.Flags().StringVar(&cleanOpt.Origins, "origin", "", "")
 	_ = cmdClean.MarkFlagRequired("origin")
 	_ = dirFlag(cmdClean, &cleanOpt.Datadir)
+	_ = forceFlag(cmdClean, &cleanOpt.Force)
 	_ = verboseFlag(cmdClean, &eout.EnableVerbose)
 	_ = traceFlag(cmdClean, &eout.EnableTrace)
 
@@ -380,6 +382,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"Options:\n" +
 			"      --origin <o>            - Origins to reset (comma-separated list)\n" +
 			dirFlag(nil, nil) +
+			forceFlag(nil, nil) +
 			verboseFlag(nil, nil) +
 			traceFlag(nil, nil) +
 			"")
@@ -392,6 +395,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"Options:\n" +
 			"      --origin <o>            - Origins to clean (comma-separated list)\n" +
 			dirFlag(nil, nil) +
+			forceFlag(nil, nil) +
 			verboseFlag(nil, nil) +
 			traceFlag(nil, nil) +
 			"")
@@ -440,6 +444,14 @@ func traceFlag(cmd *cobra.Command, trace *bool) string {
 			"      --trace                 - Enable extremely verbose output\n"
 	}
 	return ""
+}
+
+func forceFlag(cmd *cobra.Command, force *bool) string {
+	if cmd != nil {
+		cmd.Flags().BoolVar(force, "force", false, "")
+	}
+	return "" +
+		"      --force                 - Do not prompt for confirmation\n"
 }
 
 func noKafkaCommitFlag(cmd *cobra.Command, noKafkaCommit *bool) string {

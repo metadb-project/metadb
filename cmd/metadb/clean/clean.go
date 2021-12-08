@@ -21,12 +21,14 @@ func Clean(opt *option.Clean) error {
 	if !strings.HasPrefix(opt.Connector, "db.") {
 		return fmt.Errorf("invalid database connector: %s", opt.Connector)
 	}
-	// Ask for confirmation
-	_, _ = fmt.Fprintf(os.Stderr, "metadb: remove old data in %q? ", opt.Connector)
-	var confirm string
-	_, err := fmt.Scanln(&confirm)
-	if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
-		return nil
+	if !opt.Force {
+		// Ask for confirmation
+		_, _ = fmt.Fprintf(os.Stderr, "metadb: remove old data in %q? ", opt.Connector)
+		var confirm string
+		_, err := fmt.Scanln(&confirm)
+		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
+			return nil
+		}
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	// Initialize sysdb
