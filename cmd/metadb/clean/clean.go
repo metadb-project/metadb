@@ -59,8 +59,12 @@ func Clean(opt *option.Clean) error {
 	origins := sqlx.CSVToSQL(opt.Origins)
 	for _, t := range tables {
 		eout.Info("cleaning: %s", t.String())
+		err := sqlx.VacuumAnalyze(db, &t)
+		if err != nil {
+			return err
+		}
 		q := "DELETE FROM " + t.Id(db.Type) + " WHERE NOT __cf AND __origin IN (" + origins + ")"
-		_, err := db.ExecContext(context.TODO(), q)
+		_, err = db.ExecContext(context.TODO(), q)
 		if err != nil {
 			return err
 		}
@@ -75,7 +79,8 @@ func Clean(opt *option.Clean) error {
 		if err != nil {
 			return err
 		}
-		if err = sqlx.VacuumAnalyze(db, &t); err != nil {
+		err = sqlx.VacuumAnalyze(db, &t)
+		if err != nil {
 			return err
 		}
 	}
