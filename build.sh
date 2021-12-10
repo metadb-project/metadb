@@ -14,7 +14,6 @@ usage() {
     echo 'Flags:'
     echo '-f                            - "Fast" build (do not remove executables)'
     echo '-h                            - Help'
-    echo '-J                            - Build with JSON transformation enabled'
     echo '-t                            - Run tests'
     echo '-T                            - Run tests and all static analyses, requires:'
     echo '                                     honnef.co/go/tools/cmd/staticcheck@latest'
@@ -32,7 +31,7 @@ while getopts 'JTcfhtv' flag; do
         T) runalltest='true' ;;
         c) ;;
         f) fast='true' ;;
-        J) json='-X main.rewriteJSON=1' ;;
+        J) echo "build.sh: -J option is deprecated" 1>&2 ;;
         h) usage
             exit 1 ;;
         t) runtest='true' ;;
