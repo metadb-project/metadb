@@ -384,7 +384,8 @@ func extractPrimaryKey(ce *change.Event) (map[string]int, error) {
 		} else {
 			topic = "(unknown)"
 		}
-		return nil, fmt.Errorf("primary key not defined: %s", topic)
+		log.Error("primary key not defined: %s", topic)
+		return nil, nil
 	}
 	if ce.Key.Schema == nil || ce.Key.Schema.Fields == nil {
 		return nil, fmt.Errorf("key: $.schema.fields not found")
@@ -453,6 +454,9 @@ func extractColumns(ce *change.Event, dbt sqlx.DBType) ([]CommandColumn, error) 
 	var primaryKey map[string]int
 	if primaryKey, err = extractPrimaryKey(ce); err != nil {
 		return nil, err
+	}
+	if primaryKey == nil {
+		return nil, nil
 	}
 	var column []CommandColumn
 	var i interface{}
@@ -657,6 +661,9 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 	}
 	if c.Column, err = extractColumns(ce, dbt); err != nil {
 		return nil, err
+	}
+	if c.Column == nil {
+		return nil, nil
 	}
 	return c, nil
 }
