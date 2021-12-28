@@ -6,6 +6,7 @@ json=''
 runtest='false'
 runalltest='false'
 verbose='false'
+experiment='false'
 
 usage() {
     echo ''
@@ -24,9 +25,10 @@ usage() {
     echo '                                     github.com/gordonklaus/ineffassign'
     echo '                                     github.com/remyoudompheng/go-misc/deadcode'
     echo '-v                            - Enable verbose output'
+    echo '-X                            - Include experimental code'
 }
 
-while getopts 'JTcfhtv' flag; do
+while getopts 'JTcfhtvX' flag; do
     case "${flag}" in
         T) runalltest='true' ;;
         c) ;;
@@ -36,6 +38,7 @@ while getopts 'JTcfhtv' flag; do
             exit 1 ;;
         t) runtest='true' ;;
         v) verbose='true' ;;
+        X) experiment='true' ;;
         *) usage
             exit 1 ;;
     esac
@@ -54,6 +57,11 @@ done
 
 if $verbose; then
     v='-v'
+fi
+
+if $experiment; then
+    json='-X main.rewriteJSON=1'
+    echo "build.sh: experimental code will be included" 1>&2
 fi
 
 bindir=bin
