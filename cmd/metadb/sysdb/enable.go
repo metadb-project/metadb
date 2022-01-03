@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
 func EnableConnector(rq *api.EnableRequest) error {
@@ -57,7 +56,7 @@ func EnableConnector(rq *api.EnableRequest) error {
 	}
 	// start txn
 	var tx *sql.Tx
-	if tx, err = sqlx.OldMakeTx(db); err != nil {
+	if tx, err = sysdbBeginTx(db); err != nil {
 		return err
 	}
 	defer func(tx *sql.Tx) {
@@ -115,7 +114,7 @@ func DisableConnector(rq *api.DisableRequest) error {
 	}
 	// start txn
 	var tx *sql.Tx
-	if tx, err = sqlx.OldMakeTx(db); err != nil {
+	if tx, err = sysdbBeginTx(db); err != nil {
 		return err
 	}
 	defer func(tx *sql.Tx) {

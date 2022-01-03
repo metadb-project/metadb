@@ -13,19 +13,22 @@ usage() {
     echo 'Usage:  build.sh [<flags>]'
     echo ''
     echo 'Flags:'
-    echo '-f                            - "Fast" build (do not remove executables)'
-    echo '-h                            - Help'
-    echo '-t                            - Run tests'
-    echo '-T                            - Run tests and all static analyses, requires:'
-    echo '                                     honnef.co/go/tools/cmd/staticcheck@latest'
-    echo '                                     github.com/kisielk/errcheck'
-    echo '                                     gitlab.com/opennota/check/cmd/aligncheck'
-    echo '                                     gitlab.com/opennota/check/cmd/structcheck'
-    echo '                                     gitlab.com/opennota/check/cmd/varcheck'
-    echo '                                     github.com/gordonklaus/ineffassign'
-    echo '                                     github.com/remyoudompheng/go-misc/deadcode'
-    echo '-v                            - Enable verbose output'
-    echo '-X                            - Include experimental code'
+    echo '-f      - "Fast" build (do not remove executables)'
+    echo '-h      - Help'
+    echo '-t      - Run tests'
+    echo '-T      - Run tests and all static analyses, requires:'
+    echo ''
+    echo '    go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest'
+    echo '    go install honnef.co/go/tools/cmd/staticcheck@latest'
+    echo '    go install github.com/kisielk/errcheck@latest'
+    # echo '    go install gitlab.com/opennota/check/cmd/aligncheck@latest'
+    # echo '    go install gitlab.com/opennota/check/cmd/structcheck@latest'
+    # echo '    go install gitlab.com/opennota/check/cmd/varcheck@latest'
+    echo '    go install github.com/gordonklaus/ineffassign@latest'
+    echo '    go install github.com/remyoudompheng/go-misc/deadcode@latest'
+    echo ''
+    echo '-v      - Enable verbose output'
+    echo '-X      - Include experimental code'
 }
 
 while getopts 'JTcfhtvX' flag; do
@@ -83,26 +86,25 @@ go build -o $bindir $v -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
 if $runalltest; then
     echo 'build.sh: running all static analyses' 1>&2
     echo 'vet' 1>&2
-    go vet $v ./cmd/metadb 1>&2
-    go vet $v ./cmd/mdb 1>&2
+    go vet $v ./cmd/... 1>&2
+    echo 'vet shadow' 1>&2
+    go vet $v -vettool=$GOPATH/bin/shadow ./cmd/... 1>&2
     echo 'staticcheck' 1>&2
-    staticcheck ./cmd/metadb 1>&2
-    staticcheck ./cmd/mdb 1>&2
+    staticcheck ./cmd/... 1>&2
+    #staticcheck -checks all ./cmd/...
     echo 'errcheck' 1>&2
-    errcheck -exclude .errcheck ./cmd/metadb 1>&2
-    errcheck -exclude .errcheck ./cmd/mdb 1>&2
-    echo 'aligncheck' 1>&2
-    aligncheck ./cmd/metadb 1>&2
-    aligncheck ./cmd/mdb 1>&2
-    echo 'structcheck' 1>&2
-    structcheck ./cmd/metadb 1>&2
-    structcheck ./cmd/mdb 1>&2
-    echo 'varcheck' 1>&2
-    varcheck ./cmd/metadb 1>&2
-    varcheck ./cmd/mdb 1>&2
+    errcheck -exclude .errcheck ./cmd/... 1>&2
+    # echo 'aligncheck' 1>&2
+    # aligncheck ./cmd/metadb 1>&2
+    # aligncheck ./cmd/mdb 1>&2
+    # echo 'structcheck' 1>&2
+    # structcheck ./cmd/metadb 1>&2
+    # structcheck ./cmd/mdb 1>&2
+    # echo 'varcheck' 1>&2
+    # varcheck ./cmd/metadb 1>&2
+    # varcheck ./cmd/mdb 1>&2
     echo 'ineffassign' 1>&2
-    ineffassign ./cmd/metadb 1>&2
-    ineffassign ./cmd/mdb 1>&2
+    ineffassign ./cmd/... 1>&2
     echo 'deadcode' 1>&2
     deadcode -test ./cmd/metadb 1>&2
     deadcode -test ./cmd/mdb 1>&2

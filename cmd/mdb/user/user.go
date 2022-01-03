@@ -58,6 +58,7 @@ func UserDelete(opt *option.User) error {
 	} else {
 		eout.Info("user: deleted permissions for %q", rq.Name)
 	}
+	eout.Info("user: restart server to update all permissions")
 	return nil
 }
 

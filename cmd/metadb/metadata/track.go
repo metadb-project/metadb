@@ -1,16 +1,13 @@
 package metadata
 
 import (
-	"context"
 	"database/sql"
-	"fmt"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
 func TrackRead(db sqlx.DB) (map[sqlx.Table]bool, error) {
 	tables := make(map[sqlx.Table]bool)
-	q := "SELECT schemaname, tablename FROM metadb.track"
-	rows, err := db.QueryContext(context.TODO(), q)
+	rows, err := db.Query(nil, "SELECT schemaname, tablename FROM metadb.track")
 	if err != nil {
 		return nil, err
 	}
@@ -31,9 +28,10 @@ func TrackRead(db sqlx.DB) (map[sqlx.Table]bool, error) {
 }
 
 func TrackWrite(db sqlx.DB, table *sqlx.Table) error {
-	q := "INSERT INTO metadb.track(schemaname,tablename,parentschema,parenttable)VALUES('" + table.Schema + "','" + table.Table + "','','')"
-	if _, err := db.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("insert: %v: %s", table, err)
+	_, err := db.Exec(nil,
+		"INSERT INTO metadb.track(schemaname,tablename,parentschema,parenttable)VALUES('"+table.Schema+"','"+table.Table+"','','')")
+	if err != nil {
+		return err
 	}
 	return nil
 }

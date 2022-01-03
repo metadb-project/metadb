@@ -1,7 +1,6 @@
 package reset
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -50,7 +49,7 @@ func Reset(opt *option.Reset) error {
 		}
 	*/
 	// Get list of tables
-	tmap, err := metadata.TrackRead(*db)
+	tmap, err := metadata.TrackRead(db)
 	if err != nil {
 		return err
 	}
@@ -64,21 +63,21 @@ func Reset(opt *option.Reset) error {
 	origins := sqlx.CSVToSQL(opt.Origins)
 	for _, t := range tables {
 		eout.Info("resetting: %s", t.String())
-		err := sqlx.VacuumAnalyze(db, &t)
+		err := db.VacuumAnalyzeTable(&t)
 		if err != nil {
 			return err
 		}
-		q := "UPDATE " + t.Id(db.Type) + " SET __cf=FALSE WHERE __cf AND __origin IN (" + origins + ")"
-		_, err = db.ExecContext(context.TODO(), q)
+		_, err = db.Exec(nil,
+			"UPDATE "+db.TableSQL(&t)+" SET __cf=FALSE WHERE __cf AND __origin IN ("+origins+")")
 		if err != nil {
 			return err
 		}
-		q = "UPDATE " + t.History().Id(db.Type) + " SET __cf=FALSE WHERE __cf AND __current AND __origin IN (" + origins + ")"
-		_, err = db.ExecContext(context.TODO(), q)
+		_, err = db.Exec(nil,
+			"UPDATE "+db.HistoryTableSQL(&t)+" SET __cf=FALSE WHERE __cf AND __current AND __origin IN ("+origins+")")
 		if err != nil {
 			return err
 		}
-		err = sqlx.VacuumAnalyze(db, &t)
+		err = db.VacuumAnalyzeTable(db.HistoryTable(&t))
 		if err != nil {
 			return err
 		}

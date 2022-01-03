@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/internal/status"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"os"
 	"sync"
@@ -94,6 +93,14 @@ func Close() error {
 	return nil
 }
 
+func sysdbBeginTx(d *sql.DB) (*sql.Tx, error) {
+	tx, err := d.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
+}
+
 const OpenOptions = "?_busy_timeout=30000" +
 	"&_foreign_keys=on" +
 	"&_journal_mode=WAL" +
@@ -113,7 +120,7 @@ func openDatabase(filename string) (*sql.DB, error) {
 func initSchema(d *sql.DB) error {
 	var err error
 	var tx *sql.Tx
-	if tx, err = sqlx.OldMakeTx(d); err != nil {
+	if tx, err = sysdbBeginTx(d); err != nil {
 		return err
 	}
 	defer func(tx *sql.Tx) {

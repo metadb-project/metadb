@@ -7,31 +7,31 @@ func ReadDataSource(spec string) (string, *sqlx.DSN, error) {
 	defer sysMu.Unlock()
 
 	var err error
-	host, err, _ := getConfig(spec + ".host")
+	host, _, err := getConfig(spec + ".host")
 	if err != nil {
 		return "", nil, err
 	}
-	port, err, _ := getConfig(spec + ".port")
+	port, _, err := getConfig(spec + ".port")
 	if err != nil {
 		return "", nil, err
 	}
-	dbname, err, _ := getConfig(spec + ".dbname")
+	dbname, _, err := getConfig(spec + ".dbname")
 	if err != nil {
 		return "", nil, err
 	}
-	user, err, _ := getConfig(spec + ".adminuser")
+	user, _, err := getConfig(spec + ".adminuser")
 	if err != nil {
 		return "", nil, err
 	}
-	password, err, _ := getConfig(spec + ".adminpassword")
+	password, _, err := getConfig(spec + ".adminpassword")
 	if err != nil {
 		return "", nil, err
 	}
-	sslmode, err, _ := getConfig(spec + ".sslmode")
+	sslmode, _, err := getConfig(spec + ".sslmode")
 	if err != nil {
 		return "", nil, err
 	}
-	account, err, _ := getConfig(spec + ".account")
+	account, _, err := getConfig(spec + ".account")
 	if err != nil {
 		return "", nil, err
 	}
@@ -44,7 +44,7 @@ func ReadDataSource(spec string) (string, *sqlx.DSN, error) {
 		SSLMode:  sslmode,
 		Account:  account,
 	}
-	dbtype, err, _ := getConfig(spec + ".type")
+	dbtype, _, err := getConfig(spec + ".type")
 	if err != nil {
 		return "", nil, err
 	}
@@ -52,7 +52,7 @@ func ReadDataSource(spec string) (string, *sqlx.DSN, error) {
 }
 
 func ReadDatabaseConnectors() ([]*DatabaseConnector, error) {
-	var cmap = make(map[string]map[string]string)
+	var cmap map[string]map[string]string
 	var err error
 	if cmap, err = readConfigMap("db"); err != nil {
 		return nil, err

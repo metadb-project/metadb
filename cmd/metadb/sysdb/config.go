@@ -117,7 +117,7 @@ func DeleteConfig(rq *api.ConfigDeleteRequest) (*api.ConfigDeleteResponse, error
 			return nil, err
 		}
 	*/
-	if _, err, exists = getConfig(rq.Attr); err != nil {
+	if _, exists, err = getConfig(rq.Attr); err != nil {
 		return nil, err
 	}
 	if exists {
@@ -148,14 +148,14 @@ func DeleteConfig(rq *api.ConfigDeleteRequest) (*api.ConfigDeleteResponse, error
 	return &api.ConfigDeleteResponse{AttrNotFound: !exists}, nil
 }
 
-func GetConfig(attr string) (string, error, bool) {
+func GetConfig(attr string) (string, bool, error) {
 	sysMu.Lock()
 	defer sysMu.Unlock()
 
 	return getConfig(attr)
 }
 
-func getConfig(attr string) (string, error, bool) {
+func getConfig(attr string) (string, bool, error) {
 	// look up config value
 	var err error
 	var q = fmt.Sprintf(""+
@@ -166,11 +166,11 @@ func getConfig(attr string) (string, error, bool) {
 	err = db.QueryRowContext(context.TODO(), q).Scan(&val)
 	switch {
 	case err == sql.ErrNoRows:
-		return "", nil, false
+		return "", false, nil
 	case err != nil:
-		return "", fmt.Errorf("reading configuration: %s: %s", attr, err), false
+		return "", false, fmt.Errorf("reading configuration: %s: %s", attr, err)
 	default:
-		return val, nil, true
+		return val, true, nil
 	}
 }
 

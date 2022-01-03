@@ -5,10 +5,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: install testing dependencies
-      run: go get -u honnef.co/go/tools/cmd/staticcheck@latest github.com/kisielk/errcheck gitlab.com/opennota/check/cmd/aligncheck gitlab.com/opennota/check/cmd/structcheck gitlab.com/opennota/check/cmd/varcheck github.com/gordonklaus/ineffassign github.com/remyoudompheng/go-misc/deadcode
+    - name: install golang
+      run: sudo apt install golang-1.16
+    - name: install vet shadow
+      run: go get golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest
+    - name: install staticcheck
+      run: go get honnef.co/go/tools/cmd/staticcheck@latest
+    - name: install errcheck
+      run: go get github.com/kisielk/errcheck@latest
+    - name: install ineffassign
+      run: go get github.com/gordonklaus/ineffassign@latest
+    - name: install deadcode
+      run: go get github.com/remyoudompheng/go-misc/deadcode@latest
     - name: build
-      run: PATH=$PATH:$HOME/go/bin ./build.sh -T
+      run: GOPATH=$HOME/go PATH=$PATH:$GOPATH/bin ./build.sh -T
     - name: run metadb
       run: ./bin/metadb help
     - name: run mdb

@@ -9,7 +9,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.CommandColumn, dbt sqlx.DBType) error {
+func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.CommandColumn, db sqlx.DB) error {
 	if column.Data == nil {
 		return nil
 	}
@@ -20,14 +20,14 @@ func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.
 	if err := json.Unmarshal([]byte(column.Data.(string)), &obj); err != nil {
 		return fmt.Errorf("rewrite json: %s", err)
 	}
-	if err := rewriteObject(cl, cmd, 1, obj, cmd.TableName+"__t", dbt); err != nil {
+	if err := rewriteObject(cl, cmd, 1, obj, cmd.TableName+"__t", db); err != nil {
 		return fmt.Errorf("rewrite json: %s", err)
 	}
 	return nil
 }
 
 func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj map[string]interface{}, table string,
-	dbt sqlx.DBType) error {
+	db sqlx.DB) error {
 	if level > 2 {
 		return nil
 	}
@@ -64,7 +64,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				DTypeSize:    0,
 				SemanticType: "",
 				Data:         v,
-				EncodedData:  command.SQLEncodeData(v, command.BooleanType, "", dbt),
+				EncodedData:  command.SQLEncodeData(v, command.BooleanType, "", db),
 				PrimaryKey:   0,
 			})
 		case float64:
@@ -74,7 +74,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				DTypeSize:    8,
 				SemanticType: "",
 				Data:         v,
-				EncodedData:  command.SQLEncodeData(v, command.FloatType, "", dbt),
+				EncodedData:  command.SQLEncodeData(v, command.FloatType, "", db),
 				PrimaryKey:   0,
 			})
 		case map[string]interface{}:
@@ -88,7 +88,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				DTypeSize:    int64(len(v)),
 				SemanticType: "",
 				Data:         v,
-				EncodedData:  command.SQLEncodeData(v, command.VarcharType, "", dbt),
+				EncodedData:  command.SQLEncodeData(v, command.VarcharType, "", db),
 				PrimaryKey:   0,
 			})
 		default:

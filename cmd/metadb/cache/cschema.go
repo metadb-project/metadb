@@ -1,34 +1,49 @@
 package cache
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
-	"strings"
-
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
 type Schema struct {
-	columns map[sqlx.Column]ColumnSchema
+	columns map[sqlx.Column]ColumnType
 	track   *Track
 }
 
-type ColumnSchema struct {
+type ColumnType struct {
 	DataType   string
 	CharMaxLen int64
 }
 
 func NewSchema(db sqlx.DB, track *Track) (*Schema, error) {
-	columns := make(map[sqlx.Column]ColumnSchema)
-	// read schema from database
-	q := "" +
-		"SELECT table_schema, table_name, column_name, data_type, character_maximum_length\n" +
-		"    FROM information_schema.columns\n" +
-		"    WHERE lower(table_schema) NOT IN ('information_schema', 'pg_catalog') AND\n" +
-		"          right(table_name, 2) <> '__' AND\n" +
-		"          lower(column_name) NOT IN ('__id', '__start', '__origin');"
-	rows, err := db.QueryContext(context.TODO(), q)
+	columns := make(map[sqlx.Column]ColumnType)
+	// Read column schemas from database.
+	columnSchemas, err := getColumnSchemas(db)
+	if err != nil {
+		return nil, fmt.Errorf("reading column schemas: %s", err)
+	}
+	for _, col := range columnSchemas {
+		if !track.Contains(sqlx.NewTable(col.Schema, col.Table)) {
+			continue
+		}
+		//if !track.Contains(&sqlx.Table{Schema: col.Schema, Table: col.Table}) {
+		//	continue
+		//}
+		c := sqlx.Column{Schema: col.Schema, Table: col.Table, Column: col.Column}
+		columns[c] = ColumnType{DataType: col.DataType, CharMaxLen: *col.CharMaxLen}
+	}
+	return &Schema{columns: columns, track: track}, nil
+}
+
+func getColumnSchemas(db sqlx.DB) ([]*sqlx.ColumnSchema, error) {
+	cs := make([]*sqlx.ColumnSchema, 0)
+	rows, err := db.Query(nil, ""+
+		"SELECT table_schema, table_name, column_name, data_type, character_maximum_length\n"+
+		"    FROM information_schema.columns\n"+
+		"    WHERE lower(table_schema) NOT IN ('information_schema', 'pg_catalog') AND\n"+
+		"          right(table_name, 2) <> '__' AND\n"+
+		"          lower(column_name) NOT IN ('__id', '__start', '__origin');")
 	if err != nil {
 		return nil, fmt.Errorf("querying database schema: %s", err)
 	}
@@ -45,23 +60,28 @@ func NewSchema(db sqlx.DB, track *Track) (*Schema, error) {
 		if charMaxLenNull.Valid {
 			charMaxLen = charMaxLenNull.Int64
 		}
-		schemaName := strings.ToLower(schema)
-		tableName := strings.ToLower(table)
-		columnName := strings.ToLower(column)
-		if !track.Contains(&sqlx.Table{Schema: schemaName, Table: tableName}) {
-			continue
+		// For Snowflake, convert to lowercase, for example:
+		//     schemaName := strings.ToLower(schema)
+		schemaName := schema
+		tableName := table
+		columnName := column
+		c := &sqlx.ColumnSchema{
+			Schema:     schemaName,
+			Table:      tableName,
+			Column:     columnName,
+			DataType:   dataType,
+			CharMaxLen: &charMaxLen,
 		}
-		c := sqlx.Column{Schema: schemaName, Table: tableName, Column: columnName}
-		columns[c] = ColumnSchema{DataType: dataType, CharMaxLen: charMaxLen}
+		cs = append(cs, c)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("reading data from database schema: %s", err)
 	}
-	return &Schema{columns: columns, track: track}, nil
+	return cs, nil
 }
 
 func (s *Schema) Update(column *sqlx.Column, dataType string, charMaxLen int64) {
-	s.columns[*column] = ColumnSchema{DataType: dataType, CharMaxLen: charMaxLen}
+	s.columns[*column] = ColumnType{DataType: dataType, CharMaxLen: charMaxLen}
 }
 
 func (s *Schema) Delete(column *sqlx.Column) {
@@ -78,8 +98,8 @@ func (s *Schema) TableColumns(table *sqlx.Table) []string {
 	return columns
 }
 
-func (s *Schema) TableSchema(table *sqlx.Table) map[string]ColumnSchema {
-	ts := make(map[string]ColumnSchema)
+func (s *Schema) TableSchema(table *sqlx.Table) map[string]ColumnType {
+	ts := make(map[string]ColumnType)
 	for k, v := range s.columns {
 		if k.Schema == table.Schema && k.Table == table.Table {
 			ts[k.Column] = v
@@ -88,7 +108,7 @@ func (s *Schema) TableSchema(table *sqlx.Table) map[string]ColumnSchema {
 	return ts
 }
 
-func (s *Schema) Column(column *sqlx.Column) *ColumnSchema {
+func (s *Schema) Column(column *sqlx.Column) *ColumnType {
 	cs, ok := s.columns[*column]
 	if ok {
 		return &cs

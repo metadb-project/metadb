@@ -30,7 +30,7 @@ func goPollLoop(svr *server) {
 		log.Fatal("%s", err)
 		os.Exit(1)
 	}
-	for true {
+	for {
 		err := launchPollLoop(svr, spr)
 		if err == nil {
 			break
@@ -64,7 +64,7 @@ func outerPollLoop(svr *server, spr *sproc) error {
 	//// TMP
 	// set command.Tenants
 	var tenants string
-	if tenants, err, _ = sysdb.GetConfig("plug.reshare.tenants"); err != nil {
+	if tenants, _, err = sysdb.GetConfig("plug.reshare.tenants"); err != nil {
 		return err
 	}
 	if tenants == "" {
@@ -106,23 +106,24 @@ func pollLoop(spr *sproc) error {
 		spr.databases[0].Status.Error()
 		return fmt.Errorf("connecting to database: ping: %s", err)
 	}
+	//////////////////////////////////////////////////////////////////////////////
 	spr.databases[0].Status.Active()
 	spr.db = append(spr.db, db)
 	// Cache tracking
 	if err = metadata.Init(db, spr.svr.opt.MetadbVersion); err != nil {
 		return err
 	}
-	track, err := cache.NewTrack(*db)
+	track, err := cache.NewTrack(db)
 	if err != nil {
 		return fmt.Errorf("caching track: %s", err)
 	}
 	// Cache schema
-	schema, err := cache.NewSchema(*db, track)
+	schema, err := cache.NewSchema(db, track)
 	if err != nil {
 		return fmt.Errorf("caching schema: %s", err)
 	}
 	// Update user permissions in database
-	if err = sysdb.UpdateUserPerms(*db, track.All()); err != nil {
+	if err = sysdb.UpdateUserPerms(db, track.All()); err != nil {
 		return err
 	}
 	// Cache users
@@ -184,7 +185,7 @@ func pollLoop(spr *sproc) error {
 
 		// Parse
 		eventReadCount, err := parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.source.SchemaPrefix,
-			sourceFileScanner, spr.sourceLog, db.Type)
+			sourceFileScanner, spr.sourceLog, db)
 		if err != nil {
 			return fmt.Errorf("parser: %s", err)
 		}
@@ -195,7 +196,7 @@ func pollLoop(spr *sproc) error {
 
 		// Rewrite
 		before := len(cl.Cmd)
-		if err = rewriteCommandList(cl, spr.svr.opt.RewriteJSON, db.Type); err != nil {
+		if err = rewriteCommandList(cl, spr.svr.opt.RewriteJSON, db); err != nil {
 			return fmt.Errorf("rewriter: %s", err)
 		}
 		after := len(cl.Cmd)
@@ -224,7 +225,7 @@ func pollLoop(spr *sproc) error {
 }
 
 func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter []*regexp.Regexp,
-	schemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog, dbt sqlx.DBType) (int, error) {
+	schemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog, db sqlx.DB) (int, error) {
 	var err error
 	var eventReadCount int
 	var x int
@@ -253,7 +254,7 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 			break
 		}
 		eventReadCount++
-		c, err := command.NewCommand(ce, schemaPassFilter, schemaPrefix, dbt)
+		c, err := command.NewCommand(ce, schemaPassFilter, schemaPrefix, db)
 		if err != nil {
 			return 0, fmt.Errorf("parsing command: %s", err)
 		}

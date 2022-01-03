@@ -1,14 +1,51 @@
 package sqlx
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"strings"
-
-	_ "github.com/lib/pq"
-	_ "github.com/snowflakedb/gosnowflake"
 )
+
+//_ "github.com/lib/pq"
+//_ "github.com/snowflakedb/gosnowflake"
+
+type DB interface {
+	Close()
+	Ping() error
+	VacuumAnalyzeTable(table *Table) error
+	EncodeString(s string) string
+	ExecMultiple(tx *sql.Tx, sql []string) error
+	Exec(tx *sql.Tx, sql string) (sql.Result, error)
+	Query(tx *sql.Tx, query string) (*sql.Rows, error)
+	QueryRow(tx *sql.Tx, query string) *sql.Row
+	HistoryTableSQL(table *Table) string
+	HistoryTable(table *Table) *Table
+	TableSQL(table *Table) string
+	IdentiferSQL(id string) string
+	AutoIncrementSQL() string
+	BeginTx() (*sql.Tx, error)
+}
+
+type ColumnSchema struct {
+	Schema     string
+	Table      string
+	Column     string
+	DataType   string
+	CharMaxLen *int64
+}
+
+func Open(dbtype string, dataSourceName *DSN) (DB, error) {
+	switch dbtype {
+	case "postgresql":
+		return OpenPostgres(dataSourceName)
+	//case "snowflake":
+	//	return NewOpenSnowflake(dataSourceName)
+	//case "redshift":
+	//	return NewOpenRedshift(dataSourceName)
+	default:
+		return nil, fmt.Errorf("unknown database type: %s", dbtype)
+	}
+}
 
 type DSN struct {
 	Host     string
@@ -20,48 +57,15 @@ type DSN struct {
 	Account  string
 }
 
-func Open(dbtype string, dataSourceName *DSN) (*DB, error) {
-	switch dbtype {
-	case "snowflake":
-		return OpenSnowflake(dataSourceName)
-	case "postgresql":
-		return OpenPostgres(dataSourceName)
-	case "redshift":
-		return OpenRedshift(dataSourceName)
-	default:
-		return nil, fmt.Errorf("unknown database type: %s", dbtype)
-	}
-}
-
-func MakeTx(db *DB) (*sql.Tx, error) {
-	tx, err := db.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelDefault})
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
-}
-
-func OldMakeTx(db *sql.DB) (*sql.Tx, error) {
-	tx, err := db.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelDefault})
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
-}
-
-type DB struct {
-	*sql.DB
-	Type DBType
-}
-
 type Table struct {
 	Schema string
 	Table  string
 }
 
 func NewTable(schema, table string) *Table {
-	return &Table{Schema: schema,
-		Table: table,
+	return &Table{
+		Schema: schema,
+		Table:  table,
 	}
 }
 
@@ -72,7 +76,8 @@ type Column struct {
 }
 
 func NewColumn(schema, table, column string) *Column {
-	return &Column{Schema: schema,
+	return &Column{
+		Schema: schema,
 		Table:  table,
 		Column: column,
 	}
@@ -80,38 +85,6 @@ func NewColumn(schema, table, column string) *Column {
 
 func (t *Table) String() string {
 	return t.Schema + "." + t.Table
-}
-
-func (t *Table) Id(dbt DBType) string {
-	return dbt.Id(t.Schema) + "." + dbt.Id(t.Table)
-}
-
-func (t *Table) History() *Table {
-	return &Table{Schema: t.Schema, Table: t.HistoryTable()}
-}
-
-func (t *Table) HistoryTable() string {
-	return t.Table + "__"
-}
-
-func VacuumAnalyze(db *DB, table *Table) error {
-	_, err := db.ExecContext(context.TODO(), "VACUUM "+table.Id(db.Type))
-	if err != nil {
-		return err
-	}
-	_, err = db.ExecContext(context.TODO(), "ANALYZE "+table.Id(db.Type))
-	if err != nil {
-		return err
-	}
-	_, err = db.ExecContext(context.TODO(), "VACUUM "+table.History().Id(db.Type))
-	if err != nil {
-		return err
-	}
-	_, err = db.ExecContext(context.TODO(), "ANALYZE "+table.History().Id(db.Type))
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func CSVToSQL(csv string) string {

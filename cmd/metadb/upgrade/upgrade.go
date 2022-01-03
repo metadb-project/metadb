@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/metadata"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
@@ -14,7 +15,7 @@ import (
 
 type databaseState struct {
 	tx   *sql.Tx
-	db   *sqlx.DB
+	db   sqlx.DB
 	name string
 	dbc  *sysdb.DatabaseConnector
 }
@@ -57,20 +58,22 @@ func Upgrade(opt *option.Upgrade) error {
 			SSLMode:  dbc.DBSSLMode,
 			Account:  dbc.DBAccount,
 		}
-		db, err := sqlx.Open(dbc.Type, dsn)
+		var db sqlx.DB
+		db, err = sqlx.Open(dbc.Type, dsn)
 		if err != nil {
 			return err
 		}
-		defer func(db *sqlx.DB) {
-			_ = db.Close()
-		}(db)
+		// TODO - Defer in loops can cause leaks.
+		defer db.Close()
 		if err = db.Ping(); err != nil {
 			return err
 		}
-		tx, err := sqlx.MakeTx(db)
+		var tx *sql.Tx
+		tx, err = db.BeginTx()
 		if err != nil {
 			return err
 		}
+		// TODO - Defer in loops can cause leaks.
 		defer func(tx *sql.Tx) {
 			_ = tx.Rollback()
 		}(tx)
@@ -115,6 +118,7 @@ func Upgrade(opt *option.Upgrade) error {
 	return nil
 }
 
+// TODO - Txn is unused
 func upgradeSysdb(tx *sql.Tx) (bool, error) {
 	dbversion, err := sysdb.GetSysdbVersion()
 	if err != nil {
@@ -132,10 +136,10 @@ func upgradeSysdb(tx *sql.Tx) (bool, error) {
 	return true, nil
 }
 
-type sysdbOpt struct {
-}
+// type sysdbOpt struct {
+// }
 
-type upgradeFunc func(p []byte) (n int, err error)
+// type upgradeFunc func(p []byte) (n int, err error)
 
 func upgradeSysdbAll(dbversion int64) error {
 	for v := dbversion + 1; v <= util.DatabaseVersion; v++ {

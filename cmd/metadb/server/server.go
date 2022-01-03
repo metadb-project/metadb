@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -29,7 +28,7 @@ type server struct {
 }
 
 type sproc struct {
-	db               []*sqlx.DB
+	db               []sqlx.DB
 	schemaPassFilter []*regexp.Regexp
 	source           *sysdb.SourceConnector
 	databases        []*sysdb.DatabaseConnector
@@ -482,16 +481,18 @@ func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) err
 		Account:  dbc.DBAccount,
 	}
 	dbsuper, err := sqlx.Open(dbc.Type, dsn)
-	defer func(dbsuper *sqlx.DB) {
-		_ = dbsuper.Close()
-	}(dbsuper)
-	if err := dbsuper.Ping(); err != nil {
+	if err != nil {
+		return err
+	}
+	defer dbsuper.Close()
+	if err = dbsuper.Ping(); err != nil {
 		return err
 	}
 	if err != nil {
 		return fmt.Errorf("user: create: %s", err)
 	}
-	if _, err := dbsuper.ExecContext(context.TODO(), "CREATE USER \""+rq.Name+"\" PASSWORD '"+rq.Password+"'"); err != nil {
+	_, err = dbsuper.Exec(nil, "CREATE USER \""+rq.Name+"\" PASSWORD '"+rq.Password+"'")
+	if err != nil {
 		return fmt.Errorf("unable to create user %q: %s", rq.Name, err)
 	}
 	dsn = &sqlx.DSN{
@@ -504,19 +505,22 @@ func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) err
 		Account:  dbc.DBAccount,
 	}
 	db, err := sqlx.Open(dbc.Type, dsn)
-	defer func(db *sqlx.DB) {
-		_ = db.Close()
-	}(db)
-	if err := db.Ping(); err != nil {
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	if err = db.Ping(); err != nil {
 		return err
 	}
 	if err != nil {
 		return fmt.Errorf("user: create: %s", err)
 	}
-	if _, err := db.ExecContext(context.TODO(), "CREATE SCHEMA \""+rq.Name+"\""); err != nil {
+	_, err = db.Exec(nil, "CREATE SCHEMA \""+rq.Name+"\"")
+	if err != nil {
 		return fmt.Errorf("unable to create schema for user %q: %s", rq.Name, err)
 	}
-	if _, err := db.ExecContext(context.TODO(), "GRANT CREATE, USAGE ON SCHEMA \""+rq.Name+"\" TO \""+rq.Name+"\""); err != nil {
+	_, err = db.Exec(nil, "GRANT CREATE, USAGE ON SCHEMA \""+rq.Name+"\" TO \""+rq.Name+"\"")
+	if err != nil {
 		log.Warning("unable to grant permissions on schema for user %q: %s", rq.Name, err)
 	}
 	return nil

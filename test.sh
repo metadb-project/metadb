@@ -9,7 +9,7 @@ testlogfile=./$testdir/metadb.log
 
 ./build.sh -f
 
-dropdb --if-exists --force $testdb
+dropdb --if-exists $testdb
 createdb -O metadbadmin $testdb
 rm -rf $testlogfile $testdatadir
 ./bin/metadb init -D ./_tmp_metadb_test_/data

@@ -1,7 +1,6 @@
 package clean
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -45,7 +44,7 @@ func Clean(opt *option.Clean) error {
 		return err
 	}
 	// Get list of tables
-	tmap, err := metadata.TrackRead(*db)
+	tmap, err := metadata.TrackRead(db)
 	if err != nil {
 		return err
 	}
@@ -59,27 +58,26 @@ func Clean(opt *option.Clean) error {
 	origins := sqlx.CSVToSQL(opt.Origins)
 	for _, t := range tables {
 		eout.Info("cleaning: %s", t.String())
-		err := sqlx.VacuumAnalyze(db, &t)
+		err := db.VacuumAnalyzeTable(&t)
 		if err != nil {
 			return err
 		}
-		q := "DELETE FROM " + t.Id(db.Type) + " WHERE NOT __cf AND __origin IN (" + origins + ")"
-		_, err = db.ExecContext(context.TODO(), q)
+		_, err = db.Exec(nil, "DELETE FROM "+db.TableSQL(&t)+" WHERE NOT __cf AND __origin IN ("+origins+")")
 		if err != nil {
 			return err
 		}
-		q = "UPDATE " + t.History().Id(db.Type) + " SET __cf=TRUE,__end='" + now + "',__current=FALSE WHERE NOT __cf AND __current AND __origin IN (" + origins + ")"
-		_, err = db.ExecContext(context.TODO(), q)
+		_, err = db.Exec(nil,
+			"UPDATE "+db.HistoryTableSQL(&t)+" SET __cf=TRUE,__end='"+now+"',__current=FALSE WHERE NOT __cf AND __current AND __origin IN ("+origins+")")
 		if err != nil {
 			return err
 		}
-		// Any non-current historical data can be set to __cf=TRUE
-		q = "UPDATE " + t.History().Id(db.Type) + " SET __cf=TRUE WHERE NOT __cf AND __origin IN (" + origins + ")"
-		_, err = db.ExecContext(context.TODO(), q)
+		// Any non-current historical data can be set to __cf=TRUE.
+		_, err = db.Exec(nil,
+			"UPDATE "+db.HistoryTableSQL(&t)+" SET __cf=TRUE WHERE NOT __cf AND __origin IN ("+origins+")")
 		if err != nil {
 			return err
 		}
-		err = sqlx.VacuumAnalyze(db, &t)
+		err = db.VacuumAnalyzeTable(db.HistoryTable(&t))
 		if err != nil {
 			return err
 		}

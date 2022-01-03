@@ -1,12 +1,10 @@
 package server
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"strconv"
 
-	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
@@ -14,7 +12,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 )
 
-func addTable(table *sqlx.Table, db *sqlx.DB, track *cache.Track, users *cache.Users) error {
+func addTable(table *sqlx.Table, db sqlx.DB, track *cache.Track, users *cache.Users) error {
 	// if tracked, then assume the table exists
 	if track.Contains(table) {
 		return nil
@@ -36,182 +34,170 @@ func addTable(table *sqlx.Table, db *sqlx.DB, track *cache.Track, users *cache.U
 	return nil
 }
 
-func createSchemaIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.Users) error {
-	q := "CREATE SCHEMA IF NOT EXISTS " + db.Type.Id(table.Schema)
-	if _, err := db.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("%s:\n%s", err, q)
+func createSchemaIfNotExists(table *sqlx.Table, db sqlx.DB, users *cache.Users) error {
+	_, err := db.Exec(nil, "CREATE SCHEMA IF NOT EXISTS "+db.IdentiferSQL(table.Schema)+"")
+	if err != nil {
+		return err
 	}
 	for _, u := range users.WithPerm(table) {
-		q = fmt.Sprintf("GRANT USAGE ON SCHEMA %s TO %s", db.Type.Id(table.Schema), u)
-		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Warning("granting permissions for user: %s", err)
+		_, err := db.Exec(nil, "GRANT USAGE ON SCHEMA "+db.IdentiferSQL(table.Schema)+" TO "+u+"")
+		if err != nil {
+			log.Warning("%s", err)
 		}
 	}
 	return nil
 }
 
-func createCurrentTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.Users) error {
-	q := "" +
-		"CREATE TABLE IF NOT EXISTS " + table.Id(db.Type) + " (\n" +
-		"    __id bigint " + db.Type.Identity() + " PRIMARY KEY,\n" +
-		"    __cf boolean NOT NULL DEFAULT TRUE,\n" +
-		"    __start timestamp with time zone NOT NULL,\n" +
-		"    __origin varchar(63) NOT NULL DEFAULT ''\n" +
-		")"
-	if _, err := db.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating current table: %s", err)
+func createCurrentTableIfNotExists(table *sqlx.Table, db sqlx.DB, users *cache.Users) error {
+	_, err := db.Exec(nil, ""+
+		"CREATE TABLE IF NOT EXISTS "+db.TableSQL(table)+" ("+
+		"    __id bigint "+db.AutoIncrementSQL()+" PRIMARY KEY,"+
+		"    __cf boolean NOT NULL DEFAULT TRUE,"+
+		"    __start timestamp with time zone NOT NULL,"+
+		"    __origin varchar(63) NOT NULL DEFAULT ''"+
+		")")
+	if err != nil {
+		return err
 	}
-	// add indexes on new columns
-
-	if db.Type.SupportsIndexes() {
-		q = db.Type.CreateIndex("", table, []string{"__start"})
-		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Error("unable to create index on " + table.String() + " (__start)")
-		}
-		q = db.Type.CreateIndex("", table, []string{"__origin"})
-		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Error("unable to create index on " + table.String() + " (__origin)")
-		}
+	// Add indexes on new columns.
+	_, err = db.Exec(nil, "CREATE INDEX ON "+db.TableSQL(table)+" (__start)")
+	if err != nil {
+		return err
 	}
-
-	// grant permissions on new table
+	_, err = db.Exec(nil, "CREATE INDEX ON "+db.TableSQL(table)+" (__origin)")
+	if err != nil {
+		return err
+	}
+	// Grant permissions on new table.
 	for _, u := range users.WithPerm(table) {
-		q = "GRANT SELECT ON " + table.Id(db.Type) + " TO " + u
-		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Warning("granting permissions for user: %s", err)
+		_, err := db.Exec(nil, "GRANT SELECT ON "+db.TableSQL(table)+" TO "+u+"")
+		if err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func createHistoryTableIfNotExists(table *sqlx.Table, db *sqlx.DB, users *cache.Users) error {
-	historyTable := table.History()
-	q := "" +
-		"CREATE TABLE IF NOT EXISTS " + historyTable.Id(db.Type) + " (\n" +
-		"    __id bigint " + db.Type.Identity() + " PRIMARY KEY,\n" +
-		"    __cf boolean NOT NULL DEFAULT TRUE,\n" +
-		"    __start timestamp with time zone NOT NULL,\n" +
-		"    __end timestamp with time zone NOT NULL,\n" +
-		"    __current boolean NOT NULL,\n" +
-		"    __origin varchar(63) NOT NULL DEFAULT ''\n" +
-		")"
-	if _, err := db.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating history table: %s", err)
+func createHistoryTableIfNotExists(table *sqlx.Table, db sqlx.DB, users *cache.Users) error {
+	_, err := db.Exec(nil, ""+
+		"CREATE TABLE IF NOT EXISTS "+db.HistoryTableSQL(table)+" ("+
+		"    __id bigint "+db.AutoIncrementSQL()+" PRIMARY KEY,"+
+		"    __cf boolean NOT NULL DEFAULT TRUE,"+
+		"    __start timestamp with time zone NOT NULL,"+
+		"    __end timestamp with time zone NOT NULL,"+
+		"    __current boolean NOT NULL,"+
+		"    __origin varchar(63) NOT NULL DEFAULT ''"+
+		")")
+	if err != nil {
+		return err
 	}
-	// add indexes on new columns
-
-	if db.Type.SupportsIndexes() {
-		q = db.Type.CreateIndex("", historyTable, []string{"__start"})
-		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Error("unable to create index on " + historyTable.String() + " (__start)")
-		}
-		q = db.Type.CreateIndex("", historyTable, []string{"__end"})
-		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Error("unable to create index on " + historyTable.String() + " (__end)")
-		}
-		q = db.Type.CreateIndex("", historyTable, []string{"__current"})
-		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Error("unable to create index on " + historyTable.String() + " (__current)")
-		}
-		q = db.Type.CreateIndex("", historyTable, []string{"__origin"})
-		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Error("unable to create index on " + historyTable.String() + " (__origin)")
-		}
+	// Add indexes on new columns.
+	_, err = db.Exec(nil, "CREATE INDEX ON "+db.HistoryTableSQL(table)+" (__start)")
+	if err != nil {
+		return err
 	}
-
-	// grant permissions on new table
+	_, err = db.Exec(nil, "CREATE INDEX ON "+db.HistoryTableSQL(table)+" (__end)")
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(nil, "CREATE INDEX ON "+db.HistoryTableSQL(table)+" (__current)")
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(nil, "CREATE INDEX ON "+db.HistoryTableSQL(table)+" (__origin)")
+	if err != nil {
+		return err
+	}
+	// Grant permissions on new table.
 	for _, u := range users.WithPerm(table) {
-		q = fmt.Sprintf("GRANT SELECT ON " + historyTable.Id(db.Type) + " TO \"" + u + "\"")
-		if _, err := db.ExecContext(context.TODO(), q); err != nil {
-			log.Warning("granting permissions for user: %s", err)
+		_, err := db.Exec(nil, "GRANT SELECT ON "+db.HistoryTableSQL(table)+" TO "+u+"")
+		if err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func addColumn(table *sqlx.Table, columnName string, newType command.DataType, newTypeSize int64, db *sqlx.DB, schema *cache.Schema) error {
-	// alter table schema in database
-	q := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table.Id(db.Type), db.Type.Id(columnName), command.DataTypeToSQL(newType, newTypeSize))
-	if _, err := db.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("adding column %q in %q: %s", columnName, table.Id(db.Type), err)
+func addColumn(table *sqlx.Table, columnName string, newType command.DataType, newTypeSize int64, db sqlx.DB, schema *cache.Schema) error {
+	// Alter table schema in database.
+	dataTypeSQL := command.DataTypeToSQL(newType, newTypeSize)
+	_, err := db.Exec(nil, "ALTER TABLE "+db.TableSQL(table)+" ADD COLUMN "+db.IdentiferSQL(columnName)+" "+dataTypeSQL)
+	if err != nil {
+		return err
 	}
-	q = fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table.History().Id(db.Type), db.Type.Id(columnName), command.DataTypeToSQL(newType, newTypeSize))
-	if _, err := db.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("adding column %q in %q: %s", columnName, table.History().Id(db.Type), err)
+	_, err = db.Exec(nil, "ALTER TABLE "+db.HistoryTableSQL(table)+" ADD COLUMN "+db.IdentiferSQL(columnName)+" "+dataTypeSQL)
+	if err != nil {
+		return err
 	}
-	// add index on new column
+	// Add index on new column.
 	if newType != command.JSONType && newTypeSize <= maximumTypeSizeIndex {
-
-		if db.Type.SupportsIndexes() {
-			q = db.Type.CreateIndex(indexName(table.Table, columnName), table, []string{columnName})
-			if _, err := db.ExecContext(context.TODO(), q); err != nil {
-				log.Warning("unable to create index on table %v (%s)", table, columnName)
-			}
-			q = db.Type.CreateIndex(indexName(table.HistoryTable(), columnName), table.History(), []string{columnName})
-			if _, err := db.ExecContext(context.TODO(), q); err != nil {
-				log.Warning("unable to create index on table %v (%s)", table.History(), columnName)
-			}
+		_, err = db.Exec(nil, ""+
+			"CREATE INDEX "+db.IdentiferSQL(indexName(table.Table, columnName))+
+			" ON "+db.TableSQL(table)+" ("+db.IdentiferSQL(columnName)+")")
+		if err != nil {
+			return err
 		}
-
+		_, err = db.Exec(nil, ""+
+			"CREATE INDEX "+db.IdentiferSQL(indexName(db.HistoryTable(table).Table, columnName))+
+			" ON "+db.HistoryTableSQL(table)+" ("+db.IdentiferSQL(columnName)+")")
+		if err != nil {
+			return err
+		}
 	} else {
 		log.Trace("disabling index: value too large")
 	}
-	// update schema
+	// Update schema.
 	dataType, charMaxLen := command.DataTypeToSQLNew(newType, newTypeSize)
 	schema.Update(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: columnName}, dataType, charMaxLen)
 	return nil
 }
 
-func alterColumnVarcharSize(table *sqlx.Table, column string, datatype command.DataType, typesize int64, db *sqlx.DB, schema *cache.Schema) error {
+func alterColumnVarcharSize(table *sqlx.Table, column string, datatype command.DataType, typesize int64, db sqlx.DB, schema *cache.Schema) error {
 	var err error
-	// remove index if type size too large
+	// Remove index if type size too large.
 	if typesize > maximumTypeSizeIndex {
 		log.Trace("disabling index: value too large")
-		var q = fmt.Sprintf("DROP INDEX IF EXISTS %s.%s", table.Schema, indexName(table.Table, column))
-		if _, err = db.ExecContext(context.TODO(), q); err != nil {
-			eout.Warning("unable to drop index %s.%s", table.Schema, indexName(table.Table, column))
+		_, err = db.Exec(nil, "DROP INDEX IF EXISTS "+db.IdentiferSQL(table.Schema)+"."+db.IdentiferSQL(indexName(table.Table, column)))
+		if err != nil {
+			return err
 		}
-		q = fmt.Sprintf("DROP INDEX IF EXISTS %s.%s", table.Schema, indexName(table.HistoryTable(), column))
-		if _, err = db.ExecContext(context.TODO(), q); err != nil {
-			eout.Warning("unable to drop index %s.%s", table.Schema, indexName(table.HistoryTable(), column))
+		_, err = db.Exec(nil, "DROP INDEX IF EXISTS "+db.IdentiferSQL(table.Schema)+"."+db.IdentiferSQL(indexName(db.HistoryTable(table).Table, column)))
+		if err != nil {
+			return err
 		}
 	}
-	// alter table
-	var q = fmt.Sprintf(""+
-		"ALTER TABLE %s\n"+
-		"    ALTER COLUMN %s TYPE %s", table.Id(db.Type), db.Type.Id(column), command.DataTypeToSQL(datatype, typesize))
-	if _, err = db.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("%s:\n%s", err, q)
+	// Alter table.
+	_, err = db.Exec(nil, "ALTER TABLE "+db.TableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+command.DataTypeToSQL(datatype, typesize))
+	if err != nil {
+		return err
 	}
-	q = fmt.Sprintf(""+
-		"ALTER TABLE %s\n"+
-		"    ALTER COLUMN %s TYPE %s", table.History().Id(db.Type), db.Type.Id(column), command.DataTypeToSQL(datatype, typesize))
-	if _, err = db.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("%s:\n%s", err, q)
+	_, err = db.Exec(nil, "ALTER TABLE "+db.HistoryTableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+command.DataTypeToSQL(datatype, typesize))
+	if err != nil {
+		return err
 	}
-	// update schema
+	// Update schema.
 	dataType, charMaxLen := command.DataTypeToSQLNew(datatype, typesize)
 	schema.Update(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: column}, dataType, charMaxLen)
 	return nil
 }
 
-func renameColumnOldType(table *sqlx.Table, column string, datatype command.DataType, typesize int64, db *sqlx.DB, schema *cache.Schema) error {
+func renameColumnOldType(table *sqlx.Table, column string, datatype command.DataType, typesize int64, db sqlx.DB, schema *cache.Schema) error {
 	var err error
-	// Find new name for old column
+	// Find new name for old column.
 	var newName string
 	if newName, err = newNumberedColumnName(table, column, schema); err != nil {
 		return err
 	}
-	// Rename
-	var q = fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s", table.Id(db.Type), db.Type.Id(column), newName)
-	if _, err = db.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("%s:\n%s", err, q)
+	// Rename.
+	_, err = db.Exec(nil, "ALTER TABLE "+db.TableSQL(table)+" RENAME COLUMN \""+column+"\" TO \""+newName+"\"")
+	if err != nil {
+		return err
 	}
-	q = fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s", table.History().Id(db.Type), db.Type.Id(column), newName)
-	if _, err = db.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("%s:\n%s", err, q)
+	_, err = db.Exec(nil, "ALTER TABLE "+db.HistoryTableSQL(table)+" RENAME COLUMN \""+column+"\" TO \""+newName+"\"")
+	if err != nil {
+		return err
 	}
-	// update schema
+	// Update schema.
 	schema.Delete(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: column})
 	dataType, charMaxLen := command.DataTypeToSQLNew(datatype, typesize)
 	schema.Update(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: newName}, dataType, charMaxLen)
@@ -240,7 +226,7 @@ func newNumberedColumnName(table *sqlx.Table, column string, schema *cache.Schem
 }
 
 func selectTableSchema(table *sqlx.Table, schema *cache.Schema) (*sysdb.TableSchema, error) {
-	var m map[string]cache.ColumnSchema = schema.TableSchema(table)
+	var m map[string]cache.ColumnType = schema.TableSchema(table)
 	var ts = new(sysdb.TableSchema)
 	for k, v := range m {
 		name := k

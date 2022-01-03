@@ -2,6 +2,7 @@ package util
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -54,7 +55,8 @@ func SendRequest(opt option.Global, method, url string, requestStruct interface{
 		}
 		transport = &http.Transport{
 			TLSClientConfig: tlsClientConfig,
-			DialTLS: func(network, addr string) (net.Conn, error) {
+			// func(ctx context.Context, network, addr string) (net.Conn, error)
+			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				conn, err = tls.Dial(network, addr, tlsConfig)
 				return conn, err
 			},

@@ -26,18 +26,18 @@ func UpdateUserPerms(adb sqlx.DB, tables []sqlx.Table) error {
 		for _, t := range tables {
 			if re.String == "" {
 				// Revoke
-				_, _ = adb.ExecContext(context.TODO(), "REVOKE USAGE ON SCHEMA \""+t.Schema+"\" FROM \""+u+"\"")
-				_, _ = adb.ExecContext(context.TODO(), "REVOKE SELECT ON "+t.Id(adb.Type)+" FROM \""+u+"\"")
-				_, _ = adb.ExecContext(context.TODO(), "REVOKE SELECT ON "+t.History().Id(adb.Type)+" FROM \""+u+"\"")
+				_, _ = adb.Exec(nil, "REVOKE USAGE ON SCHEMA "+adb.IdentiferSQL(t.Schema)+" FROM "+u)
+				_, _ = adb.Exec(nil, "REVOKE SELECT ON "+adb.TableSQL(&t)+" FROM "+u)
+				_, _ = adb.Exec(nil, "REVOKE SELECT ON "+adb.HistoryTableSQL(&t)+" FROM "+u)
 			} else {
 				// Grant if regex matches
 				if util.UserPerm(re, &t) {
-					_, _ = adb.ExecContext(context.TODO(), "GRANT USAGE ON SCHEMA \""+t.Schema+"\" TO \""+u+"\"")
-					_, _ = adb.ExecContext(context.TODO(), "GRANT SELECT ON "+t.Id(adb.Type)+" TO \""+u+"\"")
-					_, _ = adb.ExecContext(context.TODO(), "GRANT SELECT ON "+t.History().Id(adb.Type)+" TO \""+u+"\"")
+					_, _ = adb.Exec(nil, "GRANT USAGE ON SCHEMA "+adb.IdentiferSQL(t.Schema)+" TO "+u)
+					_, _ = adb.Exec(nil, "GRANT SELECT ON "+adb.TableSQL(&t)+" TO "+u)
+					_, _ = adb.Exec(nil, "GRANT SELECT ON "+adb.HistoryTableSQL(&t)+" TO "+u)
 				} else {
-					_, _ = adb.ExecContext(context.TODO(), "REVOKE SELECT ON "+t.Id(adb.Type)+" FROM \""+u+"\"")
-					_, _ = adb.ExecContext(context.TODO(), "REVOKE SELECT ON "+t.History().Id(adb.Type)+" FROM \""+u+"\"")
+					_, _ = adb.Exec(nil, "REVOKE SELECT ON "+adb.TableSQL(&t)+" FROM "+u)
+					_, _ = adb.Exec(nil, "REVOKE SELECT ON "+adb.HistoryTableSQL(&t)+" FROM "+u)
 				}
 			}
 

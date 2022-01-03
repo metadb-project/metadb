@@ -411,7 +411,7 @@ func extractPrimaryKey(ce *change.Event) (map[string]int, error) {
 	return primaryKey, nil
 }
 
-func extractColumns(ce *change.Event, dbt sqlx.DBType) ([]CommandColumn, error) {
+func extractColumns(ce *change.Event, db sqlx.DB) ([]CommandColumn, error) {
 	var err error
 	var ok bool
 	// Extract field data from payload
@@ -508,7 +508,7 @@ func extractColumns(ce *change.Event, dbt sqlx.DBType) ([]CommandColumn, error) 
 		} else {
 			data = col.Data
 		}
-		col.EncodedData = SQLEncodeData(data, col.DType, col.SemanticType, dbt)
+		col.EncodedData = SQLEncodeData(data, col.DType, col.SemanticType, db)
 		if col.DTypeSize, err = convertTypeSize(col.EncodedData, ftype, col.DType); err != nil {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type size", field)
 		}
@@ -533,7 +533,7 @@ func indentJSON(data string) (string, error) {
 
 var Tenants []string
 
-func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string, dbt sqlx.DBType) (*Command, error) {
+func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string, db sqlx.DB) (*Command, error) {
 	// Note: this function returns nil, nil in some cases.
 	if ce == nil {
 		return nil, fmt.Errorf("missing change event")
@@ -631,19 +631,22 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 			if !ok {
 				return nil, fmt.Errorf("delete: unexpected type: key schema type: %v", m["type"])
 			}
-			dtype, err := convertDataType(dt, semtype)
+			var dtype DataType
+			dtype, err = convertDataType(dt, semtype)
 			if err != nil {
 				return nil, fmt.Errorf("delete: unknown key schema type: %v", m["type"])
 			}
 			data := payload[attr]
 			if dtype == JSONType {
-				d, err := indentJSON(data.(string))
+				var d string
+				d, err = indentJSON(data.(string))
 				if err == nil {
 					data = d
 				}
 			}
-			edata := SQLEncodeData(data, dtype, semtype, dbt)
-			typesize, err := convertTypeSize(edata, dt, dtype)
+			edata := SQLEncodeData(data, dtype, semtype, db)
+			var typesize int64
+			typesize, err = convertTypeSize(edata, dt, dtype)
 			if err != nil {
 				return nil, fmt.Errorf("delete: unknown type size: %v", data)
 			}
@@ -659,7 +662,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 		}
 		return c, nil
 	}
-	if c.Column, err = extractColumns(ce, dbt); err != nil {
+	if c.Column, err = extractColumns(ce, db); err != nil {
 		return nil, err
 	}
 	if c.Column == nil {
@@ -681,7 +684,7 @@ func extractOrigin(prefixes []string, schema string) (string, string) {
 	return "", schema
 }
 
-func SQLEncodeData(data interface{}, datatype DataType, semtype string, dbt sqlx.DBType) string {
+func SQLEncodeData(data interface{}, datatype DataType, semtype string, db sqlx.DB) string {
 	if data == nil {
 		return "NULL"
 	}
@@ -690,8 +693,7 @@ func SQLEncodeData(data interface{}, datatype DataType, semtype string, dbt sqlx
 		if datatype == TimestamptzType || datatype == TimetzType {
 			return "'" + v + "'"
 		}
-		//return util.PostgresEncodeString(v, true)
-		return dbt.EncodeString(v)
+		return db.EncodeString(v)
 	case int:
 		return fmt.Sprintf("%d", v)
 	case int64:
