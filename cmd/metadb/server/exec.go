@@ -241,6 +241,7 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 		return err
 	}
 	uphist.WriteString(" LIMIT 1)")
+	exec = append(exec, uphist.String())
 	// insert new record
 	var inshist strings.Builder
 	inshist.WriteString("INSERT INTO " + db.HistoryTableSQL(&t) + "(__start,__end,__current")
