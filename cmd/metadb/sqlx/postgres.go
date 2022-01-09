@@ -33,10 +33,7 @@ func (d *PostgresDB) Ping() error {
 
 func (d *PostgresDB) VacuumAnalyzeTable(table *Table) error {
 	_, err := d.DB.ExecContext(context.TODO(), "VACUUM ANALYZE "+d.TableSQL(table))
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (d *PostgresDB) EncodeString(s string) string {
