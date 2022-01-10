@@ -218,7 +218,9 @@ func pollLoop(spr *sproc) error {
 			}
 		}
 
-		log.Debug("checkpoint: %d records", eventReadCount)
+		if eventReadCount > 0 {
+			log.Debug("checkpoint: %d records", eventReadCount)
+		}
 	}
 }
 
