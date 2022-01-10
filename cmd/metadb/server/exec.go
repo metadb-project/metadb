@@ -229,7 +229,7 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 		inscur.WriteString(",'" + c.Origin + "'")
 	}
 	for _, c := range c.Column {
-		inscur.WriteString("," + db.EncodeString(c.SQLData))
+		inscur.WriteString("," + encodeSQLData(c.SQLData, c.DType, db))
 	}
 	inscur.WriteString(")")
 	exec = append(exec, inscur.String())
@@ -256,7 +256,7 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 		inshist.WriteString(",'" + c.Origin + "'")
 	}
 	for _, c := range c.Column {
-		inshist.WriteString("," + db.EncodeString(c.SQLData))
+		inshist.WriteString("," + encodeSQLData(c.SQLData, c.DType, db))
 	}
 	inshist.WriteString(")")
 	exec = append(exec, inshist.String())
@@ -339,12 +339,11 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 		return false, "", "", nil
 	}
 	for _, col := range c.Column {
-		var cdata interface{}
-		var ddata *string
+		var cdata, ddata *string
 		var cdatas, ddatas string
 		cdata = col.SQLData
 		if cdata != nil {
-			cdatas = fmt.Sprintf("%v", cdata)
+			cdatas = *cdata
 		}
 		ddata = attrs[col.Name]
 		if ddata != nil {
@@ -411,9 +410,9 @@ func wherePKDataEqual(db sqlx.DB, b *strings.Builder, columns []command.CommandC
 		if c.PrimaryKey != 0 {
 			b.WriteString(" AND")
 			if c.DType == command.JSONType {
-				b.WriteString(" " + db.IdentiferSQL(c.Name) + "::text=" + db.EncodeString(c.SQLData) + "::text")
+				b.WriteString(" " + db.IdentiferSQL(c.Name) + "::text=" + encodeSQLData(c.SQLData, c.DType, db) + "::text")
 			} else {
-				b.WriteString(" " + db.IdentiferSQL(c.Name) + "=" + db.EncodeString(c.SQLData))
+				b.WriteString(" " + db.IdentiferSQL(c.Name) + "=" + encodeSQLData(c.SQLData, c.DType, db))
 			}
 			first = false
 		}
@@ -422,6 +421,23 @@ func wherePKDataEqual(db sqlx.DB, b *strings.Builder, columns []command.CommandC
 		return fmt.Errorf("command missing primary key")
 	}
 	return nil
+}
+
+func encodeSQLData(sqldata *string, datatype command.DataType, db sqlx.DB) string {
+	if sqldata == nil {
+		return "NULL"
+	}
+	switch datatype {
+	case command.VarcharType, command.JSONType:
+		return db.EncodeString(*sqldata)
+	case command.DateType, command.TimeType, command.TimetzType, command.TimestampType, command.TimestamptzType:
+		return db.EncodeString(*sqldata)
+	case command.IntegerType, command.NumberType, command.FloatType, command.BooleanType:
+		return *sqldata
+	default:
+		log.Error("encoding SQL data: unknown data type: %s", datatype)
+		return "(unknown type)"
+	}
 }
 
 /*func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64, error) {

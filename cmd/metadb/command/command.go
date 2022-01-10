@@ -274,7 +274,7 @@ type CommandColumn struct {
 	DTypeSize    int64
 	SemanticType string
 	Data         interface{}
-	SQLData      string
+	SQLData      *string
 	PrimaryKey   int
 }
 
@@ -684,52 +684,63 @@ func extractOrigin(prefixes []string, schema string) (string, string) {
 	return "", schema
 }
 
-func ToSQLData(data interface{}, datatype DataType, semtype string) string {
+func ToSQLData(data interface{}, datatype DataType, semtype string) *string {
 	if data == nil {
-		return "NULL"
+		return nil
 	}
 	switch v := data.(type) {
 	case string:
 		// if datatype == TimestamptzType || datatype == TimetzType {
 		// 	return "'" + v + "'"
 		// }
-		return v
+		return &v
 	case int:
-		return fmt.Sprintf("%d", v)
+		s := fmt.Sprintf("%d", v)
+		return &s
 	case int64:
-		return fmt.Sprintf("%d", v)
+		s := fmt.Sprintf("%d", v)
+		return &s
 	case float64:
 		if datatype == DateType {
-			return "'" + time.Unix(int64(v*86400), int64(0)).UTC().Format("2006-01-02") + "'"
+			s := "'" + time.Unix(int64(v*86400), int64(0)).UTC().Format("2006-01-02") + "'"
+			return &s
 		}
 		if datatype == TimestampType && strings.HasSuffix(semtype, ".time.MicroTimestamp") {
 			var i, f float64 = math.Modf(v / 1000000)
 			var t string = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000000")
-			return fixupSQLTime(t)
+			s := fixupSQLTime(t)
+			return &s
 		}
 		if datatype == TimestampType && strings.HasSuffix(semtype, ".time.Timestamp") {
 			var i, f float64 = math.Modf(v / 1000)
 			var t string = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000000")
-			return fixupSQLTime(t)
+			s := fixupSQLTime(t)
+			return &s
 		}
 		if datatype == TimeType && strings.HasSuffix(semtype, ".time.MicroTime") {
 			var i, f float64 = math.Modf(v / 1000000)
 			var t string = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("15:04:05.000000000")
-			return fixupSQLTime(t)
+			s := fixupSQLTime(t)
+			return &s
 		}
 		if datatype == TimeType && strings.HasSuffix(semtype, ".time.Time") {
 			var i, f float64 = math.Modf(v / 1000)
 			var t string = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("15:04:05.000000000")
-			return fixupSQLTime(t)
+			s := fixupSQLTime(t)
+			return &s
 		}
-		return fmt.Sprintf("%g", v)
+		s := fmt.Sprintf("%g", v)
+		return &s
 	case bool:
 		if v {
-			return "true"
+			s := "true"
+			return &s
 		}
-		return "false"
+		s := "false"
+		return &s
 	default:
-		return fmt.Sprintf("(unknown:%T)", data)
+		s := fmt.Sprintf("(unknown:%T)", data)
+		return &s
 	}
 }
 
