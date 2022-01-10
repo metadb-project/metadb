@@ -342,7 +342,7 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 		var cdata interface{}
 		var ddata *string
 		var cdatas, ddatas string
-		cdata = col.Data
+		cdata = col.SQLData
 		if cdata != nil {
 			cdatas = fmt.Sprintf("%v", cdata)
 		}
