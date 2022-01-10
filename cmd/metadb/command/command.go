@@ -326,11 +326,7 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 	}
 }
 
-func convertTypeSize(data interface{}, coltype string, datatype DataType) (int64, error) {
-	var ok bool
-	// if data == nil {
-	// 	return 0, nil
-	// }
+func convertTypeSize(data *string, coltype string, datatype DataType) (int64, error) {
 	switch datatype {
 	case IntegerType:
 		switch coltype {
@@ -351,11 +347,7 @@ func convertTypeSize(data interface{}, coltype string, datatype DataType) (int64
 		if data == nil {
 			return 1, nil
 		}
-		var s string
-		if s, ok = data.(string); !ok {
-			return 0, fmt.Errorf("internal error: varchar data %q not string type", data)
-		}
-		return int64(len(s)), nil
+		return int64(len(*data)), nil
 	case BooleanType:
 		return 0, nil
 	case DateType:
