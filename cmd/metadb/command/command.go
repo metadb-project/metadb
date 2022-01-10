@@ -274,7 +274,7 @@ type CommandColumn struct {
 	DTypeSize    int64
 	SemanticType string
 	Data         interface{}
-	EncodedData  string
+	SQLData      string
 	PrimaryKey   int
 }
 
@@ -508,8 +508,8 @@ func extractColumns(ce *change.Event, db sqlx.DB) ([]CommandColumn, error) {
 		// } else {
 		// 	data = col.Data
 		// }
-		col.EncodedData = SQLEncodeData(col.Data, col.DType, col.SemanticType, db)
-		if col.DTypeSize, err = convertTypeSize(col.EncodedData, ftype, col.DType); err != nil {
+		col.SQLData = ToSQLData(col.Data, col.DType, col.SemanticType, db)
+		if col.DTypeSize, err = convertTypeSize(col.SQLData, ftype, col.DType); err != nil {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type size", field)
 		}
 		col.PrimaryKey = primaryKey[field]
@@ -644,7 +644,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 					data = d
 				}
 			}
-			edata := SQLEncodeData(data, dtype, semtype, db)
+			edata := ToSQLData(data, dtype, semtype, db)
 			var typesize int64
 			typesize, err = convertTypeSize(edata, dt, dtype)
 			if err != nil {
@@ -656,7 +656,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 				DTypeSize:    typesize,
 				SemanticType: semtype,
 				Data:         data,
-				EncodedData:  edata,
+				SQLData:      edata,
 				PrimaryKey:   i + 1,
 			})
 		}
@@ -684,7 +684,7 @@ func extractOrigin(prefixes []string, schema string) (string, string) {
 	return "", schema
 }
 
-func SQLEncodeData(data interface{}, datatype DataType, semtype string, db sqlx.DB) string {
+func ToSQLData(data interface{}, datatype DataType, semtype string, db sqlx.DB) string {
 	if data == nil {
 		return "NULL"
 	}
@@ -693,7 +693,7 @@ func SQLEncodeData(data interface{}, datatype DataType, semtype string, db sqlx.
 		if datatype == TimestamptzType || datatype == TimetzType {
 			return "'" + v + "'"
 		}
-		return db.EncodeString(v)
+		return v
 	case int:
 		return fmt.Sprintf("%d", v)
 	case int64:

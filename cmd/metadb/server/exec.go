@@ -229,7 +229,7 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 		inscur.WriteString(",'" + c.Origin + "'")
 	}
 	for _, c := range c.Column {
-		inscur.WriteString("," + c.EncodedData)
+		inscur.WriteString("," + db.EncodeString(c.SQLData))
 	}
 	inscur.WriteString(")")
 	exec = append(exec, inscur.String())
@@ -256,7 +256,7 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 		inshist.WriteString(",'" + c.Origin + "'")
 	}
 	for _, c := range c.Column {
-		inshist.WriteString("," + c.EncodedData)
+		inshist.WriteString("," + db.EncodeString(c.SQLData))
 	}
 	inshist.WriteString(")")
 	exec = append(exec, inshist.String())
@@ -411,9 +411,9 @@ func wherePKDataEqual(db sqlx.DB, b *strings.Builder, columns []command.CommandC
 		if c.PrimaryKey != 0 {
 			b.WriteString(" AND")
 			if c.DType == command.JSONType {
-				b.WriteString(" " + db.IdentiferSQL(c.Name) + "::text=" + c.EncodedData + "::text")
+				b.WriteString(" " + db.IdentiferSQL(c.Name) + "::text=" + db.EncodeString(c.SQLData) + "::text")
 			} else {
-				b.WriteString(" " + db.IdentiferSQL(c.Name) + "=" + c.EncodedData)
+				b.WriteString(" " + db.IdentiferSQL(c.Name) + "=" + db.EncodeString(c.SQLData))
 			}
 			first = false
 		}

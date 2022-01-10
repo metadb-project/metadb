@@ -64,7 +64,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				DTypeSize:    0,
 				SemanticType: "",
 				Data:         v,
-				EncodedData:  command.SQLEncodeData(v, command.BooleanType, "", db),
+				SQLData:      command.ToSQLData(v, command.BooleanType, "", db),
 				PrimaryKey:   0,
 			})
 		case float64:
@@ -74,7 +74,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				DTypeSize:    8,
 				SemanticType: "",
 				Data:         v,
-				EncodedData:  command.SQLEncodeData(v, command.FloatType, "", db),
+				SQLData:      command.ToSQLData(v, command.FloatType, "", db),
 				PrimaryKey:   0,
 			})
 		case map[string]interface{}:
@@ -88,7 +88,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				DTypeSize:    int64(len(v)),
 				SemanticType: "",
 				Data:         v,
-				EncodedData:  command.SQLEncodeData(v, command.VarcharType, "", db),
+				SQLData:      command.ToSQLData(v, command.VarcharType, "", db),
 				PrimaryKey:   0,
 			})
 		default:
