@@ -499,16 +499,16 @@ func extractColumns(ce *change.Event, db sqlx.DB) ([]CommandColumn, error) {
 		}
 		col.SemanticType = semtype
 		col.Data = fieldData[field]
-		var data interface{}
-		if col.DType == JSONType && col.Data != nil {
-			data, err = indentJSON(col.Data.(string))
-			if err != nil {
-				data = col.Data
-			}
-		} else {
-			data = col.Data
-		}
-		col.EncodedData = SQLEncodeData(data, col.DType, col.SemanticType, db)
+		// var data interface{}
+		// if col.DType == JSONType && col.Data != nil {
+		// 	data, err = indentJSON(col.Data.(string))
+		// 	if err != nil {
+		// 		data = col.Data
+		// 	}
+		// } else {
+		// 	data = col.Data
+		// }
+		col.EncodedData = SQLEncodeData(col.Data, col.DType, col.SemanticType, db)
 		if col.DTypeSize, err = convertTypeSize(col.EncodedData, ftype, col.DType); err != nil {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type size", field)
 		}
