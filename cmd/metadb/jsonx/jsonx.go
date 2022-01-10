@@ -9,7 +9,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.CommandColumn, db sqlx.DB) error {
+func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.CommandColumn) error {
 	if column.Data == nil {
 		return nil
 	}
@@ -20,14 +20,13 @@ func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.
 	if err := json.Unmarshal([]byte(column.Data.(string)), &obj); err != nil {
 		return fmt.Errorf("rewrite json: %s", err)
 	}
-	if err := rewriteObject(cl, cmd, 1, obj, cmd.TableName+"__t", db); err != nil {
+	if err := rewriteObject(cl, cmd, 1, obj, cmd.TableName+"__t"); err != nil {
 		return fmt.Errorf("rewrite json: %s", err)
 	}
 	return nil
 }
 
-func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj map[string]interface{}, table string,
-	db sqlx.DB) error {
+func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj map[string]interface{}, table string) error {
 	if level > 2 {
 		return nil
 	}
@@ -64,7 +63,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				DTypeSize:    0,
 				SemanticType: "",
 				Data:         v,
-				SQLData:      command.ToSQLData(v, command.BooleanType, "", db),
+				SQLData:      command.ToSQLData(v, command.BooleanType, ""),
 				PrimaryKey:   0,
 			})
 		case float64:
@@ -74,7 +73,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				DTypeSize:    8,
 				SemanticType: "",
 				Data:         v,
-				SQLData:      command.ToSQLData(v, command.FloatType, "", db),
+				SQLData:      command.ToSQLData(v, command.FloatType, ""),
 				PrimaryKey:   0,
 			})
 		case map[string]interface{}:
@@ -88,7 +87,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				DTypeSize:    int64(len(v)),
 				SemanticType: "",
 				Data:         v,
-				SQLData:      command.ToSQLData(v, command.VarcharType, "", db),
+				SQLData:      command.ToSQLData(v, command.VarcharType, ""),
 				PrimaryKey:   0,
 			})
 		default:

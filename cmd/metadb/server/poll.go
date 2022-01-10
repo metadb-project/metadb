@@ -184,8 +184,7 @@ func pollLoop(spr *sproc) error {
 		var cl = &command.CommandList{}
 
 		// Parse
-		eventReadCount, err := parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.source.SchemaPrefix,
-			sourceFileScanner, spr.sourceLog, db)
+		eventReadCount, err := parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.source.SchemaPrefix, sourceFileScanner, spr.sourceLog)
 		if err != nil {
 			return fmt.Errorf("parser: %s", err)
 		}
@@ -196,7 +195,7 @@ func pollLoop(spr *sproc) error {
 
 		// Rewrite
 		before := len(cl.Cmd)
-		if err = rewriteCommandList(cl, spr.svr.opt.RewriteJSON, db); err != nil {
+		if err = rewriteCommandList(cl, spr.svr.opt.RewriteJSON); err != nil {
 			return fmt.Errorf("rewriter: %s", err)
 		}
 		after := len(cl.Cmd)
@@ -225,7 +224,7 @@ func pollLoop(spr *sproc) error {
 }
 
 func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter []*regexp.Regexp,
-	schemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog, db sqlx.DB) (int, error) {
+	schemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
 	var err error
 	var eventReadCount int
 	var x int
@@ -254,7 +253,7 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 			break
 		}
 		eventReadCount++
-		c, err := command.NewCommand(ce, schemaPassFilter, schemaPrefix, db)
+		c, err := command.NewCommand(ce, schemaPassFilter, schemaPrefix)
 		if err != nil {
 			return 0, fmt.Errorf("parsing command: %s", err)
 		}

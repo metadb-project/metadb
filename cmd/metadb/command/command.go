@@ -411,7 +411,7 @@ func extractPrimaryKey(ce *change.Event) (map[string]int, error) {
 	return primaryKey, nil
 }
 
-func extractColumns(ce *change.Event, db sqlx.DB) ([]CommandColumn, error) {
+func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 	var err error
 	var ok bool
 	// Extract field data from payload
@@ -508,7 +508,7 @@ func extractColumns(ce *change.Event, db sqlx.DB) ([]CommandColumn, error) {
 		// } else {
 		// 	data = col.Data
 		// }
-		col.SQLData = ToSQLData(col.Data, col.DType, col.SemanticType, db)
+		col.SQLData = ToSQLData(col.Data, col.DType, col.SemanticType)
 		if col.DTypeSize, err = convertTypeSize(col.SQLData, ftype, col.DType); err != nil {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type size", field)
 		}
@@ -533,7 +533,7 @@ func indentJSON(data string) (string, error) {
 
 var Tenants []string
 
-func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string, db sqlx.DB) (*Command, error) {
+func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string) (*Command, error) {
 	// Note: this function returns nil, nil in some cases.
 	if ce == nil {
 		return nil, fmt.Errorf("missing change event")
@@ -644,7 +644,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 					data = d
 				}
 			}
-			edata := ToSQLData(data, dtype, semtype, db)
+			edata := ToSQLData(data, dtype, semtype)
 			var typesize int64
 			typesize, err = convertTypeSize(edata, dt, dtype)
 			if err != nil {
@@ -662,7 +662,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 		}
 		return c, nil
 	}
-	if c.Column, err = extractColumns(ce, db); err != nil {
+	if c.Column, err = extractColumns(ce); err != nil {
 		return nil, err
 	}
 	if c.Column == nil {
@@ -684,7 +684,7 @@ func extractOrigin(prefixes []string, schema string) (string, string) {
 	return "", schema
 }
 
-func ToSQLData(data interface{}, datatype DataType, semtype string, db sqlx.DB) string {
+func ToSQLData(data interface{}, datatype DataType, semtype string) string {
 	if data == nil {
 		return "NULL"
 	}
