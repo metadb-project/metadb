@@ -218,8 +218,7 @@ func pollLoop(spr *sproc) error {
 			}
 		}
 
-		log.Trace("checkpoint")
-		// log.Debug("checkpoint") // log.Debug("checkpoint: %d records", len(cl.Cmd))
+		log.Debug("checkpoint: %d records", eventReadCount)
 	}
 }
 
