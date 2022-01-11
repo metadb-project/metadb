@@ -694,7 +694,7 @@ func ToSQLData(data interface{}, datatype DataType, semtype string) *string {
 		return &s
 	case float64:
 		if datatype == DateType {
-			s := "'" + time.Unix(int64(v*86400), int64(0)).UTC().Format("2006-01-02") + "'"
+			s := time.Unix(int64(v*86400), int64(0)).UTC().Format("2006-01-02")
 			return &s
 		}
 		if datatype == TimestampType && strings.HasSuffix(semtype, ".time.MicroTimestamp") {
