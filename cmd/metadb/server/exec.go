@@ -431,7 +431,7 @@ func encodeSQLData(sqldata *string, datatype command.DataType, db sqlx.DB) strin
 	case command.VarcharType, command.JSONType:
 		return db.EncodeString(*sqldata)
 	case command.DateType, command.TimeType, command.TimetzType, command.TimestampType, command.TimestamptzType:
-		return db.EncodeString(*sqldata)
+		return "'" + *sqldata + "'"
 	case command.IntegerType, command.NumberType, command.FloatType, command.BooleanType:
 		return *sqldata
 	default:
