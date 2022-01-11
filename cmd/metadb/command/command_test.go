@@ -4,6 +4,60 @@ import (
 	"testing"
 )
 
+func TestTrimFractionalZerosInFraction(t *testing.T) {
+	s := "2022-01-11T14:07:44.400"
+	want := "2022-01-11T14:07:44.4"
+	got := trimFractionalZeros(s)
+	if got != want {
+		t.Errorf("got %v; want %v", got, want)
+	}
+}
+
+func TestTrimFractionalZerosFractionAllZeros(t *testing.T) {
+	s := "2022-01-11T14:07:44.000"
+	want := "2022-01-11T14:07:44"
+	got := trimFractionalZeros(s)
+	if got != want {
+		t.Errorf("got %v; want %v", got, want)
+	}
+}
+
+func TestTrimFractionalZerosNoFraction(t *testing.T) {
+	s := "2022-01-11T14:07:44"
+	want := "2022-01-11T14:07:44"
+	got := trimFractionalZeros(s)
+	if got != want {
+		t.Errorf("got %v; want %v", got, want)
+	}
+}
+
+func TestTrimFractionalZerosNonFractionZeros(t *testing.T) {
+	s := "2022-01-11T14:07:00"
+	want := "2022-01-11T14:07:00"
+	got := trimFractionalZeros(s)
+	if got != want {
+		t.Errorf("got %v; want %v", got, want)
+	}
+}
+
+func TestTrimFractionalZerosAllZeros(t *testing.T) {
+	s := "2022-01-11T14:07:00.000"
+	want := "2022-01-11T14:07:00"
+	got := trimFractionalZeros(s)
+	if got != want {
+		t.Errorf("got %v; want %v", got, want)
+	}
+}
+
+func TestTrimFractionalZerosEmpty(t *testing.T) {
+	s := ""
+	want := ""
+	got := trimFractionalZeros(s)
+	if got != want {
+		t.Errorf("got %v; want %v", got, want)
+	}
+}
+
 func TestExtractOriginMatch(t *testing.T) {
 	var prefixes = []string{"reshare_east", "reshare_north", "reshare_outer", "reshare_south", "reshare_west"}
 	var schema = "reshare_west_inventory"

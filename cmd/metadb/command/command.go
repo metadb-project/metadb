@@ -736,8 +736,43 @@ func ToSQLData(data interface{}, datatype DataType, semtype string) *string {
 	}
 }
 
+// fixupSQLTime prepares a time or timestamp for subsequent SQL encoding.  Any
+// fractional trailing zeros are removed.  "T" is added between the date and
+// time of a timestamp.  This function does not validate the input string but
+// assumes it is a valid time or timestamp without a time zone.
 func fixupSQLTime(t string) string {
-	return strings.Replace(strings.TrimRight(t, "0"), " ", "T", 1) + "Z"
+	s := trimFractionalZeros(t)
+	return strings.Replace(s, " ", "T", 1)
+}
+
+// trimFractionalZeros removes trailing zeros from a string if it ends with a
+// fraction.  It is intended for trimming time and timestamp strings that do
+// not have a time zone suffix.  This function does not validate the input
+// string but assumes it is a valid time or timestamp without a time zone.
+func trimFractionalZeros(s string) string {
+	// fraction is true if we have reached the fractional part.
+	fraction := false
+	// mark is the offset of the last seen Unicode code point that should
+	// not be trimmed.
+	mark := -1
+	// Scan the string for the last offset where trimming should begin.
+	for i, r := range s {
+		if fraction {
+			if r != '0' {
+				mark = i
+			}
+		} else {
+			// When we find '.', we are in the fractional part and
+			// do not mark until we know if the next character is
+			// '0'.
+			if r == '.' {
+				fraction = true
+				continue
+			}
+			mark = i
+		}
+	}
+	return s[:mark+1]
 }
 
 func PrimaryKeyColumns(columns []CommandColumn) []CommandColumn {
