@@ -351,11 +351,11 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 			ddatas = *ddata
 		}
 		if (cdata == nil && ddata != nil) || (cdata != nil && ddata == nil) {
-			log.Trace("matcher: %s (%s): cdata(%v) != ddata(%v)", t, col, cdata, ddata)
+			log.Trace("matcher: %s (%s): cdata(%v) != ddata(%v)", t, col.Name, cdata, ddata)
 			return false, id, cf, nil
 		}
 		if cdata != nil && ddata != nil && cdatas != ddatas {
-			log.Trace("matcher: %s (%s): cdatas(%s) != ddatas(%s)", t, col, cdatas, ddatas)
+			log.Trace("matcher: %s (%s): cdatas(%s) != ddatas(%s)", t, col.Name, cdatas, ddatas)
 			return false, id, cf, nil
 		}
 		delete(attrs, col.Name)
