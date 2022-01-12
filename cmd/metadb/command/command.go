@@ -738,11 +738,11 @@ func ToSQLData(data interface{}, datatype DataType, semtype string) *string {
 
 // fixupSQLTime prepares a time or timestamp for subsequent SQL encoding.  Any
 // fractional trailing zeros are removed.  "T" is added between the date and
-// time of a timestamp.  This function does not validate the input string but
-// assumes it is a valid time or timestamp without a time zone.
+// time of a timestamp.  "Z" is appended to specify UTC.  This function does
+// not validate the input string but assumes it is a valid time or timestamp
+// without a time zone.
 func fixupSQLTime(t string) string {
-	s := trimFractionalZeros(t)
-	return strings.Replace(s, " ", "T", 1)
+	return strings.Replace(trimFractionalZeros(t), " ", "T", 1) + "Z"
 }
 
 // trimFractionalZeros removes trailing zeros from a string if it ends with a
