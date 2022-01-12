@@ -278,6 +278,21 @@ type CommandColumn struct {
 	PrimaryKey   int
 }
 
+func (c CommandColumn) String() string {
+	return fmt.Sprintf("%s=%v", c.Name, c.Data)
+}
+
+func ColumnsString(cols []CommandColumn) string {
+	var b strings.Builder
+	for i, c := range cols {
+		if i != 0 {
+			b.WriteRune(' ')
+		}
+		b.WriteString(c.String())
+	}
+	return b.String()
+}
+
 func (c Command) String() string {
 	return fmt.Sprintf("command = %s %s.%s (%v)\nevent =\n%v", c.Op, c.SchemaName, c.TableName, c.Column, c.ChangeEvent)
 }
