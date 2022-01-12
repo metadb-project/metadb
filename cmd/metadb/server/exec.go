@@ -204,8 +204,10 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 	}
 	if ident {
 		if cf == "false" {
+			log.Trace("matched_cf")
 			return updateRowCF(c, tx, db, &t, id)
 		}
+		log.Trace("matched_ok")
 		return nil
 	}
 	exec := make([]string, 0)

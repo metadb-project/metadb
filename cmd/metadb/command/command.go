@@ -6,6 +6,7 @@ import (
 	"math"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -702,14 +703,14 @@ func ToSQLData(data interface{}, datatype DataType, semtype string) *string {
 		// }
 		return &v
 	case int:
-		s := fmt.Sprintf("%d", v)
+		s := strconv.Itoa(v)
 		return &s
 	case int64:
-		s := fmt.Sprintf("%d", v)
+		s := strconv.FormatInt(v, 10)
 		return &s
 	case float64:
 		if datatype == DateType {
-			s := time.Unix(int64(v*86400), int64(0)).UTC().Format("2006-01-02")
+			s := time.Unix(int64(v*86400), int64(0)).UTC().Format("2006-01-02") + "T00:00:00Z"
 			return &s
 		}
 		if datatype == TimestampType && strings.HasSuffix(semtype, ".time.MicroTimestamp") {
