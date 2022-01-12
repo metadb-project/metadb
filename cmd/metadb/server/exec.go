@@ -336,6 +336,7 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 			}
 		}
 	} else {
+		log.Trace("matcher: row not found in database")
 		return false, "", "", nil
 	}
 	for _, col := range c.Column {
@@ -350,15 +351,18 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 			ddatas = *ddata
 		}
 		if (cdata == nil && ddata != nil) || (cdata != nil && ddata == nil) {
+			log.Trace("matcher: %v != %v", cdata, ddata)
 			return false, id, cf, nil
 		}
 		if cdata != nil && ddata != nil && cdatas != ddatas {
+			log.Trace("matcher: %s != %s", cdatas, ddatas)
 			return false, id, cf, nil
 		}
 		delete(attrs, col.Name)
 	}
 	for _, v := range attrs {
 		if v != nil {
+			log.Trace("matcher: database has extra value %v", v)
 			return false, id, cf, nil
 		}
 	}
