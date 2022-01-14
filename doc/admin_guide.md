@@ -53,8 +53,6 @@ $ mdb enable db.main
 * Database systems supported:
   * [PostgreSQL](https://www.postgresql.org/) 14.1 or later
 * Other software dependencies:
-  * [Kafka](https://kafka.apache.org/) 3.0.0 or later
-  * [Debezium](https://debezium.io/) 1.8.0 or later
   * [Go](https://golang.org/) 1.18 or later
   * [GCC C compiler](https://gcc.gnu.org/) 9.3.0 or later
 
