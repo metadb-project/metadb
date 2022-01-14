@@ -1,2 +1,1 @@
-Pull requests are not currently accepted for this project.
-
+Pull requests in GitHub are not accepted for this project.
