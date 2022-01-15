@@ -57,23 +57,31 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 			//        return err
 			//}
 		case bool:
+			sqldata, err := command.ToSQLData(v, command.BooleanType, "")
+			if err != nil {
+				return err
+			}
 			cols = append(cols, command.CommandColumn{
 				Name:         n,
 				DType:        command.BooleanType,
 				DTypeSize:    0,
 				SemanticType: "",
 				Data:         v,
-				SQLData:      command.ToSQLData(v, command.BooleanType, ""),
+				SQLData:      sqldata,
 				PrimaryKey:   0,
 			})
 		case float64:
+			sqldata, err := command.ToSQLData(v, command.FloatType, "")
+			if err != nil {
+				return err
+			}
 			cols = append(cols, command.CommandColumn{
 				Name:         n,
 				DType:        command.FloatType,
 				DTypeSize:    8,
 				SemanticType: "",
 				Data:         v,
-				SQLData:      command.ToSQLData(v, command.FloatType, ""),
+				SQLData:      sqldata,
 				PrimaryKey:   0,
 			})
 		case map[string]interface{}:
@@ -81,13 +89,17 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 			//        return err
 			//}
 		case string:
+			sqldata, err := command.ToSQLData(v, command.VarcharType, "")
+			if err != nil {
+				return err
+			}
 			cols = append(cols, command.CommandColumn{
 				Name:         n,
 				DType:        command.VarcharType,
 				DTypeSize:    int64(len(v)),
 				SemanticType: "",
 				Data:         v,
-				SQLData:      command.ToSQLData(v, command.VarcharType, ""),
+				SQLData:      sqldata,
 				PrimaryKey:   0,
 			})
 		default:

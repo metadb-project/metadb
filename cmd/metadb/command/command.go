@@ -302,46 +302,6 @@ type CommandList struct {
 	Cmd []Command
 }
 
-func convertDataType(coltype, semtype string) (DataType, error) {
-	switch coltype {
-	case "int8":
-		fallthrough
-	case "int16":
-		fallthrough
-	case "int32":
-		if strings.HasSuffix(semtype, ".time.Time") {
-			return TimeType, nil
-		}
-		fallthrough
-	case "int64":
-		if strings.HasSuffix(semtype, ".time.MicroTimestamp") || strings.HasSuffix(semtype, ".time.Timestamp") {
-			return TimestampType, nil
-		}
-		if strings.HasSuffix(semtype, ".time.Date") {
-			return DateType, nil
-		}
-		if strings.HasSuffix(semtype, ".time.MicroTime") {
-			return TimeType, nil
-		}
-		return IntegerType, nil
-	case "string":
-		if strings.HasSuffix(semtype, ".time.ZonedTimestamp") {
-			return TimestamptzType, nil
-		}
-		if strings.HasSuffix(semtype, ".time.ZonedTime") {
-			return TimetzType, nil
-		}
-		if strings.HasSuffix(semtype, ".data.Json") {
-			return JSONType, nil
-		}
-		return VarcharType, nil
-	case "boolean":
-		return BooleanType, nil
-	default:
-		return 0, fmt.Errorf("convert data type: unknown data type: %s", coltype)
-	}
-}
-
 func convertTypeSize(data *string, coltype string, datatype DataType) (int64, error) {
 	switch datatype {
 	case IntegerType:
@@ -516,7 +476,9 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 		// } else {
 		// 	data = col.Data
 		// }
-		col.SQLData = ToSQLData(col.Data, col.DType, col.SemanticType)
+		if col.SQLData, err = ToSQLData(col.Data, col.DType, col.SemanticType); err != nil {
+			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type: %v", field, err)
+		}
 		if col.DTypeSize, err = convertTypeSize(col.SQLData, ftype, col.DType); err != nil {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type size", field)
 		}
@@ -652,7 +614,11 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 					data = d
 				}
 			}
-			edata := ToSQLData(data, dtype, semtype)
+			var edata *string
+			edata, err = ToSQLData(data, dtype, semtype)
+			if err != nil {
+				return nil, fmt.Errorf("delete: unknown type: %v", err)
+			}
 			var typesize int64
 			typesize, err = convertTypeSize(edata, dt, dtype)
 			if err != nil {
@@ -692,64 +658,129 @@ func extractOrigin(prefixes []string, schema string) (string, string) {
 	return "", schema
 }
 
-func ToSQLData(data interface{}, datatype DataType, semtype string) *string {
-	if data == nil {
-		return nil
+// convertDataType converts a literal type and semantic type (provided by a
+// change event) to a DataType.
+func convertDataType(coltype, semtype string) (DataType, error) {
+	switch coltype {
+	case "boolean":
+		return BooleanType, nil
+	case "int8", "int16":
+		return IntegerType, nil
+	case "int32":
+		if strings.HasSuffix(semtype, ".time.Time") {
+			return TimeType, nil
+		}
+		return IntegerType, nil
+	case "int64":
+		if strings.HasSuffix(semtype, ".time.Date") {
+			return DateType, nil
+		}
+		if strings.HasSuffix(semtype, ".time.MicroTime") {
+			return TimeType, nil
+		}
+		if strings.HasSuffix(semtype, ".time.Timestamp") || strings.HasSuffix(semtype, ".time.MicroTimestamp") {
+			return TimestampType, nil
+		}
+		return IntegerType, nil
+	case "float32", "float64":
+		return FloatType, nil
+	case "string":
+		if strings.HasSuffix(semtype, ".data.Json") {
+			return JSONType, nil
+		}
+		if strings.HasSuffix(semtype, ".time.ZonedTime") {
+			return TimetzType, nil
+		}
+		if strings.HasSuffix(semtype, ".time.ZonedTimestamp") {
+			return TimestamptzType, nil
+		}
+		return VarcharType, nil
+	default:
+		return 0, fmt.Errorf("convert data type: unknown data type: %s", coltype)
 	}
-	switch v := data.(type) {
-	case string:
-		// if datatype == TimestamptzType || datatype == TimetzType {
-		// 	return "'" + v + "'"
-		// }
-		return &v
-	case int:
-		s := strconv.Itoa(v)
-		return &s
-	case int64:
-		s := strconv.FormatInt(v, 10)
-		return &s
-	case float64:
-		if datatype == DateType {
-			s := time.Unix(int64(v*86400), int64(0)).UTC().Format("2006-01-02") + "T00:00:00Z"
-			return &s
+}
+
+// ToSQLData converts data to a string ready for encoding to SQL.
+func ToSQLData(data interface{}, datatype DataType, semtype string) (*string, error) {
+	if data == nil {
+		return nil, nil
+	}
+	switch datatype {
+	case BooleanType:
+		v, ok := data.(bool)
+		if !ok {
+			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
 		}
-		if datatype == TimestampType && strings.HasSuffix(semtype, ".time.MicroTimestamp") {
-			var i, f float64 = math.Modf(v / 1000000)
-			var t string = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000")
-			s := fixupSQLTime(t)
-			return &s
-		}
-		if datatype == TimestampType && strings.HasSuffix(semtype, ".time.Timestamp") {
-			var i, f float64 = math.Modf(v / 1000)
-			var t string = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000")
-			s := fixupSQLTime(t)
-			return &s
-		}
-		if datatype == TimeType && strings.HasSuffix(semtype, ".time.MicroTime") {
-			var i, f float64 = math.Modf(v / 1000000)
-			var t string = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("15:04:05.000000")
-			s := fixupSQLTime(t)
-			return &s
-		}
-		if datatype == TimeType && strings.HasSuffix(semtype, ".time.Time") {
-			var i, f float64 = math.Modf(v / 1000)
-			var t string = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("15:04:05.000000")
-			s := fixupSQLTime(t)
-			return &s
-		}
-		s := fmt.Sprintf("%g", v)
-		return &s
-	case bool:
 		if v {
 			s := "true"
-			return &s
+			return &s, nil
 		}
 		s := "false"
-		return &s
-	default:
-		s := fmt.Sprintf("(unknown:%T)", data)
-		return &s
+		return &s, nil
+	case IntegerType:
+		v, ok := data.(float64)
+		if !ok {
+			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
+		}
+		i := int64(v)
+		s := strconv.FormatInt(i, 10)
+		return &s, nil
+	case FloatType:
+		v, ok := data.(float64)
+		if !ok {
+			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
+		}
+		s := fmt.Sprintf("%g", v)
+		return &s, nil
+	case DateType:
+		v, ok := data.(float64)
+		if !ok {
+			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
+		}
+		s := time.Unix(int64(v*86400), int64(0)).UTC().Format("2006-01-02") + "T00:00:00Z"
+		return &s, nil
+	case TimeType:
+		v, ok := data.(float64)
+		if !ok {
+			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
+		}
+		switch {
+		case strings.HasSuffix(semtype, ".time.Time"):
+			var i, f float64 = math.Modf(v / 1000)
+			var t string = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("15:04:05.000000")
+			s := fixupSQLTime(t)
+			return &s, nil
+		case strings.HasSuffix(semtype, ".time.MicroTime"):
+			var i, f float64 = math.Modf(v / 1000000)
+			var t string = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("15:04:05.000000")
+			s := fixupSQLTime(t)
+			return &s, nil
+		}
+	case TimestampType:
+		v, ok := data.(float64)
+		if !ok {
+			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
+		}
+		switch {
+		case strings.HasSuffix(semtype, ".time.Timestamp"):
+			var i, f float64 = math.Modf(v / 1000)
+			var t string = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000")
+			s := fixupSQLTime(t)
+			return &s, nil
+		case strings.HasSuffix(semtype, ".time.MicroTimestamp"):
+			var i, f float64 = math.Modf(v / 1000000)
+			var t string = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000")
+			s := fixupSQLTime(t)
+			return &s, nil
+		}
+	case VarcharType, JSONType, TimetzType, TimestamptzType:
+		s, ok := data.(string)
+		if !ok {
+			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
+		}
+		return &s, nil
 	}
+	return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
 }
 
 // fixupSQLTime prepares a time or timestamp for subsequent SQL encoding.  Any
