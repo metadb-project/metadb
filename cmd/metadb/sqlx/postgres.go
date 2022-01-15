@@ -20,6 +20,10 @@ func OpenPostgres(dsn *DSN) (*PostgresDB, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, err = db.ExecContext(context.TODO(), "SET timezone='UTC'")
+	if err != nil {
+		return nil, err
+	}
 	return &PostgresDB{DB: db}, nil
 }
 
