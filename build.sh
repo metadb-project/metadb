@@ -15,8 +15,8 @@ usage() {
     echo 'Flags:'
     echo '-f      - "Fast" build (do not remove executables)'
     echo '-h      - Help'
-    echo '-t      - Run tests'
-    echo '-T      - Run tests and all static analyses, requires:'
+    echo '-T      - Run tests without static analysis'
+    echo '-t      - Run tests and static analysis, requires:'
     echo ''
     echo '    go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest'
     echo '    go install honnef.co/go/tools/cmd/staticcheck@latest'
@@ -33,13 +33,13 @@ usage() {
 
 while getopts 'JTcfhtvX' flag; do
     case "${flag}" in
-        T) runalltest='true' ;;
+        t) runalltest='true' ;;
         c) ;;
         f) fast='true' ;;
         J) echo "build.sh: -J option is deprecated" 1>&2 ;;
         h) usage
             exit 1 ;;
-        t) runtest='true' ;;
+        T) runtest='true' ;;
         v) verbose='true' ;;
         X) experiment='true' ;;
         *) usage
