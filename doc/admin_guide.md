@@ -15,6 +15,11 @@ Metadb Administrator Guide
 1\. Overview
 ------------
 
+A _Metadb instance_ defines a selection of data sources, data
+transforms, and analytic databases.  Metadb stores state for a single
+instance in a _data directory_ on the local file system.  Multiple
+instances require a separate data directory for each instance.
+
 The software consists of a server (`metadb`) and a command-line client
 (`mdb`).
 
@@ -104,12 +109,13 @@ $ ./bin/mdb help
 
 ### Metadb user account
 
-It is recommended to create a user account that will run the `metadb` server.
-This guide assumes that a user "metadb" has been created for this purpose.
+It is recommended to create a Linux user account that will run the
+`metadb` server.  This guide assumes that a user "metadb" has been
+created for this purpose.
 
 ### Creating a data directory
 
-Metadb stores an instance's state and metadata in a "data directory,"
+Metadb stores an instance's state and metadata in a data directory,
 which is created using the `init` command of `metadb`.  The data
 directory is required to be on a local file system; it may not be on a
 network file system.
@@ -302,9 +308,8 @@ source, or empty string ( `''` ) if there are no origins.
 5. Start the Metadb server, configure and enable the source connector
    for the new stream, and begin streaming the data.
 
-6. Once the new data have finished or nearly finished streaming, stop
-   the Metadb server, and "clean" the analytic database to remove old
-   data.
+6. Once the new data have finished streaming, stop the Metadb server,
+   and "clean" the analytic database to remove old data.
 
 ```bash
 $ metadb clean -D /usr/local/metadb/data --origin 's1,s2,s3' db.main
@@ -312,8 +317,17 @@ $ metadb clean -D /usr/local/metadb/data --origin 's1,s2,s3' db.main
 
 The `--origin` should be the same as used for the reset.
 
+Note that the metadb server currently does not give any indication
+that it has finished re-streaming, except that running it with
+`--debug` will typically show updates slowing down.  The precise
+timing when "metadb clean" is run is not critical, but it is
+preferable to run it late rather than early.  (Having the server
+report that initial streaming or re-streaming has finished is a
+planned feature.)
+
 7. Start the server.
 
-If a failed stream is re-streamed without following the process above,
-then the analytic database may become unsynchronized with the source.
+Until a failed stream is re-streamed by following the process above,
+the analytic database may continue to be unsynchronized with the
+source.
 
