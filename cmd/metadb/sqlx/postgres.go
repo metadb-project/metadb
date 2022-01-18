@@ -17,7 +17,7 @@ type PostgresDB struct {
 // Ensure that the type implements the DB interface.
 var _ DB = (*PostgresDB)(nil)
 
-func OpenPostgres(dsn *DSN) (*PostgresDB, error) {
+func OpenPostgres(dbspec string, dsn *DSN) (*PostgresDB, error) {
 	s := "host=" + dsn.Host + " port=" + dsn.Port + " user=" + dsn.User + " password=" + dsn.Password + " dbname=" + dsn.DBName + " sslmode=" + dsn.SSLMode
 	db, err := sql.Open("postgres", s)
 	if err != nil {
@@ -27,7 +27,7 @@ func OpenPostgres(dsn *DSN) (*PostgresDB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &PostgresDB{DB: db}, nil
+	return &PostgresDB{Name: dbspec, DB: db}, nil
 }
 
 func (d *PostgresDB) Close() {

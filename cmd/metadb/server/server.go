@@ -480,7 +480,7 @@ func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) err
 		SSLMode:  dbc.DBSSLMode,
 		Account:  dbc.DBAccount,
 	}
-	dbsuper, err := sqlx.Open(dbc.Type, dsn)
+	dbsuper, err := sqlx.Open(dbc.Name, dbc.Type, dsn)
 	if err != nil {
 		return err
 	}
@@ -504,7 +504,7 @@ func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) err
 		SSLMode:  dbc.DBSSLMode,
 		Account:  dbc.DBAccount,
 	}
-	db, err := sqlx.Open(dbc.Type, dsn)
+	db, err := sqlx.Open(dbc.Name, dbc.Type, dsn)
 	if err != nil {
 		return err
 	}

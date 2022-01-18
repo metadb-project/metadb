@@ -97,7 +97,7 @@ func pollLoop(spr *sproc) error {
 		SSLMode:  database0.DBSSLMode,
 		Account:  database0.DBAccount,
 	}
-	db, err := sqlx.Open(database0.Type, dsn)
+	db, err := sqlx.Open(database0.Name, database0.Type, dsn)
 	if err != nil {
 		return err
 	}
@@ -439,7 +439,7 @@ func waitForConfig(svr *server) (*sproc, error) {
 		}
 		if len(databases) > 0 && len(sources) > 0 {
 			var dbEnabled, srcEnabled bool
-			if dbEnabled, err = sysdb.IsConnectorEnabled("db." + databases[0].Name); err != nil {
+			if dbEnabled, err = sysdb.IsConnectorEnabled(databases[0].Name); err != nil {
 				return nil, err
 			}
 			if srcEnabled, err = sysdb.IsConnectorEnabled("src." + sources[0].Name); err != nil {
@@ -454,7 +454,7 @@ func waitForConfig(svr *server) (*sproc, error) {
 			sources = []*sysdb.SourceConnector{{}}
 			time.Sleep(2 * time.Second)
 			var dbEnabled bool
-			if dbEnabled, err = sysdb.IsConnectorEnabled("db." + databases[0].Name); err != nil {
+			if dbEnabled, err = sysdb.IsConnectorEnabled(databases[0].Name); err != nil {
 				return nil, err
 			}
 			//var users = strings.TrimSpace(databases[0].DBUsers)

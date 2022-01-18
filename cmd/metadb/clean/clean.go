@@ -39,7 +39,7 @@ func Clean(opt *option.Clean) error {
 	if err != nil {
 		return err
 	}
-	db, err := sqlx.Open(dbtype, dsn)
+	db, err := sqlx.Open(opt.Connector, dbtype, dsn)
 	if err != nil {
 		return err
 	}

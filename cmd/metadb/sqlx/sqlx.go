@@ -34,10 +34,10 @@ type ColumnSchema struct {
 	CharMaxLen *int64
 }
 
-func Open(dbtype string, dataSourceName *DSN) (DB, error) {
+func Open(dbspec string, dbtype string, dataSourceName *DSN) (DB, error) {
 	switch dbtype {
 	case "postgresql":
-		return OpenPostgres(dataSourceName)
+		return OpenPostgres(dbspec, dataSourceName)
 	//case "snowflake":
 	//	return NewOpenSnowflake(dataSourceName)
 	//case "redshift":

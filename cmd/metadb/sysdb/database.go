@@ -1,6 +1,8 @@
 package sysdb
 
-import "github.com/metadb-project/metadb/cmd/metadb/sqlx"
+import (
+	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
+)
 
 func ReadDataSource(spec string) (string, *sqlx.DSN, error) {
 	sysMu.Lock()

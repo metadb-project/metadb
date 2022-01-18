@@ -48,7 +48,7 @@ func Upgrade(opt *option.Upgrade) error {
 	}
 	dbstate := make([]databaseState, 0)
 	for _, dbc := range dbcs {
-		name := "db." + dbc.Name
+		name := dbc.Name
 		dsn := &sqlx.DSN{
 			Host:     dbc.DBHost,
 			Port:     dbc.DBPort,
@@ -59,7 +59,7 @@ func Upgrade(opt *option.Upgrade) error {
 			Account:  dbc.DBAccount,
 		}
 		var db sqlx.DB
-		db, err = sqlx.Open(dbc.Type, dsn)
+		db, err = sqlx.Open(dbc.Name, dbc.Type, dsn)
 		if err != nil {
 			return err
 		}

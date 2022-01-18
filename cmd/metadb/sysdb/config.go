@@ -197,7 +197,7 @@ func readConfigMap(prefix string) (map[string]map[string]string, error) {
 		if len(sp) < 3 {
 			continue
 		}
-		var name = sp[1]
+		var name = sp[0] + "." + sp[1]
 		var key = sp[2]
 		var conf map[string]string
 		var ok bool
