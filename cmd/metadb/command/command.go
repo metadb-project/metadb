@@ -1,7 +1,6 @@
 package command
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"regexp"
@@ -488,18 +487,18 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 	return column, nil
 }
 
-func indentJSON(data string) (string, error) {
-	var err error
-	var j map[string]interface{}
-	if err = json.Unmarshal([]byte(data), &j); err != nil {
-		return "", err
-	}
-	var jb []byte
-	if jb, err = json.MarshalIndent(j, "", "    "); err != nil {
-		return "", err
-	}
-	return string(jb), nil
-}
+// func indentJSON(data string) (string, error) {
+// 	var err error
+// 	var j map[string]interface{}
+// 	if err = json.Unmarshal([]byte(data), &j); err != nil {
+// 		return "", err
+// 	}
+// 	var jb []byte
+// 	if jb, err = json.MarshalIndent(j, "", "    "); err != nil {
+// 		return "", err
+// 	}
+// 	return string(jb), nil
+// }
 
 var Tenants []string
 
@@ -607,13 +606,13 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 				return nil, fmt.Errorf("delete: unknown key schema type: %v", m["type"])
 			}
 			data := payload[attr]
-			if dtype == JSONType {
-				var d string
-				d, err = indentJSON(data.(string))
-				if err == nil {
-					data = d
-				}
-			}
+			// if dtype == JSONType {
+			// 	var d string
+			// 	d, err = indentJSON(data.(string))
+			// 	if err == nil {
+			// 		data = d
+			// 	}
+			// }
 			var edata *string
 			edata, err = ToSQLData(data, dtype, semtype)
 			if err != nil {
