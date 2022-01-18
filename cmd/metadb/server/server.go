@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"sync"
 	"syscall"
 	"time"
 
@@ -21,12 +22,22 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
+// The server thread handling needs to be reworked.  It currently runs an HTTP
+// server and a single poll loop in two goroutines.
+
 type server struct {
-	opt       *option.Server
+	opt   *option.Server
+	state serverstate
+}
+
+// serverstate is shared between goroutines.
+type serverstate struct {
+	mu        sync.Mutex
 	databases []*sysdb.DatabaseConnector
 	sources   []*sysdb.SourceConnector
 }
 
+// sproc stores state for a single poll loop.
 type sproc struct {
 	db               []sqlx.DB
 	schemaPassFilter []*regexp.Regexp
@@ -343,6 +354,8 @@ func (svr *server) handleUserGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (svr *server) handleStatusGet(w http.ResponseWriter, r *http.Request) {
+	svr.state.mu.Lock()
+	defer svr.state.mu.Unlock()
 
 	var p api.GetStatusRequest
 	var ok bool
@@ -355,12 +368,12 @@ func (svr *server) handleStatusGet(w http.ResponseWriter, r *http.Request) {
 	stat.Sources = make(map[string]status.Status)
 
 	var d *sysdb.DatabaseConnector
-	for _, d = range svr.databases {
+	for _, d = range svr.state.databases {
 		stat.Databases[d.Name] = d.Status
 	}
 
 	var s *sysdb.SourceConnector
-	for _, s = range svr.sources {
+	for _, s = range svr.state.sources {
 		stat.Sources[s.Name] = s.Status
 	}
 
@@ -461,7 +474,10 @@ func (svr *server) handleUserPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (svr *server) createUser(rq *api.UserUpdateRequest) error {
-	for _, dbc := range svr.databases {
+	svr.state.mu.Lock()
+	defer svr.state.mu.Unlock()
+
+	for _, dbc := range svr.state.databases {
 		err := createUserInDB(rq, dbc)
 		if err != nil {
 			return err

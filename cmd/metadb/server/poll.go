@@ -417,52 +417,21 @@ func logDebugCommand(c *command.Command) {
 }
 
 // TODO waitForConfig is not currently using the source-database mapping.
+// TODO To be reworked.
 func waitForConfig(svr *server) (*sproc, error) {
 	log.Debug("waiting for configuration")
-	var err error
 	var databases []*sysdb.DatabaseConnector
 	var sources []*sysdb.SourceConnector
+	var ready bool
+	var err error
 	for {
-		if databases, err = sysdb.ReadDatabaseConnectors(); err != nil {
+		databases, sources, ready, err = waitForConfigCheck(svr)
+		if err != nil {
 			return nil, err
 		}
-		if len(databases) > 0 {
-			databases[0].Status.Waiting()
-			svr.databases = databases
+		if ready {
+			break
 		}
-		if sources, err = sysdb.ReadSourceConnectors(); err != nil {
-			return nil, err
-		}
-		if len(sources) > 0 {
-			sources[0].Status.Waiting()
-			svr.sources = sources
-		}
-		if len(databases) > 0 && len(sources) > 0 {
-			var dbEnabled, srcEnabled bool
-			if dbEnabled, err = sysdb.IsConnectorEnabled(databases[0].Name); err != nil {
-				return nil, err
-			}
-			if srcEnabled, err = sysdb.IsConnectorEnabled("src." + sources[0].Name); err != nil {
-				return nil, err
-			}
-			//var users = strings.TrimSpace(databases[0].DBUsers)
-			if dbEnabled && srcEnabled {
-				break
-			}
-		}
-		if len(databases) > 0 && svr.opt.SourceFilename != "" {
-			sources = []*sysdb.SourceConnector{{}}
-			time.Sleep(2 * time.Second)
-			var dbEnabled bool
-			if dbEnabled, err = sysdb.IsConnectorEnabled(databases[0].Name); err != nil {
-				return nil, err
-			}
-			//var users = strings.TrimSpace(databases[0].DBUsers)
-			if dbEnabled {
-				break
-			}
-		}
-		time.Sleep(2 * time.Second)
 	}
 	var src *sysdb.SourceConnector
 	if svr.opt.SourceFilename == "" {
@@ -476,4 +445,78 @@ func waitForConfig(svr *server) (*sproc, error) {
 		svr:       svr,
 	}
 	return spr, nil
+}
+
+// TODO To be reworked.
+func waitForConfigCheck(svr *server) ([]*sysdb.DatabaseConnector, []*sysdb.SourceConnector, bool, error) {
+	svr.state.mu.Lock()
+	defer svr.state.mu.Unlock()
+
+	var databases []*sysdb.DatabaseConnector
+	var sources []*sysdb.SourceConnector
+	var err error
+	if databases, err = sysdb.ReadDatabaseConnectors(); err != nil {
+		return nil, nil, false, err
+	}
+	// if len(databases) > 0 {
+	// 	databases[0].Status.Waiting()
+	// 	svr.state.databases = databases
+	// }
+	if sources, err = sysdb.ReadSourceConnectors(); err != nil {
+		return nil, nil, false, err
+	}
+	// if len(sources) > 0 {
+	// 	sources[0].Status.Waiting()
+	// 	svr.state.sources = sources
+	// }
+	if len(databases) > 0 && len(sources) > 0 {
+		var dbEnabled, srcEnabled bool
+		if dbEnabled, err = sysdb.IsConnectorEnabled(databases[0].Name); err != nil {
+			return nil, nil, false, err
+		}
+		if srcEnabled, err = sysdb.IsConnectorEnabled("src." + sources[0].Name); err != nil {
+			return nil, nil, false, err
+		}
+		//var users = strings.TrimSpace(databases[0].DBUsers)
+		if dbEnabled && srcEnabled {
+			// Reread connectors in case configuration was incomplete.
+			if databases, err = sysdb.ReadDatabaseConnectors(); err != nil {
+				return nil, nil, false, err
+			}
+			if len(databases) > 0 {
+				databases[0].Status.Waiting()
+				svr.state.databases = databases
+			}
+			if sources, err = sysdb.ReadSourceConnectors(); err != nil {
+				return nil, nil, false, err
+			}
+			if len(sources) > 0 {
+				sources[0].Status.Waiting()
+				svr.state.sources = sources
+			}
+			return databases, sources, true, nil
+		}
+	}
+	if len(databases) > 0 && svr.opt.SourceFilename != "" {
+		sources = []*sysdb.SourceConnector{{}}
+		time.Sleep(2 * time.Second)
+		var dbEnabled bool
+		if dbEnabled, err = sysdb.IsConnectorEnabled(databases[0].Name); err != nil {
+			return nil, nil, false, err
+		}
+		//var users = strings.TrimSpace(databases[0].DBUsers)
+		if dbEnabled {
+			// Reread connector in case configuration was incomplete.
+			if databases, err = sysdb.ReadDatabaseConnectors(); err != nil {
+				return nil, nil, false, err
+			}
+			if len(databases) > 0 {
+				databases[0].Status.Waiting()
+				svr.state.databases = databases
+			}
+			return databases, sources, true, nil
+		}
+	}
+	time.Sleep(2 * time.Second)
+	return nil, nil, false, nil
 }
