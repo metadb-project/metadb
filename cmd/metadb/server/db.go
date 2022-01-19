@@ -194,8 +194,8 @@ func renameColumnOldType(table *sqlx.Table, column string, datatype command.Data
 		return err
 	}
 	// Current table: rename index.
-	_, err = db.Exec(nil, "ALTER INDEX IF EXISTS "+db.IdentiferSQL(indexName(table.Table, column))+
-		" RENAME TO "+db.IdentiferSQL(indexName(table.Table, newName)))
+	index := db.IdentiferSQL(table.Schema) + "." + db.IdentiferSQL(indexName(table.Table, column))
+	_, err = db.Exec(nil, "ALTER INDEX IF EXISTS "+index+" RENAME TO "+db.IdentiferSQL(indexName(table.Table, newName)))
 	if err != nil {
 		return err
 	}
@@ -205,8 +205,8 @@ func renameColumnOldType(table *sqlx.Table, column string, datatype command.Data
 		return err
 	}
 	// History table: rename index.
-	_, err = db.Exec(nil, "ALTER INDEX IF EXISTS "+db.IdentiferSQL(indexName(db.HistoryTable(table).Table, column))+
-		" RENAME TO "+db.IdentiferSQL(indexName(db.HistoryTable(table).Table, newName)))
+	index = db.IdentiferSQL(table.Schema) + "." + db.IdentiferSQL(indexName(db.HistoryTable(table).Table, column))
+	_, err = db.Exec(nil, "ALTER INDEX IF EXISTS "+index+" RENAME TO "+db.IdentiferSQL(indexName(db.HistoryTable(table).Table, newName)))
 	if err != nil {
 		return err
 	}
