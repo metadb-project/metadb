@@ -70,10 +70,10 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		}
 		// If the type is changing from varchar to another type, keep
 		// the type as varchar and let the executor cast the data.
-		// This is to prevent bad data from causing runaway type
-		// changes (and the resulting runaway column renaming).  Later
-		// we can give the user a way to change the type of a specific
-		// column if needed.
+		// This is to prevent poorly typed JSON fields from causing
+		// runaway type changes (and the resulting runaway column
+		// renaming).  Later we can give the user a way to change the
+		// type of a specific column.
 		if col.oldType == command.VarcharType && col.newType != command.VarcharType {
 			// Adjust the new data type in the command.
 			var typeSize int64 = -1
