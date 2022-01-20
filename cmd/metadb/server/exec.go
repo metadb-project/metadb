@@ -34,58 +34,93 @@ func execCommandList(cl *command.CommandList, db sqlx.DB, track *cache.Track, cs
 	return nil
 }
 
-func execCommandSchema(c *command.Command, db sqlx.DB, track *cache.Track, schema *cache.Schema, users *cache.Users) error {
-	if c.Op == command.DeleteOp {
+func execCommandSchema(cmd *command.Command, db sqlx.DB, track *cache.Track, schema *cache.Schema, users *cache.Users) error {
+	if cmd.Op == command.DeleteOp {
 		return nil
 	}
 	var err error
 	var delta *deltaSchema
-	if delta, err = findDeltaSchema(c, schema); err != nil {
+	if delta, err = findDeltaSchema(cmd, schema); err != nil {
 		return err
 	}
 	// TODO can we skip adding the table if we confirm it in sysdb?
-	if err = addTable(sqlx.NewTable(c.SchemaName, c.TableName), db, track, users); err != nil {
+	if err = addTable(sqlx.NewTable(cmd.SchemaName, cmd.TableName), db, track, users); err != nil {
 		return err
 	}
-	if err = execDeltaSchema(delta, c.SchemaName, c.TableName, db, schema); err != nil {
+	// Note that execDeltaSchema() may adjust data types in cmd.
+	if err = execDeltaSchema(cmd, delta, cmd.SchemaName, cmd.TableName, db, schema); err != nil {
 		return err
 	}
 	return nil
 }
 
-func execDeltaSchema(delta *deltaSchema, tschema string, tableName string, db sqlx.DB, schema *cache.Schema) error {
-	var err error
-	var col deltaColumnSchema
+func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, tableName string, db sqlx.DB, schema *cache.Schema) error {
 	//if len(delta.column) == 0 {
 	//        log.Trace("table %s: no schema changes", util.JoinSchemaTable(tschema, tableName))
 	//}
-	for _, col = range delta.column {
+	for _, col := range delta.column {
 		// Is this a new column (as opposed to a modification)?
 		if col.newColumn {
 			log.Trace("table %s.%s: new column: %s %s", tschema, tableName, col.name, command.DataTypeToSQL(col.newType, col.newTypeSize))
 			t := &sqlx.Table{Schema: tschema, Table: tableName}
-			if err = addColumn(t, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
+			if err := addColumn(t, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 				return err
 			}
 			continue
 		}
-		// If the types are the same and they are varchar, both PostgreSQL and
-		// Redshift can alter the column in place
-		if col.oldType == col.newType && col.oldType == command.VarcharType {
+		// If the type is changing from varchar to another type, keep
+		// the type as varchar and let the executor cast the data.
+		// This is to prevent bad data from causing runaway type
+		// changes (and the resulting runaway column renaming).  Later
+		// we can give the user a way to change the type of a specific
+		// column if needed.
+		if col.oldType == command.VarcharType && col.newType != command.VarcharType {
+			// Adjust the new data type in the command.
+			var typeSize int64 = -1
+			for j, c := range cmd.Column {
+				if c.Name == col.name && cmd.Column[j].SQLData != nil {
+					if cmd.Column[j].SQLData == nil {
+						typeSize = 0
+					} else {
+						typeSize = int64(len(*(cmd.Column[j].SQLData)))
+						cmd.Column[j].DType = command.VarcharType
+						cmd.Column[j].DTypeSize = typeSize
+					}
+				}
+			}
+			if typeSize == -1 {
+				log.Error("delta schema: internal error: column not found in command: %s.%s (%s)", tschema, tableName, col.name)
+				continue
+			}
+			if typeSize == 0 {
+				log.Error("delta schema: internal error: unexpected nil column value: %s.%s (%s)", tschema, tableName, col.name)
+				continue
+			}
+			if typeSize <= col.oldTypeSize {
+				continue
+			}
+			// Change the delta column type as well so that column
+			// size can be adjusted below if needed.
+			col.newType = command.VarcharType
+			col.newTypeSize = typeSize
+		}
+		// If both the old and new types are varchar, most databases
+		// can alter the column in place.
+		if col.oldType == command.VarcharType && col.newType == command.VarcharType {
 			log.Trace("table %s.%s: alter column: %s %s", tschema, tableName, col.name, command.DataTypeToSQL(col.newType, col.newTypeSize))
-			if err = alterColumnVarcharSize(sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db, schema); err != nil {
+			if err := alterColumnVarcharSize(sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 				return err
 			}
 			continue
 		}
 		// Otherwise we have a completely new type
 		log.Trace("table %s.%s: rename column %s", tschema, tableName, col.name)
-		if err = renameColumnOldType(sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db, schema); err != nil {
+		if err := renameColumnOldType(sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 			return err
 		}
 		log.Trace("table %s.%s: new column %s %s", tschema, tableName, col.name, command.DataTypeToSQL(col.newType, col.newTypeSize))
 		t := &sqlx.Table{Schema: tschema, Table: tableName}
-		if err = addColumn(t, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
+		if err := addColumn(t, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 			return err
 		}
 	}
@@ -103,8 +138,8 @@ func execCommandListData(db sqlx.DB, cc command.CommandList, cschema *cache.Sche
 	}(tx)
 	// Exec data
 	for _, c := range cc.Cmd {
-		// Extra check of varchar sizes to ensure size was adjusted and avoid silent data loss
-		// due to optimization errors
+		// Extra check of varchar sizes to ensure size was adjusted and
+		// avoid silent data loss due to optimization errors
 		for _, col := range c.Column {
 			if col.DType == command.VarcharType {
 				schemaCol := cschema.Column(sqlx.NewColumn(c.SchemaName, c.TableName, col.Name))
