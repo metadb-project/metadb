@@ -474,7 +474,7 @@ func waitForConfigCheck(svr *server) ([]*sysdb.DatabaseConnector, []*sysdb.Sourc
 		if dbEnabled, err = sysdb.IsConnectorEnabled(databases[0].Name); err != nil {
 			return nil, nil, false, err
 		}
-		if srcEnabled, err = sysdb.IsConnectorEnabled("src." + sources[0].Name); err != nil {
+		if srcEnabled, err = sysdb.IsConnectorEnabled(sources[0].Name); err != nil {
 			return nil, nil, false, err
 		}
 		//var users = strings.TrimSpace(databases[0].DBUsers)
