@@ -400,7 +400,8 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 		}
 		delete(attrs, col.Name)
 	}
-	for k, v := range attrs {
+	// for k, v := range attrs {
+	for _, v := range attrs {
 		if v != nil {
 			// log.Trace("matcher: %s (%s): database has extra value: %v", t, k, v)
 			return false, id, cf, nil
