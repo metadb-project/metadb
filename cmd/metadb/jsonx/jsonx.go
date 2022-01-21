@@ -62,13 +62,12 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				return err
 			}
 			cols = append(cols, command.CommandColumn{
-				Name:         n,
-				DType:        command.BooleanType,
-				DTypeSize:    0,
-				SemanticType: "",
-				Data:         v,
-				SQLData:      sqldata,
-				PrimaryKey:   0,
+				Name:       n,
+				DType:      command.BooleanType,
+				DTypeSize:  0,
+				Data:       v,
+				SQLData:    sqldata,
+				PrimaryKey: 0,
 			})
 		case float64:
 			sqldata, err := command.ToSQLData(v, command.FloatType, "")
@@ -76,13 +75,12 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				return err
 			}
 			cols = append(cols, command.CommandColumn{
-				Name:         n,
-				DType:        command.FloatType,
-				DTypeSize:    8,
-				SemanticType: "",
-				Data:         v,
-				SQLData:      sqldata,
-				PrimaryKey:   0,
+				Name:       n,
+				DType:      command.FloatType,
+				DTypeSize:  8,
+				Data:       v,
+				SQLData:    sqldata,
+				PrimaryKey: 0,
 			})
 		case map[string]interface{}:
 			//if err := rewriteObject(cl, cmd, column, db, level+1, v, table+"_"+n); err != nil {
@@ -94,13 +92,12 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				return err
 			}
 			cols = append(cols, command.CommandColumn{
-				Name:         n,
-				DType:        command.VarcharType,
-				DTypeSize:    int64(len(v)),
-				SemanticType: "",
-				Data:         v,
-				SQLData:      sqldata,
-				PrimaryKey:   0,
+				Name:       n,
+				DType:      command.VarcharType,
+				DTypeSize:  int64(len(v)),
+				Data:       v,
+				SQLData:    sqldata,
+				PrimaryKey: 0,
 			})
 		default:
 		}

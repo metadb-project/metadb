@@ -269,13 +269,12 @@ type Command struct {
 }
 
 type CommandColumn struct {
-	Name         string
-	DType        DataType
-	DTypeSize    int64
-	SemanticType string
-	Data         interface{}
-	SQLData      *string
-	PrimaryKey   int
+	Name       string
+	DType      DataType
+	DTypeSize  int64
+	Data       interface{}
+	SQLData    *string
+	PrimaryKey int
 }
 
 func (c CommandColumn) String() string {
@@ -464,7 +463,6 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 		if col.DType, err = convertDataType(ftype, semtype); err != nil {
 			return nil, fmt.Errorf("value: $.schema.fields: \"type\": %s", err)
 		}
-		col.SemanticType = semtype
 		col.Data = fieldData[field]
 		// var data interface{}
 		// if col.DType == JSONType && col.Data != nil {
@@ -475,7 +473,7 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 		// } else {
 		// 	data = col.Data
 		// }
-		if col.SQLData, err = ToSQLData(col.Data, col.DType, col.SemanticType); err != nil {
+		if col.SQLData, err = ToSQLData(col.Data, col.DType, semtype); err != nil {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type: %v", field, err)
 		}
 		if col.DTypeSize, err = convertTypeSize(col.SQLData, ftype, col.DType); err != nil {
@@ -624,13 +622,12 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 				return nil, fmt.Errorf("delete: unknown type size: %v", data)
 			}
 			c.Column = append(c.Column, CommandColumn{
-				Name:         attr,
-				DType:        dtype,
-				DTypeSize:    typesize,
-				SemanticType: semtype,
-				Data:         data,
-				SQLData:      edata,
-				PrimaryKey:   i + 1,
+				Name:       attr,
+				DType:      dtype,
+				DTypeSize:  typesize,
+				Data:       data,
+				SQLData:    edata,
+				PrimaryKey: i + 1,
 			})
 		}
 		return c, nil

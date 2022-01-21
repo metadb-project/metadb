@@ -196,7 +196,7 @@ func requiresSchemaChanges(c, o *command.Command, cschema *cache.Schema) bool {
 	}
 	for i, col := range c.Column {
 		cc := sqlx.Column{Schema: c.SchemaName, Table: c.TableName, Column: col.Name}
-		if col.Name != o.Column[i].Name || col.DType != o.Column[i].DType || col.SemanticType != o.Column[i].SemanticType || col.PrimaryKey != o.Column[i].PrimaryKey {
+		if col.Name != o.Column[i].Name || col.DType != o.Column[i].DType || col.PrimaryKey != o.Column[i].PrimaryKey {
 			return true
 		}
 		if col.DType == command.VarcharType {
