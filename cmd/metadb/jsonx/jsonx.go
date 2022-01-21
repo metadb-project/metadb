@@ -57,7 +57,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 			//        return err
 			//}
 		case bool:
-			sqldata, err := command.ToSQLData(v, command.BooleanType, "")
+			sqldata, err := command.DataToSQLData(v, command.BooleanType, "")
 			if err != nil {
 				return err
 			}
@@ -70,7 +70,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				PrimaryKey: 0,
 			})
 		case float64:
-			sqldata, err := command.ToSQLData(v, command.FloatType, "")
+			sqldata, err := command.DataToSQLData(v, command.FloatType, "")
 			if err != nil {
 				return err
 			}
@@ -87,14 +87,18 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 			//        return err
 			//}
 		case string:
-			sqldata, err := command.ToSQLData(v, command.VarcharType, "")
+			sqldata, err := command.DataToSQLData(v, command.VarcharType, "")
 			if err != nil {
 				return err
+			}
+			lenv := len(v)
+			if lenv < 1 {
+				lenv = 1
 			}
 			cols = append(cols, command.CommandColumn{
 				Name:       n,
 				DType:      command.VarcharType,
-				DTypeSize:  int64(len(v)),
+				DTypeSize:  int64(lenv),
 				Data:       v,
 				SQLData:    sqldata,
 				PrimaryKey: 0,

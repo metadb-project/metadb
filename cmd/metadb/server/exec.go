@@ -61,7 +61,8 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 	for _, col := range delta.column {
 		// Is this a new column (as opposed to a modification)?
 		if col.newColumn {
-			log.Trace("table %s.%s: new column: %s %s", tschema, tableName, col.name, command.DataTypeToSQL(col.newType, col.newTypeSize))
+			dtypesql, _, _ := command.DataTypeToSQL(col.newType, col.newTypeSize)
+			log.Trace("table %s.%s: new column: %s %s", tschema, tableName, col.name, dtypesql)
 			t := &sqlx.Table{Schema: tschema, Table: tableName}
 			if err := addColumn(t, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 				return err
@@ -107,7 +108,8 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		// If both the old and new types are varchar, most databases
 		// can alter the column in place.
 		if col.oldType == command.VarcharType && col.newType == command.VarcharType {
-			log.Trace("table %s.%s: alter column: %s %s", tschema, tableName, col.name, command.DataTypeToSQL(col.newType, col.newTypeSize))
+			dtypesql, _, _ := command.DataTypeToSQL(col.newType, col.newTypeSize)
+			log.Trace("table %s.%s: alter column: %s %s", tschema, tableName, col.name, dtypesql)
 			if err := alterColumnVarcharSize(sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 				return err
 			}
@@ -118,7 +120,8 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		if err := renameColumnOldType(sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 			return err
 		}
-		log.Trace("table %s.%s: new column %s %s", tschema, tableName, col.name, command.DataTypeToSQL(col.newType, col.newTypeSize))
+		dtypesql, _, _ := command.DataTypeToSQL(col.newType, col.newTypeSize)
+		log.Trace("table %s.%s: new column %s %s", tschema, tableName, col.name, dtypesql)
 		t := &sqlx.Table{Schema: tschema, Table: tableName}
 		if err := addColumn(t, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 			return err

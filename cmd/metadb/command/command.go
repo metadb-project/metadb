@@ -161,99 +161,52 @@ func MakeDataType(dtype string) DataType {
 }
 */
 
-func DataTypeToSQLNew(dtype DataType, typeSize int64) (string, int64) {
+// DataTypeToSQL convert a data type and type size to a database type, with and
+// without a character maximum length (charMaxLen).  It returns three values:
+// the SQL type including charMaxLen, the SQL type name without charMaxLen, and
+// charMaxLen.
+func DataTypeToSQL(dtype DataType, typeSize int64) (string, string, int64) {
 	switch dtype {
 	case VarcharType:
-		return "character varying", typeSize
+		return fmt.Sprintf("character varying(%d)", typeSize), "character varying", typeSize
 	case IntegerType:
 		switch typeSize {
 		case 2:
-			return "smallint", 0
+			return "smallint", "smallint", 0
 		case 4:
-			return "integer", 0
+			return "integer", "integer", 0
 		case 8:
-			return "bigint", 0
+			return "bigint", "bigint", 0
 		case 38:
-			return "number", 0
+			return "number", "number", 0
 		default:
-			return "(unknown)", 0
+			return "(unknown)", "(unknown)", 0
 		}
 	case FloatType:
 		switch typeSize {
 		case 4:
-			return "real", 0
+			return "real", "real", 0
 		case 8:
-			return "double precision", 0
+			return "double precision", "double precision", 0
 		default:
-			return "(unknown)", 0
+			return "(unknown)", "(unknown)", 0
 		}
 	case BooleanType:
-		return "boolean", 0
+		return "boolean", "boolean", 0
 	case DateType:
-		return "date", 0
+		return "date", "date", 0
 	case TimeType:
-		return "time", 0
+		return "time", "time", 0
 	case TimetzType:
-		return "time with time zone", 0
+		return "time with time zone", "time with time zone", 0
 	case TimestampType:
-		return "timestamp without time zone", 0
+		return "timestamp without time zone", "timestamp without time zone", 0
 	case TimestamptzType:
-		return "timestamp with time zone", 0
+		return "timestamp with time zone", "timestamp with time zone", 0
 	case JSONType:
-		// Postgres only
-		return "json", 0
+		return "json", "json", 0
 	default:
-		return "(unknown)", 0
-	}
-}
-
-func DataTypeToSQL(dtype DataType, typeSize int64) string {
-	switch dtype {
-	case VarcharType:
-		ts := typeSize
-		if ts < 1 {
-			ts = 1
-		}
-		return fmt.Sprintf("varchar(%d)", ts)
-	case IntegerType:
-		switch typeSize {
-		case 2:
-			return "smallint"
-		case 4:
-			return "integer"
-		case 8:
-			return "bigint"
-		case 38:
-			return "number"
-		default:
-			return "(unknown)"
-		}
-	case FloatType:
-		switch typeSize {
-		case 4:
-			return "real"
-		case 8:
-			return "double precision"
-		default:
-			return "(unknown)"
-		}
-	case BooleanType:
-		return "boolean"
-	case DateType:
-		return "date"
-	case TimeType:
-		return "time"
-	case TimetzType:
-		return "time with time zone"
-	case TimestampType:
-		return "timestamp"
-	case TimestamptzType:
-		return "timestamptz"
-	case JSONType:
-		// Postgres only
-		return "json"
-	default:
-		return "(unknown)"
+		return "(unknown)", "(unknown)", 0
 	}
 }
 
@@ -321,7 +274,11 @@ func convertTypeSize(data *string, coltype string, datatype DataType) (int64, er
 		if data == nil {
 			return 1, nil
 		}
-		return int64(len(*data)), nil
+		lendata := len(*data)
+		if lendata <= 1 {
+			return 1, nil
+		}
+		return int64(lendata), nil
 	case BooleanType:
 		return 0, nil
 	case DateType:
@@ -473,7 +430,7 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 		// } else {
 		// 	data = col.Data
 		// }
-		if col.SQLData, err = ToSQLData(col.Data, col.DType, semtype); err != nil {
+		if col.SQLData, err = DataToSQLData(col.Data, col.DType, semtype); err != nil {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type: %v", field, err)
 		}
 		if col.DTypeSize, err = convertTypeSize(col.SQLData, ftype, col.DType); err != nil {
@@ -612,7 +569,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 			// 	}
 			// }
 			var edata *string
-			edata, err = ToSQLData(data, dtype, semtype)
+			edata, err = DataToSQLData(data, dtype, semtype)
 			if err != nil {
 				return nil, fmt.Errorf("delete: unknown type: %v", err)
 			}
@@ -696,8 +653,8 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 	}
 }
 
-// ToSQLData converts data to a string ready for encoding to SQL.
-func ToSQLData(data interface{}, datatype DataType, semtype string) (*string, error) {
+// DataToSQLData converts data to a string ready for encoding to SQL.
+func DataToSQLData(data interface{}, datatype DataType, semtype string) (*string, error) {
 	if data == nil {
 		return nil, nil
 	}

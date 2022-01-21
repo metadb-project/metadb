@@ -120,7 +120,7 @@ func createHistoryTableIfNotExists(table *sqlx.Table, db sqlx.DB, users *cache.U
 
 func addColumn(table *sqlx.Table, columnName string, newType command.DataType, newTypeSize int64, db sqlx.DB, schema *cache.Schema) error {
 	// Alter table schema in database.
-	dataTypeSQL := command.DataTypeToSQL(newType, newTypeSize)
+	dataTypeSQL, dataType, charMaxLen := command.DataTypeToSQL(newType, newTypeSize)
 	_, err := db.Exec(nil, "ALTER TABLE "+db.TableSQL(table)+" ADD COLUMN "+db.IdentiferSQL(columnName)+" "+dataTypeSQL)
 	if err != nil {
 		return err
@@ -147,7 +147,6 @@ func addColumn(table *sqlx.Table, columnName string, newType command.DataType, n
 		log.Trace("disabling index: value too large")
 	}
 	// Update schema.
-	dataType, charMaxLen := command.DataTypeToSQLNew(newType, newTypeSize)
 	schema.Update(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: columnName}, dataType, charMaxLen)
 	return nil
 }
@@ -167,16 +166,16 @@ func alterColumnVarcharSize(table *sqlx.Table, column string, datatype command.D
 		}
 	}
 	// Alter table.
-	_, err = db.Exec(nil, "ALTER TABLE "+db.TableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+command.DataTypeToSQL(datatype, typesize))
+	dtypesql, dataType, charMaxLen := command.DataTypeToSQL(datatype, typesize)
+	_, err = db.Exec(nil, "ALTER TABLE "+db.TableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+dtypesql)
 	if err != nil {
 		return err
 	}
-	_, err = db.Exec(nil, "ALTER TABLE "+db.HistoryTableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+command.DataTypeToSQL(datatype, typesize))
+	_, err = db.Exec(nil, "ALTER TABLE "+db.HistoryTableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+dtypesql)
 	if err != nil {
 		return err
 	}
 	// Update schema.
-	dataType, charMaxLen := command.DataTypeToSQLNew(datatype, typesize)
 	schema.Update(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: column}, dataType, charMaxLen)
 	return nil
 }
@@ -212,7 +211,7 @@ func renameColumnOldType(table *sqlx.Table, column string, datatype command.Data
 	}
 	// Update schema.
 	schema.Delete(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: column})
-	dataType, charMaxLen := command.DataTypeToSQLNew(datatype, typesize)
+	_, dataType, charMaxLen := command.DataTypeToSQL(datatype, typesize)
 	schema.Update(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: newName}, dataType, charMaxLen)
 	return nil
 }
