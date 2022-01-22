@@ -90,6 +90,7 @@ if $runalltest; then
     staticcheck ./cmd/... 1>&2
     #staticcheck -checks all ./cmd/...
     echo 'build.sh: running linter: errcheck' 1>&2
+    # Add -verbose to get the function signature for .errcheck.
     errcheck -exclude .errcheck ./cmd/... 1>&2
     # echo 'build.sh: running linter: aligncheck' 1>&2
     # aligncheck ./cmd/metadb 1>&2
