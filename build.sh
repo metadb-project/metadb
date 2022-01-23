@@ -61,6 +61,14 @@ if $verbose; then
 fi
 
 if $experiment; then
+    echo "The \"include experimental code\" option (-X) has been selected."
+    read -p "This may prevent later upgrades.  Are you sure? " yn
+    case $yn in
+        [Yy] ) break ;;
+        [Yy][Ee][Ss] ) break ;;
+        * ) echo "Exiting" 1>&2
+            exit 1 ;;
+    esac
     json='-X main.rewriteJSON=1'
     echo "build.sh: experimental code will be included" 1>&2
 fi
