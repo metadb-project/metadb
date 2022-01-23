@@ -270,8 +270,11 @@ mdb enable src.example
 ```
 
 Here the connector is named `example`.  Source connector names are
-prefixed with `src.`.  When Metadb stores data via the database
-connector, it will tag records with the source connector name.
+prefixed with `src.`.
+
+When Metadb stores data via the database connector, it will tag
+records with the source connector name.  It is a good idea to choose a
+short name that meaningfully identifies the source.
 
 
 8\. Resynchronizing a data stream
