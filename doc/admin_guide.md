@@ -10,7 +10,8 @@ Metadb Administrator Guide
 6\. [Adding a database](#6-adding-a-database)  
 7\. [Adding a data source](#7-adding-a-data-source)  
 8\. [Resynchronizing a data stream](#8-resynchronizing-a-data-stream)  
-9\. [User permissions](#9-user-permissions)
+9\. [User permissions](#9-user-permissions)  
+10\. [Command line](#9-command-line)
 
 
 1\. Overview
@@ -386,4 +387,30 @@ mdb: user: deleted permissions for "jim"
 
 Support for table-specific permissions is planned for a future
 version.
+
+
+10\. Command line
+-----------------
+
+### Color
+
+To enable color when writing to the standard error stream, set the
+environment variable `METADB_COLOR` to:
+
+*  `auto`: Color is automatically enabled for terminal output but
+   otherwise disabled, such as when the output is piped to another
+   process.
+
+* `always`: Color is always enabled.
+
+* In all other cases, color is disabled.
+
+### Command-line completion
+
+Comand-line completion scripts are available via the `completion`
+command, e.g. for bash:
+
+```bash
+source < (mdb completion bash)
+```
 
