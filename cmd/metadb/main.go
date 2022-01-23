@@ -314,7 +314,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"  start                       - " + helpStart +
 			"  stop                        - " + helpStop +
 			"  init                        - " + helpInit +
-			//"  upgrade                     - " + helpUpgrade +
+			"  upgrade                     - " + helpUpgrade +
 			"  reset                       - " + helpReset +
 			"  clean                       - " + helpClean +
 			"  version                     - " + helpVersion +
