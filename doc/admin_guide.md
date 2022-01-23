@@ -54,10 +54,10 @@ $ mdb enable db.main
 -----------------------
 
 * Architecture:  x86-64 (AMD64)
-* Operating system:  Ubuntu Linux 22.04 LTS
+* Operating system:  Ubuntu Linux 20.04 LTS
 * Database systems supported:
-  * [PostgreSQL](https://www.postgresql.org/) 14.1 or later
-* Other software dependencies:
+  * [PostgreSQL](https://www.postgresql.org/) 13.4 or later
+* Required to build from source:
   * [Go](https://golang.org/) 1.17 or later
   * [GCC C compiler](https://gcc.gnu.org/) 9.3.0 or later
 
