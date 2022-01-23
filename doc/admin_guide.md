@@ -7,7 +7,7 @@ Metadb Administrator Guide
 3\. [Installing Metadb](#3-installing-metadb)  
 4\. [Running the server](#4-running-the-server)  
 5\. [Running the client](#5-running-the-client)  
-6\. [Adding an analytic database](#6-adding-an-analytic-database)  
+6\. [Adding a database](#6-adding-a-database)  
 7\. [Adding a data source](#7-adding-a-data-source)  
 8\. [Resynchronizing a data stream](#8-resynchronizing-a-data-stream)  
 9\. [User permissions](#9-user-permissions)
@@ -23,32 +23,6 @@ instances require a separate data directory for each instance.
 
 The software consists of a server (`metadb`) and a command-line client
 (`mdb`).
-
-The `metadb` server is used to create a new instance, e.g. with a data
-directory `metadb_data`:
-
-```bash
-$ metadb init -D metadb_data
-```
-
-Once this is done, the server can be started:
-
-```bash
-$ metadb start -D metadb_data
-```
-
-The client can then be used to configure the instance, for example by 
-adding a database connector:
-
-```bash
-$ mdb config db.main.type postgresql
-$ mdb config db.main.host dbserver
-$ mdb config db.main.dbname metadb
-$ mdb config db.main.adminuser metadbadmin
-$ mdb config --pwprompt db.main.adminpassword
-$ mdb config db.main.sslmode require
-$ mdb enable db.main
-```
 
 
 2\. System requirements
@@ -85,23 +59,56 @@ First set the `GOPATH` environment variable to specify a path that can
 serve as the build workspace for Go, e.g.:
 
 ```bash
-$ export GOPATH=$HOME/go
+export GOPATH=$HOME/go
 ```
 
 Then:
 
 ```bash
-$ ./build.sh
+./build.sh
 ```
 
-The `build.sh` script creates a `bin/` subdirectory and builds the `metadb` and
-`mdb` executables there:
+The `build.sh` script creates a `bin/` subdirectory and builds the
+`metadb` and `mdb` executables there:
 
 ```bash
-$ ./bin/metadb help
+./bin/metadb help
 ```
+```
+Metadb server
+
+Usage:  metadb <command> <arguments>
+
+Commands:
+  start                       - Start server
+  stop                        - Shutdown server
+  init                        - Initialize new Metadb instance
+  upgrade                     - Upgrade a Metadb instance to the current version
+  reset                       - Reset database for new snapshot
+  clean                       - Remove data from previous reset
+  version                     - Print metadb version
+  completion                  - Generate command-line completion
+
+Use "metadb help <command>" for more information about a command.
+```
+
 ```bash
-$ ./bin/mdb help
+./bin/mdb help
+```
+```
+Metadb client
+
+Usage:  mdb <command> <arguments>
+
+Commands:
+  config                      - Configure or show server settings
+  user                        - Configure or show database user permissions
+  enable                      - Enable database or source connectors
+  disable                     - Disable database or source connectors
+  version                     - Print mdb version
+  completion                  - Generate command-line completion
+
+Use "mdb help <command>" for more information about a command.
 ```
 
 
@@ -111,41 +118,36 @@ $ ./bin/mdb help
 ### Metadb user account
 
 It is recommended to create a Linux user account that will run the
-`metadb` server.  This guide assumes that a user "metadb" has been
-created for this purpose.
+`metadb` server.  This guide assumes that a user `metadb` has been
+created for this purpose and that the commands are run in the user's
+home directory.
 
 ### Creating a data directory
 
-Metadb stores an instance's state and metadata in a data directory,
-which is created using the `init` command of `metadb`.  The data
-directory is required to be on a local file system; it may not be on a
-network file system.
+Metadb stores an instance's state in a data directory, which is
+created using `metadb` with the `init` command.  The data directory is
+required to be on a local file system; it may not be on a network file
+system.  For these examples we will create the data directory as
+simply `data`:
 
-As root:
 ```bash
-# chown metadb /usr/local/metadb
+metadb init -D data
 ```
-As metadb:
 ```
-$ metadb init -D /usr/local/metadb/data
-metadb: initializing new instance in /usr/local/metadb/data
+metadb: initializing new instance in data
 ```
 
 If the directory already exists, `metadb` will exit with an error.
 
-Creating the data directory is generally a one-time operation.
-
-Note that the data directory contains important data and there is
-currently no function to regenerate it.  It must be kept in sync with
-the analytic database(s) and they should be backed up together.  See
-the section on backups below for details.
+Creating the data directory is generally done only once, when Metadb
+is first installed.
 
 ### Starting the server
 
 To start the server:
 
 ```bash
-$ nohup metadb start -D /usr/local/metadb/data -l metadb.log &
+nohup metadb start -D data -l metadb.log &
 ```
 
 The server log is by default written to standard error.  The `-l` or 
@@ -156,13 +158,14 @@ The server listens by default on the loopback address.  This allows
 the command-line client, `mdb`, to connect to the server when running 
 locally.
 
-The server uses two ports:
+Although not yet fully implemented, the server is planned to support
+two ports:
 
 * The "admin port" defaults to 8440.  This provides administrative 
   services, e.g. server configuration.
 
-* The "client port" defaults to 8441.  It is currently disabled but is 
-  planned to support metadata services.
+* The "client port" defaults to 8441.  It is currently unused but is
+  planned to support user services.
 
 The `--listen` option allows listening on a specified address.  When
 `--listen` is used, the `--cert` and `--key` options also must be
@@ -172,6 +175,9 @@ alternative, `--notls` may be used in both server and client to
 disable TLS entirely; however, this is insecure and for testing
 purposes only.
 
+**At present it is recommended that the client and server run on the
+same host, until support for authentication is added.**
+
 The `--debug` option enables detailed logging.
 
 ### Stopping the server
@@ -179,7 +185,7 @@ The `--debug` option enables detailed logging.
 To stop the server:
 
 ```bash
-$ metadb stop -D /usr/local/metadb/data
+metadb stop -D data
 ```
 
 It is recommended to stop the server before making a backup of the
@@ -190,15 +196,15 @@ data directory.
 When installing a new version of Metadb, the instance should be
 "upgraded" before starting the new server:
 
-1. Stop the old version of the server.
+a. Stop the old version of the server.
 
-2. Make a backup of the data directory and database(s).
+b. Make a backup of the data directory and database(s).
 
-3. Use the `upgrade` command in the new version of Metadb to perform 
+c. Use the `upgrade` command in the new version of Metadb to perform 
    the upgrade, e.g.:
 
 ```bash
-$ metadb upgrade -D /usr/local/metadb/data
+metadb upgrade -D /usr/local/metadb/data
 ```
 
 In automated deployments, the `--force` option can be used to disable
@@ -206,7 +212,7 @@ prompting.
 
 The upgrade process may take some time, depending on the version.
 
-4. Start the new version of the server.
+d. Start the new version of the server.
 
 
 5\. Running the client
@@ -220,40 +226,51 @@ loopback address.  To specify a different address, the `-h` or
 The `-v` option enables verbose output.
 
 
-6\. Adding an analytic database
--------------------------------
+6\. Adding a database
+---------------------
 
-(To be written)
-
-Example:
+To configure a connector for an analytical database that will receive
+data from Metadb, for example:
 
 ```bash
-$ mdb config db.main.type postgresql
-$ mdb config db.main.host dbserver
-$ mdb config db.main.dbname metadb
-$ mdb config db.main.adminuser metadbadmin
-$ mdb config db.main.adminpassword @metadb_creds.txt
-$ mdb config db.main.sslmode require
-$ mdb enable db.main
+mdb config db.main.type postgresql
+mdb config db.main.host dbserver
+mdb config db.main.port 5432
+mdb config db.main.dbname metadb
+mdb config db.main.adminuser metadbadmin
+mdb config db.main.adminpassword @admincred.txt
+mdb config db.main.superuser admin
+mdb config --pwprompt db.main.superpassword
+mdb config db.main.sslmode require
+mdb enable db.main
 ```
+
+The connector in this example is named `main`.  Database connector
+names are prefixed with `db.`.
+
+Note that the `@` in `@admincred.txt` means that the password will be
+read from the file `admincred.txt`.
 
 
 7\. Adding a data source
 ------------------------
 
-(To be written)
-
-Example:
+A source connector defines a Kafka source that Metadb will read data
+from, for example:
 
 ```bash
-$ mdb config src.example.brokers kafka:29092
-$ mdb config src.example.topics '^metadb_example[.].*'
-$ mdb config src.example.group metadb_example
-$ mdb config src.example.schemapassfilter 'example_.+'
-$ mdb config src.example.schemaprefix 'example_'
-$ mdb config src.example.dbs main
-$ mdb enable src.example
+mdb config src.example.brokers kafka:29092
+mdb config src.example.topics '^metadb_example[.].*'
+mdb config src.example.group metadb_example
+mdb config src.example.schemapassfilter 'example_.+'
+mdb config src.example.schemaprefix 'example_'
+mdb config src.example.dbs main
+mdb enable src.example
 ```
+
+Here the connector is named `example`.  Source connector names are
+prefixed with `src.`.  When Metadb stores data via the database
+connector, it will tag records with the source connector name.
 
 
 8\. Resynchronizing a data stream
@@ -266,41 +283,41 @@ snapshot of the source database to be streamed.  Metadb can accept
 re-streamed data in order to resynchronize with the source, using this
 procedure:
 
-1. Disable the source connector, for example:
+a. Disable the source connector, for example:
 
 ```bash
-$ mdb disable src.example
+mdb disable src.example
 ```
 
-2. Update the source connector's `topics` and `group` configuration
+b. Update the source connector's `topics` and `group` configuration
    settings for the new data stream, or temporarily delete them or set
    them to empty strings.
 
 ```bash
-$ mdb config src.example.topics ''
-$ mdb config src.example.group ''
+mdb config src.example.topics ''
+mdb config src.example.group ''
 ```
 
-3. Stop the Metadb server.
+c. Stop the Metadb server.
 
-4. "Reset" the analytic database to mark current data as old.  This
+d. "Reset" the analytic database to mark current data as old.  This
    may take some time to run.
 
 ```bash
-$ metadb reset -D /usr/local/metadb/data --origin 's1,s2,s3' db.main
+metadb reset -D /usr/local/metadb/data --origin 's1,s2,s3' db.main
 ```
 
 Note that `--origin` should include all origins associated with the
 source, or empty string ( `''` ) if there are no origins.
 
-5. Start the Metadb server, configure and enable the source connector
+e. Start the Metadb server, configure and enable the source connector
    for the new stream, and begin streaming the data.
 
-6. Once the new data have finished streaming, stop the Metadb server,
+f. Once the new data have finished streaming, stop the Metadb server,
    and "clean" the analytic database to remove old data.
 
 ```bash
-$ metadb clean -D /usr/local/metadb/data --origin 's1,s2,s3' db.main
+metadb clean -D /usr/local/metadb/data --origin 's1,s2,s3' db.main
 ```
 
 The `--origin` should be the same as used for the reset.
@@ -313,7 +330,7 @@ preferable to run it late rather than early.  (Having the server
 report that initial streaming or re-streaming has finished is a
 planned feature.)
 
-7. Start the server.
+g. Start the server.
 
 Until a failed stream is re-streamed by following the process above,
 the analytic database may continue to be unsynchronized with the
@@ -323,31 +340,48 @@ source.
 9\. User permissions
 --------------------
 
-Database permissions to access tables managed by Metadb can be enabled
-using the `mdb user` command, for example:
+The `user` command enables database users to access the tables managed
+by Metadb.  For example to grant read-only permissions to a database
+user `ada`:
 
 ```bash
-$ mdb user jim
+mdb user ada
+```
+```
+mdb: user: updated "ada"
 ```
 
-This grants read-only permissions to a database user `jim`.  A
-variation of this also creates the database user and creates a schema
-for the user:
+A variation of this command also creates the database user and creates
+a schema for the user, in addition to granting the permissions:
 
 ```bash
-$ mdb user -c jim
+mdb user -c jim
+```
+```
+Password for "jim":
+mdb: user: created "jim"
 ```
 
-To revoke the access permissions:
-
-```bash
-$ mdb user -d jim
-```
+It is recommended that short user names be used, ideally three
+letters.
 
 To list all users that have access:
 
 ```bash
-$ mdb user -l
+mdb user -l
+```
+```
+ada
+jim
+```
+
+To revoke access permissions:
+
+```bash
+mdb user -d jim
+```
+```
+mdb: user: deleted permissions for "jim"
 ```
 
 Support for table-specific permissions is planned for a future
