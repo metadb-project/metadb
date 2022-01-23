@@ -184,20 +184,14 @@ $ metadb stop -D /usr/local/metadb/data
 It is recommended to stop the server before making a backup of the
 data directory.
 
-<!--
-
 ### Upgrading to a new version
-
-Please note that this section documents an upgrade feature that is
-planned for Metadb 1.2 and not yet available.
 
 When installing a new version of Metadb, the instance should be
 "upgraded" before starting the new server:
 
 1. Stop the old version of the server.
 
-2. Make a backup of the data directory and database(s).  See the 
-   section below on backups to make sure this is done correctly.
+2. Make a backup of the data directory and database(s).
 
 3. Use the `upgrade` command in the new version of Metadb to perform 
    the upgrade, e.g.:
@@ -206,19 +200,12 @@ When installing a new version of Metadb, the instance should be
 $ metadb upgrade -D /usr/local/metadb/data
 ```
 
+In automated deployments, the `--force` option can be used to disable
+prompting.
+
+The upgrade process may take some time, depending on the version.
+
 4. Start the new version of the server.
-
-In automated deployments, the `upgrade-database` command can be run
-after `git pull`, whether or not any new changes were pulled.  If no
-upgrade is needed, it will exit normally:
-
-```bash
-$ metadb upgrade -D /usr/local/metadb/data ; echo $?
-metadb: instance is up to date
-0
-```
-
--->
 
 
 5\. Running the client
