@@ -90,15 +90,18 @@ func UserList(opt *option.User) error {
 	}
 	// print response
 	if opt.Name != nil {
-		if len(rs.Users) == 0 {
+		// if len(rs.Users) == 0 {
+		if len(rs.Users) == 0 || rs.Users[0].Tables == "" {
 			eout.Warning("user: user name %q not found", rq.Name)
 		} else {
-			fmt.Printf("%q\n", rs.Users[0].Tables)
+			// fmt.Printf("%q\n", rs.Users[0].Tables)
+			fmt.Printf("%s\n", rs.Users[0].Name)
 		}
 	} else {
 		var c api.UserItem
 		for _, c = range rs.Users {
-			fmt.Printf("%s %q\n", c.Name, c.Tables)
+			// fmt.Printf("%s %q\n", c.Name, c.Tables)
+			fmt.Printf("%s\n", c.Name)
 		}
 	}
 	return nil

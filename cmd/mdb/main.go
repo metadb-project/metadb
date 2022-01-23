@@ -135,9 +135,11 @@ func run() error {
 			if len(args) > 0 {
 				userOpt.Name = &args[0]
 			}
-			if len(args) > 1 {
-				userOpt.Tables = &args[1]
-			}
+			// if len(args) > 1 {
+			// 	userOpt.Tables = &args[1]
+			// }
+			s := ".*"
+			userOpt.Tables = &s
 			if userOpt.Create {
 				var pw string
 				if pw, err = inputPassword("Password for \""+(*userOpt.Name)+"\": ", false); err != nil {
@@ -379,7 +381,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 		fmt.Printf("" +
 			helpUser +
 			"\n" +
-			"Usage:  mdb user [<options>] [<username> [<tables>]]\n" +
+			"Usage:  mdb user [<options>] [<username>]\n" +
 			"\n" +
 			"Options:\n" +
 			"  -c, --create                - Create database user\n" +
