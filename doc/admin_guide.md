@@ -9,7 +9,8 @@ Metadb Administrator Guide
 5\. [Running the client](#5-running-the-client)  
 6\. [Adding an analytic database](#6-adding-an-analytic-database)  
 7\. [Adding a data source](#7-adding-a-data-source)  
-8\. [Resynchronizing a data stream](#8-resynchronizing-a-data-stream)
+8\. [Resynchronizing a data stream](#8-resynchronizing-a-data-stream)  
+9\. [User permissions](#9-user-permissions)
 
 
 1\. Overview
@@ -317,4 +318,38 @@ planned feature.)
 Until a failed stream is re-streamed by following the process above,
 the analytic database may continue to be unsynchronized with the
 source.
+
+
+9\. User permissions
+--------------------
+
+Database permissions to access tables managed by Metadb can be enabled
+using the `mdb user` command, for example:
+
+```bash
+$ mdb user jim
+```
+
+This grants read-only permissions to a database user `jim`.  A
+variation of this also creates the database user and creates a schema
+for the user:
+
+```bash
+$ mdb user -c jim
+```
+
+To revoke the access permissions:
+
+```bash
+$ mdb user -d jim
+```
+
+To list all users that have access:
+
+```bash
+$ mdb user -l
+```
+
+Support for table-specific permissions is planned for a future
+version.
 
