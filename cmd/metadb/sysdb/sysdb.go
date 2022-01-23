@@ -4,11 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"sync"
+
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
-	"os"
-	"sync"
 )
 
 type DatabaseConnector struct {
@@ -324,4 +325,16 @@ func getSysdbVersion() (int64, error) {
 	default:
 		return dbversion, nil
 	}
+}
+
+func WriteSysdbVersion(version int64) error {
+	sysMu.Lock()
+	defer sysMu.Unlock()
+
+	q := fmt.Sprintf("PRAGMA user_version = %d", version)
+	_, err := db.ExecContext(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("writing database version: %s", err)
+	}
+	return nil
 }

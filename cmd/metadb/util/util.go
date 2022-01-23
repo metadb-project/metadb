@@ -15,7 +15,19 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-const DatabaseVersion = 4
+const DatabaseVersion = 5
+
+func MetadbVersion() string {
+	return metadbVersion
+}
+
+func SetMetadbVersion(version string) {
+	if metadbVersion == "" {
+		metadbVersion = version
+	}
+}
+
+var metadbVersion string
 
 // ModePermRW is the umask "-rw-------".
 const ModePermRW = 0600

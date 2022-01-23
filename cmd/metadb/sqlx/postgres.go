@@ -208,5 +208,5 @@ func (d *PostgresDB) BeginTx() (*sql.Tx, error) {
 //}
 
 //func (d *Postgres) JSONType() string {
-//	return "JSON"
+//	return "JSONB"
 //}

@@ -13,7 +13,9 @@ type Init struct {
 
 type Upgrade struct {
 	Global
-	Datadir string
+	Datadir       string
+	Force         bool
+	MetadbVersion string // Call util.MetadbVersion() instead
 }
 
 type Server struct {
@@ -29,7 +31,7 @@ type Server struct {
 	TLSCert        string
 	TLSKey         string
 	NoTLS          bool
-	MetadbVersion  string
+	MetadbVersion  string // Call util.MetadbVersion() instead
 	RewriteJSON    bool
 }
 

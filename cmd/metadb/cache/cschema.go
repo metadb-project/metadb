@@ -3,6 +3,7 @@ package cache
 import (
 	"database/sql"
 	"fmt"
+
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
@@ -39,11 +40,11 @@ func NewSchema(db sqlx.DB, track *Track) (*Schema, error) {
 func getColumnSchemas(db sqlx.DB) ([]*sqlx.ColumnSchema, error) {
 	cs := make([]*sqlx.ColumnSchema, 0)
 	rows, err := db.Query(nil, ""+
-		"SELECT table_schema, table_name, column_name, data_type, character_maximum_length\n"+
-		"    FROM information_schema.columns\n"+
-		"    WHERE lower(table_schema) NOT IN ('information_schema', 'pg_catalog') AND\n"+
-		"          right(table_name, 2) <> '__' AND\n"+
-		"          lower(column_name) NOT IN ('__id', '__start', '__origin');")
+		"SELECT table_schema, table_name, column_name, data_type, character_maximum_length "+
+		"FROM information_schema.columns "+
+		"WHERE lower(table_schema) NOT IN ('information_schema', 'pg_catalog')"+
+		" AND right(table_name, 2) <> '__'"+
+		" AND lower(column_name) NOT IN ('__id', '__cf', '__start', '__end', '__current', '__origin');")
 	if err != nil {
 		return nil, fmt.Errorf("querying database schema: %s", err)
 	}

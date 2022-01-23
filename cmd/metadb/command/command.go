@@ -50,6 +50,7 @@ const (
 	TimetzType
 	TimestampType
 	TimestamptzType
+	UUIDType
 	JSONType
 )
 
@@ -75,8 +76,10 @@ func (d DataType) String() string {
 		return "timestamp"
 	case TimestamptzType:
 		return "timestamptz"
+	case UUIDType:
+		return "uuid"
 	case JSONType:
-		return "json"
+		return "jsonb"
 	default:
 		log.Error("data type to string: unknown data type: %d", d)
 		return "(unknown type)"
@@ -123,7 +126,9 @@ func MakeDataTypeNew(dataType string, charMaxLen int64) (DataType, int64) {
 		fallthrough
 	case "timestamp_tz":
 		return TimestamptzType, 0
-	case "json":
+	case "uuid":
+		return UUIDType, 0
+	case "jsonb":
 		return JSONType, 0
 	default:
 		log.Error("make data type new: unknown data type: %s", dataType)
@@ -152,7 +157,9 @@ func MakeDataType(dtype string) DataType {
 		return TimestampType
 	case "timestamptz":
 		return TimestamptzType
-	case "json":
+	case "uuid":
+		return UUIDType
+	case "jsonb":
 		return JSONType
 	default:
 		log.Error("make data type: unknown data type: %s", dtype)
@@ -203,8 +210,10 @@ func DataTypeToSQL(dtype DataType, typeSize int64) (string, string, int64) {
 		return "timestamp without time zone", "timestamp without time zone", 0
 	case TimestamptzType:
 		return "timestamp with time zone", "timestamp with time zone", 0
+	case UUIDType:
+		return "uuid", "uuid", 0
 	case JSONType:
-		return "json", "json", 0
+		return "jsonb", "jsonb", 0
 	default:
 		return "(unknown)", "(unknown)", 0
 	}
@@ -290,6 +299,8 @@ func convertTypeSize(data *string, coltype string, datatype DataType) (int64, er
 	case TimestampType:
 		return 0, nil
 	case TimestamptzType:
+		return 0, nil
+	case UUIDType:
 		return 0, nil
 	case JSONType:
 		return 0, nil
@@ -638,6 +649,9 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 	case "float32", "float64":
 		return FloatType, nil
 	case "string":
+		if strings.HasSuffix(semtype, ".data.Uuid") {
+			return UUIDType, nil
+		}
 		if strings.HasSuffix(semtype, ".data.Json") {
 			return JSONType, nil
 		}
@@ -726,7 +740,7 @@ func DataToSQLData(data interface{}, datatype DataType, semtype string) (*string
 			s := fixupSQLTime(t)
 			return &s, nil
 		}
-	case VarcharType, JSONType, TimetzType, TimestamptzType:
+	case VarcharType, UUIDType, JSONType, TimetzType, TimestamptzType:
 		s, ok := data.(string)
 		if !ok {
 			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)

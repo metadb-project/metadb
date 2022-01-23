@@ -35,6 +35,7 @@ var devMode bool
 var colorInitialized bool
 
 func main() {
+	util.SetMetadbVersion(metadbVersion)
 	colorMode = os.Getenv("METADB_COLOR")
 	devMode = os.Getenv("METADB_DEV") == "on"
 	_ = gosnowflake.GetLogger().SetLogLevel("panic")
@@ -63,7 +64,6 @@ func run() error {
 	var stopOpt = option.Stop{}
 	var resetOpt = option.Reset{}
 	var cleanOpt = option.Clean{}
-	//var upgradeOpt = option.Upgrade{}
 	var logfile, csvlogfile string
 
 	var cmdInit = &cobra.Command{
@@ -96,6 +96,7 @@ func run() error {
 			if err = sysdb.Init(util.SysdbFileName(upgradeOpt.Datadir)); err != nil {
 				return err
 			}
+			upgradeOpt.MetadbVersion = metadbVersion
 			if err = upgrade.Upgrade(&upgradeOpt); err != nil {
 				return err
 			}
@@ -108,6 +109,7 @@ func run() error {
 	}
 	cmdUpgrade.SetHelpFunc(help)
 	_ = dirFlag(cmdUpgrade, &upgradeOpt.Datadir)
+	_ = forceFlag(cmdUpgrade, &upgradeOpt.Force)
 	_ = verboseFlag(cmdUpgrade, &eout.EnableVerbose)
 	_ = traceFlag(cmdUpgrade, &eout.EnableTrace)
 
@@ -370,6 +372,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"\n" +
 			"Options:\n" +
 			dirFlag(nil, nil) +
+			forceFlag(nil, nil) +
 			verboseFlag(nil, nil) +
 			traceFlag(nil, nil) +
 			"")

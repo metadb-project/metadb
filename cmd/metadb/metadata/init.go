@@ -3,6 +3,8 @@ package metadata
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
+
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
@@ -40,9 +42,9 @@ func Init(db sqlx.DB, metadbVersion string) error {
 	if err != nil {
 		return fmt.Errorf("creating table metadb.track: %s", err)
 	}
-	mdbVersion := metadbVersionString(metadbVersion)
-	dbVersion := fmt.Sprintf("%d", util.DatabaseVersion)
-	_, err = db.Exec(nil, "INSERT INTO metadb.init (version, dbversion) VALUES ('"+mdbVersion+"', "+dbVersion+")")
+	mver := metadbVersionString(metadbVersion)
+	dbver := strconv.FormatInt(util.DatabaseVersion, 10)
+	_, err = db.Exec(nil, "INSERT INTO metadb.init (version, dbversion) VALUES ('"+mver+"', "+dbver+")")
 	if err != nil {
 		return fmt.Errorf("writing to table metadb.init: %s", err)
 	}
@@ -73,10 +75,6 @@ func isDatabaseInitialized(db sqlx.DB) (bool, error) {
 	}
 }
 
-func metadbVersionString(metadbVersion string) string {
-	return "Metadb " + metadbVersion
-}
-
 func ValidateDatabaseVersion(db sqlx.DB) error {
 	dbversion, err := GetDatabaseVersion(db)
 	if err != nil {
@@ -103,4 +101,18 @@ func GetDatabaseVersion(db sqlx.DB) (int64, error) {
 	default:
 		return dbversion, nil
 	}
+}
+
+func WriteDatabaseVersion(db sqlx.DB, version int64) error {
+	mver := metadbVersionString(util.MetadbVersion())
+	dbver := strconv.FormatInt(version, 10)
+	_, err := db.Exec(nil, "UPDATE metadb.init SET version='"+mver+"',dbversion="+dbver)
+	if err != nil {
+		return fmt.Errorf("updating dbversion in table metadb.init: %s", err)
+	}
+	return nil
+}
+
+func metadbVersionString(metadbVersion string) string {
+	return "Metadb " + metadbVersion
 }

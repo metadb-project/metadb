@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"database/sql"
+
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 

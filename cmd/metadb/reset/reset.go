@@ -21,7 +21,7 @@ func Reset(opt *option.Reset) error {
 	}
 	if !opt.Force {
 		// Ask for confirmation
-		_, _ = fmt.Fprintf(os.Stderr, "metadb: reset current data in %q? ", opt.Connector)
+		_, _ = fmt.Fprintf(os.Stderr, "Reset current data in %q? ", opt.Connector)
 		var confirm string
 		_, err := fmt.Scanln(&confirm)
 		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
