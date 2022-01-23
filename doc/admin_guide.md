@@ -58,7 +58,7 @@ $ mdb enable db.main
 * Database systems supported:
   * [PostgreSQL](https://www.postgresql.org/) 14.1 or later
 * Other software dependencies:
-  * [Go](https://golang.org/) 1.18 or later
+  * [Go](https://golang.org/) 1.17 or later
   * [GCC C compiler](https://gcc.gnu.org/) 9.3.0 or later
 
 
