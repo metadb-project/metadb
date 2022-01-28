@@ -79,23 +79,19 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 			// Adjust the new data type in the command.
 			var typeSize int64 = -1
 			for j, c := range cmd.Column {
-				if c.Name == col.name && cmd.Column[j].SQLData != nil {
+				if c.Name == col.name {
 					if cmd.Column[j].SQLData == nil {
 						typeSize = 0
 					} else {
 						typeSize = int64(len(*(cmd.Column[j].SQLData)))
-						cmd.Column[j].DType = command.VarcharType
-						cmd.Column[j].DTypeSize = typeSize
 					}
+					cmd.Column[j].DType = command.VarcharType
+					cmd.Column[j].DTypeSize = typeSize
+					break
 				}
 			}
 			if typeSize == -1 {
-				log.Error("delta schema: internal error: column not found in command: %s.%s (%s)", tschema, tableName, col.name)
-				continue
-			}
-			if typeSize == 0 {
-				log.Error("delta schema: internal error: unexpected nil column value: %s.%s (%s)", tschema, tableName, col.name)
-				continue
+				return fmt.Errorf("delta schema: internal error: column not found in command: %s.%s (%s)", tschema, tableName, col.name)
 			}
 			if typeSize <= col.oldTypeSize {
 				continue
