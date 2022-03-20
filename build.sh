@@ -18,11 +18,8 @@ usage() {
     echo '-T  Run tests'
     echo '-t  Run linters and tests; requires'
     echo '    go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest'
-    echo '    go install honnef.co/go/tools/cmd/staticcheck@latest'
+    # echo '    go install honnef.co/go/tools/cmd/staticcheck@latest'
     echo '    go install github.com/kisielk/errcheck@latest'
-    # echo '    go install gitlab.com/opennota/check/cmd/aligncheck@latest'
-    # echo '    go install gitlab.com/opennota/check/cmd/structcheck@latest'
-    # echo '    go install gitlab.com/opennota/check/cmd/varcheck@latest'
     echo '    go install github.com/gordonklaus/ineffassign@latest'
     echo '    go install github.com/remyoudompheng/go-misc/deadcode@latest'
     echo '-v  Enable verbose output'
@@ -101,9 +98,8 @@ if $runalltest; then
     go vet $v $tags ./cmd/... 1>&2
     echo 'build.sh: running linter: vet shadow' 1>&2
     go vet $v $tags -vettool=$GOPATH/bin/shadow ./cmd/... 1>&2
-    echo 'build.sh: running linter: staticcheck' 1>&2
-    staticcheck $tags ./cmd/... 1>&2
-    #staticcheck $tags -checks all ./cmd/...
+    # echo 'build.sh: running linter: staticcheck' 1>&2
+    # staticcheck ./cmd/... 1>&2
     echo 'build.sh: running linter: errcheck' 1>&2
     # Add -verbose to get the function signature for .errcheck.
     errcheck -exclude .errcheck ./cmd/... 1>&2
