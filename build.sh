@@ -29,7 +29,7 @@ usage() {
     echo '-X  Include experimental code'
 }
 
-while getopts 'JTcfhtvX' flag; do
+while getopts 'cfhJTtvX' flag; do
     case "${flag}" in
         t) runalltest='true' ;;
         c) ;;
@@ -84,19 +84,26 @@ echo 'build.sh: compiling Metadb' 1>&2
 
 version=`git describe --tags --always`
 
+# Check which operating system is running.
+case "$(uname -s)" in
+    Linux*)     tags='' ;;
+    Darwin*)    tags='-tags dynamic' ;;
+    *)          tags='' ;;
+esac
+
 mkdir -p $bindir
 
-go build -o $bindir $v -ldflags "-X main.metadbVersion=$version $json" ./cmd/metadb
-go build -o $bindir $v -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
+go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version $json" ./cmd/metadb
+go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
 
 if $runalltest; then
     echo 'build.sh: running linter: vet' 1>&2
-    go vet $v ./cmd/... 1>&2
+    go vet $v $tags ./cmd/... 1>&2
     echo 'build.sh: running linter: vet shadow' 1>&2
-    go vet $v -vettool=$GOPATH/bin/shadow ./cmd/... 1>&2
+    go vet $v $tags -vettool=$GOPATH/bin/shadow ./cmd/... 1>&2
     echo 'build.sh: running linter: staticcheck' 1>&2
-    staticcheck ./cmd/... 1>&2
-    #staticcheck -checks all ./cmd/...
+    staticcheck $tags ./cmd/... 1>&2
+    #staticcheck $tags -checks all ./cmd/...
     echo 'build.sh: running linter: errcheck' 1>&2
     # Add -verbose to get the function signature for .errcheck.
     errcheck -exclude .errcheck ./cmd/... 1>&2
@@ -118,9 +125,9 @@ fi
 
 if $runtest || $runalltest; then
     echo 'build.sh: running tests' 1>&2
-    go test $v -vet=off -count=1 ./cmd/metadb/command 1>&2
-    go test $v -vet=off -count=1 ./cmd/metadb/sqlx 1>&2
-    go test $v -vet=off -count=1 ./cmd/metadb/util 1>&2
+    go test $v $tags -vet=off -count=1 ./cmd/metadb/command 1>&2
+    go test $v $tags -vet=off -count=1 ./cmd/metadb/sqlx 1>&2
+    go test $v $tags -vet=off -count=1 ./cmd/metadb/util 1>&2
 fi
 
 echo 'build.sh: compiled to executables in bin' 1>&2
