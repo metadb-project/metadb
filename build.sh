@@ -6,6 +6,7 @@ json=''
 runtest='false'
 runalltest='false'
 verbose='false'
+quiet='false'
 experiment='false'
 
 usage() {
@@ -23,10 +24,11 @@ usage() {
     echo '    go install github.com/gordonklaus/ineffassign@latest'
     echo '    go install github.com/remyoudompheng/go-misc/deadcode@latest'
     echo '-v  Enable verbose output'
+    echo '-q  Enable quiet output'
     echo '-X  Include experimental code'
 }
 
-while getopts 'cfhJTtvX' flag; do
+while getopts 'cfhJTtvqX' flag; do
     case "${flag}" in
         t) runalltest='true' ;;
         c) ;;
@@ -36,6 +38,7 @@ while getopts 'cfhJTtvX' flag; do
             exit 1 ;;
         T) runtest='true' ;;
         v) verbose='true' ;;
+        q) quiet='true' ;;
         X) experiment='true' ;;
         *) usage
             exit 1 ;;
@@ -73,11 +76,15 @@ fi
 bindir=bin
 
 if ! $fast; then
-    echo 'build.sh: removing executables' 1>&2
+    if ! $quiet; then
+	echo 'build.sh: removing executables' 1>&2
+    fi
     rm -f ./$bindir/metadb ./$bindir/mdb
 fi
 
-echo 'build.sh: compiling Metadb' 1>&2
+if ! $quiet; then
+    echo 'build.sh: compiling Metadb' 1>&2
+fi
 
 version=`git describe --tags --always`
 
@@ -94,13 +101,19 @@ go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version $json" ./c
 go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
 
 if $runalltest; then
-    echo 'build.sh: running linter: vet' 1>&2
+    if ! $quiet; then
+        echo 'build.sh: running linter: vet' 1>&2
+    fi
     go vet $v $tags ./cmd/... 1>&2
-    echo 'build.sh: running linter: vet shadow' 1>&2
+    if ! $quiet; then
+	echo 'build.sh: running linter: vet shadow' 1>&2
+    fi
     go vet $v $tags -vettool=$GOPATH/bin/shadow ./cmd/... 1>&2
     # echo 'build.sh: running linter: staticcheck' 1>&2
     # staticcheck ./cmd/... 1>&2
-    echo 'build.sh: running linter: errcheck' 1>&2
+    if ! $quiet; then
+	echo 'build.sh: running linter: errcheck' 1>&2
+    fi
     # Add -verbose to get the function signature for .errcheck.
     errcheck -exclude .errcheck ./cmd/... 1>&2
     # echo 'build.sh: running linter: aligncheck' 1>&2
@@ -112,19 +125,26 @@ if $runalltest; then
     # echo 'build.sh: running linter: varcheck' 1>&2
     # varcheck ./cmd/metadb 1>&2
     # varcheck ./cmd/mdb 1>&2
-    echo 'build.sh: running linter: ineffassign' 1>&2
+    if ! $quiet; then
+	echo 'build.sh: running linter: ineffassign' 1>&2
+    fi
     ineffassign ./cmd/... 1>&2
-    echo 'build.sh: running linter: deadcode' 1>&2
+    if ! $quiet; then
+	echo 'build.sh: running linter: deadcode' 1>&2
+    fi
     deadcode -test ./cmd/metadb 1>&2
     deadcode -test ./cmd/mdb 1>&2
 fi
 
 if $runtest || $runalltest; then
-    echo 'build.sh: running tests' 1>&2
+    if ! $quiet; then
+	echo 'build.sh: running tests' 1>&2
+    fi
     go test $v $tags -vet=off -count=1 ./cmd/metadb/command 1>&2
     go test $v $tags -vet=off -count=1 ./cmd/metadb/sqlx 1>&2
     go test $v $tags -vet=off -count=1 ./cmd/metadb/util 1>&2
 fi
 
-echo 'build.sh: compiled to executables in bin' 1>&2
-
+if ! $quiet; then
+    echo 'build.sh: compiled to executables in bin' 1>&2
+fi
