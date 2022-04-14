@@ -102,10 +102,19 @@ var upsysList = []upsysFunc{
 	nil,
 	nil,
 	upsys5,
+	upsys6,
 }
 
 func upsys5(opt *sysopt) error {
 	err := sysdb.WriteSysdbVersion(5)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func upsys6(opt *sysopt) error {
+	err := sysdb.WriteSysdbVersion(6)
 	if err != nil {
 		return err
 	}
@@ -169,11 +178,12 @@ func upgradeDatabase(name string, dbtype string, dsn *sqlx.DSN) (bool, error) {
 }
 
 func upgradeDatabaseAll(name string, db sqlx.DB, dbversion int64) error {
-	opt := dbopt{
-		DB:    db,
-		CName: name,
-	}
 	for v := dbversion + 1; v <= util.DatabaseVersion; v++ {
+		opt := dbopt{
+			DB:        db,
+			CName:     name,
+			DBVersion: v,
+		}
 		eout.Info("upgrading: %s: version %d", name, v)
 		err := updbList[v](&opt)
 		if err != nil {
@@ -190,6 +200,7 @@ var updbList = []updbFunc{
 	nil,
 	nil,
 	updb5,
+	updb6,
 }
 
 func updb5(opt *dbopt) error {
@@ -202,7 +213,7 @@ func updb5(opt *dbopt) error {
 		return err
 	}
 	for _, t := range track.All() {
-		eout.Info("upgrading: %s: table %s", opt.CName, t.String())
+		eout.Info("upgrading: %s: version %d: %s", opt.CName, opt.DBVersion, t.String())
 		err = updb5Table(opt, schema, &t)
 		if err != nil {
 			return err
@@ -216,8 +227,6 @@ func updb5(opt *dbopt) error {
 }
 
 func updb5Table(opt *dbopt, schema *cache.Schema, table *sqlx.Table) error {
-	_ = opt.DB.VacuumAnalyzeTable(table)
-	_ = opt.DB.VacuumAnalyzeTable(opt.DB.HistoryTable(table))
 	alterColumns := make([]string, 0)
 	tableSchema := schema.TableSchema(table)
 	for colname, coltype := range tableSchema {
@@ -226,7 +235,11 @@ func updb5Table(opt *dbopt, schema *cache.Schema, table *sqlx.Table) error {
 			if err != nil {
 				return err
 			}
-			if uuid {
+			uuidh, err := updb5UUID(opt.DB, opt.DB.HistoryTable(table), colname)
+			if err != nil {
+				return err
+			}
+			if uuid && uuidh {
 				alterColumns = append(alterColumns, "ALTER COLUMN "+colname+" TYPE uuid USING "+colname+"::uuid")
 			}
 		}
@@ -266,9 +279,54 @@ func updb5UUID(db sqlx.DB, table *sqlx.Table, colname string) (bool, error) {
 	}
 }
 
+func updb6(opt *dbopt) error {
+	track, err := cache.NewTrack(opt.DB)
+	if err != nil {
+		return err
+	}
+	schema, err := cache.NewSchema(opt.DB, track)
+	if err != nil {
+		return err
+	}
+	for _, t := range track.All() {
+		eout.Info("upgrading: %s: version %d: %s", opt.CName, opt.DBVersion, t.String())
+		err = updb6Table(opt, schema, &t)
+		if err != nil {
+			return err
+		}
+		err = updb6Table(opt, schema, opt.DB.HistoryTable(&t))
+		if err != nil {
+			return err
+		}
+	}
+	err = metadata.WriteDatabaseVersion(opt.DB, 6)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb6Table(opt *dbopt, schema *cache.Schema, table *sqlx.Table) error {
+	q := "ALTER TABLE " + opt.DB.TableSQL(table) + " ADD COLUMN __source varchar(63);"
+	_, _ = opt.DB.Exec(nil, q)
+	q = "UPDATE " + opt.DB.TableSQL(table) + " SET __source='';"
+	_, err := opt.DB.Exec(nil, q)
+	if err != nil {
+		return err
+	}
+	q = "ALTER TABLE " + opt.DB.TableSQL(table) + " ALTER COLUMN __source SET NOT NULL;"
+	_, err = opt.DB.Exec(nil, q)
+	if err != nil {
+		return err
+	}
+	_ = opt.DB.VacuumAnalyzeTable(table)
+	return nil
+}
+
 type updbFunc func(opt *dbopt) error
 
 type dbopt struct {
-	DB    sqlx.DB
-	CName string
+	DB        sqlx.DB
+	CName     string
+	DBVersion int64
 }

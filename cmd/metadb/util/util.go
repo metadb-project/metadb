@@ -15,7 +15,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-const DatabaseVersion = 5
+const DatabaseVersion = 6
 
 func MetadbVersion() string {
 	return metadbVersion
