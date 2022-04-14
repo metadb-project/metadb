@@ -12,7 +12,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-func execCommandList(cl *command.CommandList, db sqlx.DB, track *cache.Track, cschema *cache.Schema, users *cache.Users) error {
+func execCommandList(cl *command.CommandList, db sqlx.DB, track *cache.Track, cschema *cache.Schema, users *cache.Users, source string) error {
 	var clt []command.CommandList = partitionTxn(cl, cschema)
 	for _, cc := range clt {
 		if len(cc.Cmd) == 0 {
@@ -22,7 +22,7 @@ func execCommandList(cl *command.CommandList, db sqlx.DB, track *cache.Track, cs
 		if err := execCommandSchema(&cc.Cmd[0], db, track, cschema, users); err != nil {
 			return fmt.Errorf("schema: %s", err)
 		}
-		err := execCommandListData(db, cc, cschema)
+		err := execCommandListData(db, cc, cschema, source)
 		if err != nil {
 			return fmt.Errorf("data: %s", err)
 		}
@@ -126,7 +126,7 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 	return nil
 }
 
-func execCommandListData(db sqlx.DB, cc command.CommandList, cschema *cache.Schema) error {
+func execCommandListData(db sqlx.DB, cc command.CommandList, cschema *cache.Schema, source string) error {
 	// Begin txn
 	tx, err := db.BeginTx()
 	if err != nil {
@@ -150,7 +150,7 @@ func execCommandListData(db sqlx.DB, cc command.CommandList, cschema *cache.Sche
 			}
 		}
 		// Execute data part of command
-		if err = execCommandData(&c, tx, db); err != nil {
+		if err = execCommandData(&c, tx, db, source); err != nil {
 			return fmt.Errorf("%s\n%v", err, c)
 		}
 	}
@@ -216,30 +216,30 @@ func requiresSchemaChanges(c, o *command.Command, cschema *cache.Schema) bool {
 	return false
 }
 
-func execCommandData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
+func execCommandData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
 	switch c.Op {
 	case command.MergeOp:
-		return execMergeData(c, tx, db)
+		return execMergeData(c, tx, db, source)
 	case command.DeleteOp:
-		return execDeleteData(c, tx, db)
+		return execDeleteData(c, tx, db, source)
 	case command.TruncateOp:
-		return execTruncateData(c, tx, db)
+		return execTruncateData(c, tx, db, source)
 	default:
 		return fmt.Errorf("unknown command op: %v", c.Op)
 	}
 }
 
-func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
+func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
 	// Check if current record is identical.
-	ident, id, cf, err := isCurrentIdentical(c, tx, db, &t)
+	ident, id, cf, err := isCurrentIdentical(c, tx, db, &t, source)
 	if err != nil {
 		return err
 	}
 	if ident {
 		if cf == "false" {
 			// log.Trace("matcher cf")
-			return updateRowCF(c, tx, db, &t, id)
+			return updateRowCF(c, tx, db, &t, id, source)
 		}
 		// log.Trace("matcher ok")
 		return nil
@@ -253,14 +253,14 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 	}
 	// Insert new record.
 	var inscur strings.Builder
-	inscur.WriteString("INSERT INTO " + db.TableSQL(&t) + "(__start")
+	inscur.WriteString("INSERT INTO " + db.TableSQL(&t) + "(__start,__source")
 	if c.Origin != "" {
 		inscur.WriteString(",__origin")
 	}
 	for _, c := range c.Column {
 		inscur.WriteString("," + db.IdentiferSQL(c.Name))
 	}
-	inscur.WriteString(")VALUES('" + c.SourceTimestamp + "'")
+	inscur.WriteString(")VALUES('" + c.SourceTimestamp + "','" + source + "'")
 	if c.Origin != "" {
 		inscur.WriteString(",'" + c.Origin + "'")
 	}
@@ -272,7 +272,7 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 	// History table:
 	// Select matching current record in history table and mark as not current.
 	var uphist strings.Builder
-	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __id=(SELECT __id FROM " + db.HistoryTableSQL(&t) + " WHERE __current AND __origin='" + c.Origin + "'")
+	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __id=(SELECT __id FROM " + db.HistoryTableSQL(&t) + " WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
 	if err = wherePKDataEqual(db, &uphist, c.Column); err != nil {
 		return err
 	}
@@ -280,14 +280,14 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 	exec = append(exec, uphist.String())
 	// insert new record
 	var inshist strings.Builder
-	inshist.WriteString("INSERT INTO " + db.HistoryTableSQL(&t) + "(__start,__end,__current")
+	inshist.WriteString("INSERT INTO " + db.HistoryTableSQL(&t) + "(__start,__end,__current,__source")
 	if c.Origin != "" {
 		inshist.WriteString(",__origin")
 	}
 	for _, c := range c.Column {
 		inshist.WriteString("," + db.IdentiferSQL(c.Name))
 	}
-	inshist.WriteString(")VALUES('" + c.SourceTimestamp + "','9999-12-31 00:00:00Z',TRUE")
+	inshist.WriteString(")VALUES('" + c.SourceTimestamp + "','9999-12-31 00:00:00Z',TRUE,'" + source + "'")
 	if c.Origin != "" {
 		inshist.WriteString(",'" + c.Origin + "'")
 	}
@@ -304,12 +304,12 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 	return nil
 }
 
-func updateRowCF(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, id string) error {
+func updateRowCF(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, id string, source string) error {
 	// Current table:
 	upcur := "UPDATE " + db.TableSQL(t) + " SET __cf=TRUE WHERE __id='" + id + "'"
 	// History table: select matching current record in history table.
 	var uphist strings.Builder
-	uphist.WriteString("UPDATE " + db.HistoryTableSQL(t) + " SET __cf=TRUE WHERE __id=(SELECT __id FROM " + db.HistoryTableSQL(t) + " WHERE __current AND __origin='" + c.Origin + "'")
+	uphist.WriteString("UPDATE " + db.HistoryTableSQL(t) + " SET __cf=TRUE WHERE __id=(SELECT __id FROM " + db.HistoryTableSQL(t) + " WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(db, &uphist, c.Column); err != nil {
 		return err
 	}
@@ -322,9 +322,9 @@ func updateRowCF(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, id s
 	return nil
 }
 
-func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table) (bool, string, string, error) {
+func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, source string) (bool, string, string, error) {
 	var b strings.Builder
-	b.WriteString("SELECT * FROM " + db.TableSQL(t) + " WHERE __origin='" + c.Origin + "'")
+	b.WriteString("SELECT * FROM " + db.TableSQL(t) + " WHERE __source='" + source + "' AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(db, &b, c.Column); err != nil {
 		return false, "", "", err
 	}
@@ -363,6 +363,7 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 				case "__start":
 				case "__end":
 				case "__current":
+				case "__source":
 				case "__origin":
 				default:
 					v := new(string)
@@ -406,18 +407,18 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 	return true, id, cf, nil
 }
 
-func execDeleteData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
+func execDeleteData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
 	// Current table: delete the record.
 	var delcur strings.Builder
-	delcur.WriteString("DELETE FROM " + db.TableSQL(&t) + " WHERE __id=(SELECT __id FROM " + db.TableSQL(&t) + " WHERE __origin='" + c.Origin + "'")
+	delcur.WriteString("DELETE FROM " + db.TableSQL(&t) + " WHERE __id=(SELECT __id FROM " + db.TableSQL(&t) + " WHERE __source='" + source + "' AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(db, &delcur, c.Column); err != nil {
 		return err
 	}
 	delcur.WriteString(" LIMIT 1)")
 	// History table: subselect matching current record in history table and mark as not current.
 	var uphist strings.Builder
-	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __id=(SELECT __id FROM " + db.HistoryTableSQL(&t) + " WHERE __current AND __origin='" + c.Origin + "'")
+	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __id=(SELECT __id FROM " + db.HistoryTableSQL(&t) + " WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(db, &uphist, c.Column); err != nil {
 		return err
 	}
@@ -430,13 +431,13 @@ func execDeleteData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 	return nil
 }
 
-func execTruncateData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
+func execTruncateData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
 	// Current table: delete all records from origin.
-	delcur := "DELETE FROM " + db.TableSQL(&t) + " WHERE __origin='" + c.Origin + "'"
+	delcur := "DELETE FROM " + db.TableSQL(&t) + " WHERE __source='" + source + "' AND __origin='" + c.Origin + "'"
 	// History table: mark as not current.
 	var uphist strings.Builder
-	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
+	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
 	// Run SQL.
 	err := db.ExecMultiple(tx, []string{delcur, uphist.String()})
 	if err != nil {

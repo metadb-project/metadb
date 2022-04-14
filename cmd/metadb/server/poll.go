@@ -204,7 +204,7 @@ func pollLoop(spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cl, spr.db[0], track, schema, users); err != nil {
+		if err = execCommandList(cl, spr.db[0], track, schema, users, spr.source.Name[4:]); err != nil {
 			return fmt.Errorf("executor: %s", err)
 		}
 

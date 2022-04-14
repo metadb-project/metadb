@@ -54,6 +54,7 @@ func createCurrentTableIfNotExists(table *sqlx.Table, db sqlx.DB, users *cache.U
 		"    __id bigint "+db.AutoIncrementSQL()+" PRIMARY KEY,"+
 		"    __cf boolean NOT NULL DEFAULT TRUE,"+
 		"    __start timestamp with time zone NOT NULL,"+
+		"    __source varchar(63) NOT NULL,"+
 		"    __origin varchar(63) NOT NULL DEFAULT ''"+
 		")")
 	if err != nil {
@@ -61,6 +62,10 @@ func createCurrentTableIfNotExists(table *sqlx.Table, db sqlx.DB, users *cache.U
 	}
 	// Add indexes on new columns.
 	_, err = db.Exec(nil, "CREATE INDEX ON "+db.TableSQL(table)+" (__start)")
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(nil, "CREATE INDEX ON "+db.TableSQL(table)+" (__source)")
 	if err != nil {
 		return err
 	}
@@ -86,6 +91,7 @@ func createHistoryTableIfNotExists(table *sqlx.Table, db sqlx.DB, users *cache.U
 		"    __start timestamp with time zone NOT NULL,"+
 		"    __end timestamp with time zone NOT NULL,"+
 		"    __current boolean NOT NULL,"+
+		"    __source varchar(63) NOT NULL,"+
 		"    __origin varchar(63) NOT NULL DEFAULT ''"+
 		")")
 	if err != nil {
@@ -101,6 +107,10 @@ func createHistoryTableIfNotExists(table *sqlx.Table, db sqlx.DB, users *cache.U
 		return err
 	}
 	_, err = db.Exec(nil, "CREATE INDEX ON "+db.HistoryTableSQL(table)+" (__current)")
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(nil, "CREATE INDEX ON "+db.HistoryTableSQL(table)+" (__source)")
 	if err != nil {
 		return err
 	}
