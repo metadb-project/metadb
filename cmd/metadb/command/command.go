@@ -803,7 +803,8 @@ func PrimaryKeyColumns(columns []CommandColumn) []CommandColumn {
 }
 
 var uuidRegexp = regexp.MustCompile(`^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$`)
-var timestamptzRegexp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}\+\d{2}:\d{2}$`)
+var timestamptzRegexp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|(\+\d+(\:\d+)?))?$`)
+var timestampRegexp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$`)
 
 func InferTypeFromString(data string) (DataType, int64) {
 	// Test for UUID
@@ -813,6 +814,10 @@ func InferTypeFromString(data string) (DataType, int64) {
 	// Test for timestamp with time zone
 	if timestamptzRegexp.MatchString(data) {
 		return TimestamptzType, 0
+	}
+	// Test for timestamp without time zone
+	if timestampRegexp.MatchString(data) {
+		return TimestampType, 0
 	}
 	// Otherwise default to varchar
 	n := len(data)
