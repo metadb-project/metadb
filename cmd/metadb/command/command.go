@@ -192,9 +192,9 @@ func DataTypeToSQL(dtype DataType, typeSize int64) (string, string, int64) {
 	case FloatType:
 		switch typeSize {
 		case 4:
-			return "real", "real", 0
+			return "numeric", "numeric", 0
 		case 8:
-			return "double precision", "double precision", 0
+			return "numeric", "numeric", 0
 		default:
 			return "(unknown)", "(unknown)", 0
 		}
