@@ -58,27 +58,23 @@ func Clean(opt *option.Clean) error {
 	origins := sqlx.CSVToSQL(opt.Origins)
 	for _, t := range tables {
 		eout.Info("cleaning: %s", t.String())
-		err := db.VacuumAnalyzeTable(&t)
-		if err != nil {
+		q := "DELETE FROM " + db.TableSQL(&t) + " WHERE NOT __cf AND __origin IN (" + origins + ")"
+		if _, err = db.Exec(nil, q); err != nil {
 			return err
 		}
-		_, err = db.Exec(nil, "DELETE FROM "+db.TableSQL(&t)+" WHERE NOT __cf AND __origin IN ("+origins+")")
-		if err != nil {
+		if err = db.VacuumAnalyzeTable(&t); err != nil {
 			return err
 		}
-		_, err = db.Exec(nil,
-			"UPDATE "+db.HistoryTableSQL(&t)+" SET __cf=TRUE,__end='"+now+"',__current=FALSE WHERE NOT __cf AND __current AND __origin IN ("+origins+")")
-		if err != nil {
+		q = "UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + now + "',__current=FALSE WHERE NOT __cf AND __current AND __origin IN (" + origins + ")"
+		if _, err = db.Exec(nil, q); err != nil {
 			return err
 		}
 		// Any non-current historical data can be set to __cf=TRUE.
-		_, err = db.Exec(nil,
-			"UPDATE "+db.HistoryTableSQL(&t)+" SET __cf=TRUE WHERE NOT __cf AND __origin IN ("+origins+")")
-		if err != nil {
+		q = "UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE WHERE NOT __cf AND __origin IN (" + origins + ")"
+		if _, err = db.Exec(nil, q); err != nil {
 			return err
 		}
-		err = db.VacuumAnalyzeTable(db.HistoryTable(&t))
-		if err != nil {
+		if err = db.VacuumAnalyzeTable(db.HistoryTable(&t)); err != nil {
 			return err
 		}
 	}
