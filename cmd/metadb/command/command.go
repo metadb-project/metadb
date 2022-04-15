@@ -810,7 +810,7 @@ var timestampRegexp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\
 
 func InferTypeFromString(data string) (DataType, int64) {
 	// Test for UUID
-	if uuidRegexp.MatchString(data) {
+	if IsUUID(data) {
 		return UUIDType, 0
 	}
 	// Test for timestamp with time zone
@@ -827,4 +827,8 @@ func InferTypeFromString(data string) (DataType, int64) {
 		n = 1
 	}
 	return VarcharType, int64(n)
+}
+
+func IsUUID(str string) bool {
+	return uuidRegexp.MatchString(str)
 }
