@@ -110,6 +110,8 @@ func MakeDataTypeNew(dataType string, charMaxLen int64) (DataType, int64) {
 		return FloatType, 4
 	case "double precision":
 		return FloatType, 8
+	case "numeric":
+		return FloatType, 8
 	case "boolean":
 		return BooleanType, 0
 	case "date":
