@@ -142,14 +142,12 @@ func addColumn(table *sqlx.Table, columnName string, newType command.DataType, n
 	// Add index on new column.
 	if newType != command.JSONType && newTypeSize <= maximumTypeSizeIndex {
 		_, err = db.Exec(nil, ""+
-			"CREATE INDEX "+db.IdentiferSQL(indexName(table.Table, columnName))+
-			" ON "+db.TableSQL(table)+" ("+db.IdentiferSQL(columnName)+")")
+			"CREATE INDEX ON "+db.TableSQL(table)+" ("+db.IdentiferSQL(columnName)+")")
 		if err != nil {
 			return err
 		}
 		_, err = db.Exec(nil, ""+
-			"CREATE INDEX "+db.IdentiferSQL(indexName(db.HistoryTable(table).Table, columnName))+
-			" ON "+db.HistoryTableSQL(table)+" ("+db.IdentiferSQL(columnName)+")")
+			"CREATE INDEX ON "+db.HistoryTableSQL(table)+" ("+db.IdentiferSQL(columnName)+")")
 		if err != nil {
 			return err
 		}
