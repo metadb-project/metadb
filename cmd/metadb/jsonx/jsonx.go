@@ -91,14 +91,11 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 			if err != nil {
 				return err
 			}
-			lenv := len(v)
-			if lenv < 1 {
-				lenv = 1
-			}
+			dtype, dtypesize := command.InferTypeFromString(v)
 			cols = append(cols, command.CommandColumn{
 				Name:       n,
-				DType:      command.VarcharType,
-				DTypeSize:  int64(lenv),
+				DType:      dtype,
+				DTypeSize:  dtypesize,
 				Data:       v,
 				SQLData:    sqldata,
 				PrimaryKey: 0,
