@@ -114,14 +114,23 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		// If both the old and new types are IntegerType, change the
 		// column type to handle the larger size.
 		if col.oldType == command.IntegerType && col.newType == command.IntegerType {
-			err := alterColumnIntegerSize(sqlx.NewTable(tschema, tableName), col.name, col.newTypeSize, db, schema)
+			// err := alterColumnIntegerSize(sqlx.NewTable(tschema, tableName), col.name, col.newTypeSize, db, schema)
+			err := alterColumnType(db, schema, tschema, tableName, col.name, command.IntegerType, col.newTypeSize, false)
 			if err != nil {
 				return err
 			}
 			continue
 		}
 
-		// TODO handle a change from integer to numeric
+		// If this is a change from an integer to numeric type, the
+		// column type can be changed using a cast.
+		if col.oldType == command.IntegerType && col.newType == command.FloatType {
+			err := alterColumnType(db, schema, tschema, tableName, col.name, command.FloatType, 0, true)
+			if err != nil {
+				return err
+			}
+			continue
+		}
 
 		// If not a compatible change, adjust new type to varchar in
 		// all cases.  To do this we need to determine what the varchar
@@ -129,21 +138,10 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		// new datum.
 
 		// Get maximum string length of existing data.
-		var maxlen int64
-		tx, err := db.BeginTx()
+		maxlen, err := selectMaxStringLength(db, sqlx.NewTable(tschema, tableName), col.name)
 		if err != nil {
-			return err
+			return fmt.Errorf("computing maximum string length in %s.%s (%s): %v", tschema, tableName, col.name, err)
 		}
-		q := "SELECT max(m) FROM (" +
-			"SELECT max(length(\"" + col.name + "\"::varchar)) AS m FROM " + db.TableSQL(sqlx.NewTable(tschema, tableName)) +
-			" UNION ALL SELECT max(length(\"" + col.name + "\"::varchar)) AS m FROM " + db.HistoryTableSQL(sqlx.NewTable(tschema, tableName)) +
-			") a"
-		err = db.QueryRow(tx, q).Scan(&maxlen)
-		if err != nil {
-			tx.Rollback()
-			return err
-		}
-		tx.Rollback()
 
 		// Get string length of new datum.
 		var typeSize int64 = -1
@@ -170,7 +168,8 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 			maxlen = 1
 		}
 
-		err = alterColumnToVarchar(sqlx.NewTable(tschema, tableName), col.name, maxlen, db, schema)
+		// err = alterColumnToVarchar(sqlx.NewTable(tschema, tableName), col.name, maxlen, db, schema)
+		err = alterColumnType(db, schema, tschema, tableName, col.name, command.VarcharType, maxlen, true)
 		if err != nil {
 			return err
 		}
@@ -189,6 +188,23 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		*/
 	}
 	return nil
+}
+
+func selectMaxStringLength(db sqlx.DB, table *sqlx.Table, column string) (int64, error) {
+	var maxlen int64
+	tx, err := db.BeginTx()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	q := "SELECT max(m) FROM (" +
+		"SELECT max(length(\"" + column + "\"::varchar)) AS m FROM " + db.TableSQL(table) +
+		" UNION ALL SELECT max(length(\"" + column + "\"::varchar)) AS m FROM " + db.HistoryTableSQL(table) + ") a"
+	err = db.QueryRow(tx, q).Scan(&maxlen)
+	if err != nil {
+		return 0, err
+	}
+	return maxlen, nil
 }
 
 func execCommandListData(db sqlx.DB, cc command.CommandList, cschema *cache.Schema, source string) error {

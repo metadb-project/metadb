@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
@@ -184,6 +186,7 @@ func alterColumnVarcharSize(table *sqlx.Table, column string, datatype command.D
 	return nil
 }
 
+/*
 func alterColumnIntegerSize(table *sqlx.Table, column string, typesize int64, db sqlx.DB, schema *cache.Schema) error {
 	dtypesql, _, _ := command.DataTypeToSQL(command.IntegerType, typesize)
 	_, err := db.Exec(nil, "ALTER TABLE "+db.TableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+dtypesql)
@@ -198,7 +201,9 @@ func alterColumnIntegerSize(table *sqlx.Table, column string, typesize int64, db
 	schema.Update(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: column}, dtypesql, 0)
 	return nil
 }
+*/
 
+/*
 func alterColumnToVarchar(table *sqlx.Table, column string, typesize int64, db sqlx.DB, schema *cache.Schema) error {
 	dtypesql, dataType, charMaxLen := command.DataTypeToSQL(command.VarcharType, typesize)
 	_, err := db.Exec(nil, "ALTER TABLE "+db.TableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+dtypesql+
@@ -213,6 +218,29 @@ func alterColumnToVarchar(table *sqlx.Table, column string, typesize int64, db s
 	}
 	// Update schema.
 	schema.Update(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: column}, dataType, charMaxLen)
+	return nil
+}
+*/
+
+// Change column type to a specified new type, optionally casting data to the new type
+func alterColumnType(db sqlx.DB, dbschema *cache.Schema, schema string, table string, column string, datatype command.DataType, typesize int64, cast bool) error {
+	schemaTable := sqlx.NewTable(schema, table)
+	sqltype, datatypeStr, charMaxLen := command.DataTypeToSQL(datatype, typesize)
+	var caststr string
+	if cast {
+		caststr = "::" + sqltype
+	}
+	q := "ALTER TABLE %s ALTER COLUMN \"" + column + "\" TYPE " + sqltype + " USING \"" + column + "\"" + caststr
+	_, err := db.Exec(nil, fmt.Sprintf(q, db.TableSQL(schemaTable)))
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(nil, fmt.Sprintf(q, db.HistoryTableSQL(schemaTable)))
+	if err != nil {
+		return err
+	}
+	// Update schema.
+	dbschema.Update(&sqlx.Column{Schema: schema, Table: table, Column: column}, datatypeStr, charMaxLen)
 	return nil
 }
 
