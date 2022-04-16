@@ -1,10 +1,6 @@
 package server
 
 import (
-	"fmt"
-	"regexp"
-	"strconv"
-
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
@@ -188,6 +184,39 @@ func alterColumnVarcharSize(table *sqlx.Table, column string, datatype command.D
 	return nil
 }
 
+func alterColumnIntegerSize(table *sqlx.Table, column string, typesize int64, db sqlx.DB, schema *cache.Schema) error {
+	dtypesql, _, _ := command.DataTypeToSQL(command.IntegerType, typesize)
+	_, err := db.Exec(nil, "ALTER TABLE "+db.TableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+dtypesql)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(nil, "ALTER TABLE "+db.HistoryTableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+dtypesql)
+	if err != nil {
+		return err
+	}
+	// Update schema.
+	schema.Update(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: column}, dtypesql, 0)
+	return nil
+}
+
+func alterColumnToVarchar(table *sqlx.Table, column string, typesize int64, db sqlx.DB, schema *cache.Schema) error {
+	dtypesql, dataType, charMaxLen := command.DataTypeToSQL(command.VarcharType, typesize)
+	_, err := db.Exec(nil, "ALTER TABLE "+db.TableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+dtypesql+
+		" USING \""+column+"\"::varchar")
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(nil, "ALTER TABLE "+db.HistoryTableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+dtypesql+
+		" USING \""+column+"\"::varchar")
+	if err != nil {
+		return err
+	}
+	// Update schema.
+	schema.Update(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: column}, dataType, charMaxLen)
+	return nil
+}
+
+/*
 func renameColumnOldType(table *sqlx.Table, column string, datatype command.DataType, typesize int64, db sqlx.DB, schema *cache.Schema) error {
 	var err error
 	// Find new name for old column.
@@ -244,6 +273,7 @@ func newNumberedColumnName(table *sqlx.Table, column string, schema *cache.Schem
 	newName := fmt.Sprintf("%s__%d", column, maxn+1)
 	return newName, nil
 }
+*/
 
 func selectTableSchema(table *sqlx.Table, schema *cache.Schema) (*sysdb.TableSchema, error) {
 	var m map[string]cache.ColumnType = schema.TableSchema(table)

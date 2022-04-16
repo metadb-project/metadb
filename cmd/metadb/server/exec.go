@@ -111,7 +111,71 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 			}
 			continue
 		}
-		// Otherwise we have a completely new type
+		// If both the old and new types are IntegerType, change the
+		// column type to handle the larger size.
+		if col.oldType == command.IntegerType && col.newType == command.IntegerType {
+			err := alterColumnIntegerSize(sqlx.NewTable(tschema, tableName), col.name, col.newTypeSize, db, schema)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		// TODO handle a change from integer to numeric
+
+		// If not a compatible change, adjust new type to varchar in
+		// all cases.  To do this we need to determine what the varchar
+		// length limit should be, by looking at existing data and the
+		// new datum.
+
+		// Get maximum string length of existing data.
+		var maxlen int64
+		tx, err := db.BeginTx()
+		if err != nil {
+			return err
+		}
+		q := "SELECT max(m) FROM (" +
+			"SELECT max(length(\"" + col.name + "\"::varchar)) AS m FROM " + db.TableSQL(sqlx.NewTable(tschema, tableName)) +
+			" UNION ALL SELECT max(length(\"" + col.name + "\"::varchar)) AS m FROM " + db.HistoryTableSQL(sqlx.NewTable(tschema, tableName)) +
+			") a"
+		err = db.QueryRow(tx, q).Scan(&maxlen)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		tx.Rollback()
+
+		// Get string length of new datum.
+		var typeSize int64 = -1
+		for j, c := range cmd.Column {
+			if c.Name == col.name {
+				if cmd.Column[j].SQLData == nil {
+					typeSize = 0
+				} else {
+					typeSize = int64(len(*(cmd.Column[j].SQLData)))
+				}
+				cmd.Column[j].DType = command.VarcharType
+				cmd.Column[j].DTypeSize = typeSize
+				break
+			}
+		}
+		if typeSize == -1 {
+			return fmt.Errorf("delta schema: internal error: column not found in command: %s.%s (%s)", tschema, tableName, col.name)
+		}
+
+		if typeSize > maxlen {
+			maxlen = typeSize
+		}
+		if maxlen < 1 {
+			maxlen = 1
+		}
+
+		err = alterColumnToVarchar(sqlx.NewTable(tschema, tableName), col.name, maxlen, db, schema)
+		if err != nil {
+			return err
+		}
+
+		/* Old renaming method:
 		log.Trace("table %s.%s: rename column %s", tschema, tableName, col.name)
 		if err := renameColumnOldType(sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 			return err
@@ -122,6 +186,7 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		if err := addColumn(t, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 			return err
 		}
+		*/
 	}
 	return nil
 }
@@ -474,7 +539,7 @@ func encodeSQLData(sqldata *string, datatype command.DataType, db sqlx.DB) strin
 		return db.EncodeString(*sqldata)
 	case command.DateType, command.TimeType, command.TimetzType, command.TimestampType, command.TimestamptzType, command.UUIDType:
 		return "'" + *sqldata + "'"
-	case command.IntegerType, command.NumberType, command.FloatType, command.BooleanType:
+	case command.IntegerType, command.FloatType, command.BooleanType:
 		return *sqldata
 	default:
 		log.Error("encoding SQL data: unknown data type: %s", datatype)

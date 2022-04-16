@@ -42,7 +42,6 @@ const (
 	UnknownType = iota
 	VarcharType
 	IntegerType
-	NumberType
 	FloatType
 	BooleanType
 	DateType
@@ -60,10 +59,8 @@ func (d DataType) String() string {
 		return "varchar"
 	case IntegerType:
 		return "integer"
-	case NumberType:
-		return "number"
 	case FloatType:
-		return "float"
+		return "numeric"
 	case BooleanType:
 		return "boolean"
 	case DateType:
@@ -104,14 +101,12 @@ func MakeDataTypeNew(dataType string, charMaxLen int64) (DataType, int64) {
 			case 8:
 				return "double precision"
 		*/
-	case "number":
-		return NumberType, 38
 	case "real":
-		return FloatType, 4
+		return FloatType, 0
 	case "double precision":
-		return FloatType, 8
+		return FloatType, 0
 	case "numeric":
-		return FloatType, 8
+		return FloatType, 0
 	case "boolean":
 		return BooleanType, 0
 	case "date":
@@ -279,8 +274,6 @@ func convertTypeSize(data *string, coltype string, datatype DataType) (int64, er
 		default:
 			return 0, fmt.Errorf("internal error: unexpected type %q", coltype)
 		}
-	case NumberType:
-		return 38, nil
 	case VarcharType:
 		if data == nil {
 			return 1, nil
@@ -290,6 +283,8 @@ func convertTypeSize(data *string, coltype string, datatype DataType) (int64, er
 			return 1, nil
 		}
 		return int64(lendata), nil
+	case FloatType:
+		return 0, nil
 	case BooleanType:
 		return 0, nil
 	case DateType:
