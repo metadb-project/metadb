@@ -621,14 +621,14 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 	case "int8", "int16":
 		return IntegerType, nil
 	case "int32":
+		if strings.HasSuffix(semtype, ".time.Date") {
+			return DateType, nil
+		}
 		if strings.HasSuffix(semtype, ".time.Time") {
 			return TimeType, nil
 		}
 		return IntegerType, nil
 	case "int64":
-		if strings.HasSuffix(semtype, ".time.Date") {
-			return DateType, nil
-		}
 		if strings.HasSuffix(semtype, ".time.MicroTime") {
 			return TimeType, nil
 		}
