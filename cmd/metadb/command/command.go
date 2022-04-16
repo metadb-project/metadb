@@ -187,14 +187,7 @@ func DataTypeToSQL(dtype DataType, typeSize int64) (string, string, int64) {
 			return "(unknown)", "(unknown)", 0
 		}
 	case FloatType:
-		switch typeSize {
-		case 4:
-			return "numeric", "numeric", 0
-		case 8:
-			return "numeric", "numeric", 0
-		default:
-			return "(unknown)", "(unknown)", 0
-		}
+		return "numeric", "numeric", 0
 	case BooleanType:
 		return "boolean", "boolean", 0
 	case DateType:
@@ -643,7 +636,7 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 			return TimestampType, nil
 		}
 		return IntegerType, nil
-	case "float32", "float64":
+	case "float", "float32", "float64":
 		return FloatType, nil
 	case "string":
 		if strings.HasSuffix(semtype, ".data.Uuid") {
