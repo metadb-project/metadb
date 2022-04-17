@@ -46,9 +46,8 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 			//n = "j_" + n
 			continue
 		}
-		//log.P("TYPE: %T, VALUE: %v", value, value)
 		if value == nil {
-			// TODO store null value
+			// For nil values, do not add the column to this record.
 			continue
 		}
 		switch v := value.(type) {
@@ -77,7 +76,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 			cols = append(cols, command.CommandColumn{
 				Name:       n,
 				DType:      command.FloatType,
-				DTypeSize:  8,
+				DTypeSize:  0,
 				Data:       v,
 				SQLData:    sqldata,
 				PrimaryKey: 0,
