@@ -66,13 +66,13 @@ func (d DataType) String() string {
 	case DateType:
 		return "date"
 	case TimeType:
-		return "time"
+		return "time without time zone"
 	case TimetzType:
-		return "timetz"
+		return "timestamp with time zone"
 	case TimestampType:
-		return "timestamp"
+		return "timestamp without time zone"
 	case TimestamptzType:
-		return "timestamptz"
+		return "timestamp with time zone"
 	case UUIDType:
 		return "uuid"
 	case JSONType:
@@ -193,7 +193,7 @@ func DataTypeToSQL(dtype DataType, typeSize int64) (string, string, int64) {
 	case DateType:
 		return "date", "date", 0
 	case TimeType:
-		return "time", "time", 0
+		return "time without time zone", "time without time zone", 0
 	case TimetzType:
 		return "time with time zone", "time with time zone", 0
 	case TimestampType:
