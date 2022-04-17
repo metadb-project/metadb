@@ -213,6 +213,7 @@ type Command struct {
 	Op              Operation
 	SchemaName      string
 	TableName       string
+	Transformed     bool
 	ParentTable     sqlx.Table
 	Origin          string
 	Column          []CommandColumn

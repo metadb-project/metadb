@@ -44,7 +44,7 @@ func execCommandSchema(cmd *command.Command, db sqlx.DB, track *cache.Track, sch
 		return err
 	}
 	// TODO can we skip adding the table if we confirm it in sysdb?
-	if err = addTable(sqlx.NewTable(cmd.SchemaName, cmd.TableName), db, track, users); err != nil {
+	if err = addTable(cmd, db, track, users); err != nil {
 		return err
 	}
 	// Note that execDeltaSchema() may adjust data types in cmd.

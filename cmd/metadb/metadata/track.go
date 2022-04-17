@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
@@ -28,9 +29,9 @@ func TrackRead(db sqlx.DB) (map[sqlx.Table]bool, error) {
 	return tables, nil
 }
 
-func TrackWrite(db sqlx.DB, table *sqlx.Table) error {
-	_, err := db.Exec(nil,
-		"INSERT INTO metadb.track(schemaname,tablename,parentschema,parenttable)VALUES('"+table.Schema+"','"+table.Table+"','','')")
+func TrackWrite(db sqlx.DB, table *sqlx.Table, transformed bool, parentTable *sqlx.Table) error {
+	q := fmt.Sprintf("INSERT INTO metadb.track(schemaname,tablename,transformed,parentschema,parenttable)VALUES('%s','%s',%t,'%s','%s')", table.Schema, table.Table, transformed, parentTable.Schema, parentTable.Table)
+	_, err := db.Exec(nil, q)
 	if err != nil {
 		return err
 	}

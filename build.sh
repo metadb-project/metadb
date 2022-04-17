@@ -25,7 +25,7 @@ usage() {
     echo '    go install github.com/remyoudompheng/go-misc/deadcode@latest'
     echo '-v  Enable verbose output'
     echo '-q  Enable quiet output'
-    echo '-X  Include experimental code'
+    # echo '-X  Include experimental code'
 }
 
 while getopts 'cfhJTtvqX' flag; do
@@ -69,7 +69,7 @@ if $experiment; then
         * ) echo "Exiting" 1>&2
             exit 1 ;;
     esac
-    json='-X main.rewriteJSON=1'
+    # json='-X main.rewriteJSON=1'
     echo "build.sh: experimental code will be included" 1>&2
 fi
 

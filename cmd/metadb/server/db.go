@@ -10,7 +10,8 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 )
 
-func addTable(table *sqlx.Table, db sqlx.DB, track *cache.Track, users *cache.Users) error {
+func addTable(cmd *command.Command, db sqlx.DB, track *cache.Track, users *cache.Users) error {
+	table := sqlx.NewTable(cmd.SchemaName, cmd.TableName)
 	// if tracked, then assume the table exists
 	if track.Contains(table) {
 		return nil
@@ -26,7 +27,7 @@ func addTable(table *sqlx.Table, db sqlx.DB, track *cache.Track, users *cache.Us
 		return err
 	}
 	// track new table
-	if err := track.Add(table); err != nil {
+	if err := track.Add(table, cmd.Transformed, &cmd.ParentTable); err != nil {
 		return err
 	}
 	return nil

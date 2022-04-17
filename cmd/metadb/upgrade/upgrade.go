@@ -103,6 +103,7 @@ var upsysList = []upsysFunc{
 	nil,
 	upsys5,
 	upsys6,
+	upsys7,
 }
 
 func upsys5(opt *sysopt) error {
@@ -115,6 +116,14 @@ func upsys5(opt *sysopt) error {
 
 func upsys6(opt *sysopt) error {
 	err := sysdb.WriteSysdbVersion(6)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func upsys7(opt *sysopt) error {
+	err := sysdb.WriteSysdbVersion(7)
 	if err != nil {
 		return err
 	}
@@ -201,6 +210,7 @@ var updbList = []updbFunc{
 	nil,
 	updb5,
 	updb6,
+	updb7,
 }
 
 func updb5(opt *dbopt) error {
@@ -219,7 +229,7 @@ func updb5(opt *dbopt) error {
 			return err
 		}
 	}
-	err = metadata.WriteDatabaseVersion(opt.DB, 5)
+	err = metadata.WriteDatabaseVersion(opt.DB, nil, 5)
 	if err != nil {
 		return err
 	}
@@ -299,7 +309,7 @@ func updb6(opt *dbopt) error {
 			return err
 		}
 	}
-	err = metadata.WriteDatabaseVersion(opt.DB, 6)
+	err = metadata.WriteDatabaseVersion(opt.DB, nil, 6)
 	if err != nil {
 		return err
 	}
@@ -320,6 +330,27 @@ func updb6Table(opt *dbopt, schema *cache.Schema, table *sqlx.Table) error {
 		return err
 	}
 	_ = opt.DB.VacuumAnalyzeTable(table)
+	return nil
+}
+
+func updb7(opt *dbopt) error {
+	tx, err := opt.DB.BeginTx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	_, err = opt.DB.Exec(nil, "ALTER TABLE metadb.track ADD COLUMN transformed boolean NOT NULL;")
+	if err != nil {
+		return err
+	}
+	err = metadata.WriteDatabaseVersion(opt.DB, tx, 7)
+	if err != nil {
+		return err
+	}
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

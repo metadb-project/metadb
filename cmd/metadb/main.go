@@ -26,8 +26,9 @@ var program = "metadb"
 // metadbVersion is defined at build time via -ldflags.
 var metadbVersion string = "(unknown version)"
 
-// rewriteJSON is defined at build time via -ldflags.
-var rewriteJSON string = "0"
+// // rewriteJSON is defined at build time via -ldflags.
+// var rewriteJSON string = "0"
+var rewriteJSON string = "1"
 
 var colorMode string
 var devMode bool

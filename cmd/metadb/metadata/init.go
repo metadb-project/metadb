@@ -50,11 +50,12 @@ func Init(db sqlx.DB, metadbVersion string) error {
 	}
 	_, err = db.Exec(nil, ""+
 		"CREATE TABLE IF NOT EXISTS metadb.track (\n"+
-		"    schemaname VARCHAR(63) NOT NULL,\n"+
-		"    tablename VARCHAR(63) NOT NULL,\n"+
+		"    schemaname varchar(63) NOT NULL,\n"+
+		"    tablename varchar(63) NOT NULL,\n"+
 		"    PRIMARY KEY (schemaname, tablename),\n"+
-		"    parentschema VARCHAR(63) NOT NULL,\n"+
-		"    parenttable VARCHAR(63) NOT NULL\n"+
+		"    transformed boolean NOT NULL,\n"+
+		"    parentschema varchar(63) NOT NULL,\n"+
+		"    parenttable varchar(63) NOT NULL\n"+
 		")")
 	if err != nil {
 		return fmt.Errorf("creating table metadb.track: %s", err)
@@ -103,10 +104,10 @@ func GetDatabaseVersion(db sqlx.DB) (int64, error) {
 	}
 }
 
-func WriteDatabaseVersion(db sqlx.DB, version int64) error {
+func WriteDatabaseVersion(db sqlx.DB, tx *sql.Tx, version int64) error {
 	mver := metadbVersionString(util.MetadbVersion())
 	dbver := strconv.FormatInt(version, 10)
-	_, err := db.Exec(nil, "UPDATE metadb.init SET version='"+mver+"',dbversion="+dbver)
+	_, err := db.Exec(tx, "UPDATE metadb.init SET version='"+mver+"',dbversion="+dbver)
 	if err != nil {
 		return fmt.Errorf("updating dbversion in table metadb.init: %s", err)
 	}

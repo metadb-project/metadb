@@ -36,9 +36,9 @@ func (t *Track) All() []sqlx.Table {
 	return a
 }
 
-func (t *Track) Add(table *sqlx.Table) error {
+func (t *Track) Add(table *sqlx.Table, transformed bool, parentTable *sqlx.Table) error {
 	t.tables[*table] = true
-	if err := metadata.TrackWrite(t.db, table); err != nil {
+	if err := metadata.TrackWrite(t.db, table, transformed, parentTable); err != nil {
 		return fmt.Errorf("writing track metadata: %v: %s", table, err)
 	}
 	return nil
