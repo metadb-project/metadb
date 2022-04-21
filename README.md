@@ -8,3 +8,7 @@ Version 2.0.  See the file
 [LICENSE](https://github.com/metadb-project/metadb/blob/master/LICENSE)
 for more information.
 
+Metadb is currently in development.
+
+For documentation (work in progress), see:
+[http://100.20.12.247/doc/](http://100.20.12.247/doc/)
