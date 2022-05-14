@@ -16,9 +16,13 @@ func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.
 	// TODO - JSON data is not necessarily a JSON object; it could be any valid JSON data type
 	// Unmarshal into interface{} and send that to a function rewriteData()
 	// which tests for each kind of JSON-derived type.
-	var obj map[string]interface{}
-	if err := json.Unmarshal([]byte(column.Data.(string)), &obj); err != nil {
+	var j interface{}
+	if err := json.Unmarshal([]byte(column.Data.(string)), &j); err != nil {
 		return fmt.Errorf("rewrite json: %s", err)
+	}
+	obj, ok := j.(map[string]interface{})
+	if !ok {
+		return nil
 	}
 	if err := rewriteObject(cl, cmd, 1, obj, cmd.TableName+"__t"); err != nil {
 		return fmt.Errorf("rewrite json: %s", err)
