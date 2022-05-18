@@ -1,8 +1,10 @@
 package command
 
 import (
+	"encoding/base64"
 	"fmt"
 	"math"
+	"math/big"
 	"regexp"
 	"sort"
 	"strconv"
@@ -13,6 +15,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"github.com/shopspring/decimal"
 )
 
 type Operation int
@@ -40,43 +43,46 @@ type DataType int
 
 const (
 	UnknownType = iota
-	VarcharType
-	IntegerType
-	FloatType
 	BooleanType
 	DateType
+	FloatType
+	IntegerType
+	JSONType
+	NumericType
 	TimeType
-	TimetzType
 	TimestampType
 	TimestamptzType
+	TimetzType
 	UUIDType
-	JSONType
+	VarcharType
 )
 
 func (d DataType) String() string {
 	switch d {
-	case VarcharType:
-		return "varchar"
-	case IntegerType:
-		return "integer"
-	case FloatType:
-		return "numeric"
 	case BooleanType:
-		return "boolean"
+		return "BooleanType"
 	case DateType:
-		return "date"
-	case TimeType:
-		return "time without time zone"
-	case TimetzType:
-		return "timestamp with time zone"
-	case TimestampType:
-		return "timestamp without time zone"
-	case TimestamptzType:
-		return "timestamp with time zone"
-	case UUIDType:
-		return "uuid"
+		return "DateType"
+	case FloatType:
+		return "FloatType"
+	case IntegerType:
+		return "IntegerType"
 	case JSONType:
-		return "jsonb"
+		return "JSONType"
+	case NumericType:
+		return "NumericType"
+	case TimeType:
+		return "TimeType"
+	case TimestampType:
+		return "TimestampType"
+	case TimestamptzType:
+		return "TimestamptzType"
+	case TimetzType:
+		return "TimetzType"
+	case UUIDType:
+		return "UUIDType"
+	case VarcharType:
+		return "VarcharType"
 	default:
 		log.Error("data type to string: unknown data type: %d", d)
 		return "(unknown type)"
@@ -85,9 +91,7 @@ func (d DataType) String() string {
 
 func MakeDataTypeNew(dataType string, charMaxLen int64) (DataType, int64) {
 	switch strings.ToLower(dataType) {
-	case "character varying":
-		fallthrough
-	case "text":
+	case "character varying", "text":
 		return VarcharType, charMaxLen
 	case "smallint":
 		return IntegerType, 2
@@ -95,18 +99,12 @@ func MakeDataTypeNew(dataType string, charMaxLen int64) (DataType, int64) {
 		return IntegerType, 4
 	case "bigint":
 		return IntegerType, 8
-		/*
-			case 4:
-				return "real"
-			case 8:
-				return "double precision"
-		*/
 	case "real":
-		return FloatType, 0
+		return FloatType, 4
 	case "double precision":
-		return FloatType, 0
+		return FloatType, 8
 	case "numeric":
-		return FloatType, 0
+		return NumericType, 0
 	case "boolean":
 		return BooleanType, 0
 	case "date":
@@ -181,12 +179,19 @@ func DataTypeToSQL(dtype DataType, typeSize int64) (string, string, int64) {
 			return "integer", "integer", 0
 		case 8:
 			return "bigint", "bigint", 0
-		case 38:
-			return "number", "number", 0
 		default:
 			return "(unknown)", "(unknown)", 0
 		}
 	case FloatType:
+		switch typeSize {
+		case 4:
+			return "real", "real", 0
+		case 8:
+			return "double precision", "double precision", 0
+		default:
+			return "(unknown)", "(unknown)", 0
+		}
+	case NumericType:
 		return "numeric", "numeric", 0
 	case BooleanType:
 		return "boolean", "boolean", 0
@@ -278,6 +283,15 @@ func convertTypeSize(data *string, coltype string, datatype DataType) (int64, er
 		}
 		return int64(lendata), nil
 	case FloatType:
+		switch coltype {
+		case "float32":
+			return 4, nil
+		case "float64":
+			return 8, nil
+		default:
+			return 0, fmt.Errorf("internal error: unexpected type %q", coltype)
+		}
+	case NumericType:
 		return 0, nil
 	case BooleanType:
 		return 0, nil
@@ -423,6 +437,11 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 			return nil, fmt.Errorf("value: $.schema.fields: \"type\": %s", err)
 		}
 		col.Data = fieldData[field]
+		if col.DType == NumericType {
+			if col.Data, err = decodeNumericBytes(m, col.Data); err != nil {
+				return nil, fmt.Errorf("decoding numeric bytes: %v", err)
+			}
+		}
 		// var data interface{}
 		// if col.DType == JSONType && col.Data != nil {
 		// 	data, err = indentJSON(col.Data.(string))
@@ -442,6 +461,73 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 		column = append(column, col)
 	}
 	return column, nil
+}
+
+func decodeNumericBytes(fieldMap map[string]any, data any) (string, error) {
+	var err error
+	// Read scale from parameters object.
+	var scale int32
+	if scale, err = parameterScale(fieldMap); err != nil {
+		return "", fmt.Errorf("reading numeric scale: %v", err)
+	}
+	// Decode bytes.
+	var ok bool
+	var s string
+	if s, ok = data.(string); !ok {
+		return "", fmt.Errorf("data \"%v\" has type %T", data, data)
+	}
+	var bytes []byte
+	if bytes, err = base64.StdEncoding.DecodeString(s); err != nil {
+		return "", fmt.Errorf("unable to decode numeric bytes: %q", s)
+	}
+	var bigInt = new(big.Int)
+	bigInt.SetBytes(bytes)
+	// go get github.com/shopspring/decimal
+	// func NewFromBigInt(value *big.Int, exp int32) Decimal
+	// var scale int32 = 2
+	var dec decimal.Decimal = decimal.NewFromBigInt(bigInt, -scale)
+	var decs string = dec.StringFixed(scale)
+	log.Trace("decoded numeric bytes: %q ==> %s", s, decs)
+	return decs, nil
+}
+
+/*
+{
+  "type": "bytes",
+  "optional": false,
+  "name": "org.apache.kafka.connect.data.Decimal",
+  "version": 1,
+  "parameters": {
+    "scale": "2",
+    "connect.decimal.precision": "19"
+  },
+  "field": "value"
+}
+*/
+func parameterScale(fieldMap map[string]any) (int32, error) {
+	var ok bool
+	var pi any
+	if pi, ok = fieldMap["parameters"]; !ok {
+		return 0, fmt.Errorf("parameter object not found: %v", fieldMap)
+	}
+	var pm map[string]any
+	if pm, ok = pi.(map[string]any); !ok {
+		return 0, fmt.Errorf("expected object: parameters field: %v", pi)
+	}
+	var si any
+	if si, ok = pm["scale"]; !ok {
+		return 0, fmt.Errorf("scale parameter not found: %v", pm)
+	}
+	var s string
+	if s, ok = si.(string); !ok {
+		return 0, fmt.Errorf("unexpected data type: scale parameter: %v", si)
+	}
+	var err error
+	var scale int64
+	if scale, err = strconv.ParseInt(s, 10, 32); err != nil {
+		return 0, fmt.Errorf("parse error: scale parameter: %q", s)
+	}
+	return int32(scale), nil
 }
 
 // func indentJSON(data string) (string, error) {
@@ -562,6 +648,13 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 			if err != nil {
 				return nil, fmt.Errorf("delete: unknown key schema type: %v", m["type"])
 			}
+			// var scale int32
+			// if dtype == NumericType {
+			// 	scale, err = parameterScale(m)
+			// 	if err != nil {
+			// 		return nil, fmt.Errorf("reading numeric scale: %v", err)
+			// 	}
+			// }
 			data := payload[attr]
 			// if dtype == JSONType {
 			// 	var d string
@@ -637,7 +730,7 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 			return TimestampType, nil
 		}
 		return IntegerType, nil
-	case "float", "float32", "float64":
+	case "float32", "float64":
 		return FloatType, nil
 	case "string":
 		if strings.HasSuffix(semtype, ".data.Uuid") {
@@ -653,13 +746,21 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 			return TimestamptzType, nil
 		}
 		return VarcharType, nil
+	case "bytes":
+		// if strings.HasSuffix(semtype, ".data.Bits") {
+		// 	return , nil
+		// }
+		if semtype == "org.apache.kafka.connect.data.Decimal" {
+			return NumericType, nil
+		}
+		return 0, fmt.Errorf("convert data type: unhandled type: type=%s, semtype=%s", coltype, semtype)
 	default:
 		return 0, fmt.Errorf("convert data type: unknown data type: %s", coltype)
 	}
 }
 
 // DataToSQLData converts data to a string ready for encoding to SQL.
-func DataToSQLData(data interface{}, datatype DataType, semtype string) (*string, error) {
+func DataToSQLData(data any, datatype DataType, semtype string) (*string, error) {
 	if data == nil {
 		return nil, nil
 	}
@@ -731,7 +832,7 @@ func DataToSQLData(data interface{}, datatype DataType, semtype string) (*string
 			s := fixupSQLTime(t)
 			return &s, nil
 		}
-	case VarcharType, UUIDType, JSONType, TimetzType, TimestamptzType:
+	case VarcharType, NumericType, UUIDType, JSONType, TimetzType, TimestamptzType:
 		s, ok := data.(string)
 		if !ok {
 			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)

@@ -1,6 +1,6 @@
 module github.com/metadb-project/metadb
 
-go 1.17
+go 1.18
 
 require (
 	github.com/confluentinc/confluent-kafka-go v1.8.2
@@ -8,6 +8,7 @@ require (
 	github.com/lib/pq v1.10.4
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mattn/go-sqlite3 v1.14.10
+	github.com/shopspring/decimal v1.3.1
 	github.com/snowflakedb/gosnowflake v1.6.6
 	github.com/spf13/cobra v1.3.0
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
