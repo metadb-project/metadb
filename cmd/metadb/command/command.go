@@ -596,6 +596,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 		}
 		// TODO the mapping is currently hardcoded
 		var schema string = strings.TrimPrefix(*ce.Value.Payload.Source.Schema, "uchicago_")
+		schema = strings.TrimPrefix(schema, "metadb_dev_")
 		schema = strings.TrimPrefix(schema, "lu_")
 		schema = strings.TrimPrefix(schema, "dbz_")
 		schema = strings.TrimPrefix(schema, "reports_dev_")
