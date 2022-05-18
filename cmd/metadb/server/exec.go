@@ -122,10 +122,31 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 			continue
 		}
 
-		// If this is a change from an integer to numeric type, the
+		// If both the old and new types are FloatType, change the
+		// column type to handle the larger size.
+		if col.oldType == command.FloatType && col.newType == command.FloatType {
+			// err := alterColumnFloatSize(sqlx.NewTable(tschema, tableName), col.name, col.newTypeSize, db, schema)
+			err := alterColumnType(db, schema, tschema, tableName, col.name, command.FloatType, col.newTypeSize, false)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		// If this is a change from an integer to float type, the
 		// column type can be changed using a cast.
 		if col.oldType == command.IntegerType && col.newType == command.FloatType {
 			err := alterColumnType(db, schema, tschema, tableName, col.name, command.FloatType, 0, true)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		// If this is a change from an integer or float to numeric
+		// type, the column type can be changed using a cast.
+		if (col.oldType == command.IntegerType || col.oldType == command.FloatType) && col.newType == command.NumericType {
+			err := alterColumnType(db, schema, tschema, tableName, col.name, command.NumericType, 0, true)
 			if err != nil {
 				return err
 			}
@@ -555,7 +576,7 @@ func encodeSQLData(sqldata *string, datatype command.DataType, db sqlx.DB) strin
 		return db.EncodeString(*sqldata)
 	case command.DateType, command.TimeType, command.TimetzType, command.TimestampType, command.TimestamptzType, command.UUIDType:
 		return "'" + *sqldata + "'"
-	case command.IntegerType, command.FloatType, command.BooleanType:
+	case command.IntegerType, command.FloatType, command.NumericType, command.BooleanType:
 		return *sqldata
 	default:
 		log.Error("encoding SQL data: unknown data type: %s", datatype)

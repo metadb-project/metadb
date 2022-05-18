@@ -3,6 +3,7 @@ package jsonx
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
@@ -73,13 +74,14 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				PrimaryKey: 0,
 			})
 		case float64:
-			sqldata, err := command.DataToSQLData(v, command.FloatType, "")
+			var s string = strconv.FormatFloat(v, 'E', -1, 64)
+			sqldata, err := command.DataToSQLData(s, command.NumericType, "")
 			if err != nil {
 				return err
 			}
 			cols = append(cols, command.CommandColumn{
 				Name:       n,
-				DType:      command.FloatType,
+				DType:      command.NumericType,
 				DTypeSize:  0,
 				Data:       v,
 				SQLData:    sqldata,

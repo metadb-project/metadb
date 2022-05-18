@@ -256,7 +256,7 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 		eventReadCount++
 		c, err := command.NewCommand(ce, schemaPassFilter, schemaPrefix)
 		if err != nil {
-			return 0, fmt.Errorf("parsing command: %s", err)
+			return 0, fmt.Errorf("parsing command: %s\n%v", err, *ce)
 		}
 		if c == nil {
 			continue
