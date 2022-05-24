@@ -32,7 +32,7 @@ The software consists of a server (`metadb`) and a command-line client
 * Architecture:  x86-64 (AMD64)
 * Operating system:  Debian 11
 * Database systems supported:
-  * [PostgreSQL](https://www.postgresql.org/) 14.2 or later
+  * [PostgreSQL](https://www.postgresql.org/) 14.3 or later
 * Required to build from source:
   * [Go](https://golang.org/) 1.18 or later
   * [GCC C compiler](https://gcc.gnu.org/) 9.3.0 or later
