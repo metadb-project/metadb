@@ -136,7 +136,7 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		// If this is a change from an integer to float type, the
 		// column type can be changed using a cast.
 		if col.oldType == command.IntegerType && col.newType == command.FloatType {
-			err := alterColumnType(db, schema, tschema, tableName, col.name, command.FloatType, 0, true)
+			err := alterColumnType(db, schema, tschema, tableName, col.name, command.FloatType, col.newTypeSize, true)
 			if err != nil {
 				return err
 			}

@@ -271,7 +271,7 @@ func convertTypeSize(data *string, coltype string, datatype DataType) (int64, er
 		case "int64":
 			return 8, nil
 		default:
-			return 0, fmt.Errorf("internal error: unexpected type %q", coltype)
+			return 0, fmt.Errorf("internal error: unexpected integer type %q", coltype)
 		}
 	case VarcharType:
 		if data == nil {
@@ -284,12 +284,12 @@ func convertTypeSize(data *string, coltype string, datatype DataType) (int64, er
 		return int64(lendata), nil
 	case FloatType:
 		switch coltype {
-		case "float32":
+		case "float", "float32":
 			return 4, nil
-		case "float64":
+		case "double", "float64":
 			return 8, nil
 		default:
-			return 0, fmt.Errorf("internal error: unexpected type %q", coltype)
+			return 0, fmt.Errorf("internal error: unexpected float type %q", coltype)
 		}
 	case NumericType:
 		return 0, nil
@@ -455,7 +455,7 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type: %v", field, err)
 		}
 		if col.DTypeSize, err = convertTypeSize(col.SQLData, ftype, col.DType); err != nil {
-			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type size", field)
+			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type size: %v", field, err)
 		}
 		col.PrimaryKey = primaryKey[field]
 		column = append(column, col)
@@ -731,7 +731,7 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 			return TimestampType, nil
 		}
 		return IntegerType, nil
-	case "float32", "float64":
+	case "float", "double", "float32", "float64":
 		return FloatType, nil
 	case "string":
 		if strings.HasSuffix(semtype, ".data.Uuid") {
