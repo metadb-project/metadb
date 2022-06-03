@@ -136,7 +136,7 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		// If this is a change from an integer to float type, the
 		// column type can be changed using a cast.
 		if col.oldType == command.IntegerType && col.newType == command.FloatType {
-			err := alterColumnType(db, schema, tschema, tableName, col.name, command.FloatType, col.newTypeSize, true)
+			err := alterColumnType(db, schema, tschema, tableName, col.name, command.FloatType, col.newTypeSize, false)
 			if err != nil {
 				return err
 			}
@@ -146,10 +146,25 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		// If this is a change from an integer or float to numeric
 		// type, the column type can be changed using a cast.
 		if (col.oldType == command.IntegerType || col.oldType == command.FloatType) && col.newType == command.NumericType {
-			err := alterColumnType(db, schema, tschema, tableName, col.name, command.NumericType, 0, true)
+			err := alterColumnType(db, schema, tschema, tableName, col.name, command.NumericType, 0, false)
 			if err != nil {
 				return err
 			}
+			continue
+		}
+
+		// If this is a change from a float to integer type, cast the
+		// column to the numeric type.
+		if col.oldType == command.FloatType && col.newType == command.IntegerType {
+			err := alterColumnType(db, schema, tschema, tableName, col.name, command.NumericType, 0, false)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		// Prevent conversion from numeric to integer or float type.
+		if col.oldType == command.NumericType && (col.newType == command.IntegerType || col.newType == command.FloatType) {
 			continue
 		}
 
@@ -190,7 +205,7 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		}
 
 		// err = alterColumnToVarchar(sqlx.NewTable(tschema, tableName), col.name, maxlen, db, schema)
-		err = alterColumnType(db, schema, tschema, tableName, col.name, command.VarcharType, maxlen, true)
+		err = alterColumnType(db, schema, tschema, tableName, col.name, command.VarcharType, maxlen, false)
 		if err != nil {
 			return err
 		}

@@ -229,9 +229,9 @@ func alterColumnType(db sqlx.DB, dbschema *cache.Schema, schema string, table st
 	sqltype, datatypeStr, charMaxLen := command.DataTypeToSQL(datatype, typesize)
 	var caststr string
 	if cast {
-		caststr = "::" + sqltype
+		caststr = " USING \"" + column + "\"::" + sqltype
 	}
-	q := "ALTER TABLE %s ALTER COLUMN \"" + column + "\" TYPE " + sqltype + " USING \"" + column + "\"" + caststr
+	var q = "ALTER TABLE %s ALTER COLUMN \"" + column + "\" TYPE " + sqltype + caststr
 	_, err := db.Exec(nil, fmt.Sprintf(q, db.TableSQL(schemaTable)))
 	if err != nil {
 		return err
