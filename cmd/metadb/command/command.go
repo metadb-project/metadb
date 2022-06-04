@@ -438,7 +438,7 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 		}
 		col.Data = fieldData[field]
 		if col.DType == NumericType {
-			if col.Data, err = decodeNumericBytes(m, col.Data); err != nil {
+			if col.Data, err = decodeNumericBytes(m, col.Data, semtype); err != nil {
 				return nil, fmt.Errorf("decoding numeric bytes: %v", err)
 			}
 		}
@@ -463,22 +463,33 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 	return column, nil
 }
 
-func decodeNumericBytes(fieldMap map[string]any, data any) (string, error) {
+func decodeNumericBytes(fieldMap map[string]any, data any, semtype string) (string, error) {
 	var err error
-	// Read scale from parameters object.
+	var ok bool
+	// Read scale and value bytes.
 	var scale int32
-	if scale, err = parameterScale(fieldMap); err != nil {
-		return "", fmt.Errorf("reading numeric scale: %v", err)
+	var valuestr string
+	switch semtype {
+	case "org.apache.kafka.connect.data.Decimal":
+		// Read scale from parameters object.
+		if scale, err = parameterScale(fieldMap); err != nil {
+			return "", fmt.Errorf("reading numeric scale from parameters: %v", err)
+		}
+		if valuestr, ok = data.(string); !ok {
+			return "", fmt.Errorf("data \"%v\" has type %T", data, data)
+		}
+	case "io.debezium.data.VariableScaleDecimal":
+		// Read scale from struct.
+		if scale, valuestr, err = structScale(data); err != nil {
+			return "", fmt.Errorf("reading numeric scale from struct: %v", err)
+		}
+	default:
+		return "", fmt.Errorf("unsupported numeric type: %s: %v", semtype, fieldMap)
 	}
 	// Decode bytes.
-	var ok bool
-	var s string
-	if s, ok = data.(string); !ok {
-		return "", fmt.Errorf("data \"%v\" has type %T", data, data)
-	}
 	var bytes []byte
-	if bytes, err = base64.StdEncoding.DecodeString(s); err != nil {
-		return "", fmt.Errorf("unable to decode numeric bytes: %q", s)
+	if bytes, err = base64.StdEncoding.DecodeString(valuestr); err != nil {
+		return "", fmt.Errorf("unable to decode numeric bytes: %q", valuestr)
 	}
 	var bigInt = new(big.Int)
 	bigInt.SetBytes(bytes)
@@ -487,7 +498,7 @@ func decodeNumericBytes(fieldMap map[string]any, data any) (string, error) {
 	// var scale int32 = 2
 	var dec decimal.Decimal = decimal.NewFromBigInt(bigInt, -scale)
 	var decs string = dec.StringFixed(scale)
-	log.Trace("decoded numeric bytes: %q ==> %s", s, decs)
+	log.Trace("decoded numeric bytes: %q ==> %s", valuestr, decs)
 	return decs, nil
 }
 
@@ -528,6 +539,57 @@ func parameterScale(fieldMap map[string]any) (int32, error) {
 		return 0, fmt.Errorf("parse error: scale parameter: %q", s)
 	}
 	return int32(scale), nil
+}
+
+/*
+{
+  "type": "struct",
+  "fields": [
+    {
+      "type": "int32",
+      "optional": false,
+      "field": "scale"
+    },
+    {
+      "type": "bytes",
+      "optional": false,
+      "field": "value"
+    }
+  ],
+  "optional": true,
+  "name": "io.debezium.data.VariableScaleDecimal",
+  "version": 1,
+  "doc": "Variable scaled decimal",
+  "field": "n"
+},
+*/
+func structScale(data any) (int32, string, error) {
+	var ok bool
+	var obj map[string]any
+	if obj, ok = data.(map[string]any); !ok {
+		return 0, "", fmt.Errorf("expected object in payload after: %v", data)
+	}
+	var si any
+	if si, ok = obj["scale"]; !ok {
+		return 0, "", fmt.Errorf("scale not found in payload after: %v", obj)
+	}
+	var scalef float64
+	if scalef, ok = si.(float64); !ok {
+		return 0, "", fmt.Errorf("unexpected data type in scale: %T: %v", si, obj)
+	}
+	var scale = int32(scalef)
+	if scalef != float64(scale) {
+		return 0, "", fmt.Errorf("scale not int32: %v: %v", si, obj)
+	}
+	var vi any
+	if vi, ok = obj["value"]; !ok {
+		return 0, "", fmt.Errorf("value not found in payload after: %v", obj)
+	}
+	var valuestr string
+	if valuestr, ok = vi.(string); !ok {
+		return 0, "", fmt.Errorf("unexpected data type in value: %T: %v", vi, obj)
+	}
+	return scale, valuestr, nil
 }
 
 // func indentJSON(data string) (string, error) {
@@ -752,6 +814,11 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 		// 	return , nil
 		// }
 		if semtype == "org.apache.kafka.connect.data.Decimal" {
+			return NumericType, nil
+		}
+		return 0, fmt.Errorf("convert data type: unhandled type: type=%s, semtype=%s", coltype, semtype)
+	case "struct":
+		if semtype == "io.debezium.data.VariableScaleDecimal" {
 			return NumericType, nil
 		}
 		return 0, fmt.Errorf("convert data type: unhandled type: type=%s, semtype=%s", coltype, semtype)
