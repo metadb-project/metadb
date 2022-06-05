@@ -437,7 +437,7 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 			return nil, fmt.Errorf("value: $.schema.fields: \"type\": %s", err)
 		}
 		col.Data = fieldData[field]
-		if col.DType == NumericType {
+		if col.DType == NumericType && col.Data != nil {
 			if col.Data, err = decodeNumericBytes(m, col.Data, semtype); err != nil {
 				return nil, fmt.Errorf("decoding numeric bytes: %v", err)
 			}
@@ -464,6 +464,9 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 }
 
 func decodeNumericBytes(fieldMap map[string]any, data any, semtype string) (string, error) {
+	if data == nil {
+		return "", fmt.Errorf("decoding nil value")
+	}
 	var err error
 	var ok bool
 	// Read scale and value bytes.
