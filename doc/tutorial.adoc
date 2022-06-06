@@ -298,10 +298,10 @@ importing external data sets.  For example:
 
 [source,sql]
 ----
-CREATE TABLE peter.groups AS SELECT * FROM patrongroup;
+CREATE TABLE u.groups AS SELECT * FROM patrongroup;
 ----
 
-If you are logged in as the user `peter`, then the `peter` schema will
+If you are logged in as the user `u`, then the `u` schema will
 generally be the default schema when no schema is specified.  In that
 case the following query, leaving out the schema name, would have the
 same effect as above:

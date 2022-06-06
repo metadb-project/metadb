@@ -419,7 +419,7 @@ func logDebugCommand(c *command.Command) {
 // TODO waitForConfig is not currently using the source-database mapping.
 // TODO To be reworked.
 func waitForConfig(svr *server) (*sproc, error) {
-	log.Debug("waiting for configuration")
+	// log.Debug("waiting for configuration")
 	var databases []*sysdb.DatabaseConnector
 	var sources []*sysdb.SourceConnector
 	var ready bool

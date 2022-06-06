@@ -79,7 +79,7 @@ if ! $fast; then
     if ! $quiet; then
 	echo 'build.sh: removing executables' 1>&2
     fi
-    rm -f ./$bindir/metadb ./$bindir/mdb
+    rm -f ./$bindir/metadb ./$bindir/mdb ./cmd/metadb/parser/gram.go ./cmd/metadb/parser/scan.go ./cmd/metadb/parser/y.output
 fi
 
 if ! $quiet; then
@@ -96,6 +96,8 @@ case "$(uname -s)" in
 esac
 
 mkdir -p $bindir
+
+go generate $v ./...
 
 go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version $json" ./cmd/metadb
 go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
@@ -141,6 +143,7 @@ if $runtest || $runalltest; then
 	echo 'build.sh: running tests' 1>&2
     fi
     go test $v $tags -vet=off -count=1 ./cmd/metadb/command 1>&2
+    go test $v $tags -vet=off -count=1 ./cmd/metadb/parser 1>&2
     go test $v $tags -vet=off -count=1 ./cmd/metadb/sqlx 1>&2
     go test $v $tags -vet=off -count=1 ./cmd/metadb/util 1>&2
 fi

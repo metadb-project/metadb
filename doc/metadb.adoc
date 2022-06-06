@@ -6,3 +6,5 @@
 include::tutorial.adoc[]
 
 include::streamproc.adoc[]
+
+include::commands.adoc[]

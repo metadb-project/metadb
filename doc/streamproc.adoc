@@ -14,7 +14,7 @@ column data types in a number of cases:
 * A data type in the source can be converted safely to a type that is
   more performant.
 
-This table summarizes the type conversions that are performed:
+This table summarizes the type adjustments that are performed:
 
 [width=80%]
 [%header,cols="2,^1,^1,^1,^1"]

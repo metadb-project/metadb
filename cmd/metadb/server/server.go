@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -12,8 +13,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/internal/status"
+	"github.com/metadb-project/metadb/cmd/metadb/libpq"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
@@ -112,9 +115,9 @@ func isServerRunning(datadir string) (bool, int, error) {
 
 func runServer(svr *server) error {
 	log.Info("starting Metadb %s", svr.opt.MetadbVersion)
-	if svr.opt.RewriteJSON {
-		log.Info("enabled JSON rewriting")
-	}
+	// if svr.opt.RewriteJSON {
+	// 	log.Info("enabled JSON rewriting")
+	// }
 	if svr.opt.NoTLS {
 		log.Warning("TLS disabled for all client connections")
 	}
@@ -137,6 +140,25 @@ func mainServer(svr *server) error {
 	// TODO also need to catch signals and call RemovePIDFile
 
 	go listenAndServe(svr)
+
+	// TODO temporary
+	dbconnectors, err := sysdb.ReadDatabaseConnectors()
+	if err != nil {
+		return err
+	}
+	dsn := dbconnectors[0]
+	s := "host=" + dsn.DBHost + " port=" + dsn.DBPort + " user=" + dsn.DBAdminUser + " password=" + dsn.DBAdminPassword + " dbname=" + dsn.DBName + " sslmode=" + dsn.DBSSLMode
+	dbpool, err := pgxpool.Connect(context.TODO(), s)
+	if err != nil {
+		return err
+	}
+	// spr, err := waitForConfig(svr)
+	// if err != nil {
+	// 	log.Fatal("%s", err)
+	// 	os.Exit(1)
+	// }
+	go libpq.Listen(svr.opt.Listen, svr.opt.AdminPort, dbpool, svr.opt.MetadbVersion)
+
 	go goPollLoop(svr)
 
 	for {
@@ -164,7 +186,8 @@ func listenAndServe(svr *server) {
 	} else {
 		host = svr.opt.Listen
 	}
-	var port = svr.opt.AdminPort
+	// var port = svr.opt.AdminPort
+	port := "8441"
 	var httpsvr = http.Server{
 		Addr:    net.JoinHostPort(host, port),
 		Handler: setupHandlers(svr),
@@ -487,13 +510,22 @@ func (svr *server) createUser(rq *api.UserUpdateRequest) error {
 }
 
 func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) error {
+	// dsn := &sqlx.DSN{
+	// 	Host:     dbc.DBHost,
+	// 	Port:     dbc.DBPort,
+	// 	User:     dbc.DBSuperUser,
+	// 	Password: dbc.DBSuperPassword,
+	// 	DBName:   dbc.DBName,
+	// 	SSLMode:  dbc.DBSSLMode,
+	// 	Account:  dbc.DBAccount,
+	// }
 	dsn := &sqlx.DSN{
-		Host:     dbc.DBHost,
-		Port:     dbc.DBPort,
+		Host:     "localhost",
+		Port:     "5432",
 		User:     dbc.DBSuperUser,
 		Password: dbc.DBSuperPassword,
-		DBName:   dbc.DBName,
-		SSLMode:  dbc.DBSSLMode,
+		DBName:   "regression",
+		SSLMode:  "disable",
 		Account:  dbc.DBAccount,
 	}
 	dbsuper, err := sqlx.Open(dbc.Name, dbc.Type, dsn)
