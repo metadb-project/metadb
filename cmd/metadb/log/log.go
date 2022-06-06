@@ -49,74 +49,74 @@ func Init(out, csvout io.Writer, logDebug bool, logTrace bool) {
 	}
 }
 
-func Fatal(format string, v ...interface{}) {
+func Fatal(format string, args ...interface{}) {
 	if DisableColor {
-		//std.log.Printf("FATAL: "+format, v...)
-		printf(nil, "FATAL", format, v...)
+		//std.log.Printf("FATAL: "+format, args...)
+		printf(nil, "FATAL", format, args...)
 	} else {
 		//var c = color.Fatal.SprintFunc()
-		//std.log.Printf(c("FATAL:")+" "+format, v...)
-		printf(color.Fatal, "FATAL", format, v...)
+		//std.log.Printf(c("FATAL:")+" "+format, args...)
+		printf(color.Fatal, "FATAL", format, args...)
 	}
 }
 
-func Error(format string, v ...interface{}) {
+func Error(format string, args ...interface{}) {
 	if DisableColor {
-		//std.log.Printf("ERROR: "+format, v...)
-		printf(nil, "ERROR", format, v...)
+		//std.log.Printf("ERROR: "+format, args...)
+		printf(nil, "ERROR", format, args...)
 	} else {
 		//var c = color.Error.SprintFunc()
-		//std.log.Printf(c("ERROR: ")+format, v...)
-		printf(color.Error, "ERROR", format, v...)
+		//std.log.Printf(c("ERROR: ")+format, args...)
+		printf(color.Error, "ERROR", format, args...)
 	}
 }
 
-func Warning(format string, v ...interface{}) {
+func Warning(format string, args ...interface{}) {
 	if DisableColor {
-		//std.log.Printf("WARNING: "+format, v...)
-		printf(nil, "WARNING", format, v...)
+		//std.log.Printf("WARNING: "+format, args...)
+		printf(nil, "WARNING", format, args...)
 	} else {
 		//var c = color.Warning.SprintFunc()
-		//std.log.Printf(c("WARNING: ")+format, v...)
-		printf(color.Warning, "WARNING", format, v...)
+		//std.log.Printf(c("WARNING: ")+format, args...)
+		printf(color.Warning, "WARNING", format, args...)
 	}
 }
 
-func Info(format string, v ...interface{}) {
-	//std.log.Printf("INFO: "+format, v...)
-	printf(nil, "INFO", format, v...)
+func Info(format string, args ...interface{}) {
+	//std.log.Printf("INFO: "+format, args...)
+	printf(nil, "INFO", format, args...)
 }
 
-func Debug(format string, v ...interface{}) {
+func Debug(format string, args ...interface{}) {
 	if !std.logDebug && !std.logTrace {
 		return
 	}
-	//std.log.Printf("DEBUG: "+format, v...)
-	printf(nil, "DEBUG", format, v...)
+	//std.log.Printf("DEBUG: "+format, args...)
+	printf(nil, "DEBUG", format, args...)
 }
 
-func Trace(format string, v ...interface{}) {
+func Trace(format string, args ...interface{}) {
 	if !std.logTrace {
 		return
 	}
-	//std.log.Printf("TRACE: "+format, v...)
-	printf(nil, "TRACE", format, v...)
+	//std.log.Printf("TRACE: "+format, args...)
+	printf(nil, "TRACE", format, args...)
 }
 
-/*func P(format string, v ...interface{}) {
+/*func P(format string, args ...interface{}) {
 	if DisableColor {
-		//std.log.Printf("PRINT: "+format, v...)
-		printf(nil, "PRINT", format, v...)
+		//std.log.Printf("PRINT: "+format, args...)
+		printf(nil, "PRINT", format, args...)
 	} else {
 		//var c = color.P.SprintFunc()
-		//std.log.Printf(c("PRINT:")+" "+format, v...)
-		printf(color.P, "PRINT", format, v...)
+		//std.log.Printf(c("PRINT:")+" "+format, args...)
+		printf(color.P, "PRINT", format, args...)
 	}
 }
 */
 
-func printf(c *fcolor.Color, level string, format string, v ...interface{}) {
-	var msg = fmt.Sprintf(format, v...)
+func printf(c *fcolor.Color, level string, format string, args ...interface{}) {
+	var msg = fmt.Sprintf(format, args...)
 	var n = time.Now().UTC()
 	var now = n.Format("2006-01-02 15:04:05 MST")
 	var nowRFC = n.Format(time.RFC3339)

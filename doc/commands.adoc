@@ -1,0 +1,87 @@
+== Command reference
+
+=== Functions
+
+==== System information
+
+[%header,cols="1,1,3"]
+|===
+|Name
+|Return type
+|Description
+
+|`version()`
+|`*varchar*`
+|Metadb version
+|===
+
+=== Statements
+
+==== CREATE SERVER
+
+Define a new external data source
+
+[source,subs="verbatim,quotes"]
+----
+CREATE SERVER `*_server_name_*` DATA SOURCE *_data_source_type_*
+    OPTIONS ( *_option_* '*_value_*' [, ... ] )
+----
+
+===== Description
+
+CREATE SERVER defines connection settings for an external data source.
+
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_server_name_*`
+|A unique name for the data source to be created.
+
+|`*_data_source_type_*`
+|The type of data source.  The only type currently supported is `kafka`.
+
+|`OPTIONS ( *_option_* '*_value_*' [, ... ] )`
+|Connection settings and other configuration options for the data source.
+|===
+
+===== Options for data source type "kafka"
+
+[frame=none,grid=none,cols="1,3"]
+|===
+|`brokers`
+|Kafka bootstrap servers (comma-separated list).
+
+|`security`
+|Security protocol: `'ssl'` or `'plaintext'`.  The default is `'ssl'`.
+
+|`topics`
+|Regular expressions matching Kafka topics to read (comma-separated list).
+
+|`group`
+|Kafka consumer group ID.
+
+|`schemapassfilter`
+|Regular expressions matching schema names to accept (comma-separated list).
+
+|`schemaprefix`
+|Prefix to add to schema names.
+
+|`enable`
+|Boolean indicating if the data source is enabled.  The default is `TRUE`.
+|===
+
+===== Examples
+
+Create a server `example` as a `kafka` data source:
+
+----
+CREATE SERVER example DATA SOURCE kafka OPTIONS (
+    brokers 'kafka:29092',
+    topics '^metadb_example[.].*',
+    group 'metadb_example',
+    schemapassfilter 'example_.+',
+    schemaprefix 'example_',
+    enable TRUE
+);
+----

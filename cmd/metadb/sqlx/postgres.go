@@ -116,7 +116,8 @@ func (d *PostgresDB) Query(tx *sql.Tx, query string) (*sql.Rows, error) {
 		rows, err = tx.QueryContext(context.TODO(), query)
 	}
 	if err != nil {
-		return nil, fmt.Errorf(d.Name + ": SQL: " + query)
+		// return nil, fmt.Errorf(d.Name + ": SQL: " + query)
+		return nil, err
 	}
 	return rows, nil
 }
