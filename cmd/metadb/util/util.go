@@ -15,7 +15,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-const DatabaseVersion = 7
+const DatabaseVersion = 8
 
 func MetadbVersion() string {
 	return metadbVersion
@@ -59,6 +59,10 @@ func SystemPIDFileName(datadir string) string {
 
 func SysdbFileName(datadir string) string {
 	return filepath.Join(SystemDirName(datadir), "systemdb")
+}
+
+func ConfigFileName(datadir string) string {
+	return filepath.Join(datadir, "metadb.conf")
 }
 
 func MatchRegexps(res []*regexp.Regexp, s string) bool {

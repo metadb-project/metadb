@@ -1,19 +1,18 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/libpq"
@@ -23,14 +22,16 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"gopkg.in/ini.v1"
 )
 
 // The server thread handling needs to be reworked.  It currently runs an HTTP
 // server and a single poll loop in two goroutines.
 
 type server struct {
-	opt   *option.Server
-	state serverstate
+	opt        *option.Server
+	state      serverstate
+	connString string
 }
 
 // serverstate is shared between goroutines.
@@ -141,23 +142,22 @@ func mainServer(svr *server) error {
 
 	go listenAndServe(svr)
 
-	// TODO temporary
-	dbconnectors, err := sysdb.ReadDatabaseConnectors()
+	cfg, err := ini.Load(filepath.Join(svr.opt.Datadir, "metadb.conf"))
 	if err != nil {
-		return err
+		return fmt.Errorf("reading configuration file: %v", err)
 	}
-	dsn := dbconnectors[0]
-	s := "host=" + dsn.DBHost + " port=" + dsn.DBPort + " user=" + dsn.DBAdminUser + " password=" + dsn.DBAdminPassword + " dbname=" + dsn.DBName + " sslmode=" + dsn.DBSSLMode
-	dbpool, err := pgxpool.Connect(context.TODO(), s)
-	if err != nil {
-		return err
-	}
+	svr.connString = cfg.Section("").Key("database").String()
+
+	// if svr.conn, err = pgxpool.Connect(context.TODO(), svr.connString); err != nil {
+	// 	return err
+	// }
+
 	// spr, err := waitForConfig(svr)
 	// if err != nil {
 	// 	log.Fatal("%s", err)
 	// 	os.Exit(1)
 	// }
-	go libpq.Listen(svr.opt.Listen, svr.opt.AdminPort, dbpool, svr.opt.MetadbVersion)
+	go libpq.Listen(svr.opt.Listen, svr.opt.AdminPort, svr.connString, svr.opt.MetadbVersion)
 
 	go goPollLoop(svr)
 

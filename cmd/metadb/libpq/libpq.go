@@ -10,13 +10,12 @@ import (
 	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/metadb-project/metadb/cmd/metadb/ast"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/parser"
 )
 
-func Listen(host string, port string, db *pgxpool.Pool, mdbVersion string) {
+func Listen(host string, port string, connString string, mdbVersion string) {
 	// var h string
 	// if host == "" {
 	// 	h = "127.0.0.1"
@@ -48,12 +47,20 @@ func Listen(host string, port string, db *pgxpool.Pool, mdbVersion string) {
 		var backend *pgproto3.Backend
 		backend = pgproto3.NewBackend(pgproto3.NewChunkReader(conn), conn)
 		log.Trace("connection received: %s", conn.RemoteAddr().String())
-		go serve(conn, backend, db, mdbVersion)
+		go serve(conn, backend, connString, mdbVersion)
 	}
 }
 
-func serve(conn net.Conn, backend *pgproto3.Backend, db *pgxpool.Pool, mdbVersion string) {
+func serve(conn net.Conn, backend *pgproto3.Backend, connString string, mdbVersion string) {
 	var err error
+
+	var dbconn *pgx.Conn
+	if dbconn, err = pgx.Connect(context.TODO(), connString); err != nil {
+		// TODO handle error
+		log.Info("%v", err)
+		return
+	}
+
 	if err = startup(conn, backend); err != nil {
 		// TODO handle error
 		log.Info("%v", err)
@@ -70,7 +77,7 @@ func serve(conn net.Conn, backend *pgproto3.Backend, db *pgxpool.Pool, mdbVersio
 		case *pgproto3.Parse:
 			log.Info("*pgproto3.Parse: not yet implemented")
 		case *pgproto3.Query:
-			if err = processQuery(conn, m, db, mdbVersion); err != nil {
+			if err = processQuery(conn, m, dbconn, mdbVersion); err != nil {
 				log.Info("%v", err)
 				return
 			}
@@ -113,7 +120,7 @@ func startup(conn net.Conn, backend *pgproto3.Backend) error {
 	}
 }
 
-func processQuery(conn net.Conn, query *pgproto3.Query, db *pgxpool.Pool, mdbVersion string) error {
+func processQuery(conn net.Conn, query *pgproto3.Query, dbconn *pgx.Conn, mdbVersion string) error {
 	var node ast.Node
 	var err error
 	var pass bool
@@ -123,7 +130,7 @@ func processQuery(conn net.Conn, query *pgproto3.Query, db *pgxpool.Pool, mdbVer
 	}
 	log.Trace("query received: query=%q node=%#v err=%q pass=%v\n", query.String, node, e, pass)
 	if pass {
-		err = passthroughQuery(conn, query, db)
+		err = passthroughQuery(conn, query, dbconn)
 		if err != nil {
 			return write(conn, encode(nil, []pgproto3.Message{
 				&pgproto3.ErrorResponse{Message: "ERROR:  " + err.Error()},
@@ -164,10 +171,10 @@ func handleStartup(conn net.Conn, msg *pgproto3.StartupMessage) error {
 	}))
 }
 
-func passthroughQuery(conn net.Conn, query *pgproto3.Query, db *pgxpool.Pool) error {
+func passthroughQuery(conn net.Conn, query *pgproto3.Query, dbconn *pgx.Conn) error {
 	var err error
 	var rows pgx.Rows
-	if rows, err = db.Query(context.TODO(), query.String); err != nil {
+	if rows, err = dbconn.Query(context.TODO(), query.String); err != nil {
 		var ok bool
 		var e *pgconn.PgError
 		if e, ok = err.(*pgconn.PgError); !ok {

@@ -8,7 +8,8 @@ type Global struct {
 
 type Init struct {
 	Global
-	Datadir string
+	Datadir     string
+	DatabaseURI string
 }
 
 type Upgrade struct {

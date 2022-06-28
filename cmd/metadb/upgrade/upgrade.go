@@ -76,15 +76,15 @@ func upgradeSysdb(datadir string) (bool, error) {
 	if dbversion > util.DatabaseVersion {
 		return false, fmt.Errorf("data directory version incompatible with server (%d > %d)", dbversion, util.DatabaseVersion)
 	}
-	err = upgradeSysdbAll(db, dbversion)
+	err = upgradeSysdbAll(db, dbversion, datadir)
 	if err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-func upgradeSysdbAll(db *sql.DB, dbversion int64) error {
-	opt := sysopt{}
+func upgradeSysdbAll(db *sql.DB, dbversion int64, datadir string) error {
+	opt := sysopt{Datadir: datadir}
 	for v := dbversion + 1; v <= util.DatabaseVersion; v++ {
 		eout.Info("upgrading: system: version %d", v)
 		err := upsysList[v](&opt)
@@ -104,6 +104,7 @@ var upsysList = []upsysFunc{
 	upsys5,
 	upsys6,
 	upsys7,
+	upsys8,
 }
 
 func upsys5(opt *sysopt) error {
@@ -130,9 +131,40 @@ func upsys7(opt *sysopt) error {
 	return nil
 }
 
+func upsys8(opt *sysopt) error {
+	var err error
+	// Read database connection parameters.
+	var dbconnectors []*sysdb.DatabaseConnector
+	if dbconnectors, err = sysdb.ReadDatabaseConnectors(); err != nil {
+		return err
+	}
+	var dsn *sysdb.DatabaseConnector
+	if dsn = dbconnectors[0]; err != nil {
+		return err
+	}
+	var connString = "postgres://" + dsn.DBAdminUser + ":" + dsn.DBAdminPassword + "@" + dsn.DBHost + ":" + dsn.DBPort + "/" + dsn.DBName + "?sslmode=" + dsn.DBSSLMode
+	// Write to configuration file.
+	var f *os.File
+	if f, err = os.Create(util.ConfigFileName(opt.Datadir)); err != nil {
+		return fmt.Errorf("creating configuration file: %v", err)
+	}
+	if _, err = f.WriteString("database = " + connString + "\n"); err != nil {
+		return fmt.Errorf("writing configuration file: %v", err)
+	}
+	if err = f.Close(); err != nil {
+		return fmt.Errorf("closing configuration file: %v", err)
+	}
+	if err = sysdb.WriteSysdbVersion(8); err != nil {
+		return err
+	}
+	return nil
+}
+
 type upsysFunc func(opt *sysopt) error
 
-type sysopt struct{}
+type sysopt struct {
+	Datadir string
+}
 
 // Database upgrades
 
@@ -211,6 +243,7 @@ var updbList = []updbFunc{
 	updb5,
 	updb6,
 	updb7,
+	updb8,
 }
 
 func updb5(opt *dbopt) error {
@@ -352,6 +385,65 @@ func updb7(opt *dbopt) error {
 		return err
 	}
 	return nil
+}
+
+func updb8(opt *dbopt) error {
+	var tx *sql.Tx
+	var err error
+	if tx, err = opt.DB.BeginTx(); err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	// Read source connector parameters.
+	var sources []*sysdb.SourceConnector
+	if sources, err = sysdb.ReadSourceConnectors(); err != nil {
+		return err
+	}
+	var src *sysdb.SourceConnector
+	if src = sources[0]; err != nil {
+		return err
+	}
+	// Write to database.
+	var q = "CREATE TABLE metadb.source (" +
+		"    name text PRIMARY KEY," +
+		"    brokers text NOT NULL," +
+		"    security text NOT NULL," +
+		"    topics text[] NOT NULL," +
+		"    consumergroup text NOT NULL," +
+		"    schemapassfilter text[] NOT NULL," +
+		"    schemaprefix text NOT NULL" +
+		")"
+	if _, err = opt.DB.Exec(nil, q); err != nil {
+		return err
+	}
+	q = "INSERT INTO metadb.source (name, brokers, security, topics, consumergroup, schemapassfilter, schemaprefix) " +
+		"VALUES ('" + src.Name + "', '" + src.Brokers + "', '" + src.Security + "', '" + toPostgresArray(src.Topics) + "', '" + src.Group + "', '" + toPostgresArray(src.SchemaPassFilter) + "', '" + src.SchemaPrefix + "')"
+	if _, err = opt.DB.Exec(nil, q); err != nil {
+		return err
+	}
+	// Write new version number.
+	if err = metadata.WriteDatabaseVersion(opt.DB, tx, 8); err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func toPostgresArray(slice []string) string {
+	var b strings.Builder
+	b.WriteString("ARRAY[")
+	var i int
+	var s string
+	for i, s = range slice {
+		if i != 0 {
+			b.WriteRune(',')
+		}
+		b.WriteString("'" + s + "'")
+	}
+	b.WriteRune(']')
+	return b.String()
 }
 
 type updbFunc func(opt *dbopt) error

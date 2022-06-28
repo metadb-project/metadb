@@ -3,10 +3,11 @@ package sysdb
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"os"
 	"sync"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
@@ -45,55 +46,61 @@ type SourceConnector struct {
 var sysMu sync.Mutex
 var db *sql.DB
 
-var initialized bool
-
-func Init(filename string) error {
-	return initSysdb(filename, false)
+// Deprecated
+func Init(s string) error {
+	return nil
 }
 
-func InitCreate(filename string) error {
-	// Init and create: call this instead of Init() when creating a new database.
-	return initSysdb(filename, true)
-}
-
-func initSysdb(filename string, create bool) error {
+func InitCreate(connString string) error {
 	sysMu.Lock()
 	defer sysMu.Unlock()
 
 	var err error
-	if initialized {
-		return fmt.Errorf("initializing sysdb: already initialized")
-	}
-	var d *sql.DB
-	if create {
-		// TODO move this block to a function and defer d.Close()
-		if d, err = openDatabase(filename); err != nil {
-			return err
-		}
-		if err = initSchema(d); err != nil {
-			return err
-		}
-		_ = d.Close()
-		if err = os.Chmod(filename, util.ModePermRW); err != nil {
-			return err
-		}
-	}
-	if d, err = openDatabase(filename); err != nil {
+
+	var dbconn *pgx.Conn
+	if dbconn, err = pgx.Connect(context.TODO(), connString); err != nil {
 		return err
 	}
-	db = d
-	initialized = true
-	return nil
-}
+	defer dbconn.Close(context.TODO())
 
-func Close() error {
-	err := db.Close()
-	if err != nil {
+	var exists bool
+	if exists, err = systemSchemaExists(dbconn); err != nil {
+		return fmt.Errorf("checking if database initialized: %v", err)
+	}
+	if exists {
+		return fmt.Errorf("database already initialized")
+	}
+
+	if err = createSchema(dbconn); err != nil {
 		return err
 	}
 	return nil
 }
 
+func systemSchemaExists(dbconn *pgx.Conn) (bool, error) {
+	var err error
+	var q = "SELECT 1 FROM pg_namespace WHERE nspname='metadb'"
+	var n int32
+	err = dbconn.QueryRow(context.TODO(), q).Scan(&n)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return false, nil
+	case err != nil:
+		return false, err
+	default:
+		return true, nil
+	}
+}
+
+// func Close() error {
+// 	err := db.Close()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
+
+// Deprecated
 func sysdbBeginTx(d *sql.DB) (*sql.Tx, error) {
 	tx, err := d.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
@@ -102,37 +109,43 @@ func sysdbBeginTx(d *sql.DB) (*sql.Tx, error) {
 	return tx, nil
 }
 
+// Deprecated
 const OpenOptions = "?_busy_timeout=30000" +
 	"&_foreign_keys=on" +
 	"&_journal_mode=WAL" +
 	"&_locking_mode=NORMAL" +
 	"&_synchronous=3"
 
-func openDatabase(filename string) (*sql.DB, error) {
-	var err error
-	var dsn = "file:" + filename + OpenOptions
-	var d *sql.DB
-	if d, err = sql.Open("sqlite3", dsn); err != nil {
-		return nil, err
-	}
-	return d, err
-}
+// func openDatabase(filename string) (*sql.DB, error) {
+// 	var err error
+// 	var dsn = "file:" + filename + OpenOptions
+// 	var d *sql.DB
+// 	if d, err = sql.Open("sqlite3", dsn); err != nil {
+// 		return nil, err
+// 	}
+// 	return d, err
+// }
 
-func initSchema(d *sql.DB) error {
+func createSchema(dbconn *pgx.Conn) error {
+	var tx pgx.Tx
 	var err error
-	var tx *sql.Tx
-	if tx, err = sysdbBeginTx(d); err != nil {
+	if tx, err = dbconn.Begin(context.TODO()); err != nil {
 		return err
 	}
-	defer func(tx *sql.Tx) {
-		_ = tx.Rollback()
-	}(tx)
+	defer tx.Rollback(context.TODO())
 
-	eout.Trace("writing database version: %d", util.DatabaseVersion)
-	var q = fmt.Sprintf("PRAGMA user_version = %d;", util.DatabaseVersion)
-	if _, err = tx.ExecContext(context.TODO(), q); err != nil {
-		return fmt.Errorf("initializing system database: writing database version: %s", err)
+	var q = "CREATE SCHEMA metadb"
+	_, err = tx.Exec(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("creating schema: metadb: %v", err)
 	}
+
+	eout.Info("*** writing database version disabled")
+	// eout.Trace("writing database version: %d", util.DatabaseVersion)
+	// var q = fmt.Sprintf("PRAGMA user_version = %d;", util.DatabaseVersion)
+	// if _, err = tx.Exec(context.TODO(), q); err != nil {
+	// 	return fmt.Errorf("initializing system database: writing database version: %s", err)
+	// }
 
 	/*
 
@@ -232,34 +245,34 @@ func initSchema(d *sql.DB) error {
 
 	eout.Trace("creating schema: config")
 	q = "" +
-		"CREATE TABLE config (\n" +
+		"CREATE TABLE metadb.config (\n" +
 		"    attr TEXT PRIMARY KEY,\n" +
 		"    val TEXT NOT NULL\n" +
 		");"
-	_, err = tx.ExecContext(context.TODO(), q)
+	_, err = tx.Exec(context.TODO(), q)
 	if err != nil {
 		return fmt.Errorf("initializing system database: creating schema: config: %s", err)
 	}
 
 	eout.Trace("creating schema: userperm")
 	q = "" +
-		"CREATE TABLE userperm (\n" +
+		"CREATE TABLE metadb.userperm (\n" +
 		"    username TEXT PRIMARY KEY,\n" +
 		"    tables TEXT NOT NULL,\n" +
 		"    dbupdated BOOLEAN NOT NULL\n" +
 		");"
-	_, err = tx.ExecContext(context.TODO(), q)
+	_, err = tx.Exec(context.TODO(), q)
 	if err != nil {
 		return fmt.Errorf("initializing system database: creating schema: userperm: %s", err)
 	}
 
 	eout.Trace("creating schema: connector")
 	q = "" +
-		"CREATE TABLE connector (\n" +
+		"CREATE TABLE metadb.connector (\n" +
 		"    spec TEXT PRIMARY KEY,\n" +
 		"    enabled BOOLEAN NOT NULL\n" +
 		");"
-	_, err = tx.ExecContext(context.TODO(), q)
+	_, err = tx.Exec(context.TODO(), q)
 	if err != nil {
 		return fmt.Errorf("initializing system database: creating schema: connector: %s", err)
 	}
@@ -278,7 +291,7 @@ func initSchema(d *sql.DB) error {
 		}
 	*/
 
-	if err = tx.Commit(); err != nil {
+	if err = tx.Commit(context.TODO()); err != nil {
 		return fmt.Errorf("initializing system database: committing changes: %s", err)
 	}
 	return nil

@@ -81,6 +81,7 @@ func run() error {
 	}
 	cmdInit.SetHelpFunc(help)
 	_ = dirFlag(cmdInit, &initOpt.Datadir)
+	_ = databaseFlag(cmdInit, &initOpt.DatabaseURI)
 	_ = verboseFlag(cmdInit, &eout.EnableVerbose)
 	_ = traceFlag(cmdInit, &eout.EnableTrace)
 
@@ -99,7 +100,7 @@ func run() error {
 			if err = upgrade.Upgrade(&upgradeOpt); err != nil {
 				return err
 			}
-			err = sysdb.Close()
+			// err = sysdb.Close()
 			if err != nil {
 				log.Error("%s", err)
 			}
@@ -138,7 +139,7 @@ func run() error {
 			if err = server.Start(&serverOpt); err != nil {
 				return logFatal(err, logf, csvlogf)
 			}
-			err = sysdb.Close()
+			// err = sysdb.Close()
 			if err != nil {
 				log.Error("%s", err)
 			}
@@ -360,6 +361,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"\n" +
 			"Options:\n" +
 			dirFlag(nil, nil) +
+			databaseFlag(nil, nil) +
 			verboseFlag(nil, nil) +
 			traceFlag(nil, nil) +
 			"")
@@ -555,6 +557,14 @@ func dirFlag(cmd *cobra.Command, datadir *string) string {
 	}
 	return "" +
 		"  -D, --dir <d>               - Data directory name\n"
+}
+
+func databaseFlag(cmd *cobra.Command, database *string) string {
+	if cmd != nil {
+		cmd.Flags().StringVar(database, "database", "", "")
+	}
+	return "" +
+		"      --database <u>          - Database connection URI\n"
 }
 
 func noTLSFlag(cmd *cobra.Command, noTLS *bool) string {

@@ -13,9 +13,12 @@ import (
 
 func InitSys(opt *option.Init) error {
 	var err error
-	// Require that a data directory be specified.
+	// Check for required options.
 	if opt.Datadir == "" {
 		return fmt.Errorf("data directory not specified")
+	}
+	if opt.DatabaseURI == "" {
+		return fmt.Errorf("database connection URI not specified")
 	}
 	// Require that the data directory not already exist.
 	var exists bool
@@ -25,30 +28,19 @@ func InitSys(opt *option.Init) error {
 	if exists {
 		return fmt.Errorf("%s already exists", opt.Datadir)
 	}
-	eout.Info("initializing new instance in %s", opt.Datadir)
-	// Create the data directory.
-	eout.Verbose("creating data directory")
-	eout.Trace("mkdir: %s", opt.Datadir)
-	err = os.MkdirAll(opt.Datadir, util.ModePermRWX)
-	if err != nil {
-		return err
-	}
-	eout.Verbose("creating system files")
-	if err = initSchema(opt.Datadir); err != nil {
-		return err
-	}
-	eout.Verbose("initialization completed")
-	return nil
-}
+	eout.Info("initializing")
 
-func initSchema(datadir string) error {
-	var err error
+	// eout.Verbose("creating system files")
+	// if err = initSchema(opt.Datadir, opt.DatabaseURI); err != nil {
+
 	// Create system directory.
 	//var sdir = filepath.Join(datadir, sysdbDir)
 	//eout.Trace("mkdir: %s", sdir)
-	if err = os.MkdirAll(util.SystemDirName(datadir), util.ModePermRWX); err != nil {
-		return err
-	}
+
+	// if err = os.MkdirAll(util.SystemDirName(datadir), util.ModePermRWX); err != nil {
+	// 	return err
+	// }
+
 	//var filename = filepath.Join(sdir, sysdbFile)
 	// Create and initialize system database.
 	/*
@@ -70,9 +62,34 @@ func initSchema(datadir string) error {
 			return err
 		}
 	*/
-	if err = sysdb.InitCreate(util.SysdbFileName(datadir)); err != nil {
+
+	eout.Verbose("initializing database")
+	if err = sysdb.InitCreate(opt.DatabaseURI); err != nil {
+		return fmt.Errorf("initializing database: %v", err)
+	}
+
+	// Create the data directory.
+	eout.Verbose("creating data directory")
+	eout.Trace("mkdir: %s", opt.Datadir)
+	err = os.MkdirAll(opt.Datadir, util.ModePermRWX)
+	if err != nil {
 		return err
 	}
+
+	eout.Verbose("writing configuration file")
+	var f *os.File
+	if f, err = os.Create(util.ConfigFileName(opt.Datadir)); err != nil {
+		return fmt.Errorf("creating configuration file: %v", err)
+	}
+	// postgres://<user>:<password>@<host>:<port>/<dbname>
+	var s = "database = " + opt.DatabaseURI + "\n"
+	if _, err = f.WriteString(s); err != nil {
+		return fmt.Errorf("writing configuration file: %v", err)
+	}
+	if err = f.Close(); err != nil {
+		return fmt.Errorf("closing configuration file: %v", err)
+	}
+
 	// TODO Do this as a function in sysdb - close, chmod, reopen
 	/*
 		db.Close()
@@ -80,5 +97,7 @@ func initSchema(datadir string) error {
 			return err
 		}
 	*/
+
+	eout.Info("initialization completed")
 	return nil
 }
