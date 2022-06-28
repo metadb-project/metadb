@@ -1,0 +1,20 @@
+== Server administration
+
+=== Server configuration
+
+Metadb makes use of local storage in a "data directory," which is
+created using `metadb` with the `init` command.  In this example we
+will create the data directory as `data/` with a sample database
+connection URI:
+
+[source,bash]
+----
+metadb init -D data --database postgres://metadb:zpreCaWS7S79dt82zgvD@dbserver:5432/metadb
+----
+
+A basic connection URI takes the form:
+
+[source,subs="verbatim,quotes"]
+----
+postgres://**_user_**:**_password_**@**_host_**:**_port_**/**_dbname_**
+----
