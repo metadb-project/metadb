@@ -233,7 +233,7 @@ func selectMaxStringLength(db sqlx.DB, table *sqlx.Table, column string) (int64,
 		return 0, err
 	}
 	defer tx.Rollback()
-	q := "SELECT max(m) FROM (" +
+	q := "SELECT coalesce(max(m), 0) FROM (" +
 		"SELECT max(length(\"" + column + "\"::varchar)) AS m FROM " + db.TableSQL(table) +
 		" UNION ALL SELECT max(length(\"" + column + "\"::varchar)) AS m FROM " + db.HistoryTableSQL(table) + ") a"
 	err = db.QueryRow(tx, q).Scan(&maxlen)
