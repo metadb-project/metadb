@@ -324,7 +324,7 @@ func readChangeEvent(consumer *kafka.Consumer, sourceLog *log.SourceLog) (*chang
 		default:
 			ev := consumer.Poll(2000)
 			if ev == nil {
-				log.Trace("poll timeout")
+				// log.Trace("poll timeout")
 				// continue
 				return nil, true, nil
 			}
