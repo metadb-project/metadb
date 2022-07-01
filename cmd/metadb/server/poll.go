@@ -242,14 +242,13 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 				break
 			}
 		} else {
-			// var partitionEOF bool
-			// if ce, partitionEOF, err = readChangeEvent(consumer, sourceLog); err != nil {
-			if ce, _, err = readChangeEvent(consumer, sourceLog); err != nil {
+			var partitionEOF bool
+			if ce, partitionEOF, err = readChangeEvent(consumer, sourceLog); err != nil {
 				return 0, fmt.Errorf("reading change event: %s", err)
 			}
-			// if partitionEOF {
-			// 	break
-			// }
+			if partitionEOF {
+				break
+			}
 		}
 		if ce == nil {
 			break
@@ -373,8 +372,7 @@ func readChangeEvent(consumer *kafka.Consumer, sourceLog *log.SourceLog) (*chang
 				return ce, false, nil
 			case kafka.PartitionEOF:
 				log.Trace("%s", e)
-				// return nil, true, nil
-				continue
+				return nil, true, nil
 			case kafka.Error:
 				// In general, errors from the Kafka
 				// client can be reported and ignored,
