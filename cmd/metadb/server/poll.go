@@ -242,13 +242,14 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 				break
 			}
 		} else {
-			var partitionEOF bool
-			if ce, partitionEOF, err = readChangeEvent(consumer, sourceLog); err != nil {
+			// var partitionEOF bool
+			// if ce, partitionEOF, err = readChangeEvent(consumer, sourceLog); err != nil {
+			if ce, _, err = readChangeEvent(consumer, sourceLog); err != nil {
 				return 0, fmt.Errorf("reading change event: %s", err)
 			}
-			if partitionEOF {
-				break
-			}
+			// if partitionEOF {
+			// 	break
+			// }
 		}
 		if ce == nil {
 			break
@@ -322,11 +323,9 @@ func readChangeEvent(consumer *kafka.Consumer, sourceLog *log.SourceLog) (*chang
 		case sig := <-sigchan:
 			return nil, false, fmt.Errorf("caught signal %v: terminating", sig)
 		default:
-			ev := consumer.Poll(2000)
+			ev := consumer.Poll(100)
 			if ev == nil {
-				log.Trace("poll timeout")
-				// continue
-				return nil, true, nil
+				continue
 			}
 			switch e := ev.(type) {
 			case *kafka.Message:
