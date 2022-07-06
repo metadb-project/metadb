@@ -372,7 +372,15 @@ func updb7(opt *dbopt) error {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = opt.DB.Exec(nil, "ALTER TABLE metadb.track ADD COLUMN transformed boolean NOT NULL;")
+	_, err = opt.DB.Exec(nil, "ALTER TABLE metadb.track ADD COLUMN transformed boolean;")
+	if err != nil {
+		return err
+	}
+	_, err = opt.DB.Exec(nil, "UPDATE metadb.track SET transformed = (tablename LIKE '%\\_\\_t');")
+	if err != nil {
+		return err
+	}
+	_, err = opt.DB.Exec(nil, "ALTER TABLE metadb.track ALTER COLUMN transformed SET NOT NULL;")
 	if err != nil {
 		return err
 	}
