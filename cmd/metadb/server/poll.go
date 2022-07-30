@@ -391,38 +391,6 @@ func readChangeEvent(consumer *kafka.Consumer, sourceLog *log.SourceLog) (*chang
 	}
 }
 
-// not currently used
-func readChangeEventSimple(consumer *kafka.Consumer, sourceLog *log.SourceLog) (*change.Event, bool, error) {
-	var err error
-	for {
-		var msg *kafka.Message
-		msg, err = consumer.ReadMessage(100)
-		if err != nil {
-			if err.(kafka.Error).Code() == kafka.ErrTimedOut {
-				continue
-			}
-			// The client will automatically try to recover from all errors.
-			// fmt.Printf("Consumer error: %v (%v)\n", err, msg)
-			log.Error("%v: %v", err.(kafka.Error).Code(), err)
-		}
-		// fmt.Printf("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
-		var ce *change.Event
-		if msg != nil { // received message
-			if sourceLog != nil {
-				sourceLog.Log("#")
-				sourceLog.Log(string(msg.Key))
-				sourceLog.Log(string(msg.Value))
-			}
-			if ce, err = change.NewEvent(msg); err != nil {
-				log.Error("%s", err)
-				ce = nil
-			}
-		}
-		log.Trace("received message")
-		return ce, false, nil
-	}
-}
-
 func logDebugCommand(c *command.Command) {
 	var schemaTable string
 	if c.SchemaName == "" {
