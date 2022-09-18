@@ -663,7 +663,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 		// Rewrite schema name
 		var schema string = *ce.Value.Payload.Source.Schema
 		if FolioTenant != "" {
-			schema = strings.TrimPrefix(schema, FolioTenant)
+			schema = strings.TrimPrefix(schema, FolioTenant+"_")
 		}
 		schema = strings.TrimPrefix(schema, "uchicago_")
 		schema = strings.TrimPrefix(schema, "metadb_dev_")
