@@ -666,7 +666,6 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 			schema = strings.TrimPrefix(schema, FolioTenant+"_")
 		}
 		schema = strings.TrimPrefix(schema, "uchicago_")
-		schema = strings.TrimPrefix(schema, "metadb_dev_")
 		schema = strings.TrimPrefix(schema, "lu_")
 		schema = strings.TrimPrefix(schema, "dbz_")
 		schema = strings.TrimPrefix(schema, "reports_dev_")
