@@ -608,7 +608,8 @@ func structScale(data any) (int32, string, error) {
 // 	return string(jb), nil
 // }
 
-var Tenants []string
+var FolioTenant string
+var ReshareTenants []string
 
 func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string) (*Command, error) {
 	// Note: this function returns nil, nil in some cases.
@@ -659,8 +660,12 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 			log.Trace("filter: reject: %s", *ce.Value.Payload.Source.Schema)
 			return nil, nil
 		}
-		// TODO the mapping is currently hardcoded
-		var schema string = strings.TrimPrefix(*ce.Value.Payload.Source.Schema, "uchicago_")
+		// Rewrite schema name
+		var schema string = *ce.Value.Payload.Source.Schema
+		if FolioTenant != "" {
+			schema = strings.TrimPrefix(schema, FolioTenant)
+		}
+		schema = strings.TrimPrefix(schema, "uchicago_")
 		schema = strings.TrimPrefix(schema, "metadb_dev_")
 		schema = strings.TrimPrefix(schema, "lu_")
 		schema = strings.TrimPrefix(schema, "dbz_")
@@ -669,7 +674,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 		schema = strings.TrimSuffix(schema, "_storage")
 		schema = strings.Replace(schema, "_mod_", "_", 1)
 		var origin string
-		origin, schema = extractOrigin(Tenants, schema)
+		origin, schema = extractOrigin(ReshareTenants, schema)
 		c.Origin = origin
 		schema = schemaPrefix + schema
 		c.SchemaName = schema

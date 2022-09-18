@@ -62,15 +62,25 @@ func outerPollLoop(svr *server, spr *sproc) error {
 	}
 
 	//// TMP
-	// set command.Tenants
-	var tenants string
-	if tenants, _, err = sysdb.GetConfig("plug.reshare.tenants"); err != nil {
+	// set command.FolioTenant
+	var folioTenant string
+	if folioTenant, _, err = sysdb.GetConfig("plug.folio.tenant"); err != nil {
 		return err
 	}
-	if tenants == "" {
-		command.Tenants = []string{}
+	if folioTenant == "" {
+		command.FolioTenant = ""
 	} else {
-		command.Tenants = util.SplitList(tenants)
+		command.FolioTenant = folioTenant
+	}
+	// set command.ReshareTenants
+	var reshareTenants string
+	if reshareTenants, _, err = sysdb.GetConfig("plug.reshare.tenants"); err != nil {
+		return err
+	}
+	if reshareTenants == "" {
+		command.ReshareTenants = []string{}
+	} else {
+		command.ReshareTenants = util.SplitList(reshareTenants)
 	}
 	////
 
