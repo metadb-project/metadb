@@ -10,5 +10,4 @@ for more information.
 
 Metadb is currently in development.
 
-For documentation (work in progress), see:
-[admin_guide.md](doc/admin_guide.md)
+For Metadb 0.11 documentation, see the file [admin_guide.md](doc/admin_guide.md).
