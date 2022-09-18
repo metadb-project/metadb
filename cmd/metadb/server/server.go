@@ -509,7 +509,7 @@ func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) err
 	}
 	_, err = dbsuper.Exec(nil, "CREATE USER \""+rq.Name+"\" PASSWORD '"+rq.Password+"'")
 	if err != nil {
-		return fmt.Errorf("unable to create user %q: %s", rq.Name, err)
+		return fmt.Errorf("%v: unable to create user %q", err, rq.Name)
 	}
 	dsn = &sqlx.DSN{
 		Host:     dbc.DBHost,
