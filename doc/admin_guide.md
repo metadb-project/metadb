@@ -328,10 +328,10 @@ The `--origin` should be the same as used for the reset.
 Note that the metadb server currently does not give any indication
 that it has finished re-streaming, except that running it with
 `--debug` will typically show updates slowing down.  The precise
-timing when "metadb clean" is run is not critical, but it is
-preferable to run it late rather than early.  (Having the server
-report that initial streaming or re-streaming has finished is a
-planned feature.)
+timing when "metadb clean" is run is not critical, but it must be run
+to complete the resynchronization process.  (Having the server report
+that initial streaming or re-streaming has finished is a planned
+feature.)
 
 g. Start the server.
 
