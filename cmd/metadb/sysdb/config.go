@@ -89,8 +89,11 @@ func UpdateConfig(rq *api.ConfigUpdateRequest) error {
 		return fmt.Errorf("configuration failed: %s: %s", rq.Attr, err)
 	}
 	//// TMP
+	if rq.Attr == "plug.folio.tenant" && rq.Val != "" {
+		command.FolioTenant = rq.Val
+	}
 	if rq.Attr == "plug.reshare.tenants" && rq.Val != "" {
-		command.Tenants = util.SplitList(rq.Val)
+		command.ReshareTenants = util.SplitList(rq.Val)
 	}
 	////
 	return nil
@@ -141,8 +144,11 @@ func DeleteConfig(rq *api.ConfigDeleteRequest) (*api.ConfigDeleteResponse, error
 		}
 	}
 	//// TMP
+	if rq.Attr == "plug.folio.tenant" {
+		command.FolioTenant = ""
+	}
 	if rq.Attr == "plug.reshare.tenants" {
-		command.Tenants = []string{}
+		command.ReshareTenants = []string{}
 	}
 	////
 	return &api.ConfigDeleteResponse{AttrNotFound: !exists}, nil
@@ -218,7 +224,7 @@ func validateAttr(attr string) error {
 	if strings.HasPrefix(attr, "db.") || strings.HasPrefix(attr, "src.") {
 		return nil
 	}
-	if attr != "plug.reshare.tenants" {
+	if attr != "plug.folio.tenant" && attr != "plug.reshare.tenants" {
 		return fmt.Errorf("invalid attribute: %s", attr)
 	}
 	return nil
