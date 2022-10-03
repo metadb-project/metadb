@@ -12,4 +12,3 @@ Metadb is currently in development.
 
 For documentation (work in progress), see:
 [https://d1f3dtrg62pav.cloudfront.net/doc/](https://d1f3dtrg62pav.cloudfront.net/doc/)
-
