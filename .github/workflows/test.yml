@@ -8,7 +8,7 @@ jobs:
     - name: download go
       run: curl -O https://dl.google.com/go/go1.19.1.linux-amd64.tar.gz
     - name: unpack go
-      run: mkdir gobuild && cd gobuild && tar xf go1.19.1.linux-amd64.tar.gz
+      run: mkdir gobuild && cd gobuild && tar xf ../go1.19.1.linux-amd64.tar.gz
     - name: install go
       run: mv gobuild/go /usr/local/.
     - name: install vet shadow
