@@ -5,6 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - name: install goyacc
+      run: go install golang.org/x/tools/cmd/goyacc@master
     - name: install ragel
       run: sudo apt install ragel
     - name: download go
