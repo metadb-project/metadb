@@ -14,15 +14,15 @@ jobs:
     - name: unpack go
       run: mkdir goinstall && cd goinstall && tar xf ../go1.19.1.linux-amd64.tar.gz
     - name: install vet shadow
-      run: PATH=$PATH:$GOINSTALL/bin go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest
+      run: PATH=$GOINSTALL/bin:$PATH go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest
     - name: install errcheck
-      run: PATH=$PATH:$GOINSTALL/bin go install github.com/kisielk/errcheck@latest
+      run: PATH=$GOINSTALL/bin:$PATH go install github.com/kisielk/errcheck@latest
     - name: install ineffassign
-      run: PATH=$PATH:$GOINSTALL/bin go install github.com/gordonklaus/ineffassign@latest
+      run: PATH=$GOINSTALL/bin:$PATH go install github.com/gordonklaus/ineffassign@latest
     - name: install deadcode
-      run: PATH=$PATH:$GOINSTALL/bin go install github.com/remyoudompheng/go-misc/deadcode@latest
+      run: PATH=$GOINSTALL/bin:$PATH go install github.com/remyoudompheng/go-misc/deadcode@latest
     - name: build
-      run: PATH=$PATH:$GOINSTALL/bin:$HOME/go/bin ./build.sh -t
+      run: PATH=$HOME/go/bin:$GOINSTALL/bin:$PATH ./build.sh -t
     - name: run metadb
       run: ./bin/metadb help
 
