@@ -22,7 +22,7 @@ jobs:
     - name: install deadcode
       run: PATH=$PATH:$GOINSTALL/bin go install github.com/remyoudompheng/go-misc/deadcode@latest
     - name: build
-      run: PATH=$PATH:$GOINSTALL/bin ./build.sh -t
+      run: PATH=$PATH:$GOINSTALL/bin:$HOME/go/bin ./build.sh -t
     - name: run metadb
       run: ./bin/metadb help
 
