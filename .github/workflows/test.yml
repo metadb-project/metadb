@@ -5,6 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - name: install ragel
+      run: sudo apt install ragel
     - name: download go
       run: curl -O https://dl.google.com/go/go1.19.1.linux-amd64.tar.gz
     - name: unpack go
