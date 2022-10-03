@@ -8,19 +8,17 @@ jobs:
     - name: download go
       run: curl -O https://dl.google.com/go/go1.19.1.linux-amd64.tar.gz
     - name: unpack go
-      run: mkdir gobuild && cd gobuild && tar xf ../go1.19.1.linux-amd64.tar.gz
-    - name: install go
-      run: mv gobuild/go /usr/local/.
+      run: mkdir goinstall && cd goinstall && tar xf ../go1.19.1.linux-amd64.tar.gz
     - name: install vet shadow
-      run: go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest
+      run: PATH=$PATH:$GOINSTALL/bin go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest
     - name: install errcheck
-      run: go install github.com/kisielk/errcheck@latest
+      run: PATH=$PATH:$GOINSTALL/bin go install github.com/kisielk/errcheck@latest
     - name: install ineffassign
-      run: go install github.com/gordonklaus/ineffassign@latest
+      run: PATH=$PATH:$GOINSTALL/bin go install github.com/gordonklaus/ineffassign@latest
     - name: install deadcode
-      run: go install github.com/remyoudompheng/go-misc/deadcode@latest
+      run: PATH=$PATH:$GOINSTALL/bin go install github.com/remyoudompheng/go-misc/deadcode@latest
     - name: build
-      run: GOPATH=$HOME/go PATH=$PATH:$GOPATH/bin ./build.sh -t
+      run: PATH=$PATH:$GOINSTALL/bin ./build.sh -t
     - name: run metadb
       run: ./bin/metadb help
 
