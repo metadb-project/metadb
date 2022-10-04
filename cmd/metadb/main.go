@@ -14,7 +14,6 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/reset"
 	"github.com/metadb-project/metadb/cmd/metadb/server"
 	"github.com/metadb-project/metadb/cmd/metadb/stop"
-	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/upgrade"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"github.com/spf13/cobra"
@@ -93,9 +92,9 @@ func run() error {
 				return err
 			}
 			upgradeOpt.Global = globalOpt
-			if err = sysdb.Init(util.SysdbFileName(upgradeOpt.Datadir)); err != nil {
-				return err
-			}
+			// if err = sysdb.Init(util.SysdbFileName(upgradeOpt.Datadir)); err != nil {
+			// 	return err
+			// }
 			upgradeOpt.MetadbVersion = metadbVersion
 			if err = upgrade.Upgrade(&upgradeOpt); err != nil {
 				return err
@@ -124,9 +123,9 @@ func run() error {
 			if err = validateServerOptions(&serverOpt); err != nil {
 				return err
 			}
-			if err = sysdb.Init(util.SysdbFileName(serverOpt.Datadir)); err != nil {
-				return err
-			}
+			// if err = sysdb.Init(util.SysdbFileName(serverOpt.Datadir)); err != nil {
+			// 	return err
+			// }
 			var logf, csvlogf *os.File
 			if logf, csvlogf, err = setupLog(logfile, csvlogfile, serverOpt.Debug, serverOpt.Trace); err != nil {
 				return err

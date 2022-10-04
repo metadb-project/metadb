@@ -4,16 +4,18 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/signal"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/metadata"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
@@ -67,11 +69,7 @@ func outerPollLoop(svr *server, spr *sproc) error {
 	if folioTenant, _, err = sysdb.GetConfig("plug.folio.tenant"); err != nil {
 		return err
 	}
-	if folioTenant == "" {
-		command.FolioTenant = ""
-	} else {
-		command.FolioTenant = folioTenant
-	}
+	command.FolioTenant = folioTenant
 	// set command.ReshareTenants
 	var reshareTenants string
 	if reshareTenants, _, err = sysdb.GetConfig("plug.reshare.tenants"); err != nil {
@@ -94,20 +92,21 @@ func outerPollLoop(svr *server, spr *sproc) error {
 
 func pollLoop(spr *sproc) error {
 	var err error
-	var database0 *sysdb.DatabaseConnector = spr.databases[0]
+	// var database0 *sysdb.DatabaseConnector = spr.databases[0]
 	//if database0.Type == "postgresql" && database0.DBPort == "" {
 	//	database0.DBPort = "5432"
 	//}
 	dsn := &sqlx.DSN{
-		Host:     database0.DBHost,
-		Port:     database0.DBPort,
-		User:     database0.DBAdminUser,
-		Password: database0.DBAdminPassword,
-		DBName:   database0.DBName,
-		SSLMode:  database0.DBSSLMode,
-		Account:  database0.DBAccount,
+		// DBURI: spr.svr.dburi,
+		Host:     spr.svr.dbadmin.Host,
+		Port:     "5432",
+		User:     spr.svr.dbadmin.User,
+		Password: spr.svr.dbadmin.Password,
+		DBName:   spr.svr.dbadmin.DBName,
+		SSLMode:  "require",
+		// Account:  database0.DBAccount,
 	}
-	db, err := sqlx.Open(database0.Name, database0.Type, dsn)
+	db, err := sqlx.Open("postgres", dsn)
 	if err != nil {
 		return err
 	}
@@ -120,9 +119,9 @@ func pollLoop(spr *sproc) error {
 	spr.databases[0].Status.Active()
 	spr.db = append(spr.db, db)
 	// Cache tracking
-	if err = metadata.Init(db, spr.svr.opt.MetadbVersion); err != nil {
-		return err
-	}
+	//if err = metadata.Init(spr.svr.dbadmin, spr.svr.opt.MetadbVersion); err != nil {
+	//	return err
+	//}
 	track, err := cache.NewTrack(db)
 	if err != nil {
 		return fmt.Errorf("caching track: %s", err)
@@ -326,11 +325,12 @@ func readChangeEventFromFile(sourceFileScanner *bufio.Scanner, sourceLog *log.So
 
 func readChangeEvent(consumer *kafka.Consumer, sourceLog *log.SourceLog) (*change.Event, bool, error) {
 	var err error
-	sigchan := make(chan os.Signal, 1)
+	var hup = make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
 	for {
 		select {
-		case sig := <-sigchan:
-			return nil, false, fmt.Errorf("caught signal %v: terminating", sig)
+		case sig := <-hup:
+			return nil, false, fmt.Errorf("caught signal %v: reloading", sig)
 		default:
 			ev := consumer.Poll(100)
 			if ev == nil {
@@ -430,12 +430,12 @@ func logDebugCommand(c *command.Command) {
 // TODO To be reworked.
 func waitForConfig(svr *server) (*sproc, error) {
 	// log.Debug("waiting for configuration")
-	var databases []*sysdb.DatabaseConnector
+	var databases []*sysdb.DatabaseConnector = makeDatabaseConnector(svr.dbsuper, svr.dbadmin)
 	var sources []*sysdb.SourceConnector
 	var ready bool
 	var err error
 	for {
-		databases, sources, ready, err = waitForConfigCheck(svr)
+		sources, ready, err = waitForConfigCheck(svr)
 		if err != nil {
 			return nil, err
 		}
@@ -457,76 +457,55 @@ func waitForConfig(svr *server) (*sproc, error) {
 	return spr, nil
 }
 
+func makeDatabaseConnector(dbsuper, dbadmin *dbx.DB) []*sysdb.DatabaseConnector {
+	var dbcs = make([]*sysdb.DatabaseConnector, 0)
+	dbcs = append(dbcs, &sysdb.DatabaseConnector{
+		DBHost:          dbadmin.Host,
+		DBPort:          dbadmin.Port,
+		DBName:          dbadmin.DBName,
+		DBAdminUser:     dbadmin.User,
+		DBAdminPassword: dbadmin.Password,
+		DBSuperUser:     "postgres",
+		DBSuperPassword: dbsuper.Password,
+	})
+	return dbcs
+}
+
 // TODO To be reworked.
-func waitForConfigCheck(svr *server) ([]*sysdb.DatabaseConnector, []*sysdb.SourceConnector, bool, error) {
+func waitForConfigCheck(svr *server) ([]*sysdb.SourceConnector, bool, error) {
 	svr.state.mu.Lock()
 	defer svr.state.mu.Unlock()
 
-	var databases []*sysdb.DatabaseConnector
+	// var databases []*sysdb.DatabaseConnector
 	var sources []*sysdb.SourceConnector
 	var err error
-	if databases, err = sysdb.ReadDatabaseConnectors(); err != nil {
-		return nil, nil, false, err
-	}
-	// if len(databases) > 0 {
-	// 	databases[0].Status.Waiting()
-	// 	svr.state.databases = databases
+	// if databases, err = sysdb.ReadDatabaseConnectors(); err != nil {
+	// 	return nil, nil, false, err
 	// }
-	if sources, err = sysdb.ReadSourceConnectors(); err != nil {
-		return nil, nil, false, err
+	if sources, err = sysdb.ReadSourceConnectors(svr.dbadmin); err != nil {
+		return nil, false, err
 	}
-	// if len(sources) > 0 {
-	// 	sources[0].Status.Waiting()
-	// 	svr.state.sources = sources
-	// }
-	if len(databases) > 0 && len(sources) > 0 {
-		var dbEnabled, srcEnabled bool
-		if dbEnabled, err = sysdb.IsConnectorEnabled(databases[0].Name); err != nil {
-			return nil, nil, false, err
-		}
+	if len(sources) > 0 {
+		var srcEnabled bool
 		if srcEnabled, err = sysdb.IsConnectorEnabled(sources[0].Name); err != nil {
-			return nil, nil, false, err
+			return nil, false, err
 		}
-		//var users = strings.TrimSpace(databases[0].DBUsers)
-		if dbEnabled && srcEnabled {
+		if srcEnabled {
 			// Reread connectors in case configuration was incomplete.
-			if databases, err = sysdb.ReadDatabaseConnectors(); err != nil {
-				return nil, nil, false, err
-			}
-			if len(databases) > 0 {
-				databases[0].Status.Waiting()
-				svr.state.databases = databases
-			}
-			if sources, err = sysdb.ReadSourceConnectors(); err != nil {
-				return nil, nil, false, err
+			if sources, err = sysdb.ReadSourceConnectors(svr.dbadmin); err != nil {
+				return nil, false, err
 			}
 			if len(sources) > 0 {
 				sources[0].Status.Waiting()
 				svr.state.sources = sources
 			}
-			return databases, sources, true, nil
+			return sources, true, nil
 		}
 	}
-	if len(databases) > 0 && svr.opt.SourceFilename != "" {
-		sources = []*sysdb.SourceConnector{{}}
+	if svr.opt.SourceFilename != "" {
+		// sources = []*sysdb.SourceConnector{{}}
 		time.Sleep(2 * time.Second)
-		var dbEnabled bool
-		if dbEnabled, err = sysdb.IsConnectorEnabled(databases[0].Name); err != nil {
-			return nil, nil, false, err
-		}
-		//var users = strings.TrimSpace(databases[0].DBUsers)
-		if dbEnabled {
-			// Reread connector in case configuration was incomplete.
-			if databases, err = sysdb.ReadDatabaseConnectors(); err != nil {
-				return nil, nil, false, err
-			}
-			if len(databases) > 0 {
-				databases[0].Status.Waiting()
-				svr.state.databases = databases
-			}
-			return databases, sources, true, nil
-		}
 	}
 	time.Sleep(2 * time.Second)
-	return nil, nil, false, nil
+	return nil, false, nil
 }

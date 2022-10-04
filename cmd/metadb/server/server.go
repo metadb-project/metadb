@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"regexp"
 	"sync"
 	"syscall"
@@ -15,6 +14,8 @@ import (
 
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/internal/status"
+	"github.com/metadb-project/metadb/cmd/metadb/cat"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/libpq"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
@@ -22,16 +23,17 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
-	"gopkg.in/ini.v1"
 )
 
 // The server thread handling needs to be reworked.  It currently runs an HTTP
 // server and a single poll loop in two goroutines.
 
 type server struct {
-	opt        *option.Server
-	state      serverstate
-	connString string
+	opt     *option.Server
+	state   serverstate
+	dbsuper *dbx.DB
+	dbadmin *dbx.DB
+	// dburi string
 }
 
 // serverstate is shared between goroutines.
@@ -67,11 +69,6 @@ func Start(opt *option.Server) error {
 	}
 
 	var svr = &server{opt: opt}
-	// Check that database version is compatible
-	err = sysdb.ValidateSysdbVersion()
-	if err != nil {
-		return err
-	}
 	if err = runServer(svr); err != nil {
 		return err
 	}
@@ -140,13 +137,23 @@ func mainServer(svr *server) error {
 	}()
 	// TODO also need to catch signals and call RemovePIDFile
 
-	go listenAndServe(svr)
-
-	cfg, err := ini.Load(filepath.Join(svr.opt.Datadir, "metadb.conf"))
+	// Read database URL from config file.
+	var err error
+	svr.dbsuper, svr.dbadmin, err = util.ReadConfigDatabase(svr.opt.Datadir)
 	if err != nil {
 		return fmt.Errorf("reading configuration file: %v", err)
 	}
-	svr.connString = cfg.Section("").Key("database").String()
+
+	// Check that database is initialized and compatible
+	if err = cat.Initialize(svr.dbadmin); err != nil {
+		return err
+	}
+
+	// Check that database version is compatible
+	// err = sysdb.ValidateSysdbVersion(svr.db)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// if svr.conn, err = pgxpool.Connect(context.TODO(), svr.connString); err != nil {
 	// 	return err
@@ -157,7 +164,10 @@ func mainServer(svr *server) error {
 	// 	log.Fatal("%s", err)
 	// 	os.Exit(1)
 	// }
-	go libpq.Listen(svr.opt.Listen, svr.opt.AdminPort, svr.connString, svr.opt.MetadbVersion)
+
+	go listenAndServe(svr)
+
+	go libpq.Listen(svr.opt.Listen, svr.opt.AdminPort, svr.dbadmin, svr.opt.MetadbVersion)
 
 	go goPollLoop(svr)
 
@@ -392,7 +402,7 @@ func (svr *server) handleStatusGet(w http.ResponseWriter, r *http.Request) {
 
 	var d *sysdb.DatabaseConnector
 	for _, d = range svr.state.databases {
-		stat.Databases[d.Name] = d.Status
+		stat.Databases["database"] = d.Status
 	}
 
 	var s *sysdb.SourceConnector
@@ -520,15 +530,16 @@ func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) err
 	// 	Account:  dbc.DBAccount,
 	// }
 	dsn := &sqlx.DSN{
-		Host:     "localhost",
+		// DBURI: "",
+		Host:     dbc.DBHost,
 		Port:     "5432",
 		User:     dbc.DBSuperUser,
 		Password: dbc.DBSuperPassword,
-		DBName:   "regression",
-		SSLMode:  "disable",
-		Account:  dbc.DBAccount,
+		DBName:   dbc.DBName,
+		SSLMode:  "require",
+		// Account:  dbc.DBAccount,
 	}
-	dbsuper, err := sqlx.Open(dbc.Name, dbc.Type, dsn)
+	dbsuper, err := sqlx.Open("postgres", dsn)
 	if err != nil {
 		return err
 	}
@@ -544,15 +555,16 @@ func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) err
 		return fmt.Errorf("unable to create user %q: %s", rq.Name, err)
 	}
 	dsn = &sqlx.DSN{
+		// DBURI: "",
 		Host:     dbc.DBHost,
-		Port:     dbc.DBPort,
+		Port:     "5432",
 		User:     dbc.DBAdminUser,
 		Password: dbc.DBAdminPassword,
 		DBName:   dbc.DBName,
-		SSLMode:  dbc.DBSSLMode,
-		Account:  dbc.DBAccount,
+		SSLMode:  "require",
+		// Account:  dbc.DBAccount,
 	}
-	db, err := sqlx.Open(dbc.Name, dbc.Type, dsn)
+	db, err := sqlx.Open("postgres", dsn)
 	if err != nil {
 		return err
 	}

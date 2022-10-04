@@ -1,41 +1,54 @@
 package metadata
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"strconv"
 
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
+	"github.com/jackc/pgx/v4"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func Init(db sqlx.DB, metadbVersion string) error {
+// TODO rework
+//func Init(db *dbx.DB, metadbVersion string) error {
+/*
+	dc, err := dbx.Connect(db)
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
 	// Check if initialized
-	initialized, err := isDatabaseInitialized(db)
+	initialized, err := isDatabaseInitialized(dc)
 	if err != nil {
 		return err
 	}
 	if initialized {
 		// Database already initialized
 		// Check that database version is compatible
-		err = ValidateDatabaseVersion(db)
+		err = ValidateDatabaseVersion(dc)
 		if err != nil {
 			return err
 		}
 		// Set Metadb version
-		_, err = db.Exec(nil, "UPDATE metadb.init SET version = '"+metadbVersionString(metadbVersion)+"'")
+		_, err = dc.Exec(context.TODO(), "UPDATE metadb.init SET version = '"+util.MetadbVersionString(metadbVersion)+"'")
 		if err != nil {
 			return fmt.Errorf("updating table metadb.init: %s", err)
 		}
 		return nil
 	}
+*/
+
+// moved to cat/init.go
+/*
 	// Initialize
-	_, err = db.Exec(nil, "CREATE SCHEMA IF NOT EXISTS metadb")
+	_, err = db.Exec(nil, "CREATE SCHEMA metadb")
 	if err != nil {
 		return fmt.Errorf("creating schema metadb: %s", err)
 	}
+	// Table metadb.init
 	_, err = db.Exec(nil, ""+
-		"CREATE TABLE IF NOT EXISTS metadb.init (\n"+
+		"CREATE TABLE metadb.init (\n"+
 		"    version VARCHAR(80) NOT NULL,\n"+
 		"    dbversion INTEGER NOT NULL\n"+
 		")")
@@ -48,8 +61,9 @@ func Init(db sqlx.DB, metadbVersion string) error {
 	if err != nil {
 		return fmt.Errorf("writing to table metadb.init: %s", err)
 	}
+	// Table metadb.track
 	_, err = db.Exec(nil, ""+
-		"CREATE TABLE IF NOT EXISTS metadb.track (\n"+
+		"CREATE TABLE metadb.track (\n"+
 		"    schemaname varchar(63) NOT NULL,\n"+
 		"    tablename varchar(63) NOT NULL,\n"+
 		"    PRIMARY KEY (schemaname, tablename),\n"+
@@ -60,14 +74,26 @@ func Init(db sqlx.DB, metadbVersion string) error {
 	if err != nil {
 		return fmt.Errorf("creating table metadb.track: %s", err)
 	}
-	return nil
-}
+	// Table metadb.userperm
+	_, err = db.Exec(nil, ""+
+		"CREATE TABLE metadb.userperm (\n"+
+		"    username TEXT PRIMARY KEY,\n"+
+		"    tables TEXT NOT NULL,\n"+
+		"    dbupdated BOOLEAN NOT NULL\n"+
+		")")
+	if err != nil {
+		return fmt.Errorf("creating table metadb.userperm: %s", err)
+	}
+*/
 
-func isDatabaseInitialized(db sqlx.DB) (bool, error) {
+//return nil
+//}
+
+/*func isDatabaseInitialized(dc *pgx.Conn) (bool, error) {
 	var v int64
-	err := db.QueryRow(nil, "SELECT dbversion FROM metadb.init LIMIT 1").Scan(&v)
+	err := dc.QueryRow(context.TODO(), "SELECT dbversion FROM metadb.init LIMIT 1").Scan(&v)
 	switch {
-	case err == sql.ErrNoRows:
+	case err == pgx.ErrNoRows:
 		return false, fmt.Errorf("reading from table metadb.init: %s", err)
 	case err != nil:
 		return false, nil
@@ -75,45 +101,29 @@ func isDatabaseInitialized(db sqlx.DB) (bool, error) {
 		return true, nil
 	}
 }
+*/
 
-func ValidateDatabaseVersion(db sqlx.DB) error {
-	dbversion, err := GetDatabaseVersion(db)
-	if err != nil {
-		return err
-	}
-	if dbversion != util.DatabaseVersion {
-		m := fmt.Sprintf("database incompatible with server (%d != %d)", dbversion, util.DatabaseVersion)
-		if dbversion < util.DatabaseVersion {
-			m = m + ": upgrade using \"metadb upgrade\""
-		}
-		return fmt.Errorf("%s", m)
-	}
-	return nil
-}
+//func ValidateDatabaseVersion(dc *pgx.Conn) error {
+//	dbversion, err := GetDatabaseVersion(dc)
+//	if err != nil {
+//		return err
+//	}
+//	if dbversion != util.DatabaseVersion {
+//		m := fmt.Sprintf("database incompatible with server (%d != %d)", dbversion, util.DatabaseVersion)
+//		if dbversion < util.DatabaseVersion {
+//			m = m + ": upgrade using \"metadb upgrade\""
+//		}
+//		return fmt.Errorf("%s", m)
+//	}
+//	return nil
+//}
 
-func GetDatabaseVersion(db sqlx.DB) (int64, error) {
-	var dbversion int64
-	err := db.QueryRow(nil, "SELECT dbversion FROM metadb.init").Scan(&dbversion)
-	switch {
-	case err == sql.ErrNoRows:
-		return 0, fmt.Errorf("unable to query dbversion")
-	case err != nil:
-		return 0, fmt.Errorf("querying dbversion: %s", err)
-	default:
-		return dbversion, nil
-	}
-}
-
-func WriteDatabaseVersion(db sqlx.DB, tx *sql.Tx, version int64) error {
-	mver := metadbVersionString(util.MetadbVersion())
+func WriteDatabaseVersion(tx pgx.Tx, version int64) error {
+	mver := util.MetadbVersionString(util.MetadbVersion())
 	dbver := strconv.FormatInt(version, 10)
-	_, err := db.Exec(tx, "UPDATE metadb.init SET version='"+mver+"',dbversion="+dbver)
+	_, err := tx.Exec(context.TODO(), "UPDATE metadb.init SET version='"+mver+"',dbversion="+dbver)
 	if err != nil {
 		return fmt.Errorf("updating dbversion in table metadb.init: %s", err)
 	}
 	return nil
-}
-
-func metadbVersionString(metadbVersion string) string {
-	return "Metadb " + metadbVersion
 }

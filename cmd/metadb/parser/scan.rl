@@ -45,6 +45,8 @@ func (lex *lexer) Lex(out *yySymType) int {
 			',' => { tok = ','; fbreak; };
 			'(' => { tok = '('; fbreak; };
 			')' => { tok = ')'; fbreak; };
+			'true'i => { tok = TRUE; fbreak; };
+			'false'i => { tok = FALSE; fbreak; };
 			'select'i => { tok = SELECT; fbreak; };
 			'create'i => { tok = CREATE; fbreak; };
 			'server'i => { tok = SERVER; fbreak; };

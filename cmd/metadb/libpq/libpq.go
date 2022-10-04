@@ -11,11 +11,12 @@ import (
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/metadb-project/metadb/cmd/metadb/ast"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/parser"
 )
 
-func Listen(host string, port string, connString string, mdbVersion string) {
+func Listen(host string, port string, db *dbx.DB, mdbVersion string) {
 	// var h string
 	// if host == "" {
 	// 	h = "127.0.0.1"
@@ -47,19 +48,18 @@ func Listen(host string, port string, connString string, mdbVersion string) {
 		var backend *pgproto3.Backend
 		backend = pgproto3.NewBackend(pgproto3.NewChunkReader(conn), conn)
 		log.Trace("connection received: %s", conn.RemoteAddr().String())
-		go serve(conn, backend, connString, mdbVersion)
+		go serve(conn, backend, db, mdbVersion)
 	}
 }
 
-func serve(conn net.Conn, backend *pgproto3.Backend, connString string, mdbVersion string) {
-	var err error
-
-	var dbconn *pgx.Conn
-	if dbconn, err = pgx.Connect(context.TODO(), connString); err != nil {
+func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, mdbVersion string) {
+	dbconn, err := dbx.Connect(db)
+	if err != nil {
 		// TODO handle error
 		log.Info("%v", err)
 		return
 	}
+	// TODO Close
 
 	if err = startup(conn, backend); err != nil {
 		// TODO handle error
@@ -148,6 +148,7 @@ func processQuery(conn net.Conn, query *pgproto3.Query, dbconn *pgx.Conn, mdbVer
 	switch n := node.(type) {
 	case *ast.CreateServerStmt:
 		// return createServer(conn, query)
+		return version(conn, query, "11111111")
 	case *ast.SelectStmt:
 		if n.Fn == "version" {
 			return version(conn, query, mdbVersion)

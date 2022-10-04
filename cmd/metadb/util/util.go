@@ -11,10 +11,14 @@ import (
 	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
+	"gopkg.in/ini.v1"
 )
 
+// Version 7 = 0.11
+// Version 8 = 0.12
 const DatabaseVersion = 8
 
 func MetadbVersion() string {
@@ -28,6 +32,10 @@ func SetMetadbVersion(version string) {
 }
 
 var metadbVersion string
+
+func MetadbVersionString(metadbVersion string) string {
+	return "Metadb " + metadbVersion
+}
 
 // ModePermRW is the umask "-rw-------".
 const ModePermRW = 0600
@@ -49,6 +57,10 @@ func UserPerm(relist *RegexList, table *sqlx.Table) bool {
 	return false
 }
 
+func ConfigFileName(datadir string) string {
+	return filepath.Join(datadir, "metadb.conf")
+}
+
 func SystemDirName(datadir string) string {
 	return filepath.Join(datadir, "system")
 }
@@ -61,9 +73,9 @@ func SysdbFileName(datadir string) string {
 	return filepath.Join(SystemDirName(datadir), "systemdb")
 }
 
-func ConfigFileName(datadir string) string {
-	return filepath.Join(datadir, "metadb.conf")
-}
+// func SystemConfigFileName(datadir string) string {
+// 	return filepath.Join(SystemDirName(datadir), "system.conf")
+// }
 
 func MatchRegexps(res []*regexp.Regexp, s string) bool {
 	var re *regexp.Regexp
@@ -202,6 +214,9 @@ func HTTPError(w http.ResponseWriter, err error, code int) {
 
 // SplitList splits a comma-separated list and trims white space from each element.
 func SplitList(list string) []string {
+	if list == "" {
+		return []string{}
+	}
 	var sp []string = strings.Split(list, ",")
 	var i int
 	var s string
@@ -210,3 +225,52 @@ func SplitList(list string) []string {
 	}
 	return sp
 }
+
+func ReadConfigDatabase(datadir string) (*dbx.DB, *dbx.DB, error) {
+	cfg, err := ini.Load(ConfigFileName(datadir))
+	if err != nil {
+		return nil, nil, err
+	}
+	s := cfg.Section("postgresql")
+	return &dbx.DB{
+			Host:     s.Key("host").String(),
+			Port:     "5432",
+			User:     "postgres",
+			Password: s.Key("postgres_password").String(),
+			DBName:   s.Key("database_name").String(),
+			SSLMode:  "require",
+		}, &dbx.DB{
+			Host:     s.Key("host").String(),
+			Port:     "5432",
+			User:     s.Key("metadb_user").String(),
+			Password: s.Key("metadb_password").String(),
+			DBName:   s.Key("database_name").String(),
+			SSLMode:  "require",
+		}, nil
+}
+
+/*func RedactPasswordInURI(uri string) string {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return "(invalid URI)"
+	}
+	if u.User == nil {
+		return uri
+	}
+	u.User = url.UserPassword(u.User.Username(), "________")
+	return u.String()
+}
+*/
+
+/*
+import "github.com/sethvargo/go-password/password"
+
+func GeneratePassword() (string, error) {
+	var res string
+	var err error
+	if res, err = password.Generate(32, 10, 0, false, true); err != nil {
+		return "", err
+	}
+	return res, nil
+}
+*/

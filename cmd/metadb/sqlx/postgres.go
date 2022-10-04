@@ -10,16 +10,16 @@ import (
 )
 
 type PostgresDB struct {
-	Name string
-	DB   *sql.DB
+	DB *sql.DB
 }
 
 // Ensure that the type implements the DB interface.
 var _ DB = (*PostgresDB)(nil)
 
-func OpenPostgres(dbspec string, dsn *DSN) (*PostgresDB, error) {
+func OpenPostgres(dsn *DSN) (*PostgresDB, error) {
 	s := "host=" + dsn.Host + " port=" + dsn.Port + " user=" + dsn.User + " password=" + dsn.Password + " dbname=" + dsn.DBName + " sslmode=" + dsn.SSLMode
 	db, err := sql.Open("postgres", s)
+	// db, err := sql.Open("postgres", dsn.DBURI)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +27,7 @@ func OpenPostgres(dbspec string, dsn *DSN) (*PostgresDB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &PostgresDB{Name: dbspec, DB: db}, nil
+	return &PostgresDB{DB: db}, nil
 }
 
 func (d *PostgresDB) Close() {
@@ -95,13 +95,13 @@ func (d *PostgresDB) Exec(tx *sql.Tx, sql string) (sql.Result, error) {
 	if tx == nil {
 		result, err := d.DB.ExecContext(context.TODO(), sql)
 		if err != nil {
-			return nil, fmt.Errorf(d.Name + ": SQL: " + sql)
+			return nil, fmt.Errorf("SQL: " + sql)
 		}
 		return result, nil
 	} else {
 		result, err := tx.ExecContext(context.TODO(), sql)
 		if err != nil {
-			return nil, fmt.Errorf(d.Name + ": SQL: " + sql)
+			return nil, fmt.Errorf("SQL: " + sql)
 		}
 		return result, nil
 	}

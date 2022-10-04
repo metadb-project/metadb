@@ -1,0 +1,30 @@
+name: test
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: download go
+      run: curl -O https://dl.google.com/go/go1.19.1.linux-amd64.tar.gz
+    - name: unpack go
+      run: tar xf go1.19.1.linux-amd64.tar.gz
+    - name: install go
+      run: sudo mkdir -p /usr/local/mdb && sudo mv go /usr/local/mdb/
+    - name: install goyacc
+      run: PATH=/usr/local/mdb/go/bin:$PATH go install golang.org/x/tools/cmd/goyacc@master
+    # - name: install vet shadow
+    #   run: PATH=/usr/local/mdb/go/bin:$PATH go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest
+    # - name: install errcheck
+    #   run: PATH=/usr/local/mdb/go/bin:$PATH go install github.com/kisielk/errcheck@latest
+    # - name: install ineffassign
+    #   run: PATH=/usr/local/mdb/go/bin:$PATH go install github.com/gordonklaus/ineffassign@latest
+    # - name: install deadcode
+    #   run: PATH=/usr/local/mdb/go/bin:$PATH go install github.com/remyoudompheng/go-misc/deadcode@latest
+    - name: install ragel
+      run: sudo apt install ragel
+    - name: build
+      run: PATH=$HOME/go/bin:/usr/local/mdb/go/bin:$PATH ./build.sh
+    - name: run metadb
+      run: ./bin/metadb help
+

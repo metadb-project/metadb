@@ -1,33 +1,52 @@
 package sysdb
 
 import (
-	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"context"
+
+	"github.com/jackc/pgx/v4"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 )
 
-func ReadSourceConnectors() ([]*SourceConnector, error) {
-	var cmap map[string]map[string]string
+func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
+	var dbc *pgx.Conn
 	var err error
-	if cmap, err = readConfigMap("src"); err != nil {
+	if dbc, err = dbx.Connect(db); err != nil {
 		return nil, err
 	}
-	var src []*SourceConnector
-	var name string
-	var conf map[string]string
-	for name, conf = range cmap {
-		security := conf["security"]
+	defer dbc.Close(context.TODO())
+
+	var rows pgx.Rows
+	rows, err = dbc.Query(context.TODO(), ""+
+		"SELECT name, brokers, security, topics, consumergroup, schemapassfilter, schemaprefix FROM metadb.source")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var src = make([]*SourceConnector, 0)
+	for rows.Next() {
+		var name, brokers, security string
+		var topics []string
+		var consumergroup string
+		var schemapassfilter []string
+		var schemaprefix string
+		if err := rows.Scan(&name, &brokers, &security, &topics, &consumergroup, &schemapassfilter, &schemaprefix); err != nil {
+			return nil, err
+		}
 		if security == "" {
 			security = "ssl"
 		}
 		src = append(src, &SourceConnector{
 			Name:             name,
-			Brokers:          conf["brokers"],
+			Brokers:          brokers,
 			Security:         security,
-			Topics:           util.SplitList(conf["topics"]),
-			Group:            conf["group"],
-			SchemaPassFilter: util.SplitList(conf["schemapassfilter"]),
-			SchemaPrefix:     conf["schemaprefix"],
-			Databases:        util.SplitList(conf["dbs"]),
+			Topics:           topics,
+			Group:            consumergroup,
+			SchemaPassFilter: schemapassfilter,
+			SchemaPrefix:     schemaprefix,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return src, nil
 }

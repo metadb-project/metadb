@@ -1,28 +1,54 @@
 package initsys
 
 import (
+	"context"
 	"fmt"
 	"os"
 
+	"github.com/jackc/pgx/v4"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
-	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
 func InitSys(opt *option.Init) error {
-	var err error
 	// Check for required options.
 	if opt.Datadir == "" {
 		return fmt.Errorf("data directory not specified")
 	}
-	if opt.DatabaseURI == "" {
-		return fmt.Errorf("database connection URI not specified")
-	}
+
+	// Require the database URI user to be postgres.
+	/*
+		var u *url.URL
+		if u, err = url.Parse(opt.DatabaseURI); err != nil {
+			return fmt.Errorf("parsing database connection URI: %v", err)
+		}
+		var username = u.User.Username()
+		if username == "" {
+			return fmt.Errorf("username not specified in database connection URI: %s", util.RedactPasswordInURI(u))
+		}
+		if username != "postgres" {
+			return fmt.Errorf("unsupported username in database connection URI: %s", username)
+		}
+	*/
+	/*
+		dburi, err := dbx.NewDB(opt.DatabaseURI)
+		if err != nil {
+			return fmt.Errorf("parsing database URI: %s: %v", opt.DatabaseURI, err)
+		}
+		if dburi.User == "" {
+			return fmt.Errorf("username not specified in database connection URI: %s", util.RedactPasswordInURI(opt.DatabaseURI))
+		}
+		if dburi.User != "postgres" {
+			return fmt.Errorf("unsupported username in database connection URI: %s", dburi.User)
+		}
+	*/
+
 	// Require that the data directory not already exist.
-	var exists bool
-	if exists, err = util.FileExists(opt.Datadir); err != nil {
+	exists, err := util.FileExists(opt.Datadir)
+	if err != nil {
 		return err
 	}
 	if exists {
@@ -63,10 +89,8 @@ func InitSys(opt *option.Init) error {
 		}
 	*/
 
-	eout.Verbose("initializing database")
-	if err = sysdb.InitCreate(opt.DatabaseURI); err != nil {
-		return fmt.Errorf("initializing database: %v", err)
-	}
+	// opt.DatabaseURI uses the postgres user; we need to create a metadb
+	// user and use that for normal operations
 
 	// Create the data directory.
 	eout.Verbose("creating data directory")
@@ -77,18 +101,77 @@ func InitSys(opt *option.Init) error {
 	}
 
 	eout.Verbose("writing configuration file")
-	var f *os.File
-	if f, err = os.Create(util.ConfigFileName(opt.Datadir)); err != nil {
+	f, err := os.Create(util.ConfigFileName(opt.Datadir))
+	if err != nil {
 		return fmt.Errorf("creating configuration file: %v", err)
 	}
-	// postgres://<user>:<password>@<host>:<port>/<dbname>
-	var s = "database = " + opt.DatabaseURI + "\n"
-	if _, err = f.WriteString(s); err != nil {
+	var s = "[postgresql]\n" +
+		"host = \n" +
+		"database_name = \n" +
+		"postgres_password = \n" +
+		"metadb_user = \n" +
+		"metadb_password = \n"
+	_, err = f.WriteString(s)
+	if err != nil {
 		return fmt.Errorf("writing configuration file: %v", err)
 	}
-	if err = f.Close(); err != nil {
+	err = f.Close()
+	if err != nil {
 		return fmt.Errorf("closing configuration file: %v", err)
 	}
+
+	/*
+		eout.Verbose("creating user")
+		var systemUser = "metadb"
+		var systemPassword string
+		if systemPassword, err = util.GeneratePassword(); err != nil {
+			return fmt.Errorf("generating password: %v", err)
+		}
+		if err = dbx.CreateUser(dburi, systemUser, systemPassword); err != nil {
+			return err
+		}
+	*/
+
+	/*
+		eout.Verbose("writing system configuration file")
+		if f, err = os.Create(util.SystemConfigFileName(opt.Datadir)); err != nil {
+			return fmt.Errorf("creating system configuration file: %v", err)
+		}
+		s = "system_user = " + systemUser + "\nsystem_password = " + systemPassword + "\n"
+		if _, err = f.WriteString(s); err != nil {
+			return fmt.Errorf("writing system configuration file: %v", err)
+		}
+		if err = f.Close(); err != nil {
+			return fmt.Errorf("closing system configuration file: %v", err)
+		}
+	*/
+
+	/*
+		eout.Verbose("creating database")
+		if err = createDatabase(dburi, systemUser); err != nil {
+			return fmt.Errorf("creating database: %v", err)
+		}
+	*/
+
+	// var db *url.URL
+	// if db, err = url.Parse(opt.DatabaseURI); err != nil {
+	// 	return fmt.Errorf("parsing database connection URI: %s: %v", util.RedactPasswordInURI(db), err)
+	// }
+	/*
+		db := dburi
+		db.User = systemUser
+		db.Password = systemPassword
+	*/
+
+	// if err = sysdb.InitCreate(opt.DatabaseURI); err != nil {
+	// 	return fmt.Errorf("initializing database: %v", err)
+	// }
+	/*
+		eout.Verbose("initializing database")
+		if err = cat.Initialize(db); err != nil {
+			return fmt.Errorf("initializing database: %v", err)
+		}
+	*/
 
 	// TODO Do this as a function in sysdb - close, chmod, reopen
 	/*
@@ -99,5 +182,19 @@ func InitSys(opt *option.Init) error {
 	*/
 
 	eout.Info("initialization completed")
+	return nil
+}
+
+func createDatabase(db *dbx.DB, owner string) error {
+	dc, err := pgx.Connect(context.TODO(), db.String())
+	if err != nil {
+		return err
+	}
+	defer dc.Close(context.TODO())
+
+	_, err = dc.Exec(context.TODO(), "CREATE DATABASE "+db.DBName+" OWNER "+owner)
+	if err != nil {
+		return fmt.Errorf("%s: %v", db.DBName, err)
+	}
 	return nil
 }

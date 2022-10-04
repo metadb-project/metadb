@@ -20,10 +20,12 @@ import (
 %type <optlist> options_clause option_list option
 %type <str> option_name option_val
 %type <str> name unreserved_keyword
+%type <str> boolean
 
 %token SELECT
 %token CREATE SERVER IF DATA SOURCE OPTIONS
 %token TYPE FOREIGN
+%token TRUE FALSE
 %token <str> VERSION
 %token <str> IDENT NUMBER
 %token <str> SLITERAL
@@ -124,6 +126,10 @@ option_val:
 		{
 			$$ = $1
 		}
+	| boolean
+		{
+			$$ = $1
+		}
 
 name:
 	IDENT
@@ -133,6 +139,16 @@ name:
 	| unreserved_keyword
 		{
 			$$ = $1
+		}
+
+boolean:
+	TRUE
+		{
+			$$ = "true"
+		}
+	| FALSE
+		{
+			$$ = "false"
 		}
 
 unreserved_keyword:

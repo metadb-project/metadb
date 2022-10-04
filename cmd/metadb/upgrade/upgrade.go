@@ -1,18 +1,21 @@
 package upgrade
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/metadb-project/metadb/cmd/metadb/cat"
+
+	"github.com/jackc/pgx/v4"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
-	"github.com/metadb-project/metadb/cmd/metadb/cache"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/metadata"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
-	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"gopkg.in/ini.v1"
 )
 
 func Upgrade(opt *option.Upgrade) error {
@@ -29,22 +32,23 @@ func Upgrade(opt *option.Upgrade) error {
 			return nil
 		}
 	}
-	// Upgrade sysdb.
-	var upgraded bool
-	up, err := upgradeSysdb(opt.Datadir)
-	if err != nil {
-		return err
-	}
-	if up {
-		upgraded = true
-	}
+	/*
+		// Upgrade sysdb.
+		var upgraded bool
+		up, err := upgradeSysdb(opt.Datadir)
+		if err != nil {
+			return err
+		}
+		if up {
+			upgraded = true
+		}
+	*/
 	// Upgrade databases.
-	up, err = upgradeDatabases(opt.Datadir)
+	var upgraded bool
+	var err error
+	upgraded, err = upgradeDatabase(opt.Datadir)
 	if err != nil {
 		return err
-	}
-	if up {
-		upgraded = true
 	}
 	// Write message if nothing was upgraded.
 	if upgraded {
@@ -54,6 +58,8 @@ func Upgrade(opt *option.Upgrade) error {
 	}
 	return nil
 }
+
+/*
 
 // System upgrades
 
@@ -166,25 +172,45 @@ type sysopt struct {
 	Datadir string
 }
 
+*/
+
 // Database upgrades
 
+/*
 func upgradeDatabases(datadir string) (bool, error) {
 	var upgraded bool
-	dbcs, err := sysdb.ReadDatabaseConnectors()
+
+	host, dbname, superpass, mdbuser, mdbpass, err := util.ReadConfigDatabase(datadir)
 	if err != nil {
 		return false, err
 	}
+	var dbcs = make([]*sysdb.DatabaseConnector, 0)
+	dbcs = append(dbcs, &sysdb.DatabaseConnector{
+		DBHost:          host,
+		DBPort:          "5432",
+		DBName:          dbname,
+		DBAdminUser:     mdbuser,
+		DBAdminPassword: mdbpass,
+		DBSuperUser:     "postgres",
+		DBSuperPassword: superpass,
+	})
+
+	// dbcs, err := sysdb.ReadDatabaseConnectors()
+	// if err != nil {
+	// 	return false, err
+	// }
 	for _, dbc := range dbcs {
 		dsn := sqlx.DSN{
-			Host:     dbc.DBHost,
-			Port:     dbc.DBPort,
-			User:     dbc.DBAdminUser,
-			Password: dbc.DBAdminPassword,
-			DBName:   dbc.DBName,
-			SSLMode:  dbc.DBSSLMode,
-			Account:  dbc.DBAccount,
+			DBURI: dbc.DBURI,
+			// Host:     dbc.DBHost,
+			// Port:     dbc.DBPort,
+			// User:     dbc.DBAdminUser,
+			// Password: dbc.DBAdminPassword,
+			// DBName:   dbc.DBName,
+			// SSLMode:  dbc.DBSSLMode,
+			// Account:  dbc.DBAccount,
 		}
-		up, err := upgradeDatabase(dbc.Name, dbc.Type, &dsn)
+		up, err := upgradeDatabase("postgres", &dsn, dburi)
 		if err != nil {
 			return false, err
 		}
@@ -194,38 +220,107 @@ func upgradeDatabases(datadir string) (bool, error) {
 	}
 	return upgraded, nil
 }
+*/
 
-func upgradeDatabase(name string, dbtype string, dsn *sqlx.DSN) (bool, error) {
-	db, err := sqlx.Open(name, dbtype, dsn)
+func upgradeDatabase(datadir string) (bool, error) {
+	confFileName := util.ConfigFileName(datadir)
+	confExists, err := util.FileExists(confFileName)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("checking for file %s: %v", confFileName, err)
 	}
-	defer db.Close()
-	dbversion, err := metadata.GetDatabaseVersion(db)
+	var dbsuper, dbadmin *dbx.DB
+	if confExists {
+		// Read from config file
+		var cfg *ini.File
+		cfg, err = ini.Load(confFileName)
+		if err != nil {
+			return false, fmt.Errorf("reading file %s: %v", confFileName, err)
+		}
+		s := cfg.Section("postgresql")
+		dbsuper = &dbx.DB{
+			Host:     s.Key("host").String(),
+			Port:     "5432",
+			User:     "postgres",
+			Password: s.Key("postgres_password").String(),
+			DBName:   s.Key("database_name").String(),
+			SSLMode:  "require",
+		}
+		dbadmin = &dbx.DB{
+			Host:     s.Key("host").String(),
+			Port:     "5432",
+			User:     s.Key("metadb_user").String(),
+			Password: s.Key("metadb_password").String(),
+			DBName:   s.Key("database_name").String(),
+			SSLMode:  "require",
+		}
+	} else {
+		// Read from sysdb
+		var cs []*databaseConnector
+		cs, err = oldReadDatabaseConnectors(datadir)
+		if err != nil {
+			return false, fmt.Errorf("reading database connectors: %v", err)
+		}
+		c := cs[0]
+		dbsuper = &dbx.DB{
+			Host:     c.DBHost,
+			Port:     "5432",
+			User:     "postgres",
+			Password: c.DBSuperPassword,
+			DBName:   c.DBName,
+			SSLMode:  "require",
+		}
+		dbadmin = &dbx.DB{
+			Host:     c.DBHost,
+			Port:     "5432",
+			User:     c.DBAdminUser,
+			Password: c.DBAdminPassword,
+			DBName:   c.DBName,
+			SSLMode:  "require",
+		}
+	}
+
+	dbversion, err := getDatabaseVersion(dbadmin)
 	if err != nil {
-		return false, fmt.Errorf("%s: %s", name, err)
+		return false, fmt.Errorf("%s", err)
 	}
 	if dbversion == util.DatabaseVersion {
 		return false, nil
 	}
 	if dbversion > util.DatabaseVersion {
-		return false, fmt.Errorf("%s: database version incompatible with server (%d > %d)", name, dbversion, util.DatabaseVersion)
+		return false, fmt.Errorf("database version incompatible with server (%d > %d)", dbversion, util.DatabaseVersion)
 	}
-	err = upgradeDatabaseAll(name, db, dbversion)
+	err = upgradeDatabaseAll(datadir, dbsuper, dbadmin, dbversion)
 	if err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-func upgradeDatabaseAll(name string, db sqlx.DB, dbversion int64) error {
+func getDatabaseVersion(db *dbx.DB) (int64, error) {
+	dc, err := dbx.Connect(db)
+	if err != nil {
+		return 0, err
+	}
+	defer dbx.Close(dc)
+	dbversion, err := cat.DatabaseVersion(dc)
+	if err != nil {
+		return 0, err
+	}
+	if dbversion < 7 {
+		return 0, fmt.Errorf("version < 7 not supported")
+	}
+	return dbversion, err
+}
+
+func upgradeDatabaseAll(datadir string, dbsuper, dbadmin *dbx.DB, dbversion int64) error {
 	for v := dbversion + 1; v <= util.DatabaseVersion; v++ {
 		opt := dbopt{
-			DB:        db,
-			CName:     name,
+			Datadir:   datadir,
+			DBSuper:   dbsuper,
+			DBAdmin:   dbadmin,
 			DBVersion: v,
 		}
-		eout.Info("upgrading: %s: version %d", name, v)
+		eout.Info("upgrading: version %d", v)
 		err := updbList[v](&opt)
 		if err != nil {
 			return err
@@ -240,12 +335,13 @@ var updbList = []updbFunc{
 	nil,
 	nil,
 	nil,
-	updb5,
-	updb6,
-	updb7,
+	nil,
+	nil,
+	nil,
 	updb8,
 }
 
+/*
 func updb5(opt *dbopt) error {
 	track, err := cache.NewTrack(opt.DB)
 	if err != nil {
@@ -256,7 +352,7 @@ func updb5(opt *dbopt) error {
 		return err
 	}
 	for _, t := range track.All() {
-		eout.Info("upgrading: %s: version %d: %s", opt.CName, opt.DBVersion, t.String())
+		eout.Info("upgrading: version %d: %s", opt.DBVersion, t.String())
 		err = updb5Table(opt, schema, &t)
 		if err != nil {
 			return err
@@ -332,7 +428,7 @@ func updb6(opt *dbopt) error {
 		return err
 	}
 	for _, t := range track.All() {
-		eout.Info("upgrading: %s: version %d: %s", opt.CName, opt.DBVersion, t.String())
+		eout.Info("upgrading: version %d: %s", opt.DBVersion, t.String())
 		err = updb6Table(opt, schema, &t)
 		if err != nil {
 			return err
@@ -394,24 +490,28 @@ func updb7(opt *dbopt) error {
 	}
 	return nil
 }
+*/
 
 func updb8(opt *dbopt) error {
-	var tx *sql.Tx
-	var err error
-	if tx, err = opt.DB.BeginTx(); err != nil {
+	// Open database
+	dc, err := dbx.Connect(opt.DBAdmin)
+	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
-	// Read source connector parameters.
-	var sources []*sysdb.SourceConnector
-	if sources, err = sysdb.ReadSourceConnectors(); err != nil {
+	defer dbx.Close(dc)
+	// Begin transaction
+	tx, err := dc.BeginTx(context.TODO(), pgx.TxOptions{IsoLevel: "read committed"})
+	if err != nil {
 		return err
 	}
-	var src *sysdb.SourceConnector
-	if src = sources[0]; err != nil {
+	defer dbx.Rollback(tx)
+
+	// Source connector parameters
+	sources, err := oldReadSourceConnectors(opt.Datadir)
+	if err != nil {
 		return err
 	}
-	// Write to database.
+	src := sources[0]
 	var q = "CREATE TABLE metadb.source (" +
 		"    name text PRIMARY KEY," +
 		"    brokers text NOT NULL," +
@@ -421,21 +521,104 @@ func updb8(opt *dbopt) error {
 		"    schemapassfilter text[] NOT NULL," +
 		"    schemaprefix text NOT NULL" +
 		")"
-	if _, err = opt.DB.Exec(nil, q); err != nil {
+	if _, err = dc.Exec(context.TODO(), q); err != nil {
 		return err
 	}
 	q = "INSERT INTO metadb.source (name, brokers, security, topics, consumergroup, schemapassfilter, schemaprefix) " +
-		"VALUES ('" + src.Name + "', '" + src.Brokers + "', '" + src.Security + "', '" + toPostgresArray(src.Topics) + "', '" + src.Group + "', '" + toPostgresArray(src.SchemaPassFilter) + "', '" + src.SchemaPrefix + "')"
-	if _, err = opt.DB.Exec(nil, q); err != nil {
+		"VALUES ('" + strings.TrimPrefix(src.Name, "src.") + "', '" + src.Brokers + "', '" + src.Security + "', " +
+		toPostgresArray(src.Topics) + ", '" + src.Group + "', " + toPostgresArray(src.SchemaPassFilter) + ", '" +
+		src.SchemaPrefix + "')"
+	if _, err = dc.Exec(context.TODO(), q); err != nil {
 		return err
 	}
-	// Write new version number.
-	if err = metadata.WriteDatabaseVersion(opt.DB, tx, 8); err != nil {
+
+	// Read users
+	users, err := readUsers(opt.Datadir)
+	if err != nil {
 		return err
 	}
-	if err = tx.Commit(); err != nil {
+	q = "CREATE TABLE metadb.auth (" +
+		"    username text PRIMARY KEY" +
+		")"
+	if _, err = dc.Exec(context.TODO(), q); err != nil {
 		return err
 	}
+	for _, u := range users {
+		q = "INSERT INTO metadb.auth (username) VALUES ($1)"
+		if _, err = dc.Exec(context.TODO(), q, u); err != nil {
+			return err
+		}
+	}
+
+	// Read plug.folio.tenant configuration
+	folioTenant, _, err := getConfig(opt.Datadir, "plug.folio.tenant")
+	if err != nil {
+		return err
+	}
+	q = "CREATE TABLE metadb.folio (" +
+		"    attr text PRIMARY KEY," +
+		"    val text NOT NULL" +
+		")"
+	if _, err = dc.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "INSERT INTO metadb.folio (attr, val) VALUES ($1, $2)"
+	if _, err = dc.Exec(context.TODO(), q, "tenant", folioTenant); err != nil {
+		return err
+	}
+
+	// Read plug.reshare.tenants configuration
+	reshareTenants, _, err := getConfig(opt.Datadir, "plug.reshare.tenants")
+	if err != nil {
+		return err
+	}
+	q = "CREATE TABLE metadb.reshare (" +
+		"    attr text PRIMARY KEY," +
+		"    val text NOT NULL" +
+		")"
+	if _, err = dc.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "INSERT INTO metadb.reshare (attr, val) VALUES ($1, $2)"
+	if _, err = dc.Exec(context.TODO(), q, "tenants", reshareTenants); err != nil {
+		return err
+	}
+
+	// Create configuration file
+	f, err := os.Create(util.ConfigFileName(opt.Datadir))
+	if err != nil {
+		return fmt.Errorf("creating configuration file: %v", err)
+	}
+	var s = "[postgresql]\n" +
+		"host = \n" +
+		"database_name = \n" +
+		"postgres_password = \n" +
+		"metadb_user = \n" +
+		"metadb_password = \n"
+	_, err = f.WriteString(s)
+	if err != nil {
+		return fmt.Errorf("writing configuration file: %v", err)
+	}
+	err = f.Close()
+	if err != nil {
+		return fmt.Errorf("closing configuration file: %v", err)
+	}
+
+	// Write new version number
+	if err = metadata.WriteDatabaseVersion(tx, 8); err != nil {
+		return err
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
+		return err
+	}
+
+	sysdir := util.SystemDirName(opt.Datadir)
+	sysdirOld := sysdir + "_old"
+	err = os.Rename(sysdir, sysdirOld)
+	if err != nil {
+		eout.Warning("renaming %q to %q: %v", sysdir, sysdirOld, err)
+	}
+
 	return nil
 }
 
@@ -450,14 +633,219 @@ func toPostgresArray(slice []string) string {
 		}
 		b.WriteString("'" + s + "'")
 	}
-	b.WriteRune(']')
+	b.WriteString("]::text[]")
 	return b.String()
 }
 
 type updbFunc func(opt *dbopt) error
 
 type dbopt struct {
-	DB        sqlx.DB
-	CName     string
+	Datadir   string
+	DBSuper   *dbx.DB
+	DBAdmin   *dbx.DB
 	DBVersion int64
+}
+
+//// Old sysdb functions for upgrading from 0.11
+
+func getConfig(datadir string, attr string) (string, bool, error) {
+	dsn := "file:" + util.SysdbFileName(datadir) + "?_busy_timeout=30000" +
+		"&_foreign_keys=on" +
+		"&_journal_mode=WAL" +
+		"&_locking_mode=NORMAL" +
+		"&_synchronous=3"
+	db, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		return "", false, err
+	}
+	defer func(db *sql.DB) {
+		_ = db.Close()
+	}(db)
+
+	// look up config value
+	q := fmt.Sprintf(""+
+		"SELECT val\n"+
+		"    FROM config\n"+
+		"    WHERE attr = '%s';", attr)
+	var val string
+	err = db.QueryRowContext(context.TODO(), q).Scan(&val)
+	switch {
+	case err == sql.ErrNoRows:
+		return "", false, nil
+	case err != nil:
+		return "", false, fmt.Errorf("reading configuration: %s: %s", attr, err)
+	default:
+		return val, true, nil
+	}
+}
+
+func oldReadDatabaseConnectors(datadir string) ([]*databaseConnector, error) {
+	var cmap map[string]map[string]string
+	var err error
+	if cmap, err = readConfigMap(datadir, "db"); err != nil {
+		return nil, err
+	}
+	var dbc []*databaseConnector
+	var conf map[string]string
+	for _, conf = range cmap {
+		dbc = append(dbc, &databaseConnector{
+			// Name:            name,
+			// Type:            conf["type"],
+			DBHost:          conf["host"],
+			DBPort:          conf["port"],
+			DBName:          conf["dbname"],
+			DBAdminUser:     conf["adminuser"],
+			DBAdminPassword: conf["adminpassword"],
+			DBSuperUser:     conf["superuser"],
+			DBSuperPassword: conf["superpassword"],
+			// DBUsers:         conf["users"],
+			// DBSSLMode:       conf["sslmode"],
+			DBAccount: conf["account"],
+		})
+	}
+	return dbc, nil
+}
+
+func oldReadSourceConnectors(datadir string) ([]*sourceConnector, error) {
+	var cmap map[string]map[string]string
+	var err error
+	if cmap, err = readConfigMap(datadir, "src"); err != nil {
+		return nil, err
+	}
+	var src []*sourceConnector
+	var name string
+	var conf map[string]string
+	for name, conf = range cmap {
+		security := conf["security"]
+		if security == "" {
+			security = "ssl"
+		}
+		src = append(src, &sourceConnector{
+			Name:             name,
+			Brokers:          conf["brokers"],
+			Security:         security,
+			Topics:           util.SplitList(conf["topics"]),
+			Group:            conf["group"],
+			SchemaPassFilter: util.SplitList(conf["schemapassfilter"]),
+			SchemaPrefix:     conf["schemaprefix"],
+			// Databases:        util.SplitList(conf["dbs"]),
+		})
+	}
+	return src, nil
+}
+
+func readConfigMap(datadir string, prefix string) (map[string]map[string]string, error) {
+	dsn := "file:" + util.SysdbFileName(datadir) + "?_busy_timeout=30000" +
+		"&_foreign_keys=on" +
+		"&_journal_mode=WAL" +
+		"&_locking_mode=NORMAL" +
+		"&_synchronous=3"
+	db, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		return nil, err
+	}
+	defer func(db *sql.DB) {
+		_ = db.Close()
+	}(db)
+
+	var cmap = make(map[string]map[string]string)
+	var rows *sql.Rows
+	var q = "SELECT attr, val FROM config WHERE attr LIKE '" + prefix + ".%';"
+	if rows, err = db.QueryContext(context.TODO(), q); err != nil {
+		return nil, err
+	}
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
+	for rows.Next() {
+		var attr, val string
+		if err = rows.Scan(&attr, &val); err != nil {
+			return nil, err
+		}
+		if !strings.HasPrefix(attr, prefix+".") {
+			continue
+		}
+		var sp []string = strings.Split(attr, ".")
+		if len(sp) < 3 {
+			continue
+		}
+		var name = sp[0] + "." + sp[1]
+		var key = sp[2]
+		var conf map[string]string
+		var ok bool
+		if conf, ok = cmap[name]; !ok {
+			conf = make(map[string]string)
+			cmap[name] = conf
+		}
+		conf[key] = val
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return cmap, nil
+}
+
+func readUsers(datadir string) ([]string, error) {
+	dsn := "file:" + util.SysdbFileName(datadir) + "?_busy_timeout=30000" +
+		"&_foreign_keys=on" +
+		"&_journal_mode=WAL" +
+		"&_locking_mode=NORMAL" +
+		"&_synchronous=3"
+	db, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		return nil, err
+	}
+	defer func(db *sql.DB) {
+		_ = db.Close()
+	}(db)
+
+	users := make([]string, 0)
+	q := "SELECT username FROM userperm WHERE tables = '.*';"
+	rows, err := db.QueryContext(context.TODO(), q)
+	if err != nil {
+		return nil, err
+	}
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
+	for rows.Next() {
+		var u string
+		if err = rows.Scan(&u); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+type databaseConnector struct {
+	// ID              int64
+	// Name            string
+	// Type            string
+	DBHost          string
+	DBPort          string
+	DBName          string
+	DBAdminUser     string
+	DBAdminPassword string
+	DBSuperUser     string
+	DBSuperPassword string
+	// DBUsers         string
+	// DBSSLMode       string
+	DBAccount string
+	// Status    status.Status
+}
+
+type sourceConnector struct {
+	// ID               int64
+	Name             string
+	Brokers          string
+	Security         string
+	Topics           []string
+	Group            string
+	SchemaPassFilter []string
+	SchemaPrefix     string
+	// Status           status.Status
 }

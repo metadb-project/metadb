@@ -10,7 +10,6 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/metadata"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
-	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -29,15 +28,27 @@ func Reset(opt *option.Reset) error {
 		}
 	}
 	// Initialize sysdb
-	if err := sysdb.Init(util.SysdbFileName(opt.Datadir)); err != nil {
-		return fmt.Errorf("initializing system database: %s", err)
-	}
+	// if err := sysdb.Init(util.SysdbFileName(opt.Datadir)); err != nil {
+	// 	return fmt.Errorf("initializing system database: %s", err)
+	// }
 	// Open database
-	dbtype, dsn, err := sysdb.ReadDataSource(opt.Connector)
+	// dbtype, dsn, err := sysdb.ReadDataSource(opt.Connector)
+	// if err != nil {
+	// 	return err
+	// }
+	_, db, err := util.ReadConfigDatabase(opt.Datadir)
 	if err != nil {
 		return err
 	}
-	db, err := sqlx.Open(opt.Connector, dbtype, dsn)
+	dsn := &sqlx.DSN{
+		Host:     db.Host,
+		Port:     "5432",
+		User:     db.User,
+		Password: db.Password,
+		DBName:   db.DBName,
+		SSLMode:  "require",
+	}
+	dc, err := sqlx.Open("postgres", dsn)
 	if err != nil {
 		return err
 	}
@@ -49,7 +60,7 @@ func Reset(opt *option.Reset) error {
 		}
 	*/
 	// Get list of tables
-	tmap, err := metadata.TrackRead(db)
+	tmap, err := metadata.TrackRead(dc)
 	if err != nil {
 		return err
 	}
@@ -63,19 +74,19 @@ func Reset(opt *option.Reset) error {
 	origins := sqlx.CSVToSQL(opt.Origins)
 	for _, t := range tables {
 		eout.Info("resetting: %s", t.String())
-		q := "UPDATE " + db.TableSQL(&t) + " SET __cf=FALSE WHERE __cf AND __origin IN (" + origins + ")"
-		if _, err = db.Exec(nil, q); err != nil {
+		q := "UPDATE " + dc.TableSQL(&t) + " SET __cf=FALSE WHERE __cf AND __origin IN (" + origins + ")"
+		if _, err = dc.Exec(nil, q); err != nil {
 			return err
 		}
-		if err = db.VacuumAnalyzeTable(&t); err != nil {
+		if err = dc.VacuumAnalyzeTable(&t); err != nil {
 			return err
 		}
-		q = "UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=FALSE WHERE __cf AND __current AND __origin IN (" +
+		q = "UPDATE " + dc.HistoryTableSQL(&t) + " SET __cf=FALSE WHERE __cf AND __current AND __origin IN (" +
 			origins + ")"
-		if _, err = db.Exec(nil, q); err != nil {
+		if _, err = dc.Exec(nil, q); err != nil {
 			return err
 		}
-		if err = db.VacuumAnalyzeTable(db.HistoryTable(&t)); err != nil {
+		if err = dc.VacuumAnalyzeTable(dc.HistoryTable(&t)); err != nil {
 			return err
 		}
 	}

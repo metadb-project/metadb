@@ -8,15 +8,14 @@ import (
 	"sync"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
 type DatabaseConnector struct {
-	ID              int64
-	Name            string
-	Type            string
+	// ID              int64
+	// Name            string
+	// Type            string
 	DBHost          string
 	DBPort          string
 	DBName          string
@@ -24,10 +23,10 @@ type DatabaseConnector struct {
 	DBAdminPassword string
 	DBSuperUser     string
 	DBSuperPassword string
-	DBUsers         string
-	DBSSLMode       string
-	DBAccount       string
-	Status          status.Status
+	// DBUsers         string
+	// DBSSLMode       string
+	DBAccount string
+	Status    status.Status
 }
 
 type SourceConnector struct {
@@ -39,7 +38,6 @@ type SourceConnector struct {
 	Group            string
 	SchemaPassFilter []string
 	SchemaPrefix     string
-	Databases        []string
 	Status           status.Status
 }
 
@@ -52,28 +50,30 @@ func Init(s string) error {
 }
 
 func InitCreate(connString string) error {
-	sysMu.Lock()
-	defer sysMu.Unlock()
+	/*
+		sysMu.Lock()
+		defer sysMu.Unlock()
 
-	var err error
+		var err error
 
-	var dbconn *pgx.Conn
-	if dbconn, err = pgx.Connect(context.TODO(), connString); err != nil {
-		return err
-	}
-	defer dbconn.Close(context.TODO())
+		var dbconn *pgx.Conn
+		if dbconn, err = pgx.Connect(context.TODO(), connString); err != nil {
+			return err
+		}
+		defer dbconn.Close(context.TODO())
 
-	var exists bool
-	if exists, err = systemSchemaExists(dbconn); err != nil {
-		return fmt.Errorf("checking if database initialized: %v", err)
-	}
-	if exists {
-		return fmt.Errorf("database already initialized")
-	}
+		var exists bool
+		if exists, err = systemSchemaExists(dbconn); err != nil {
+			return fmt.Errorf("checking if database initialized: %v", err)
+		}
+		if exists {
+			return fmt.Errorf("database already initialized")
+		}
 
-	if err = createSchema(dbconn); err != nil {
-		return err
-	}
+		if err = createSchema(dbconn); err != nil {
+			return err
+		}
+	*/
 	return nil
 }
 
@@ -140,7 +140,6 @@ func createSchema(dbconn *pgx.Conn) error {
 		return fmt.Errorf("creating schema: metadb: %v", err)
 	}
 
-	eout.Info("*** writing database version disabled")
 	// eout.Trace("writing database version: %d", util.DatabaseVersion)
 	// var q = fmt.Sprintf("PRAGMA user_version = %d;", util.DatabaseVersion)
 	// if _, err = tx.Exec(context.TODO(), q); err != nil {
@@ -243,39 +242,39 @@ func createSchema(dbconn *pgx.Conn) error {
 
 	*/
 
-	eout.Trace("creating schema: config")
-	q = "" +
-		"CREATE TABLE metadb.config (\n" +
-		"    attr TEXT PRIMARY KEY,\n" +
-		"    val TEXT NOT NULL\n" +
-		");"
-	_, err = tx.Exec(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("initializing system database: creating schema: config: %s", err)
-	}
+	// eout.Trace("creating schema: config")
+	// q = "" +
+	// 	"CREATE TABLE metadb.config (\n" +
+	// 	"    attr TEXT PRIMARY KEY,\n" +
+	// 	"    val TEXT NOT NULL\n" +
+	// 	");"
+	// _, err = tx.Exec(context.TODO(), q)
+	// if err != nil {
+	// 	return fmt.Errorf("initializing system database: creating schema: config: %s", err)
+	// }
 
-	eout.Trace("creating schema: userperm")
-	q = "" +
-		"CREATE TABLE metadb.userperm (\n" +
-		"    username TEXT PRIMARY KEY,\n" +
-		"    tables TEXT NOT NULL,\n" +
-		"    dbupdated BOOLEAN NOT NULL\n" +
-		");"
-	_, err = tx.Exec(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("initializing system database: creating schema: userperm: %s", err)
-	}
+	// eout.Trace("creating schema: userperm")
+	// q = "" +
+	// 	"CREATE TABLE metadb.userperm (\n" +
+	// 	"    username TEXT PRIMARY KEY,\n" +
+	// 	"    tables TEXT NOT NULL,\n" +
+	// 	"    dbupdated BOOLEAN NOT NULL\n" +
+	// 	");"
+	// _, err = tx.Exec(context.TODO(), q)
+	// if err != nil {
+	// 	return fmt.Errorf("initializing system database: creating schema: userperm: %s", err)
+	// }
 
-	eout.Trace("creating schema: connector")
-	q = "" +
-		"CREATE TABLE metadb.connector (\n" +
-		"    spec TEXT PRIMARY KEY,\n" +
-		"    enabled BOOLEAN NOT NULL\n" +
-		");"
-	_, err = tx.Exec(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("initializing system database: creating schema: connector: %s", err)
-	}
+	// eout.Trace("creating schema: connector")
+	// q = "" +
+	// 	"CREATE TABLE metadb.connector (\n" +
+	// 	"    spec TEXT PRIMARY KEY,\n" +
+	// 	"    enabled BOOLEAN NOT NULL\n" +
+	// 	");"
+	// _, err = tx.Exec(context.TODO(), q)
+	// if err != nil {
+	// 	return fmt.Errorf("initializing system database: creating schema: connector: %s", err)
+	// }
 
 	/*
 		eout.Trace("creating schema: track")
@@ -297,11 +296,8 @@ func createSchema(dbconn *pgx.Conn) error {
 	return nil
 }
 
-func ValidateSysdbVersion() error {
-	sysMu.Lock()
-	defer sysMu.Unlock()
-
-	dbversion, err := getSysdbVersion()
+func ValidateSysdbVersion(dbconnstr string) error {
+	dbversion, err := getSysdbVersion(dbconnstr)
 	if err != nil {
 		return err
 	}
@@ -315,26 +311,41 @@ func ValidateSysdbVersion() error {
 	return nil
 }
 
-func GetSysdbVersion() (int64, error) {
-	sysMu.Lock()
-	defer sysMu.Unlock()
-
-	dbversion, err := getSysdbVersion()
+func GetSysdbVersion(dbconnstr string) (int64, error) {
+	dbversion, err := getSysdbVersion(dbconnstr)
 	if err != nil {
 		return 0, err
 	}
 	return dbversion, nil
 }
 
-func getSysdbVersion() (int64, error) {
-	q := "PRAGMA user_version"
-	var dbversion int64
-	err := db.QueryRowContext(context.TODO(), q).Scan(&dbversion)
+func getSysdbVersion(dbconnstr string) (int64, error) {
+	var dbconn *pgx.Conn
+	var err error
+	if dbconn, err = pgx.Connect(context.TODO(), dbconnstr); err != nil {
+		return 0, fmt.Errorf("unable to query database version: %v", err)
+	}
+	defer dbconn.Close(context.TODO())
+
+	var q = "SELECT 1 FROM pg_class c JOIN pg_namespace ns ON c.relnamespace = ns.oid WHERE ns.nspname='metadb' AND c.relname='init'"
+	var init int64
+	err = dbconn.QueryRow(context.TODO(), q).Scan(&init)
 	switch {
-	case err == sql.ErrNoRows:
-		return 0, fmt.Errorf("unable to query pragma user_version")
+	case err == pgx.ErrNoRows:
+		return 0, fmt.Errorf("database not initialized")
 	case err != nil:
-		return 0, fmt.Errorf("querying pragma user_version: %s", err)
+		return 0, fmt.Errorf("unable to query database version: checking for table metadb.init: %v", err)
+	default:
+	}
+
+	q = "SELECT dbversion FROM metadb.init"
+	var dbversion int64
+	err = dbconn.QueryRow(context.TODO(), q).Scan(&dbversion)
+	switch {
+	case err == pgx.ErrNoRows:
+		return 0, fmt.Errorf("unable to query database version: no rows in metadb.init")
+	case err != nil:
+		return 0, fmt.Errorf("unable to query database version: %v", err)
 	default:
 		return dbversion, nil
 	}

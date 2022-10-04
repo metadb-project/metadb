@@ -1,2 +1,5 @@
+(*github.com/jackc/pgx/v4.Conn).Close
+(github.com/jackc/pgx/v4.Tx).Rollback
+
 (*database/sql.DB).Close
 (*database/sql.Tx).Rollback

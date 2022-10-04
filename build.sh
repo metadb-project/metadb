@@ -3,7 +3,6 @@ set -e
 
 fast='false'
 json=''
-runtest='false'
 runalltest='false'
 verbose='false'
 quiet='false'
@@ -14,21 +13,20 @@ usage() {
     echo 'Usage:  build.sh [<flags>]'
     echo ''
     echo 'Flags:'
-    echo '-f  "Fast" build (do not remove executables)'
+    echo '-f  "Fast" build (do not remove executables or run tests)'
     echo '-h  Help'
-    echo '-T  Run tests'
-    echo '-t  Run linters and tests; requires'
+    echo '-t  Run more checks; requires'
     echo '    go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest'
     # echo '    go install honnef.co/go/tools/cmd/staticcheck@latest'
     echo '    go install github.com/kisielk/errcheck@latest'
     echo '    go install github.com/gordonklaus/ineffassign@latest'
     echo '    go install github.com/remyoudompheng/go-misc/deadcode@latest'
     echo '-v  Enable verbose output'
-    echo '-q  Enable quiet output'
+    # echo '-q  Enable quiet output'
     # echo '-X  Include experimental code'
 }
 
-while getopts 'cfhJTtvqX' flag; do
+while getopts 'cfhJtvqX' flag; do
     case "${flag}" in
         t) runalltest='true' ;;
         c) ;;
@@ -36,7 +34,6 @@ while getopts 'cfhJTtvqX' flag; do
         J) echo "build.sh: -J option is deprecated" 1>&2 ;;
         h) usage
             exit 1 ;;
-        T) runtest='true' ;;
         v) verbose='true' ;;
         q) quiet='true' ;;
         X) experiment='true' ;;
@@ -77,7 +74,7 @@ bindir=bin
 
 if ! $fast; then
     if ! $quiet; then
-	echo 'build.sh: removing executables' 1>&2
+        echo 'build.sh: removing executables' 1>&2
     fi
     rm -f ./$bindir/metadb ./$bindir/mdb ./cmd/metadb/parser/gram.go ./cmd/metadb/parser/scan.go ./cmd/metadb/parser/y.output
 fi
@@ -100,52 +97,53 @@ mkdir -p $bindir
 go generate $v ./...
 
 go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version $json" ./cmd/metadb
-go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
+# go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
+
+if ! $fast; then
+    if ! $quiet; then
+        echo 'build.sh: running tests' 1>&2
+    fi
+    go test $v $tags -vet=off -count=1 ./cmd/metadb/command 1>&2
+    go test $v $tags -vet=off -count=1 ./cmd/metadb/dbx 1>&2
+    # go test $v $tags -vet=off -count=1 ./cmd/metadb/parser 1>&2
+    go test $v $tags -vet=off -count=1 ./cmd/metadb/sqlx 1>&2
+    go test $v $tags -vet=off -count=1 ./cmd/metadb/util 1>&2
+fi
 
 if $runalltest; then
-    if ! $quiet; then
-        echo 'build.sh: running linter: vet' 1>&2
+    if ! $quiet && ! $fast; then
+        echo 'build.sh: running: vet' 1>&2
     fi
-    go vet $v $tags ./cmd/... 1>&2
+    go vet $v $tags $(go list ./... | grep -v 'github.com/metadb-project/metadb/cmd/metadb/parser') 1>&2
     if ! $quiet; then
-	echo 'build.sh: running linter: vet shadow' 1>&2
+        echo 'build.sh: running: vet shadow' 1>&2
     fi
     go vet $v $tags -vettool=$GOPATH/bin/shadow ./cmd/... 1>&2
-    # echo 'build.sh: running linter: staticcheck' 1>&2
+    # echo 'build.sh: running: staticcheck' 1>&2
     # staticcheck ./cmd/... 1>&2
     if ! $quiet; then
-	echo 'build.sh: running linter: errcheck' 1>&2
+        echo 'build.sh: running: errcheck' 1>&2
     fi
     # Add -verbose to get the function signature for .errcheck.
     errcheck -exclude .errcheck ./cmd/... 1>&2
-    # echo 'build.sh: running linter: aligncheck' 1>&2
+    # echo 'build.sh: running: aligncheck' 1>&2
     # aligncheck ./cmd/metadb 1>&2
     # aligncheck ./cmd/mdb 1>&2
-    # echo 'build.sh: running linter: structcheck' 1>&2
+    # echo 'build.sh: running: structcheck' 1>&2
     # structcheck ./cmd/metadb 1>&2
     # structcheck ./cmd/mdb 1>&2
-    # echo 'build.sh: running linter: varcheck' 1>&2
+    # echo 'build.sh: running: varcheck' 1>&2
     # varcheck ./cmd/metadb 1>&2
     # varcheck ./cmd/mdb 1>&2
     if ! $quiet; then
-	echo 'build.sh: running linter: ineffassign' 1>&2
+        echo 'build.sh: running: ineffassign' 1>&2
     fi
     ineffassign ./cmd/... 1>&2
     if ! $quiet; then
-	echo 'build.sh: running linter: deadcode' 1>&2
+        echo 'build.sh: running: deadcode' 1>&2
     fi
     deadcode -test ./cmd/metadb 1>&2
-    deadcode -test ./cmd/mdb 1>&2
-fi
-
-if $runtest || $runalltest; then
-    if ! $quiet; then
-	echo 'build.sh: running tests' 1>&2
-    fi
-    go test $v $tags -vet=off -count=1 ./cmd/metadb/command 1>&2
-    go test $v $tags -vet=off -count=1 ./cmd/metadb/parser 1>&2
-    go test $v $tags -vet=off -count=1 ./cmd/metadb/sqlx 1>&2
-    go test $v $tags -vet=off -count=1 ./cmd/metadb/util 1>&2
+#    deadcode -test ./cmd/mdb 1>&2
 fi
 
 if ! $quiet; then

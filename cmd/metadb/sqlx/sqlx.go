@@ -6,9 +6,6 @@ import (
 	"strings"
 )
 
-//_ "github.com/lib/pq"
-//_ "github.com/snowflakedb/gosnowflake"
-
 type DB interface {
 	Close()
 	Ping() error
@@ -34,27 +31,24 @@ type ColumnSchema struct {
 	CharMaxLen *int64
 }
 
-func Open(dbspec string, dbtype string, dataSourceName *DSN) (DB, error) {
+func Open(dbtype string, dataSourceName *DSN) (DB, error) {
 	switch dbtype {
 	case "postgresql":
-		return OpenPostgres(dbspec, dataSourceName)
-	//case "snowflake":
-	//	return NewOpenSnowflake(dataSourceName)
-	//case "redshift":
-	//	return NewOpenRedshift(dataSourceName)
+		return OpenPostgres(dataSourceName)
 	default:
 		return nil, fmt.Errorf("unknown database type: %s", dbtype)
 	}
 }
 
 type DSN struct {
+	// DBURI string
 	Host     string
 	Port     string
 	User     string
 	Password string
 	DBName   string
 	SSLMode  string
-	Account  string
+	// Account  string
 }
 
 type Table struct {
