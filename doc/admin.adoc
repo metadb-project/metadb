@@ -1,5 +1,16 @@
 == Server administration
 
+=== System requirements
+
+* Architecture: x86-64 (AMD64)
+* Operating system: Debian 11
+* https://www.postgresql.org/[PostgreSQL] 14.5 or later
+* Required to build from source:
+** https://golang.org/[Go] 1.19 or later
+** https://gcc.gnu.org/[GCC C compiler] 9.3.0 or later
+
+////
+
 === Server configuration
 
 Metadb makes use of local storage in a "data directory," which is
@@ -18,3 +29,5 @@ A basic connection URI takes the form:
 ----
 postgres://**_user_**:**_password_**@**_host_**:**_port_**/**_dbname_**
 ----
+
+////
