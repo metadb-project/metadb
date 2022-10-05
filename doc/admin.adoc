@@ -9,25 +9,37 @@
 ** https://golang.org/[Go] 1.19 or later
 ** https://gcc.gnu.org/[GCC C compiler] 9.3.0 or later
 
-////
-
 === Server configuration
 
 Metadb makes use of local storage in a "data directory," which is
 created using `metadb` with the `init` command.  In this example we
-will create the data directory as `data/` with a sample database
-connection URI:
+will create the data directory as `data/`:
 
 [source,bash]
 ----
-metadb init -D data --database postgres://metadb:zpreCaWS7S79dt82zgvD@dbserver:5432/metadb
+metadb init -D data
 ----
 
-A basic connection URI takes the form:
+This will also create a file `metadb.conf` in the data directory:
 
-[source,subs="verbatim,quotes"]
+[source,toml]
 ----
-postgres://**_user_**:**_password_**@**_host_**:**_port_**/**_dbname_**
+[postgresql]
+host =
+database_name =
+postgres_password =
+metadb_user =
+metadb_password =
 ----
 
-////
+This file should be edited to add connection parameters, for example:
+
+[source,toml]
+----
+[postgresql]
+host = a.b.c
+database_name = mydb
+postgres_password = zpreCaWS7S79dt82zgvD
+metadb_user = metadb
+metadb_password = ZHivGie5juxGJZmTObHU
+----
