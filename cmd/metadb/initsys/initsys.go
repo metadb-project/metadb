@@ -105,14 +105,15 @@ func InitSys(opt *option.Init) error {
 	if err != nil {
 		return fmt.Errorf("creating configuration file: %v", err)
 	}
-	var s = "[postgresql]\n" +
+	var s = "[main]\n" +
 		"host = \n" +
-		"port = \n" +
-		"database_name = \n" +
-		"postgres_password = \n" +
-		"metadb_user = \n" +
-		"metadb_password = \n" +
-		"sslmode = \n"
+		"port = 5432\n" +
+		"database = \n" +
+		"superuser = postgres\n" +
+		"superuser_password = \n" +
+		"systemuser = metadb\n" +
+		"systemuser_password = \n" +
+		"sslmode = require\n"
 	_, err = f.WriteString(s)
 	if err != nil {
 		return fmt.Errorf("writing configuration file: %v", err)

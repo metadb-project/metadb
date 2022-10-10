@@ -231,21 +231,21 @@ func ReadConfigDatabase(datadir string) (*dbx.DB, *dbx.DB, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	s := cfg.Section("postgresql")
+	s := cfg.Section("main")
 	return &dbx.DB{
 			Host:     s.Key("host").String(),
-			Port:     "5432",
-			User:     "postgres",
-			Password: s.Key("postgres_password").String(),
-			DBName:   s.Key("database_name").String(),
-			SSLMode:  "require",
+			Port:     s.Key("port").String(),
+			User:     s.Key("superuser").String(),
+			Password: s.Key("superuser_password").String(),
+			DBName:   s.Key("database").String(),
+			SSLMode:  s.Key("sslmode").String(),
 		}, &dbx.DB{
 			Host:     s.Key("host").String(),
-			Port:     "5432",
-			User:     s.Key("metadb_user").String(),
-			Password: s.Key("metadb_password").String(),
-			DBName:   s.Key("database_name").String(),
-			SSLMode:  "require",
+			Port:     s.Key("port").String(),
+			User:     s.Key("systemuser").String(),
+			Password: s.Key("systemuser_password").String(),
+			DBName:   s.Key("database").String(),
+			SSLMode:  s.Key("sslmode").String(),
 		}, nil
 }
 

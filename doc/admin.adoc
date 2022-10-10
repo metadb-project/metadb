@@ -24,22 +24,28 @@ This will also create a file `metadb.conf` in the data directory:
 
 [source,toml]
 ----
-[postgresql]
+[main]
 host =
-database_name =
-postgres_password =
-metadb_user =
-metadb_password =
+port =
+database =
+superuser =
+superuser_password =
+systemuser =
+systemuser_password =
+sslmode =
 ----
 
 This file should be edited to add connection parameters, for example:
 
 [source,toml]
 ----
-[postgresql]
+[main]
 host = a.b.c
-database_name = mydb
-postgres_password = zpreCaWS7S79dt82zgvD
-metadb_user = metadb
-metadb_password = ZHivGie5juxGJZmTObHU
+port = 5432
+database = mydb
+superuser = postgres
+superuser_password = zpreCaWS7S79dt82zgvD
+systemuser = metadb
+systemuser_password = ZHivGie5juxGJZmTObHU
+sslmode = require
 ----

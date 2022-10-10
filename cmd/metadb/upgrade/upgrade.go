@@ -236,22 +236,22 @@ func upgradeDatabase(datadir string) (bool, error) {
 		if err != nil {
 			return false, fmt.Errorf("reading file %s: %v", confFileName, err)
 		}
-		s := cfg.Section("postgresql")
+		s := cfg.Section("main")
 		dbsuper = &dbx.DB{
 			Host:     s.Key("host").String(),
-			Port:     "5432",
-			User:     "postgres",
-			Password: s.Key("postgres_password").String(),
-			DBName:   s.Key("database_name").String(),
-			SSLMode:  "require",
+			Port:     s.Key("port").String(),
+			User:     s.Key("superuser").String(),
+			Password: s.Key("superuser_password").String(),
+			DBName:   s.Key("database").String(),
+			SSLMode:  s.Key("sslmode").String(),
 		}
 		dbadmin = &dbx.DB{
 			Host:     s.Key("host").String(),
-			Port:     "5432",
-			User:     s.Key("metadb_user").String(),
-			Password: s.Key("metadb_password").String(),
-			DBName:   s.Key("database_name").String(),
-			SSLMode:  "require",
+			Port:     s.Key("port").String(),
+			User:     s.Key("systemuser").String(),
+			Password: s.Key("systemuser_password").String(),
+			DBName:   s.Key("database").String(),
+			SSLMode:  s.Key("sslmode").String(),
 		}
 	} else {
 		// Read from sysdb
@@ -276,6 +276,28 @@ func upgradeDatabase(datadir string) (bool, error) {
 			Password: c.DBAdminPassword,
 			DBName:   c.DBName,
 			SSLMode:  "require",
+		}
+		// Create configuration file
+		f, err := os.Create(util.ConfigFileName(datadir))
+		if err != nil {
+			return false, fmt.Errorf("creating configuration file: %v", err)
+		}
+		var s = "[main]\n" +
+			"host = " + c.DBHost + "\n" +
+			"port = " + c.DBPort + "\n" +
+			"database = " + c.DBName + "\n" +
+			"superuser = " + c.DBSuperUser + "\n" +
+			"superuser_password = " + c.DBSuperPassword + "\n" +
+			"systemuser = " + c.DBAdminUser + "\n" +
+			"systemuser_password = " + c.DBAdminPassword + "\n" +
+			"sslmode = require\n"
+		_, err = f.WriteString(s)
+		if err != nil {
+			return false, fmt.Errorf("writing configuration file: %v", err)
+		}
+		err = f.Close()
+		if err != nil {
+			return false, fmt.Errorf("closing configuration file: %v", err)
 		}
 	}
 
@@ -582,26 +604,6 @@ func updb8(opt *dbopt) error {
 	q = "INSERT INTO metadb.reshare (attr, val) VALUES ($1, $2)"
 	if _, err = dc.Exec(context.TODO(), q, "tenants", reshareTenants); err != nil {
 		return err
-	}
-
-	// Create configuration file
-	f, err := os.Create(util.ConfigFileName(opt.Datadir))
-	if err != nil {
-		return fmt.Errorf("creating configuration file: %v", err)
-	}
-	var s = "[postgresql]\n" +
-		"host = \n" +
-		"database_name = \n" +
-		"postgres_password = \n" +
-		"metadb_user = \n" +
-		"metadb_password = \n"
-	_, err = f.WriteString(s)
-	if err != nil {
-		return fmt.Errorf("writing configuration file: %v", err)
-	}
-	err = f.Close()
-	if err != nil {
-		return fmt.Errorf("closing configuration file: %v", err)
 	}
 
 	// Write new version number
