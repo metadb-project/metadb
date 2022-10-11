@@ -278,26 +278,9 @@ func upgradeDatabase(datadir string) (bool, error) {
 			SSLMode:  "require",
 		}
 		// Create configuration file
-		f, err := os.Create(util.ConfigFileName(datadir))
+		err = createConfigFile(datadir, c)
 		if err != nil {
-			return false, fmt.Errorf("creating configuration file: %v", err)
-		}
-		var s = "[main]\n" +
-			"host = " + c.DBHost + "\n" +
-			"port = " + c.DBPort + "\n" +
-			"database = " + c.DBName + "\n" +
-			"superuser = " + c.DBSuperUser + "\n" +
-			"superuser_password = " + c.DBSuperPassword + "\n" +
-			"systemuser = " + c.DBAdminUser + "\n" +
-			"systemuser_password = " + c.DBAdminPassword + "\n" +
-			"sslmode = require\n"
-		_, err = f.WriteString(s)
-		if err != nil {
-			return false, fmt.Errorf("writing configuration file: %v", err)
-		}
-		err = f.Close()
-		if err != nil {
-			return false, fmt.Errorf("closing configuration file: %v", err)
+			return false, err
 		}
 	}
 
@@ -316,6 +299,31 @@ func upgradeDatabase(datadir string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func createConfigFile(datadir string, c *databaseConnector) error {
+	f, err := os.Create(util.ConfigFileName(datadir))
+	if err != nil {
+		return fmt.Errorf("creating configuration file: %v", err)
+	}
+	var s = "[main]\n" +
+		"host = " + c.DBHost + "\n" +
+		"port = " + c.DBPort + "\n" +
+		"database = " + c.DBName + "\n" +
+		"superuser = " + c.DBSuperUser + "\n" +
+		"superuser_password = " + c.DBSuperPassword + "\n" +
+		"systemuser = " + c.DBAdminUser + "\n" +
+		"systemuser_password = " + c.DBAdminPassword + "\n" +
+		"sslmode = require\n"
+	_, err = f.WriteString(s)
+	if err != nil {
+		return fmt.Errorf("writing configuration file: %v", err)
+	}
+	err = f.Close()
+	if err != nil {
+		return fmt.Errorf("closing configuration file: %v", err)
+	}
+	return nil
 }
 
 func getDatabaseVersion(db *dbx.DB) (int64, error) {
