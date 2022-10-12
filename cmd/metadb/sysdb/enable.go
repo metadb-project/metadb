@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 )
@@ -138,25 +139,25 @@ func DisableConnector(rq *api.DisableRequest) error {
 }
 
 func IsConnectorEnabled(spec string) (bool, error) {
-	sysMu.Lock()
-	defer sysMu.Unlock()
-
 	return isConnectorEnabled(spec)
 }
 
 func isConnectorEnabled(spec string) (bool, error) {
-	var q = fmt.Sprintf("SELECT enabled FROM connector WHERE spec = '%s';", spec)
-	var enabled bool
-	var err = db.QueryRowContext(context.TODO(), q).Scan(&enabled)
-	switch {
-	case err == sql.ErrNoRows:
-		return false, nil
-	case err != nil:
-		return false, fmt.Errorf("reading connection enabled state: %s: %s", spec, err)
-	default:
-		return enabled, nil
-	}
-
+	fmt.Println("sysdb/enable.go:isConnectorEnabled() always returning true")
+	return true, nil
+	/*
+		var q = fmt.Sprintf("SELECT enabled FROM connector WHERE spec = '%s';", spec)
+		var enabled bool
+		var err = db.QueryRowContext(context.TODO(), q).Scan(&enabled)
+		switch {
+		case err == sql.ErrNoRows:
+			return false, nil
+		case err != nil:
+			return false, fmt.Errorf("reading connection enabled state: %s: %s", spec, err)
+		default:
+			return enabled, nil
+		}
+	*/
 }
 
 /*func DisableSourceConnectors() error {

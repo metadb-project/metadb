@@ -116,7 +116,9 @@ func createCatalogSchema(dc *pgx.Conn) error {
 	// Table auth
 	_, err = tx.Exec(context.TODO(), ""+
 		"CREATE TABLE "+catalogSchema+".auth ("+
-		"    username text PRIMARY KEY"+
+		"    username text PRIMARY KEY,"+
+		"    tables text NOT NULL,"+
+		"    dbupdated boolean NOT NULL"+
 		")")
 	if err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".auth: %v", err)

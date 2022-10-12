@@ -12,6 +12,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
+	"github.com/metadb-project/metadb/cmd/metadb/cat"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
@@ -44,12 +45,13 @@ func goPollLoop(svr *server) {
 }
 
 func launchPollLoop(svr *server, spr *sproc) (reterr error) {
-	defer func() {
-		if r := recover(); r != nil {
-			reterr = fmt.Errorf("%v", r)
-			log.Fatal("%s", reterr)
-		}
-	}()
+	fmt.Println("server/poll.go:launchPollLoop) disabled recover()")
+	//defer func() {
+	//	if r := recover(); r != nil {
+	//		reterr = fmt.Errorf("%v", r)
+	//		log.Fatal("%s", reterr)
+	//	}
+	//}()
 	reterr = outerPollLoop(svr, spr)
 	return
 }
@@ -66,13 +68,13 @@ func outerPollLoop(svr *server, spr *sproc) error {
 	//// TMP
 	// set command.FolioTenant
 	var folioTenant string
-	if folioTenant, _, err = sysdb.GetConfig("plug.folio.tenant"); err != nil {
+	if folioTenant, err = cat.FolioTenant(svr.dbadmin); err != nil {
 		return err
 	}
 	command.FolioTenant = folioTenant
 	// set command.ReshareTenants
 	var reshareTenants string
-	if reshareTenants, _, err = sysdb.GetConfig("plug.reshare.tenants"); err != nil {
+	if reshareTenants, err = cat.ReshareTenants(svr.dbadmin); err != nil {
 		return err
 	}
 	if reshareTenants == "" {
@@ -106,7 +108,7 @@ func pollLoop(spr *sproc) error {
 		SSLMode:  "require",
 		// Account:  database0.DBAccount,
 	}
-	db, err := sqlx.Open("postgres", dsn)
+	db, err := sqlx.Open("postgresql", dsn)
 	if err != nil {
 		return err
 	}
@@ -136,7 +138,7 @@ func pollLoop(spr *sproc) error {
 		return err
 	}
 	// Cache users
-	users, err := cache.NewUsers()
+	users, err := cache.NewUsers(db)
 	if err != nil {
 		return fmt.Errorf("caching users: %s", err)
 	}
@@ -213,7 +215,7 @@ func pollLoop(spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cl, spr.db[0], track, schema, users, spr.source.Name[4:]); err != nil {
+		if err = execCommandList(cl, spr.db[0], track, schema, users, spr.source.Name); err != nil {
 			return fmt.Errorf("executor: %s", err)
 		}
 
@@ -426,16 +428,13 @@ func logDebugCommand(c *command.Command) {
 	log.Debug("%s", b.String())
 }
 
-// TODO waitForConfig is not currently using the source-database mapping.
-// TODO To be reworked.
 func waitForConfig(svr *server) (*sproc, error) {
-	// log.Debug("waiting for configuration")
-	var databases []*sysdb.DatabaseConnector = makeDatabaseConnector(svr.dbsuper, svr.dbadmin)
+	var databases = dbxToConnector(svr.dbsuper, svr.dbadmin)
 	var sources []*sysdb.SourceConnector
 	var ready bool
 	var err error
 	for {
-		sources, ready, err = waitForConfigCheck(svr)
+		sources, ready, err = waitForConfigSource(svr)
 		if err != nil {
 			return nil, err
 		}
@@ -457,22 +456,7 @@ func waitForConfig(svr *server) (*sproc, error) {
 	return spr, nil
 }
 
-func makeDatabaseConnector(dbsuper, dbadmin *dbx.DB) []*sysdb.DatabaseConnector {
-	var dbcs = make([]*sysdb.DatabaseConnector, 0)
-	dbcs = append(dbcs, &sysdb.DatabaseConnector{
-		DBHost:          dbadmin.Host,
-		DBPort:          dbadmin.Port,
-		DBName:          dbadmin.DBName,
-		DBAdminUser:     dbadmin.User,
-		DBAdminPassword: dbadmin.Password,
-		DBSuperUser:     "postgres",
-		DBSuperPassword: dbsuper.Password,
-	})
-	return dbcs
-}
-
-// TODO To be reworked.
-func waitForConfigCheck(svr *server) ([]*sysdb.SourceConnector, bool, error) {
+func waitForConfigSource(svr *server) ([]*sysdb.SourceConnector, bool, error) {
 	svr.state.mu.Lock()
 	defer svr.state.mu.Unlock()
 
@@ -508,4 +492,18 @@ func waitForConfigCheck(svr *server) ([]*sysdb.SourceConnector, bool, error) {
 	}
 	time.Sleep(2 * time.Second)
 	return nil, false, nil
+}
+
+func dbxToConnector(dbsuper, dbadmin *dbx.DB) []*sysdb.DatabaseConnector {
+	var dbcs = make([]*sysdb.DatabaseConnector, 0)
+	dbcs = append(dbcs, &sysdb.DatabaseConnector{
+		DBHost:          dbadmin.Host,
+		DBPort:          dbadmin.Port,
+		DBName:          dbadmin.DBName,
+		DBAdminUser:     dbadmin.User,
+		DBAdminPassword: dbadmin.Password,
+		DBSuperUser:     "postgres",
+		DBSuperPassword: dbsuper.Password,
+	})
+	return dbcs
 }

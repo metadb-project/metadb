@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/metadb-project/metadb/cmd/internal/api"
@@ -15,10 +14,7 @@ import (
 )
 
 func UpdateUserPerms(adb sqlx.DB, tables []sqlx.Table) error {
-	sysMu.Lock()
-	defer sysMu.Unlock()
-
-	users, err := userRead(true)
+	users, err := userRead(adb, true)
 	if err != nil {
 		return err
 	}
@@ -43,15 +39,16 @@ func UpdateUserPerms(adb sqlx.DB, tables []sqlx.Table) error {
 
 		}
 	}
-	if _, err := db.ExecContext(context.TODO(), "UPDATE userperm SET dbupdated=TRUE"); err != nil {
+	if _, err := adb.Exec(nil, "UPDATE metadb.auth SET dbupdated=TRUE"); err != nil {
 		return fmt.Errorf("sysdb: update: %s", err)
 	}
-	if _, err := db.ExecContext(context.TODO(), "DELETE FROM userperm WHERE tables=''"); err != nil {
+	if _, err := adb.Exec(nil, "DELETE FROM metadb.auth WHERE tables=''"); err != nil {
 		return fmt.Errorf("sysdb: update: %s", err)
 	}
 	return nil
 }
 
+/*
 func ListUser(rq *api.UserListRequest) (*api.UserListResponse, error) {
 	sysMu.Lock()
 	defer sysMu.Unlock()
@@ -73,6 +70,7 @@ func ListUser(rq *api.UserListRequest) (*api.UserListResponse, error) {
 	})
 	return rs, nil
 }
+*/
 
 func UpdateUser(rq *api.UserUpdateRequest) error {
 	sysMu.Lock()
@@ -92,17 +90,14 @@ func DeleteUser(rq *api.UserDeleteRequest) (*api.UserDeleteResponse, error) {
 	return &api.UserDeleteResponse{NameNotFound: !found}, nil
 }
 
-func UserRead() (map[string]*util.RegexList, error) {
-	sysMu.Lock()
-	defer sysMu.Unlock()
-
-	return userRead(false)
+func UserRead(db sqlx.DB) (map[string]*util.RegexList, error) {
+	return userRead(db, false)
 }
 
-func userRead(notUpdatedOnly bool) (map[string]*util.RegexList, error) {
+func userRead(adb sqlx.DB, notUpdatedOnly bool) (map[string]*util.RegexList, error) {
 	users := make(map[string]*util.RegexList)
-	q := "SELECT username,tables,dbupdated FROM userperm"
-	rows, err := db.QueryContext(context.TODO(), q)
+	q := "SELECT username, tables, dbupdated FROM metadb.auth"
+	rows, err := adb.Query(nil, q)
 	if err != nil {
 		return nil, err
 	}

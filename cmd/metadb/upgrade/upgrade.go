@@ -568,13 +568,15 @@ func updb8(opt *dbopt) error {
 		return err
 	}
 	q = "CREATE TABLE metadb.auth (" +
-		"    username text PRIMARY KEY" +
+		"    username text PRIMARY KEY," +
+		"    tables text NOT NULL," +
+		"    dbupdated boolean NOT NULL" +
 		")"
 	if _, err = dc.Exec(context.TODO(), q); err != nil {
 		return err
 	}
 	for _, u := range users {
-		q = "INSERT INTO metadb.auth (username) VALUES ($1)"
+		q = "INSERT INTO metadb.auth (username, tables, dbupdated) VALUES ($1, '.*', TRUE)"
 		if _, err = dc.Exec(context.TODO(), q, u); err != nil {
 			return err
 		}

@@ -365,25 +365,26 @@ func (svr *server) handleConfigGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (svr *server) handleUserGet(w http.ResponseWriter, r *http.Request) {
-	// read request
-	var rq api.UserListRequest
-	var ok bool
-	if ok = util.ReadRequest(w, r, &rq); !ok {
-		return
-	}
-	// retrieve user
-	var rs *api.UserListResponse
-	var err error
-	if rs, err = sysdb.ListUser(&rq); err != nil {
-		util.HandleError(w, err, http.StatusInternalServerError)
-		return
-	}
-	// success response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err = json.NewEncoder(w).Encode(rs); err != nil {
-		util.HandleError(w, err, http.StatusInternalServerError)
-	}
+	/*	// read request
+		var rq api.UserListRequest
+		var ok bool
+		if ok = util.ReadRequest(w, r, &rq); !ok {
+			return
+		}
+		// retrieve user
+		var rs *api.UserListResponse
+		var err error
+		if rs, err = sysdb.ListUser(&rq); err != nil {
+			util.HandleError(w, err, http.StatusInternalServerError)
+			return
+		}
+		// success response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err = json.NewEncoder(w).Encode(rs); err != nil {
+			util.HandleError(w, err, http.StatusInternalServerError)
+		}
+	*/
 }
 
 func (svr *server) handleStatusGet(w http.ResponseWriter, r *http.Request) {

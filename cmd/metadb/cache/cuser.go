@@ -14,9 +14,9 @@ type Users struct {
 	users map[string]*util.RegexList
 }
 
-func NewUsers() (*Users, error) {
+func NewUsers(db sqlx.DB) (*Users, error) {
 	// read users
-	users, err := sysdb.UserRead()
+	users, err := sysdb.UserRead(db)
 	if err != nil {
 		return nil, fmt.Errorf("reading user permissions: %s", err)
 	}
