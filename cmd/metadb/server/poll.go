@@ -466,15 +466,12 @@ func waitForConfigSource(svr *server) ([]*sysdb.SourceConnector, bool, error) {
 	// if databases, err = sysdb.ReadDatabaseConnectors(); err != nil {
 	// 	return nil, nil, false, err
 	// }
+	log.Trace("reading source configuration")
 	if sources, err = sysdb.ReadSourceConnectors(svr.db); err != nil {
 		return nil, false, err
 	}
 	if len(sources) > 0 {
-		var srcEnabled bool
-		if srcEnabled, err = sysdb.IsConnectorEnabled(sources[0].Name); err != nil {
-			return nil, false, err
-		}
-		if srcEnabled {
+		if sources[0].Enable {
 			// Reread connectors in case configuration was incomplete.
 			if sources, err = sysdb.ReadSourceConnectors(svr.db); err != nil {
 				return nil, false, err

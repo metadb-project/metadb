@@ -138,9 +138,9 @@ func DisableConnector(rq *api.DisableRequest) error {
 	return nil
 }
 
-func IsConnectorEnabled(spec string) (bool, error) {
-	return isConnectorEnabled(spec)
-}
+//func IsConnectorEnabled(spec string) (bool, error) {
+//	return isConnectorEnabled(spec)
+//}
 
 func isConnectorEnabled(spec string) (bool, error) {
 	fmt.Println("sysdb/enable.go:isConnectorEnabled() always returning true")

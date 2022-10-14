@@ -17,7 +17,7 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 
 	var rows pgx.Rows
 	rows, err = dbc.Query(context.TODO(), ""+
-		"SELECT name, brokers, security, topics, consumergroup, schemapassfilter, schemaprefix FROM metadb.source")
+		"SELECT name, enable, brokers, security, topics, consumergroup, schemapassfilter, schemaprefix FROM metadb.source")
 	if err != nil {
 		return nil, err
 	}
@@ -25,11 +25,12 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 	var src = make([]*SourceConnector, 0)
 	for rows.Next() {
 		var name, brokers, security string
+		var enable bool
 		var topics []string
 		var consumergroup string
 		var schemapassfilter []string
 		var schemaprefix string
-		if err := rows.Scan(&name, &brokers, &security, &topics, &consumergroup, &schemapassfilter, &schemaprefix); err != nil {
+		if err := rows.Scan(&name, &enable, &brokers, &security, &topics, &consumergroup, &schemapassfilter, &schemaprefix); err != nil {
 			return nil, err
 		}
 		if security == "" {
@@ -37,6 +38,7 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 		}
 		src = append(src, &SourceConnector{
 			Name:             name,
+			Enable:           enable,
 			Brokers:          brokers,
 			Security:         security,
 			Topics:           topics,

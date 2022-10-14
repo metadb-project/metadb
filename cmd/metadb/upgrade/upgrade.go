@@ -544,6 +544,7 @@ func updb8(opt *dbopt) error {
 	src := sources[0]
 	var q = "CREATE TABLE metadb.source (" +
 		"    name text PRIMARY KEY," +
+		"    enable boolean NOT NULL," +
 		"    brokers text NOT NULL," +
 		"    security text NOT NULL," +
 		"    topics text[] NOT NULL," +
@@ -554,8 +555,8 @@ func updb8(opt *dbopt) error {
 	if _, err = dc.Exec(context.TODO(), q); err != nil {
 		return err
 	}
-	q = "INSERT INTO metadb.source (name, brokers, security, topics, consumergroup, schemapassfilter, schemaprefix) " +
-		"VALUES ('" + strings.TrimPrefix(src.Name, "src.") + "', '" + src.Brokers + "', '" + src.Security + "', " +
+	q = "INSERT INTO metadb.source (name, enable, brokers, security, topics, consumergroup, schemapassfilter, schemaprefix) " +
+		"VALUES ('" + strings.TrimPrefix(src.Name, "src.") + "', TRUE, '" + src.Brokers + "', '" + src.Security + "', " +
 		toPostgresArray(src.Topics) + ", '" + src.Group + "', " + toPostgresArray(src.SchemaPassFilter) + ", '" +
 		src.SchemaPrefix + "')"
 	if _, err = dc.Exec(context.TODO(), q); err != nil {

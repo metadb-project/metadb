@@ -145,6 +145,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 	_, err = tx.Exec(context.TODO(), ""+
 		"CREATE TABLE "+catalogSchema+".source ("+
 		"    name text PRIMARY KEY,"+
+		"    enable boolean NOT NULL,"+
 		"    brokers text NOT NULL,"+
 		"    security text NOT NULL,"+
 		"    topics text[] NOT NULL,"+

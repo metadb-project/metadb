@@ -32,6 +32,7 @@ type DatabaseConnector struct {
 type SourceConnector struct {
 	ID               int64
 	Name             string
+	Enable           bool
 	Brokers          string
 	Security         string
 	Topics           []string
