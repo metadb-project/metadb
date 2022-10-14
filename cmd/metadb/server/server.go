@@ -148,6 +148,19 @@ func mainServer(svr *server) error {
 		return err
 	}
 
+	// TODO move to all functions func
+	dc, err := svr.db.ConnectSuper()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+	// TODO move all functions to a file
+	err = util.CreateVersionFunc(dc, svr.opt.MetadbVersion)
+	if err != nil {
+		return err
+	}
+	// TODO users need permission for public and functions
+
 	// Check that database version is compatible
 	// err = sysdb.ValidateSysdbVersion(svr.db)
 	// if err != nil {

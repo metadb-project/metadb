@@ -67,11 +67,7 @@ stmt:
 		}
 
 select_stmt:
-	SELECT VERSION '(' ')' ';'
-		{
-			$$ = &ast.SelectStmt{Fn: $2}
-		}
-	| SELECT
+	SELECT
 		{
 			yylex.(*lexer).pass = true
 			// $$ = &ast.SelectStmt{}

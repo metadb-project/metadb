@@ -10,7 +10,7 @@
 |Return type
 |Description
 
-|`version()`
+|`metadb_version()`
 |`*varchar*`
 |Metadb version
 |===

@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/jackc/pgx/v4"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
@@ -269,3 +271,14 @@ func GeneratePassword() (string, error) {
 	return res, nil
 }
 */
+
+func CreateVersionFunc(dc *pgx.Conn, mdbVersion string) error {
+	q := "CREATE OR REPLACE FUNCTION public.metadb_version() RETURNS text\n" +
+		"    AS $$ SELECT 'Metadb " + mdbVersion + "' $$\n" +
+		"    LANGUAGE SQL;"
+	_, err := dc.Exec(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("creating metadb_version function: %v", err)
+	}
+	return nil
+}
