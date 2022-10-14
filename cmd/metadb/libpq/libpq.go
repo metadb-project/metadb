@@ -53,7 +53,7 @@ func Listen(host string, port string, db *dbx.DB, mdbVersion string) {
 }
 
 func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, mdbVersion string) {
-	dbconn, err := dbx.Connect(db)
+	dbconn, err := db.Connect()
 	if err != nil {
 		// TODO handle error
 		log.Info("%v", err)

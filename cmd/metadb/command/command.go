@@ -501,22 +501,22 @@ func decodeNumericBytes(fieldMap map[string]any, data any, semtype string) (stri
 	// var scale int32 = 2
 	var dec decimal.Decimal = decimal.NewFromBigInt(bigInt, -scale)
 	var decs string = dec.StringFixed(scale)
-	log.Trace("decoded numeric bytes: %q ==> %s", valuestr, decs)
+	//log.Trace("decoded numeric bytes: %q ==> %s", valuestr, decs)
 	return decs, nil
 }
 
 /*
-{
-  "type": "bytes",
-  "optional": false,
-  "name": "org.apache.kafka.connect.data.Decimal",
-  "version": 1,
-  "parameters": {
-    "scale": "2",
-    "connect.decimal.precision": "19"
-  },
-  "field": "value"
-}
+	{
+	  "type": "bytes",
+	  "optional": false,
+	  "name": "org.apache.kafka.connect.data.Decimal",
+	  "version": 1,
+	  "parameters": {
+	    "scale": "2",
+	    "connect.decimal.precision": "19"
+	  },
+	  "field": "value"
+	}
 */
 func parameterScale(fieldMap map[string]any) (int32, error) {
 	var ok bool
@@ -545,26 +545,26 @@ func parameterScale(fieldMap map[string]any) (int32, error) {
 }
 
 /*
-{
-  "type": "struct",
-  "fields": [
-    {
-      "type": "int32",
-      "optional": false,
-      "field": "scale"
-    },
-    {
-      "type": "bytes",
-      "optional": false,
-      "field": "value"
-    }
-  ],
-  "optional": true,
-  "name": "io.debezium.data.VariableScaleDecimal",
-  "version": 1,
-  "doc": "Variable scaled decimal",
-  "field": "n"
-},
+	{
+	  "type": "struct",
+	  "fields": [
+	    {
+	      "type": "int32",
+	      "optional": false,
+	      "field": "scale"
+	    },
+	    {
+	      "type": "bytes",
+	      "optional": false,
+	      "field": "value"
+	    }
+	  ],
+	  "optional": true,
+	  "name": "io.debezium.data.VariableScaleDecimal",
+	  "version": 1,
+	  "doc": "Variable scaled decimal",
+	  "field": "n"
+	},
 */
 func structScale(data any) (int32, string, error) {
 	var ok bool

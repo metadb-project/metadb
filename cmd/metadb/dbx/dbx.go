@@ -3,55 +3,62 @@ package dbx
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"strings"
 
 	"github.com/jackc/pgx/v4"
 )
 
 type DB struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
+	Host          string
+	Port          string
+	User          string
+	Password      string
+	SuperUser     string
+	SuperPassword string
+	DBName        string
+	SSLMode       string
 }
 
-func NewDB(databaseURI string) (*DB, error) {
-	uri, err := url.Parse(databaseURI)
-	if err != nil {
-		return nil, err
-	}
-	db := new(DB)
-	db.Host = uri.Hostname()
-	db.Port = uri.Port()
-	user := uri.User
-	if user == nil {
-		return nil, fmt.Errorf("username/password not specified in database URI: " + databaseURI)
-	}
-	db.User = user.Username()
-	db.Password, _ = user.Password()
-	db.DBName = strings.TrimPrefix(uri.EscapedPath(), "/")
-	db.SSLMode = strings.Join(uri.Query()["sslmode"], ",")
-	return db, nil
-}
+//func NewDB(databaseURI string) (*DB, error) {
+//	uri, err := url.Parse(databaseURI)
+//	if err != nil {
+//		return nil, err
+//	}
+//	db := new(DB)
+//	db.Host = uri.Hostname()
+//	db.Port = uri.Port()
+//	user := uri.User
+//	if user == nil {
+//		return nil, fmt.Errorf("username/password not specified in database URI: " + databaseURI)
+//	}
+//	db.User = user.Username()
+//	db.Password, _ = user.Password()
+//	db.DBName = strings.TrimPrefix(uri.EscapedPath(), "/")
+//	db.SSLMode = strings.Join(uri.Query()["sslmode"], ",")
+//	return db, nil
+//}
 
 func (d *DB) String() string {
-	var sslmode string
-	if d.SSLMode != "" {
-		sslmode = " sslmode=" + d.SSLMode
-	}
-	return "host=" + d.Host + " port=" + d.Port + " user=" + d.User + " password=" + d.Password + " dbname=" + d.DBName + sslmode
+	e := *d
+	e.Password = ""
+	e.SuperPassword = ""
+	return fmt.Sprintf("%v", e)
 }
 
-func Connect(db *DB) (*pgx.Conn, error) {
-	var dbc *pgx.Conn
-	var err error
-	if dbc, err = pgx.Connect(context.TODO(), db.String()); err != nil {
-		return nil, fmt.Errorf("connecting to database: %s: %v", db.DBName, err)
+func (d *DB) Connect() (*pgx.Conn, error) {
+	return d.connectUser(d.User, d.Password)
+}
+
+func (d *DB) ConnectSuper() (*pgx.Conn, error) {
+	return d.connectUser(d.SuperUser, d.SuperPassword)
+}
+
+func (d *DB) connectUser(user, password string) (*pgx.Conn, error) {
+	dsn := "connect_timeout=30 host=" + d.Host + " port=" + d.Port + " user=" + user + " password=" + password + " dbname=" + d.DBName + " sslmode=" + d.SSLMode
+	dc, err := pgx.Connect(context.TODO(), dsn)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to database: %v: %v", d, err)
 	}
-	return dbc, nil
+	return dc, nil
 }
 
 func Close(dbc *pgx.Conn) {

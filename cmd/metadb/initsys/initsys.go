@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jackc/pgx/v4"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
@@ -189,7 +188,7 @@ func InitSys(opt *option.Init) error {
 }
 
 func createDatabase(db *dbx.DB, owner string) error {
-	dc, err := pgx.Connect(context.TODO(), db.String())
+	dc, err := db.Connect()
 	if err != nil {
 		return err
 	}

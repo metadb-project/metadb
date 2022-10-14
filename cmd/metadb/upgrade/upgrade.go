@@ -327,7 +327,7 @@ func createConfigFile(datadir string, c *databaseConnector) error {
 }
 
 func getDatabaseVersion(db *dbx.DB) (int64, error) {
-	dc, err := dbx.Connect(db)
+	dc, err := db.Connect()
 	if err != nil {
 		return 0, err
 	}
@@ -524,7 +524,7 @@ func updb7(opt *dbopt) error {
 
 func updb8(opt *dbopt) error {
 	// Open database
-	dc, err := dbx.Connect(opt.DBAdmin)
+	dc, err := opt.DBAdmin.Connect()
 	if err != nil {
 		return err
 	}

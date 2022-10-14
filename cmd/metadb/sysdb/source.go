@@ -10,7 +10,7 @@ import (
 func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 	var dbc *pgx.Conn
 	var err error
-	if dbc, err = dbx.Connect(db); err != nil {
+	if dbc, err = db.Connect(); err != nil {
 		return nil, err
 	}
 	defer dbc.Close(context.TODO())

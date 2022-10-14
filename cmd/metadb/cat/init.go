@@ -15,7 +15,7 @@ import (
 var catalogSchema = "metadb"
 
 func Initialize(db *dbx.DB) error {
-	dbc, err := pgx.Connect(context.TODO(), db.String())
+	dbc, err := db.Connect()
 	if err != nil {
 		return err
 	}

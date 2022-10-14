@@ -226,27 +226,22 @@ func SplitList(list string) []string {
 	return sp
 }
 
-func ReadConfigDatabase(datadir string) (*dbx.DB, *dbx.DB, error) {
+func ReadConfigDatabase(datadir string) (*dbx.DB, error) {
 	cfg, err := ini.Load(ConfigFileName(datadir))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	s := cfg.Section("main")
 	return &dbx.DB{
-			Host:     s.Key("host").String(),
-			Port:     s.Key("port").String(),
-			User:     s.Key("superuser").String(),
-			Password: s.Key("superuser_password").String(),
-			DBName:   s.Key("database").String(),
-			SSLMode:  s.Key("sslmode").String(),
-		}, &dbx.DB{
-			Host:     s.Key("host").String(),
-			Port:     s.Key("port").String(),
-			User:     s.Key("systemuser").String(),
-			Password: s.Key("systemuser_password").String(),
-			DBName:   s.Key("database").String(),
-			SSLMode:  s.Key("sslmode").String(),
-		}, nil
+		Host:          s.Key("host").String(),
+		Port:          s.Key("port").String(),
+		User:          s.Key("systemuser").String(),
+		Password:      s.Key("systemuser_password").String(),
+		SuperUser:     s.Key("superuser").String(),
+		SuperPassword: s.Key("superuser_password").String(),
+		DBName:        s.Key("database").String(),
+		SSLMode:       s.Key("sslmode").String(),
+	}, nil
 }
 
 /*func RedactPasswordInURI(uri string) string {

@@ -29,10 +29,9 @@ import (
 // server and a single poll loop in two goroutines.
 
 type server struct {
-	opt     *option.Server
-	state   serverstate
-	dbsuper *dbx.DB
-	dbadmin *dbx.DB
+	opt   *option.Server
+	state serverstate
+	db    *dbx.DB
 	// dburi string
 }
 
@@ -139,13 +138,13 @@ func mainServer(svr *server) error {
 
 	// Read database URL from config file.
 	var err error
-	svr.dbsuper, svr.dbadmin, err = util.ReadConfigDatabase(svr.opt.Datadir)
+	svr.db, err = util.ReadConfigDatabase(svr.opt.Datadir)
 	if err != nil {
 		return fmt.Errorf("reading configuration file: %v", err)
 	}
 
 	// Check that database is initialized and compatible
-	if err = cat.Initialize(svr.dbadmin); err != nil {
+	if err = cat.Initialize(svr.db); err != nil {
 		return err
 	}
 
@@ -167,7 +166,7 @@ func mainServer(svr *server) error {
 
 	go listenAndServe(svr)
 
-	go libpq.Listen(svr.opt.Listen, svr.opt.AdminPort, svr.dbadmin, svr.opt.MetadbVersion)
+	go libpq.Listen(svr.opt.Listen, svr.opt.AdminPort, svr.db, svr.opt.MetadbVersion)
 
 	go goPollLoop(svr)
 

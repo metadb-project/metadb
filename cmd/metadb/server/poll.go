@@ -68,13 +68,13 @@ func outerPollLoop(svr *server, spr *sproc) error {
 	//// TMP
 	// set command.FolioTenant
 	var folioTenant string
-	if folioTenant, err = cat.FolioTenant(svr.dbadmin); err != nil {
+	if folioTenant, err = cat.FolioTenant(svr.db); err != nil {
 		return err
 	}
 	command.FolioTenant = folioTenant
 	// set command.ReshareTenants
 	var reshareTenants string
-	if reshareTenants, err = cat.ReshareTenants(svr.dbadmin); err != nil {
+	if reshareTenants, err = cat.ReshareTenants(svr.db); err != nil {
 		return err
 	}
 	if reshareTenants == "" {
@@ -100,11 +100,11 @@ func pollLoop(spr *sproc) error {
 	//}
 	dsn := &sqlx.DSN{
 		// DBURI: spr.svr.dburi,
-		Host:     spr.svr.dbadmin.Host,
+		Host:     spr.svr.db.Host,
 		Port:     "5432",
-		User:     spr.svr.dbadmin.User,
-		Password: spr.svr.dbadmin.Password,
-		DBName:   spr.svr.dbadmin.DBName,
+		User:     spr.svr.db.User,
+		Password: spr.svr.db.Password,
+		DBName:   spr.svr.db.DBName,
 		SSLMode:  "require",
 		// Account:  database0.DBAccount,
 	}
@@ -121,7 +121,7 @@ func pollLoop(spr *sproc) error {
 	spr.databases[0].Status.Active()
 	spr.db = append(spr.db, db)
 	// Cache tracking
-	//if err = metadata.Init(spr.svr.dbadmin, spr.svr.opt.MetadbVersion); err != nil {
+	//if err = metadata.Init(spr.svr.db, spr.svr.opt.MetadbVersion); err != nil {
 	//	return err
 	//}
 	track, err := cache.NewTrack(db)
@@ -429,7 +429,7 @@ func logDebugCommand(c *command.Command) {
 }
 
 func waitForConfig(svr *server) (*sproc, error) {
-	var databases = dbxToConnector(svr.dbsuper, svr.dbadmin)
+	var databases = dbxToConnector(svr.db)
 	var sources []*sysdb.SourceConnector
 	var ready bool
 	var err error
@@ -466,7 +466,7 @@ func waitForConfigSource(svr *server) ([]*sysdb.SourceConnector, bool, error) {
 	// if databases, err = sysdb.ReadDatabaseConnectors(); err != nil {
 	// 	return nil, nil, false, err
 	// }
-	if sources, err = sysdb.ReadSourceConnectors(svr.dbadmin); err != nil {
+	if sources, err = sysdb.ReadSourceConnectors(svr.db); err != nil {
 		return nil, false, err
 	}
 	if len(sources) > 0 {
@@ -476,7 +476,7 @@ func waitForConfigSource(svr *server) ([]*sysdb.SourceConnector, bool, error) {
 		}
 		if srcEnabled {
 			// Reread connectors in case configuration was incomplete.
-			if sources, err = sysdb.ReadSourceConnectors(svr.dbadmin); err != nil {
+			if sources, err = sysdb.ReadSourceConnectors(svr.db); err != nil {
 				return nil, false, err
 			}
 			if len(sources) > 0 {
@@ -494,16 +494,16 @@ func waitForConfigSource(svr *server) ([]*sysdb.SourceConnector, bool, error) {
 	return nil, false, nil
 }
 
-func dbxToConnector(dbsuper, dbadmin *dbx.DB) []*sysdb.DatabaseConnector {
+func dbxToConnector(db *dbx.DB) []*sysdb.DatabaseConnector {
 	var dbcs = make([]*sysdb.DatabaseConnector, 0)
 	dbcs = append(dbcs, &sysdb.DatabaseConnector{
-		DBHost:          dbadmin.Host,
-		DBPort:          dbadmin.Port,
-		DBName:          dbadmin.DBName,
-		DBAdminUser:     dbadmin.User,
-		DBAdminPassword: dbadmin.Password,
-		DBSuperUser:     "postgres",
-		DBSuperPassword: dbsuper.Password,
+		DBHost:          db.Host,
+		DBPort:          db.Port,
+		DBName:          db.DBName,
+		DBAdminUser:     db.User,
+		DBAdminPassword: db.Password,
+		DBSuperUser:     db.SuperUser,
+		DBSuperPassword: db.SuperPassword,
 	})
 	return dbcs
 }

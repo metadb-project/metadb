@@ -9,7 +9,7 @@ import (
 )
 
 func FolioTenant(db *dbx.DB) (string, error) {
-	dc, err := dbx.Connect(db)
+	dc, err := db.Connect()
 	if err != nil {
 		return "", fmt.Errorf("connecting to database: %v", err)
 	}
@@ -28,7 +28,7 @@ func FolioTenant(db *dbx.DB) (string, error) {
 }
 
 func ReshareTenants(db *dbx.DB) (string, error) {
-	dc, err := dbx.Connect(db)
+	dc, err := db.Connect()
 	if err != nil {
 		return "", fmt.Errorf("connecting to database: %v", err)
 	}

@@ -38,7 +38,7 @@ func Clean(opt *option.Clean) error {
 	// if err != nil {
 	// 	return err
 	// }
-	_, db, err := util.ReadConfigDatabase(opt.Datadir)
+	db, err := util.ReadConfigDatabase(opt.Datadir)
 	if err != nil {
 		return err
 	}
