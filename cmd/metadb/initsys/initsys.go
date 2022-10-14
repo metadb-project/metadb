@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
@@ -45,15 +46,21 @@ func InitSys(opt *option.Init) error {
 		}
 	*/
 
-	// Require that the data directory not already exist.
-	exists, err := util.FileExists(opt.Datadir)
+	dd, err := filepath.Abs(opt.Datadir)
 	if err != nil {
-		return err
+		return fmt.Errorf("absolute path: %v", err)
+	}
+
+	// Require that the data directory not already exist.
+	exists, err := util.FileExists(dd)
+	if err != nil {
+		return fmt.Errorf("checking if path exists: %v", err)
 	}
 	if exists {
-		return fmt.Errorf("%s already exists", opt.Datadir)
+		return fmt.Errorf("%s already exists", dd)
 	}
-	eout.Info("initializing")
+
+	eout.Info("initializing new data directory in %s", dd)
 
 	// eout.Verbose("creating system files")
 	// if err = initSchema(opt.Datadir, opt.DatabaseURI); err != nil {
@@ -93,14 +100,14 @@ func InitSys(opt *option.Init) error {
 
 	// Create the data directory.
 	eout.Verbose("creating data directory")
-	eout.Trace("mkdir: %s", opt.Datadir)
-	err = os.MkdirAll(opt.Datadir, util.ModePermRWX)
+	eout.Trace("mkdir: %s", dd)
+	err = os.MkdirAll(dd, util.ModePermRWX)
 	if err != nil {
-		return err
+		return fmt.Errorf("mkdir: %v", err)
 	}
 
 	eout.Verbose("writing configuration file")
-	f, err := os.Create(util.ConfigFileName(opt.Datadir))
+	f, err := os.Create(util.ConfigFileName(dd))
 	if err != nil {
 		return fmt.Errorf("creating configuration file: %v", err)
 	}
