@@ -106,7 +106,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 	if err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".track: %v", err)
 	}
-	mver := util.MetadbVersionString(util.MetadbVersion())
+	mver := util.MetadbVersionString()
 	dbver := strconv.FormatInt(util.DatabaseVersion, 10)
 	_, err = tx.Exec(context.TODO(), "INSERT INTO "+catalogSchema+".init (version, dbversion) VALUES ('"+mver+"', "+dbver+")")
 	if err != nil {

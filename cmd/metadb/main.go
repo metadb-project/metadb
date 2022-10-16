@@ -21,9 +21,6 @@ import (
 
 var program = "metadb"
 
-// metadbVersion is defined at build time via -ldflags.
-var metadbVersion string = "(unknown version)"
-
 // // rewriteJSON is defined at build time via -ldflags.
 // var rewriteJSON string = "0"
 var rewriteJSON string = "1"
@@ -34,7 +31,6 @@ var devMode bool
 var colorInitialized bool
 
 func main() {
-	util.SetMetadbVersion(metadbVersion)
 	colorMode = os.Getenv("METADB_COLOR")
 	devMode = os.Getenv("METADB_DEV") == "on"
 	metadbMain()
@@ -95,7 +91,6 @@ func run() error {
 			// if err = sysdb.Init(util.SysdbFileName(upgradeOpt.Datadir)); err != nil {
 			// 	return err
 			// }
-			upgradeOpt.MetadbVersion = metadbVersion
 			if err = upgrade.Upgrade(&upgradeOpt); err != nil {
 				return err
 			}
@@ -133,7 +128,6 @@ func run() error {
 			//if serverOpt.AdminPort == "" {
 			//        serverOpt.AdminPort = metadbAdminPort
 			//}
-			serverOpt.MetadbVersion = metadbVersion
 			serverOpt.RewriteJSON = rewriteJSON == "1"
 			if err = server.Start(&serverOpt); err != nil {
 				return logFatal(err, logf, csvlogf)
@@ -231,7 +225,7 @@ func run() error {
 	var cmdVersion = &cobra.Command{
 		Use: "version",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Printf("metadb version %s\n", metadbVersion)
+			fmt.Printf("metadb version %s\n", util.MetadbVersion)
 			return nil
 		},
 	}

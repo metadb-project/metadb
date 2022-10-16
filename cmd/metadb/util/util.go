@@ -1,7 +1,6 @@
 package util
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -12,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/jackc/pgx/v4"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
@@ -23,20 +21,11 @@ import (
 // Version 8 = 0.12
 const DatabaseVersion = 8
 
-func MetadbVersion() string {
-	return metadbVersion
-}
+// MetadbVersion is defined at build time via -ldflags.
+var MetadbVersion = "(unknown version)"
 
-func SetMetadbVersion(version string) {
-	if metadbVersion == "" {
-		metadbVersion = version
-	}
-}
-
-var metadbVersion string
-
-func MetadbVersionString(metadbVersion string) string {
-	return "Metadb " + metadbVersion
+func MetadbVersionString() string {
+	return "Metadb " + MetadbVersion
 }
 
 // ModePermRW is the umask "-rw-------".
@@ -271,14 +260,3 @@ func GeneratePassword() (string, error) {
 	return res, nil
 }
 */
-
-func CreateVersionFunc(dc *pgx.Conn, mdbVersion string) error {
-	q := "CREATE OR REPLACE FUNCTION public.metadb_version() RETURNS text\n" +
-		"    AS $$ SELECT 'Metadb " + mdbVersion + "' $$\n" +
-		"    LANGUAGE SQL;"
-	_, err := dc.Exec(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("creating metadb_version function: %v", err)
-	}
-	return nil
-}

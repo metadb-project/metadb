@@ -96,7 +96,7 @@ mkdir -p $bindir
 
 go generate $v ./...
 
-go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version $json" ./cmd/metadb
+go build -o $bindir $v $tags -ldflags "-X github.com/metadb-project/metadb/cmd/metadb/util.MetadbVersion=$version $json" ./cmd/metadb
 # go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
 
 if ! $fast; then

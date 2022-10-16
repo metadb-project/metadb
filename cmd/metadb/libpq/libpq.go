@@ -14,9 +14,10 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/parser"
+	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func Listen(host string, port string, db *dbx.DB, mdbVersion string) {
+func Listen(host string, port string, db *dbx.DB) {
 	// var h string
 	// if host == "" {
 	// 	h = "127.0.0.1"
@@ -48,11 +49,11 @@ func Listen(host string, port string, db *dbx.DB, mdbVersion string) {
 		var backend *pgproto3.Backend
 		backend = pgproto3.NewBackend(pgproto3.NewChunkReader(conn), conn)
 		log.Trace("connection received: %s", conn.RemoteAddr().String())
-		go serve(conn, backend, db, mdbVersion)
+		go serve(conn, backend, db)
 	}
 }
 
-func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, mdbVersion string) {
+func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB) {
 	dbconn, err := db.Connect()
 	if err != nil {
 		// TODO handle error
@@ -77,7 +78,7 @@ func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, mdbVersion stri
 		case *pgproto3.Parse:
 			log.Info("*pgproto3.Parse: not yet implemented")
 		case *pgproto3.Query:
-			if err = processQuery(conn, m, dbconn, mdbVersion); err != nil {
+			if err = processQuery(conn, m, dbconn); err != nil {
 				log.Info("%v", err)
 				return
 			}
@@ -120,7 +121,7 @@ func startup(conn net.Conn, backend *pgproto3.Backend) error {
 	}
 }
 
-func processQuery(conn net.Conn, query *pgproto3.Query, dbconn *pgx.Conn, mdbVersion string) error {
+func processQuery(conn net.Conn, query *pgproto3.Query, dbconn *pgx.Conn) error {
 	var node ast.Node
 	var err error
 	var pass bool
@@ -148,10 +149,10 @@ func processQuery(conn net.Conn, query *pgproto3.Query, dbconn *pgx.Conn, mdbVer
 	switch n := node.(type) {
 	case *ast.CreateServerStmt:
 		// return createServer(conn, query)
-		return version(conn, query, "11111111")
+		return version(conn, query)
 	case *ast.SelectStmt:
 		if n.Fn == "version" {
-			return version(conn, query, mdbVersion)
+			return version(conn, query)
 		}
 		return write(conn, encode(nil, []pgproto3.Message{
 			&pgproto3.ErrorResponse{Message: "ERROR:  function " + n.Fn + "() does not exist"},
@@ -248,7 +249,7 @@ func encodeRow(buffer []byte, rows pgx.Rows, cols []pgproto3.FieldDescription) (
 	return row.Encode(buffer), nil
 }
 
-func version(conn net.Conn, query *pgproto3.Query, mdbVersion string) error {
+func version(conn net.Conn, query *pgproto3.Query) error {
 	var b []byte = encode(nil, []pgproto3.Message{
 		&pgproto3.RowDescription{Fields: []pgproto3.FieldDescription{
 			{
@@ -261,7 +262,7 @@ func version(conn net.Conn, query *pgproto3.Query, mdbVersion string) error {
 				Format:               0,
 			},
 		}},
-		&pgproto3.DataRow{Values: [][]byte{[]byte("Metadb " + mdbVersion)}},
+		&pgproto3.DataRow{Values: [][]byte{[]byte(util.MetadbVersionString())}},
 		&pgproto3.CommandComplete{CommandTag: []byte("SELECT 1")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})

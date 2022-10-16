@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/cat"
@@ -29,10 +30,11 @@ import (
 // server and a single poll loop in two goroutines.
 
 type server struct {
-	opt   *option.Server
-	state serverstate
-	db    *dbx.DB
-	// dburi string
+	opt     *option.Server
+	state   serverstate
+	db      *dbx.DB
+	dc      *pgx.Conn
+	dcsuper *pgx.Conn
 }
 
 // serverstate is shared between goroutines.
@@ -111,7 +113,7 @@ func isServerRunning(datadir string) (bool, int, error) {
 }
 
 func runServer(svr *server) error {
-	log.Info("starting Metadb %s", svr.opt.MetadbVersion)
+	log.Info("starting Metadb %s", util.MetadbVersion)
 	// if svr.opt.RewriteJSON {
 	// 	log.Info("enabled JSON rewriting")
 	// }
@@ -143,23 +145,27 @@ func mainServer(svr *server) error {
 		return fmt.Errorf("reading configuration file: %v", err)
 	}
 
+	svr.dc, err = svr.db.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(svr.dc)
+
+	svr.dcsuper, err = svr.db.ConnectSuper()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(svr.dcsuper)
+
 	// Check that database is initialized and compatible
 	if err = cat.Initialize(svr.db); err != nil {
 		return err
 	}
 
-	// TODO move to all functions func
-	dc, err := svr.db.ConnectSuper()
+	err = cat.CreateAllFunctions(svr.dcsuper, svr.dc, svr.db.User)
 	if err != nil {
 		return err
 	}
-	defer dbx.Close(dc)
-	// TODO move all functions to a file
-	err = util.CreateVersionFunc(dc, svr.opt.MetadbVersion)
-	if err != nil {
-		return err
-	}
-	// TODO users need permission for public and functions
 
 	// Check that database version is compatible
 	// err = sysdb.ValidateSysdbVersion(svr.db)
@@ -179,7 +185,7 @@ func mainServer(svr *server) error {
 
 	go listenAndServe(svr)
 
-	go libpq.Listen(svr.opt.Listen, svr.opt.AdminPort, svr.db, svr.opt.MetadbVersion)
+	go libpq.Listen(svr.opt.Listen, svr.opt.AdminPort, svr.db)
 
 	go goPollLoop(svr)
 

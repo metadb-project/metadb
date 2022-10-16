@@ -25,7 +25,7 @@ func Upgrade(opt *option.Upgrade) error {
 	}
 	// Ask for confirmation
 	if !opt.Force {
-		_, _ = fmt.Fprintf(os.Stderr, "Upgrade instance %q to Metadb %s? ", opt.Datadir, util.MetadbVersion())
+		_, _ = fmt.Fprintf(os.Stderr, "Upgrade instance %q to Metadb %s? ", opt.Datadir, util.MetadbVersion)
 		var confirm string
 		_, err := fmt.Scanln(&confirm)
 		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
