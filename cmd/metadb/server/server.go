@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v4"
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/cat"
@@ -30,11 +29,11 @@ import (
 // server and a single poll loop in two goroutines.
 
 type server struct {
-	opt     *option.Server
-	state   serverstate
-	db      *dbx.DB
-	dc      *pgx.Conn
-	dcsuper *pgx.Conn
+	opt   *option.Server
+	state serverstate
+	db    *dbx.DB
+	//dc      *pgx.Conn
+	//dcsuper *pgx.Conn
 }
 
 // serverstate is shared between goroutines.
@@ -145,25 +144,20 @@ func mainServer(svr *server) error {
 		return fmt.Errorf("reading configuration file: %v", err)
 	}
 
-	svr.dc, err = svr.db.Connect()
-	if err != nil {
-		return err
-	}
-	defer dbx.Close(svr.dc)
-
-	svr.dcsuper, err = svr.db.ConnectSuper()
-	if err != nil {
-		return err
-	}
-	defer dbx.Close(svr.dcsuper)
+	//svr.dc, err = svr.db.Connect()
+	//if err != nil {
+	//	return err
+	//}
+	//defer dbx.Close(svr.dc)
+	//
+	//svr.dcsuper, err = svr.db.ConnectSuper()
+	//if err != nil {
+	//	return err
+	//}
+	//defer dbx.Close(svr.dcsuper)
 
 	// Check that database is initialized and compatible
 	if err = cat.Initialize(svr.db); err != nil {
-		return err
-	}
-
-	err = cat.CreateAllFunctions(svr.dcsuper, svr.dc, svr.db.User)
-	if err != nil {
 		return err
 	}
 
@@ -183,7 +177,9 @@ func mainServer(svr *server) error {
 	// 	os.Exit(1)
 	// }
 
-	go listenAndServe(svr)
+	//go listenAndServe(svr)
+
+	go goCreateFunctions(*(svr.db))
 
 	go libpq.Listen(svr.opt.Listen, svr.opt.AdminPort, svr.db)
 
@@ -197,6 +193,28 @@ func mainServer(svr *server) error {
 	}
 
 	return nil
+}
+
+func goCreateFunctions(db dbx.DB) {
+	dc, err := db.Connect()
+	if err != nil {
+		log.Error("%v", err)
+		return
+	}
+	defer dbx.Close(dc)
+
+	dcsuper, err := db.ConnectSuper()
+	if err != nil {
+		log.Error("%v", err)
+		return
+	}
+	defer dbx.Close(dcsuper)
+
+	err = cat.CreateAllFunctions(dcsuper, dc, db.User)
+	if err != nil {
+		log.Error("%v", err)
+		return
+	}
 }
 
 //func goListenAndServe(svr *server) {

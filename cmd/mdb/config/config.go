@@ -193,7 +193,7 @@ func ConfigSource(opt *option.ConfigSource) error {
 			Topics:           opt.Topics,
 			Group:            opt.Group,
 			SchemaPassFilter: opt.SchemaPassFilter,
-			SchemaPrefix:     opt.SchemaPrefix,
+			AddSchemaPrefix:     opt.AddSchemaPrefix,
 			Databases:        opt.Databases,
 		},
 	}

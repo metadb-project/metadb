@@ -45,14 +45,16 @@ func goPollLoop(svr *server) {
 }
 
 func launchPollLoop(svr *server, spr *sproc) (reterr error) {
-	fmt.Println("server/poll.go:launchPollLoop) disabled recover()")
-	//defer func() {
-	//	if r := recover(); r != nil {
-	//		reterr = fmt.Errorf("%v", r)
-	//		log.Fatal("%s", reterr)
-	//	}
-	//}()
+	defer func() {
+		if r := recover(); r != nil {
+			reterr = fmt.Errorf("%v", r)
+			log.Fatal("%s", reterr)
+		}
+	}()
 	reterr = outerPollLoop(svr, spr)
+	if reterr != nil {
+		panic(reterr.Error())
+	}
 	return
 }
 
@@ -67,20 +69,16 @@ func outerPollLoop(svr *server, spr *sproc) error {
 
 	//// TMP
 	// set command.FolioTenant
-	var folioTenant string
-	if folioTenant, err = cat.FolioTenant(svr.db); err != nil {
-		return err
-	}
-	command.FolioTenant = folioTenant
+	/*	var folioTenant string
+		if folioTenant, err = cat.FolioTenant(svr.db); err != nil {
+			return err
+		}
+		command.FolioTenant = folioTenant
+	*/
 	// set command.ReshareTenants
-	var reshareTenants string
-	if reshareTenants, err = cat.ReshareTenants(svr.db); err != nil {
+	command.ReshareTenants, err = cat.Origins(svr.db)
+	if err != nil {
 		return err
-	}
-	if reshareTenants == "" {
-		command.ReshareTenants = []string{}
-	} else {
-		command.ReshareTenants = util.SplitList(reshareTenants)
 	}
 	////
 
@@ -195,7 +193,8 @@ func pollLoop(spr *sproc) error {
 		var cl = &command.CommandList{}
 
 		// Parse
-		eventReadCount, err := parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.source.SchemaPrefix, sourceFileScanner, spr.sourceLog)
+		eventReadCount, err := parseChangeEvents(consumer, cl, spr.schemaPassFilter,
+			spr.source.TrimSchemaPrefix, spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog)
 		if err != nil {
 			return fmt.Errorf("parser: %s", err)
 		}
@@ -236,7 +235,7 @@ func pollLoop(spr *sproc) error {
 }
 
 func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter []*regexp.Regexp,
-	schemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
+	trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
 	var err error
 	var eventReadCount int
 	var x int
@@ -265,7 +264,7 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 			break
 		}
 		eventReadCount++
-		c, err := command.NewCommand(ce, schemaPassFilter, schemaPrefix)
+		c, err := command.NewCommand(ce, schemaPassFilter, trimSchemaPrefix, addSchemaPrefix)
 		if err != nil {
 			return 0, fmt.Errorf("parsing command: %s\n%v", err, *ce)
 		}
@@ -466,7 +465,6 @@ func waitForConfigSource(svr *server) ([]*sysdb.SourceConnector, bool, error) {
 	// if databases, err = sysdb.ReadDatabaseConnectors(); err != nil {
 	// 	return nil, nil, false, err
 	// }
-	log.Trace("reading source configuration")
 	if sources, err = sysdb.ReadSourceConnectors(svr.db); err != nil {
 		return nil, false, err
 	}

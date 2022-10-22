@@ -49,3 +49,65 @@ systemuser = metadb
 systemuser_password = ZHivGie5juxGJZmTObHU
 sslmode = require
 ----
+
+=== Resynchronizing a data source
+
+If a Kafka data stream fails and cannot be resumed, it may be
+necessary to re-stream data to Metadb.  For example, a source database
+may become unsynchronized with the analytic database, requiring a new
+snapshot of the source database to be streamed.  Metadb can accept
+re-streamed data in order to resynchronize with the source, using this
+procedure:
+
+1. Update the data source `topics` and `consumergroup` configuration
+   settings for the new data stream.
++
+[source,sql]
+----
+ALTER DATA SOURCE example OPTIONS
+    (SET topics '^metadb_2.*', SET consumergroup 'metadb_2_1');
+----
+
+2. Stop the Metadb server.
++
+[source,bash]
+----
+metadb stop -D data
+----
+
+3. "Reset" the analytic database to mark current data as old.  This
+   may take some time to run.
++
+[source,bash]
+----
+metadb reset -D data --origin 's1,s2,s3' db.main
+----
++
+Note that `--origin` should include all origins associated with the
+source, or empty string ( `''` ) if there are no origins.
+
+4. Start the Metadb server to begin streaming the data.
+
+5. Once the new data have finished streaming, stop the Metadb server,
+   and "clean" the analytic database to remove old data.
++
+[source,bash]
+----
+metadb clean -D data --origin 's1,s2,s3' db.main
+----
++
+The `--origin` should be the same as used for the reset.
++
+Note that the metadb server currently does not give any indication
+that it has finished re-streaming, except that running it with
+`--debug` will typically show updates slowing down.  The precise
+timing when "metadb clean" is run is not critical, but it must be run
+to complete the resynchronization process.  (Having the server report
+that initial streaming or re-streaming has finished is a planned
+feature.)
+
+6. Start the server.
++
+Until a failed stream is re-streamed by following the process above,
+the analytic database may continue to be unsynchronized with the
+source.

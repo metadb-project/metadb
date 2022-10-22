@@ -17,28 +17,131 @@
 
 === Statements
 
-==== CREATE SERVER
+==== ALTER DATA SOURCE
 
-Define a new external data source
+Change the configuration of a data source
 
 [source,subs="verbatim,quotes"]
 ----
-CREATE SERVER `*_server_name_*` DATA SOURCE *_data_source_type_*
-    OPTIONS ( *_option_* '*_value_*' [, ... ] )
+ALTER DATA SOURCE `*_source_name_*`
+    OPTIONS ( [ ADD | SET | DROP ] *_option_* ['*_value_*'] [, ... ] )
 ----
 
 ===== Description
 
-CREATE SERVER defines connection settings for an external data source.
+ALTER DATA SOURCE changes connection settings for a data source.
 
 ===== Parameters
 
 [frame=none,grid=none,cols="1,2"]
 |===
-|`*_server_name_*`
+|`*_source_name_*`
+|The name of an existing data source.
+
+|`OPTIONS ( [ ADD \| SET \| DROP ] *_option_* ['*_value_*'] [, ... ] )`
+|Connection settings and other configuration options for the data source.
+|===
+
+===== Options
+
+See CREATE DATA SOURCE
+
+===== Examples
+
+Change the consumer group:
+
+----
+ALTER DATA SOURCE example OPTIONS (SET consumergroup 'metadb_example_1');
+----
+
+==== AUTHORIZE
+
+Enable access to tables generated from an external data source
+
+[source,subs="verbatim,quotes"]
+----
+AUTHORIZE SELECT
+    ON ALL TABLES IN DATA SOURCE `*_source_name_*`
+    TO `*_role_specification_*`
+----
+
+===== Description
+
+The AUTHORIZE command grants access to tables.  It differs from GRANT
+in that the authorization continues to apply to tables created at a
+later time.
+
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_source_name_*`
+|The name of an existing data source.
+
+|`*_role_specification_*`
+|An existing role to be granted the authorization.
+|===
+
+===== Examples
+
+----
+AUTHORIZE SELECT
+    ON ALL TABLES IN DATA SOURCE example
+    TO beatrice;
+----
+
+==== CREATE DATA ORIGIN
+
+Define a new data origin
+
+[source,subs="verbatim,quotes"]
+----
+CREATE DATA ORIGIN `*_origin_name_*`
+----
+
+===== Description
+
+CREATE DATA ORIGIN defines a new origin.
+
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_origin_name_*`
+|A unique name for the data origin to be created.
+|===
+
+===== Examples
+
+Create a new origin `test_origin`:
+
+----
+CREATE DATA ORIGIN test_origin;
+----
+
+
+==== CREATE DATA SOURCE
+
+Define a new external data source
+
+[source,subs="verbatim,quotes"]
+----
+CREATE DATA SOURCE `*_source_name_*` TYPE *_source_type_*
+    OPTIONS ( *_option_* '*_value_*' [, ... ] )
+----
+
+===== Description
+
+CREATE DATA SOURCE defines connection settings for an external data source.
+
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_source_name_*`
 |A unique name for the data source to be created.
 
-|`*_data_source_type_*`
+|`*_source_type_*`
 |The type of data source.  The only type currently supported is `kafka`.
 
 |`OPTIONS ( *_option_* '*_value_*' [, ... ] )`
@@ -58,30 +161,61 @@ CREATE SERVER defines connection settings for an external data source.
 |`topics`
 |Regular expressions matching Kafka topics to read (comma-separated list).
 
-|`group`
+|`consumergroup`
 |Kafka consumer group ID.
 
 |`schemapassfilter`
 |Regular expressions matching schema names to accept (comma-separated list).
 
-|`schemaprefix`
+|`trimschemaprefix`
+|Prefix to remove from schema names.
+
+|`addschemaprefix`
 |Prefix to add to schema names.
 
-|`enable`
-|Boolean indicating if the data source is enabled.  The default is `TRUE`.
+|`module`
+|Name of pre-defined configuration.
 |===
 
 ===== Examples
 
-Create a server `example` as a `kafka` data source:
+Create `example` as a `kafka` data source:
 
 ----
-CREATE SERVER example DATA SOURCE kafka OPTIONS (
+CREATE DATA SOURCE example TYPE kafka OPTIONS (
     brokers 'kafka:29092',
     topics '^metadb_example[.].*',
-    group 'metadb_example',
+    consumergroup 'metadb_example',
     schemapassfilter 'example_.+',
-    schemaprefix 'example_',
-    enable TRUE
+    addschemaprefix 'example_'
 );
+----
+
+==== DROP DATA SOURCE
+
+Remove a data source configuration
+
+[source,subs="verbatim,quotes"]
+----
+DROP DATA SOURCE `*_source_name_*`
+----
+
+===== Description
+
+DROP DATA SOURCE removes a data source configuration.
+
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_source_name_*`
+|The name of an existing data source.
+|===
+
+===== Examples
+
+Drop a data source `example`:
+
+----
+DROP DATA SOURCE example;
 ----

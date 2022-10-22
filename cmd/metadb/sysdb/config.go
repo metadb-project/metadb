@@ -89,9 +89,9 @@ func UpdateConfig(rq *api.ConfigUpdateRequest) error {
 		return fmt.Errorf("configuration failed: %s: %s", rq.Attr, err)
 	}
 	//// TMP
-	if rq.Attr == "plug.folio.tenant" && rq.Val != "" {
-		command.FolioTenant = rq.Val
-	}
+	//if rq.Attr == "plug.folio.tenant" && rq.Val != "" {
+	//	command.FolioTenant = rq.Val
+	//}
 	if rq.Attr == "plug.reshare.tenants" && rq.Val != "" {
 		command.ReshareTenants = util.SplitList(rq.Val)
 	}
@@ -144,9 +144,9 @@ func DeleteConfig(rq *api.ConfigDeleteRequest) (*api.ConfigDeleteResponse, error
 		}
 	}
 	//// TMP
-	if rq.Attr == "plug.folio.tenant" {
-		command.FolioTenant = ""
-	}
+	//if rq.Attr == "plug.folio.tenant" {
+	//	command.FolioTenant = ""
+	//}
 	if rq.Attr == "plug.reshare.tenants" {
 		command.ReshareTenants = []string{}
 	}

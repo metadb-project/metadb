@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
@@ -38,7 +38,9 @@ type SourceConnector struct {
 	Topics           []string
 	Group            string
 	SchemaPassFilter []string
-	SchemaPrefix     string
+	TrimSchemaPrefix string
+	AddSchemaPrefix  string
+	Module           string
 	Status           status.Status
 }
 

@@ -16,17 +16,22 @@ import (
 
 %type <node> top_level_stmt stmt
 %type <node> select_stmt
-%type <node> create_server_stmt
-%type <optlist> options_clause option_list option
+%type <node> create_data_source_stmt alter_data_source_stmt drop_data_source_stmt authorize_stmt
+%type <node> create_data_origin_stmt
+%type <optlist> options_clause alter_options_clause option_list alter_option_list option alter_option
 %type <str> option_name option_val
 %type <str> name unreserved_keyword
+/*
 %type <str> boolean
+*/
 
 %token SELECT
-%token CREATE SERVER IF DATA SOURCE OPTIONS
-%token TYPE FOREIGN
+%token CREATE ALTER DATA SOURCE ORIGIN OPTIONS
+%token AUTHORIZE ON ALL TABLES IN TO
+%token TYPE
 %token TRUE FALSE
 %token <str> VERSION
+%token <str> ADD SET DROP
 %token <str> IDENT NUMBER
 %token <str> SLITERAL
 
@@ -51,7 +56,11 @@ stmt:
 		{
 			$$ = $1
 		}
-	| create_server_stmt
+	| create_data_source_stmt
+		{
+			$$ = $1
+		}
+	| create_data_origin_stmt
 		{
 			$$ = $1
 		}
@@ -59,6 +68,28 @@ stmt:
 		{
 			yylex.(*lexer).pass = true
 			// $$ = nil
+		}
+	| alter_data_source_stmt
+		{
+			$$ = $1
+		}
+	| ALTER
+		{
+			yylex.(*lexer).pass = true
+			// $$ = nil
+		}
+	| drop_data_source_stmt
+		{
+			$$ = $1
+		}
+	| DROP
+		{
+			yylex.(*lexer).pass = true
+			// $$ = nil
+		}
+	| authorize_stmt
+		{
+			$$ = $1
 		}
 	| IDENT
 		{
@@ -73,24 +104,38 @@ select_stmt:
 			// $$ = &ast.SelectStmt{}
 		}
 
-create_server_stmt:
-	CREATE SERVER name DATA SOURCE name options_clause ';'
+create_data_source_stmt:
+	CREATE DATA SOURCE name TYPE name options_clause ';'
 		{
-			$$ = &ast.CreateServerStmt{ServerName: $3, TypeName: $6, Options: $7}
+			$$ = &ast.CreateDataSourceStmt{DataSourceName: $4, TypeName: $6, Options: $7}
 		}
-	| CREATE SERVER name
+
+create_data_origin_stmt:
+	CREATE DATA ORIGIN name ';'
 		{
-			yylex.(*lexer).pass = true
-			// $$ = &ast.CreateServerStmt{}
+			$$ = &ast.CreateDataOriginStmt{OriginName: $4}
 		}
-	| CREATE SERVER IF
+
+alter_data_source_stmt:
+	ALTER DATA SOURCE name alter_options_clause ';'
 		{
-			yylex.(*lexer).pass = true
-			// $$ = &ast.CreateServerStmt{}
+			$$ = &ast.AlterDataSourceStmt{DataSourceName: $4, Options: $5}
+		}
+
+drop_data_source_stmt:
+	DROP DATA SOURCE name ';'
+		{
+			$$ = &ast.DropDataSourceStmt{DataSourceName: $4}
 		}
 
 options_clause:
-	OPTIONS '(' option_list ')'
+     OPTIONS '(' option_list ')'
+		{
+			$$ = $3
+		}
+
+alter_options_clause:
+     OPTIONS '(' alter_option_list ')'
 		{
 			$$ = $3
 		}
@@ -105,10 +150,38 @@ option_list:
 			$$ = append($1, $3...)
 		}
 
+alter_option_list:
+	alter_option
+		{
+			$$ = $1
+		}
+	| alter_option_list ',' alter_option
+		{
+			$$ = append($1, $3...)
+		}
+
 option:
 	option_name option_val
 		{
 			$$ = []ast.Option{ast.Option{Name: $1, Val: $2}}
+		}
+
+alter_option:
+	DROP option_name
+		{
+			$$ = []ast.Option{ast.Option{Action: "DROP", Name: $2, Val: ""}}
+		}
+	| SET option_name option_val
+		{
+			$$ = []ast.Option{ast.Option{Action: "SET", Name: $2, Val: $3}}
+		}
+	| ADD option_name option_val
+		{
+			$$ = []ast.Option{ast.Option{Action: "ADD", Name: $2, Val: $3}}
+		}
+	| option_name option_val
+		{
+			$$ = []ast.Option{ast.Option{Action: "ADD", Name: $1, Val: $2}}
 		}
 
 option_name:
@@ -122,9 +195,11 @@ option_val:
 		{
 			$$ = $1
 		}
-	| boolean
+
+authorize_stmt:
+    AUTHORIZE SELECT ON ALL TABLES IN DATA SOURCE name TO name ';'
 		{
-			$$ = $1
+			$$ = &ast.AuthorizeStmt{DataSourceName: $9, RoleName: $11}
 		}
 
 name:
@@ -137,6 +212,7 @@ name:
 			$$ = $1
 		}
 
+/*
 boolean:
 	TRUE
 		{
@@ -146,6 +222,7 @@ boolean:
 		{
 			$$ = "false"
 		}
+*/
 
 unreserved_keyword:
 	VERSION

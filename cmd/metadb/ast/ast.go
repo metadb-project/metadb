@@ -1,8 +1,9 @@
 package ast
 
 type Option struct {
-	Name string
-	Val  string
+	Action string
+	Name   string
+	Val    string
 }
 
 type Node interface {
@@ -21,11 +22,41 @@ type SelectStmt struct {
 func (*SelectStmt) node()     {}
 func (*SelectStmt) stmtNode() {}
 
-type CreateServerStmt struct {
-	ServerName string
-	TypeName   string
-	Options    []Option
+type CreateDataSourceStmt struct {
+	DataSourceName string
+	TypeName       string
+	Options        []Option
 }
 
-func (*CreateServerStmt) node()     {}
-func (*CreateServerStmt) stmtNode() {}
+func (*CreateDataSourceStmt) node()     {}
+func (*CreateDataSourceStmt) stmtNode() {}
+
+type CreateDataOriginStmt struct {
+	OriginName string
+}
+
+func (*CreateDataOriginStmt) node()     {}
+func (*CreateDataOriginStmt) stmtNode() {}
+
+type AlterDataSourceStmt struct {
+	DataSourceName string
+	Options        []Option
+}
+
+func (*AlterDataSourceStmt) node()     {}
+func (*AlterDataSourceStmt) stmtNode() {}
+
+type DropDataSourceStmt struct {
+	DataSourceName string
+}
+
+func (*DropDataSourceStmt) node()     {}
+func (*DropDataSourceStmt) stmtNode() {}
+
+type AuthorizeStmt struct {
+	DataSourceName string
+	RoleName       string
+}
+
+func (*AuthorizeStmt) node()     {}
+func (*AuthorizeStmt) stmtNode() {}

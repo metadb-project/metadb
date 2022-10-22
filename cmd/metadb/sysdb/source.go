@@ -2,8 +2,9 @@ package sysdb
 
 import (
 	"context"
+	"strings"
 
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 )
 
@@ -17,7 +18,9 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 
 	var rows pgx.Rows
 	rows, err = dbc.Query(context.TODO(), ""+
-		"SELECT name, enable, brokers, security, topics, consumergroup, schemapassfilter, schemaprefix FROM metadb.source")
+		"SELECT name,enable,coalesce(brokers,''),coalesce(security,''),coalesce(topics,''),"+
+		"coalesce(consumergroup,''),coalesce(schemapassfilter,''),coalesce(trimschemaprefix,''),"+
+		"coalesce(addschemaprefix,''),coalesce(module,'') FROM metadb.source")
 	if err != nil {
 		return nil, err
 	}
@@ -26,11 +29,14 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 	for rows.Next() {
 		var name, brokers, security string
 		var enable bool
-		var topics []string
+		var topics string
 		var consumergroup string
-		var schemapassfilter []string
-		var schemaprefix string
-		if err := rows.Scan(&name, &enable, &brokers, &security, &topics, &consumergroup, &schemapassfilter, &schemaprefix); err != nil {
+		var schemapassfilter string
+		var trimschemaprefix string
+		var addschemaprefix string
+		var module string
+		if err := rows.Scan(&name, &enable, &brokers, &security, &topics, &consumergroup, &schemapassfilter,
+			&trimschemaprefix, &addschemaprefix, &module); err != nil {
 			return nil, err
 		}
 		if security == "" {
@@ -41,10 +47,12 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 			Enable:           enable,
 			Brokers:          brokers,
 			Security:         security,
-			Topics:           topics,
+			Topics:           strings.Split(topics, ","),
 			Group:            consumergroup,
-			SchemaPassFilter: schemapassfilter,
-			SchemaPrefix:     schemaprefix,
+			SchemaPassFilter: strings.Split(schemapassfilter, ","),
+			TrimSchemaPrefix: trimschemaprefix,
+			AddSchemaPrefix:  addschemaprefix,
+			Module:           module,
 		})
 	}
 	if err := rows.Err(); err != nil {

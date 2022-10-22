@@ -60,8 +60,6 @@ func InitSys(opt *option.Init) error {
 		return fmt.Errorf("%s already exists", dd)
 	}
 
-	eout.Info("initializing new data directory in %s", dd)
-
 	// eout.Verbose("creating system files")
 	// if err = initSchema(opt.Datadir, opt.DatabaseURI); err != nil {
 
@@ -190,7 +188,7 @@ func InitSys(opt *option.Init) error {
 		}
 	*/
 
-	eout.Info("initialization completed")
+	eout.Info("initialized new data directory in %s", dd)
 	return nil
 }
 

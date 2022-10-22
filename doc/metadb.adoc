@@ -1,4 +1,4 @@
-= Metadb Documentation
+= Metadb 0.12 Documentation
 :toc: left
 :toclevels: 3
 :toc-title: Contents
@@ -10,3 +10,5 @@ include::streamproc.adoc[]
 include::commands.adoc[]
 
 include::admin.adoc[]
+
+include::external.adoc[]

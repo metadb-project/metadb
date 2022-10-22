@@ -9,7 +9,7 @@ import (
 
 	"github.com/metadb-project/metadb/cmd/metadb/cat"
 
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/metadata"
@@ -52,9 +52,9 @@ func Upgrade(opt *option.Upgrade) error {
 	}
 	// Write message if nothing was upgraded.
 	if upgraded {
-		eout.Info("upgrade of instance %q is completed", opt.Datadir)
+		eout.Info("upgrade of %q is completed", opt.Datadir)
 	} else {
-		eout.Info("instance %q is up to date", opt.Datadir)
+		eout.Info("%q is up to date", opt.Datadir)
 	}
 	return nil
 }
@@ -536,29 +536,61 @@ func updb8(opt *dbopt) error {
 	}
 	defer dbx.Rollback(tx)
 
+	// Read plug.folio.tenant configuration
+	folioTenant, _, err := getConfig(opt.Datadir, "plug.folio.tenant")
+	if err != nil {
+		return err
+	}
+
+	// Read plug.reshare.tenants configuration
+	reshareTenantsString, _, err := getConfig(opt.Datadir, "plug.reshare.tenants")
+	if err != nil {
+		return err
+	}
+	reshareTenants := strings.Split(reshareTenantsString, ",")
+	if len(reshareTenants) == 1 && reshareTenants[0] == "" {
+		reshareTenants = []string{}
+	}
+	q := "CREATE TABLE metadb.origin (" +
+		"    name text PRIMARY KEY" +
+		")"
+	_, err = dc.Exec(context.TODO(), q)
+	if err != nil {
+		return err
+	}
+	for _, t := range reshareTenants {
+		q = "INSERT INTO metadb.origin (name) VALUES ($1)"
+		_, err = dc.Exec(context.TODO(), q, t)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Source connector parameters
-	sources, err := oldReadSourceConnectors(opt.Datadir)
+	sources, err := oldReadSourceConnectors(opt.Datadir, folioTenant, reshareTenants)
 	if err != nil {
 		return err
 	}
 	src := sources[0]
-	var q = "CREATE TABLE metadb.source (" +
+	q = "CREATE TABLE metadb.source (" +
 		"    name text PRIMARY KEY," +
 		"    enable boolean NOT NULL," +
-		"    brokers text NOT NULL," +
-		"    security text NOT NULL," +
-		"    topics text[] NOT NULL," +
-		"    consumergroup text NOT NULL," +
-		"    schemapassfilter text[] NOT NULL," +
-		"    schemaprefix text NOT NULL" +
+		"    brokers text," +
+		"    security text," +
+		"    topics text," +
+		"    consumergroup text," +
+		"    schemapassfilter text," +
+		"    trimschemaprefix text," +
+		"    addschemaprefix text," +
+		"    module text" +
 		")"
 	if _, err = dc.Exec(context.TODO(), q); err != nil {
 		return err
 	}
-	q = "INSERT INTO metadb.source (name, enable, brokers, security, topics, consumergroup, schemapassfilter, schemaprefix) " +
+	q = "INSERT INTO metadb.source (name, enable, brokers, security, topics, consumergroup, schemapassfilter, trimschemaprefix, addschemaprefix, module) " +
 		"VALUES ('" + strings.TrimPrefix(src.Name, "src.") + "', TRUE, '" + src.Brokers + "', '" + src.Security + "', " +
-		toPostgresArray(src.Topics) + ", '" + src.Group + "', " + toPostgresArray(src.SchemaPassFilter) + ", '" +
-		src.SchemaPrefix + "')"
+		strings.Join(src.Topics, ",") + ", '" + src.Group + "', " + strings.Join(src.SchemaPassFilter, ",") + ", '" +
+		src.TrimSchemaPrefix + "', '" + src.AddSchemaPrefix + "', '" + src.Module + "')"
 	if _, err = dc.Exec(context.TODO(), q); err != nil {
 		return err
 	}
@@ -583,40 +615,6 @@ func updb8(opt *dbopt) error {
 		}
 	}
 
-	// Read plug.folio.tenant configuration
-	folioTenant, _, err := getConfig(opt.Datadir, "plug.folio.tenant")
-	if err != nil {
-		return err
-	}
-	q = "CREATE TABLE metadb.folio (" +
-		"    attr text PRIMARY KEY," +
-		"    val text NOT NULL" +
-		")"
-	if _, err = dc.Exec(context.TODO(), q); err != nil {
-		return err
-	}
-	q = "INSERT INTO metadb.folio (attr, val) VALUES ($1, $2)"
-	if _, err = dc.Exec(context.TODO(), q, "tenant", folioTenant); err != nil {
-		return err
-	}
-
-	// Read plug.reshare.tenants configuration
-	reshareTenants, _, err := getConfig(opt.Datadir, "plug.reshare.tenants")
-	if err != nil {
-		return err
-	}
-	q = "CREATE TABLE metadb.reshare (" +
-		"    attr text PRIMARY KEY," +
-		"    val text NOT NULL" +
-		")"
-	if _, err = dc.Exec(context.TODO(), q); err != nil {
-		return err
-	}
-	q = "INSERT INTO metadb.reshare (attr, val) VALUES ($1, $2)"
-	if _, err = dc.Exec(context.TODO(), q, "tenants", reshareTenants); err != nil {
-		return err
-	}
-
 	// Write new version number
 	if err = metadata.WriteDatabaseVersion(tx, 8); err != nil {
 		return err
@@ -635,20 +633,20 @@ func updb8(opt *dbopt) error {
 	return nil
 }
 
-func toPostgresArray(slice []string) string {
-	var b strings.Builder
-	b.WriteString("ARRAY[")
-	var i int
-	var s string
-	for i, s = range slice {
-		if i != 0 {
-			b.WriteRune(',')
-		}
-		b.WriteString("'" + s + "'")
-	}
-	b.WriteString("]::text[]")
-	return b.String()
-}
+//func toPostgresArray(slice []string) string {
+//	var b strings.Builder
+//	b.WriteString("ARRAY[")
+//	var i int
+//	var s string
+//	for i, s = range slice {
+//		if i != 0 {
+//			b.WriteRune(',')
+//		}
+//		b.WriteString("'" + s + "'")
+//	}
+//	b.WriteString("]::text[]")
+//	return b.String()
+//}
 
 type updbFunc func(opt *dbopt) error
 
@@ -719,7 +717,23 @@ func oldReadDatabaseConnectors(datadir string) ([]*databaseConnector, error) {
 	return dbc, nil
 }
 
-func oldReadSourceConnectors(datadir string) ([]*sourceConnector, error) {
+func oldReadSourceConnectors(datadir string, folioTenant string, reshareTenants []string) ([]*sourceConnector, error) {
+	if folioTenant == "" && len(reshareTenants) == 0 {
+		eout.Warning("neither plug.folio.tenant nor plug.reshare.tenants is defined")
+	}
+	if folioTenant != "" && len(reshareTenants) != 0 {
+		eout.Warning("both plug.folio.tenant and plug.reshare.tenants are defined")
+	}
+	var trimSchemaPrefix string
+	if folioTenant != "" {
+		trimSchemaPrefix = folioTenant + "_"
+	}
+	var module string
+	if len(reshareTenants) != 0 {
+		module = "reshare"
+	} else {
+		module = "folio"
+	}
 	var cmap map[string]map[string]string
 	var err error
 	if cmap, err = readConfigMap(datadir, "src"); err != nil {
@@ -740,8 +754,9 @@ func oldReadSourceConnectors(datadir string) ([]*sourceConnector, error) {
 			Topics:           util.SplitList(conf["topics"]),
 			Group:            conf["group"],
 			SchemaPassFilter: util.SplitList(conf["schemapassfilter"]),
-			SchemaPrefix:     conf["schemaprefix"],
-			// Databases:        util.SplitList(conf["dbs"]),
+			TrimSchemaPrefix: trimSchemaPrefix,
+			AddSchemaPrefix:  conf["schemaprefix"],
+			Module:           module,
 		})
 	}
 	return src, nil
@@ -859,6 +874,8 @@ type sourceConnector struct {
 	Topics           []string
 	Group            string
 	SchemaPassFilter []string
-	SchemaPrefix     string
+	TrimSchemaPrefix string
+	AddSchemaPrefix  string
+	Module           string
 	// Status           status.Status
 }

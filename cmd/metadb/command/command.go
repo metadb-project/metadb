@@ -608,10 +608,10 @@ func structScale(data any) (int32, string, error) {
 // 	return string(jb), nil
 // }
 
-var FolioTenant string
+// var FolioTenant string
 var ReshareTenants []string
 
-func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefix string) (*Command, error) {
+func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string) (*Command, error) {
 	// Note: this function returns nil, nil in some cases.
 	if ce == nil {
 		return nil, fmt.Errorf("missing change event")
@@ -662,8 +662,8 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 		}
 		// Rewrite schema name
 		var schema string = *ce.Value.Payload.Source.Schema
-		if FolioTenant != "" {
-			schema = strings.TrimPrefix(schema, FolioTenant+"_")
+		if trimSchemaPrefix != "" {
+			schema = strings.TrimPrefix(schema, trimSchemaPrefix)
 		}
 		schema = strings.TrimPrefix(schema, "uchicago_")
 		schema = strings.TrimPrefix(schema, "lu_")
@@ -675,7 +675,7 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, schemaPrefi
 		var origin string
 		origin, schema = extractOrigin(ReshareTenants, schema)
 		c.Origin = origin
-		schema = schemaPrefix + schema
+		schema = addSchemaPrefix + schema
 		c.SchemaName = schema
 	} else {
 		c.SchemaName = ""

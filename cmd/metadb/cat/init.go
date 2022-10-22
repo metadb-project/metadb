@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
@@ -123,35 +123,27 @@ func createCatalogSchema(dc *pgx.Conn) error {
 	if err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".auth: %v", err)
 	}
-	// Table folio
+	// Table origin
 	_, err = tx.Exec(context.TODO(), ""+
-		"CREATE TABLE "+catalogSchema+".folio ("+
-		"    attr text PRIMARY KEY,"+
-		"    val text NOT NULL"+
+		"CREATE TABLE "+catalogSchema+".origin ("+
+		"    name text PRIMARY KEY"+
 		")")
 	if err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".folio: %v", err)
-	}
-	// Table reshare
-	_, err = tx.Exec(context.TODO(), ""+
-		"CREATE TABLE "+catalogSchema+".reshare ("+
-		"    attr text PRIMARY KEY,"+
-		"    val text NOT NULL"+
-		")")
-	if err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".reshare: %v", err)
+		return fmt.Errorf("creating table "+catalogSchema+".origin: %v", err)
 	}
 	// Table source
 	_, err = tx.Exec(context.TODO(), ""+
 		"CREATE TABLE "+catalogSchema+".source ("+
 		"    name text PRIMARY KEY,"+
 		"    enable boolean NOT NULL,"+
-		"    brokers text NOT NULL,"+
-		"    security text NOT NULL,"+
-		"    topics text[] NOT NULL,"+
-		"    consumergroup text NOT NULL,"+
-		"    schemapassfilter text[] NOT NULL,"+
-		"    schemaprefix text NOT NULL"+
+		"    brokers text,"+
+		"    security text,"+
+		"    topics text,"+
+		"    consumergroup text,"+
+		"    schemapassfilter text,"+
+		"    trimschemaprefix text,"+
+		"    addschemaprefix text,"+
+		"    module text"+
 		")")
 	if err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".source: %v", err)
