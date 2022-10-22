@@ -59,8 +59,8 @@ snapshot of the source database to be streamed.  Metadb can accept
 re-streamed data in order to resynchronize with the source, using this
 procedure:
 
-1. Update the data source `topics` and `consumergroup` configuration
-   settings for the new data stream.
+1. Update the `topics` and `consumergroup` configuration settings for
+   the new data stream.
 +
 [source,sql]
 ----
@@ -80,23 +80,26 @@ metadb reset -D data --source example
 
 3. Start the Metadb server to begin streaming the data.
 
-4. Once the new data have finished streaming, stop the Metadb server,
-   and "clean" the analytic database to remove old data.
+4. Once the new data have finished (or nearly finished) re-streaming,
+   stop the Metadb server, and "clean" the analytic database to remove
+   old data.
 +
 [source,bash]
 ----
 metadb clean -D data --source example
 ----
 +
-Note that the metadb server currently does not give an indication
-that it has finished re-streaming, except that running it with
-`--debug` will typically show updates slowing down.  The precise
-timing when "metadb clean" is run is not critical, but it must be run
-to complete the resynchronization process.  (Having the server report
+Note that the metadb server currently does not give an indication that
+it has finished re-streaming, except that running it with `--debug`
+will typically show updates slowing down.  (Having the server report
 that initial streaming or re-streaming has finished is a planned
 feature.)
++
+The precise timing of when "metadb clean" is run is not important, but
+it must be run to remove redundant data and to complete the
+resynchronization process.
 
-6. Start the server.
+5. Start the server.
 +
 Until a failed stream is re-streamed by following the process above,
 the analytic database may continue to be unsynchronized with the
