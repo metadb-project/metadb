@@ -68,26 +68,19 @@ ALTER DATA SOURCE example OPTIONS
     (SET topics '^metadb_2.*', SET consumergroup 'metadb_2_1');
 ----
 
-2. Stop the Metadb server.
+2. Stop the Metadb server, and then "reset" the analytic database to
+   mark current data as old.  This may take some time to run.
 +
 [source,bash]
 ----
 metadb stop -D data
-----
-+
-Do not start the server again until the next step (metadb reset) is completed.
 
-3. "Reset" the analytic database to mark current data as old.  This
-   may take some time to run.
-+
-[source,bash]
-----
 metadb reset -D data --source example
 ----
 
-4. Start the Metadb server to begin streaming the data.
+3. Start the Metadb server to begin streaming the data.
 
-5. Once the new data have finished streaming, stop the Metadb server,
+4. Once the new data have finished streaming, stop the Metadb server,
    and "clean" the analytic database to remove old data.
 +
 [source,bash]
