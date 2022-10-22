@@ -2,6 +2,9 @@
 
 === FOLIO
 
+When creating a FOLIO data source, use the `module 'folio'` option,
+and set `trimschemaprefix` to remove the tenant from schema names:
+
 ----
 CREATE DATA SOURCE folio TYPE kafka OPTIONS (
     module 'folio',
@@ -14,6 +17,9 @@ CREATE DATA SOURCE folio TYPE kafka OPTIONS (
 
 === ReShare
 
+Before defining a ReShare data source, create a data origin for each
+consortial tenant.
+
 ----
 CREATE DATA ORIGIN tenant1;
 
@@ -21,6 +27,8 @@ CREATE DATA ORIGIN tenant2;
 
 CREATE DATA ORIGIN tenant3;
 ----
+
+Then use the `module 'reshare'` option when creating the data source.
 
 ----
 CREATE DATA SOURCE reshare TYPE kafka OPTIONS (
@@ -30,3 +38,9 @@ CREATE DATA SOURCE reshare TYPE kafka OPTIONS (
     consumergroup 'reshare_example'
 );
 ----
+
+The order is important: The initial set of data origins should be
+created before the data source is created so that schema names of
+incoming data will be processed correctly.  Later, whenever a new
+consortial tenant is to be added, it should be defined in Metadb using
+`CREATE DATA ORIGIN` before the tenant is added to ReShare.
