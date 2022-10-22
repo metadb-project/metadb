@@ -175,15 +175,13 @@ func run() error {
 	_ = traceFlag(cmdStop, &eout.EnableTrace)
 
 	var cmdReset = &cobra.Command{
-		Use:  "reset",
-		Args: cobra.ExactArgs(1),
+		Use: "reset",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 			if err = initColor(); err != nil {
 				return err
 			}
 			resetOpt.Global = globalOpt
-			resetOpt.Connector = args[0]
 			if err = reset.Reset(&resetOpt); err != nil {
 				return err
 			}
@@ -191,23 +189,21 @@ func run() error {
 		},
 	}
 	cmdReset.SetHelpFunc(help)
-	cmdReset.Flags().StringVar(&resetOpt.Origins, "origin", "", "")
-	_ = cmdReset.MarkFlagRequired("origin")
+	cmdReset.Flags().StringVar(&resetOpt.Source, "source", "", "")
+	_ = cmdReset.MarkFlagRequired("source")
 	_ = dirFlag(cmdReset, &resetOpt.Datadir)
 	_ = forceFlag(cmdReset, &resetOpt.Force)
 	_ = verboseFlag(cmdReset, &eout.EnableVerbose)
 	_ = traceFlag(cmdReset, &eout.EnableTrace)
 
 	var cmdClean = &cobra.Command{
-		Use:  "clean",
-		Args: cobra.ExactArgs(1),
+		Use: "clean",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 			if err = initColor(); err != nil {
 				return err
 			}
 			cleanOpt.Global = globalOpt
-			cleanOpt.Connector = args[0]
 			if err = clean.Clean(&cleanOpt); err != nil {
 				return err
 			}
@@ -215,8 +211,8 @@ func run() error {
 		},
 	}
 	cmdClean.SetHelpFunc(help)
-	cmdClean.Flags().StringVar(&cleanOpt.Origins, "origin", "", "")
-	_ = cmdClean.MarkFlagRequired("origin")
+	cmdClean.Flags().StringVar(&cleanOpt.Source, "source", "", "")
+	_ = cmdClean.MarkFlagRequired("source")
 	_ = dirFlag(cmdClean, &cleanOpt.Datadir)
 	_ = forceFlag(cmdClean, &cleanOpt.Force)
 	_ = verboseFlag(cmdClean, &eout.EnableVerbose)
@@ -374,10 +370,10 @@ func help(cmd *cobra.Command, commandLine []string) {
 		fmt.Printf("" +
 			helpReset +
 			"\n" +
-			"Usage:  metadb reset <options> <connector>\n" +
+			"Usage:  metadb reset <options>\n" +
 			"\n" +
 			"Options:\n" +
-			"      --origin <o>            - Origins to reset (comma-separated list)\n" +
+			"      --source <o>            - Data source to reset\n" +
 			dirFlag(nil, nil) +
 			forceFlag(nil, nil) +
 			verboseFlag(nil, nil) +
@@ -387,10 +383,10 @@ func help(cmd *cobra.Command, commandLine []string) {
 		fmt.Printf("" +
 			helpClean +
 			"\n" +
-			"Usage:  metadb clean <options> <connector>\n" +
+			"Usage:  metadb clean <options>\n" +
 			"\n" +
 			"Options:\n" +
-			"      --origin <o>            - Origins to clean (comma-separated list)\n" +
+			"      --source <o>            - Data source to clean\n" +
 			dirFlag(nil, nil) +
 			forceFlag(nil, nil) +
 			verboseFlag(nil, nil) +

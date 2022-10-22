@@ -41,16 +41,14 @@ type Stop struct {
 
 type Reset struct {
 	Global
-	Datadir   string
-	Origins   string
-	Force     bool
-	Connector string
+	Datadir string
+	Source  string
+	Force   bool
 }
 
 type Clean struct {
 	Global
-	Datadir   string
-	Origins   string
-	Force     bool
-	Connector string
+	Datadir string
+	Source  string
+	Force   bool
 }

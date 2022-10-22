@@ -1,6 +1,7 @@
 package reset
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"sort"
@@ -15,12 +16,9 @@ import (
 
 func Reset(opt *option.Reset) error {
 	// Validate options
-	if !strings.HasPrefix(opt.Connector, "db.") {
-		return fmt.Errorf("invalid database connector: %s", opt.Connector)
-	}
 	if !opt.Force {
 		// Ask for confirmation
-		_, _ = fmt.Fprintf(os.Stderr, "Reset current data in %q? ", opt.Connector)
+		_, _ = fmt.Fprintf(os.Stderr, "Reset current data for data source %q? ", opt.Source)
 		var confirm string
 		_, err := fmt.Scanln(&confirm)
 		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
@@ -42,15 +40,23 @@ func Reset(opt *option.Reset) error {
 	}
 	dsn := &sqlx.DSN{
 		Host:     db.Host,
-		Port:     "5432",
+		Port:     db.Port,
 		User:     db.User,
 		Password: db.Password,
 		DBName:   db.DBName,
-		SSLMode:  "require",
+		SSLMode:  db.SSLMode,
 	}
-	dc, err := sqlx.Open("postgres", dsn)
+	dc, err := sqlx.Open("postgresql", dsn)
 	if err != nil {
 		return err
+	}
+	defer dc.Close()
+	exists, err := sourceExists(dc, opt.Source)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("data source %q does not exist", opt.Source)
 	}
 	// Disable source connectors before beginning reset
 	/*
@@ -71,18 +77,17 @@ func Reset(opt *option.Reset) error {
 	sort.Slice(tables, func(i, j int) bool {
 		return tables[i].String() < tables[j].String()
 	})
-	origins := sqlx.CSVToSQL(opt.Origins)
 	for _, t := range tables {
 		eout.Info("resetting: %s", t.String())
-		q := "UPDATE " + dc.TableSQL(&t) + " SET __cf=FALSE WHERE __cf AND __origin IN (" + origins + ")"
+		q := "UPDATE " + dc.TableSQL(&t) + " SET __cf=FALSE WHERE __cf AND __source='" + opt.Source + "'"
 		if _, err = dc.Exec(nil, q); err != nil {
 			return err
 		}
 		if err = dc.VacuumAnalyzeTable(&t); err != nil {
 			return err
 		}
-		q = "UPDATE " + dc.HistoryTableSQL(&t) + " SET __cf=FALSE WHERE __cf AND __current AND __origin IN (" +
-			origins + ")"
+		q = "UPDATE " + dc.HistoryTableSQL(&t) + " SET __cf=FALSE WHERE __cf AND __current AND " +
+			"__source='" + opt.Source + "'"
 		if _, err = dc.Exec(nil, q); err != nil {
 			return err
 		}
@@ -92,4 +97,18 @@ func Reset(opt *option.Reset) error {
 	}
 	eout.Info("completed reset")
 	return nil
+}
+
+func sourceExists(dc sqlx.DB, sourceName string) (bool, error) {
+	q := "SELECT 1 FROM metadb.source WHERE name='" + sourceName + "'"
+	var i int64
+	err := dc.QueryRow(nil, q).Scan(&i)
+	switch {
+	case err == sql.ErrNoRows:
+		return false, nil
+	case err != nil:
+		return false, err
+	default:
+		return true, nil
+	}
 }

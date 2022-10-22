@@ -3,7 +3,6 @@ package sqlx
 import (
 	"database/sql"
 	"fmt"
-	"strings"
 )
 
 type DB interface {
@@ -81,6 +80,7 @@ func (t *Table) String() string {
 	return t.Schema + "." + t.Table
 }
 
+/*
 func CSVToSQL(csv string) string {
 	list := strings.Split(csv, ",")
 	var b strings.Builder
@@ -92,3 +92,4 @@ func CSVToSQL(csv string) string {
 	}
 	return b.String()
 }
+*/

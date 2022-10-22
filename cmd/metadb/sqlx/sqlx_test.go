@@ -1,9 +1,6 @@
 package sqlx
 
-import (
-	"testing"
-)
-
+/*
 func TestCSVToSQLBasic(t *testing.T) {
 	var csv = "first,second,third"
 	var wantSQL = "'first','second','third'"
@@ -39,3 +36,4 @@ func TestCSVToSQLEmptyElement(t *testing.T) {
 		t.Errorf("got %v; want %v", gotSQL, wantSQL)
 	}
 }
+*/

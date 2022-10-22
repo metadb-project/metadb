@@ -99,14 +99,14 @@ go generate $v ./...
 go build -o $bindir $v $tags -ldflags "-X github.com/metadb-project/metadb/cmd/metadb/util.MetadbVersion=$version $json" ./cmd/metadb
 # go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
 
-if ! $fast; then
+if $runalltest; then
     if ! $quiet; then
         echo 'build.sh: running tests' 1>&2
     fi
     go test $v $tags -vet=off -count=1 ./cmd/metadb/command 1>&2
-    go test $v $tags -vet=off -count=1 ./cmd/metadb/dbx 1>&2
-    # go test $v $tags -vet=off -count=1 ./cmd/metadb/parser 1>&2
-    go test $v $tags -vet=off -count=1 ./cmd/metadb/sqlx 1>&2
+#    go test $v $tags -vet=off -count=1 ./cmd/metadb/dbx 1>&2
+#    go test $v $tags -vet=off -count=1 ./cmd/metadb/parser 1>&2
+#    go test $v $tags -vet=off -count=1 ./cmd/metadb/sqlx 1>&2
     go test $v $tags -vet=off -count=1 ./cmd/metadb/util 1>&2
 fi
 

@@ -74,17 +74,16 @@ ALTER DATA SOURCE example OPTIONS
 ----
 metadb stop -D data
 ----
++
+Do not start the server again until the next step (metadb reset) is completed.
 
 3. "Reset" the analytic database to mark current data as old.  This
    may take some time to run.
 +
 [source,bash]
 ----
-metadb reset -D data --origin 's1,s2,s3' db.main
+metadb reset -D data --source example
 ----
-+
-Note that `--origin` should include all origins associated with the
-source, or empty string ( `''` ) if there are no origins.
 
 4. Start the Metadb server to begin streaming the data.
 
@@ -93,12 +92,10 @@ source, or empty string ( `''` ) if there are no origins.
 +
 [source,bash]
 ----
-metadb clean -D data --origin 's1,s2,s3' db.main
+metadb clean -D data --source example
 ----
 +
-The `--origin` should be the same as used for the reset.
-+
-Note that the metadb server currently does not give any indication
+Note that the metadb server currently does not give an indication
 that it has finished re-streaming, except that running it with
 `--debug` will typically show updates slowing down.  The precise
 timing when "metadb clean" is run is not critical, but it must be run
