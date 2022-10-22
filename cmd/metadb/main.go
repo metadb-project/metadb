@@ -373,7 +373,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"Usage:  metadb reset <options>\n" +
 			"\n" +
 			"Options:\n" +
-			"      --source <o>            - Data source to reset\n" +
+			"      --source <s>            - Data source to reset\n" +
 			dirFlag(nil, nil) +
 			forceFlag(nil, nil) +
 			verboseFlag(nil, nil) +
@@ -386,7 +386,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"Usage:  metadb clean <options>\n" +
 			"\n" +
 			"Options:\n" +
-			"      --source <o>            - Data source to clean\n" +
+			"      --source <s>            - Data source to clean\n" +
 			dirFlag(nil, nil) +
 			forceFlag(nil, nil) +
 			verboseFlag(nil, nil) +
