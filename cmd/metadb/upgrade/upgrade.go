@@ -588,8 +588,8 @@ func updb8(opt *dbopt) error {
 		return err
 	}
 	q = "INSERT INTO metadb.source (name, enable, brokers, security, topics, consumergroup, schemapassfilter, trimschemaprefix, addschemaprefix, module) " +
-		"VALUES ('" + strings.TrimPrefix(src.Name, "src.") + "', TRUE, '" + src.Brokers + "', '" + src.Security + "', " +
-		strings.Join(src.Topics, ",") + ", '" + src.Group + "', " + strings.Join(src.SchemaPassFilter, ",") + ", '" +
+		"VALUES ('" + strings.TrimPrefix(src.Name, "src.") + "', TRUE, '" + src.Brokers + "', '" + src.Security + "', '" +
+		strings.Join(src.Topics, ",") + "', '" + src.Group + "', '" + strings.Join(src.SchemaPassFilter, ",") + "', '" +
 		src.TrimSchemaPrefix + "', '" + src.AddSchemaPrefix + "', '" + src.Module + "')"
 	if _, err = dc.Exec(context.TODO(), q); err != nil {
 		return err
