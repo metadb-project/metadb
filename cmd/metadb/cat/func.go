@@ -8,7 +8,8 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-// TODO move to func and check existence and value of metadb_version() before creating
+// TODO move to func and check existence and value of metadb_version() before creating;
+// but note this requires user permissions to be fixed
 
 var functionDefs = [][]string{
 	{"metadb_version()",

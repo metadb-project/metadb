@@ -191,6 +191,13 @@ CREATE DATA SOURCE example TYPE kafka OPTIONS (
 );
 ----
 
+==== CREATE USER
+
+CREATE USER is mostly equivalent to the PostgreSQL CREATE USER
+statement.  However it also creates a schema having the same name as
+the user, if the schema does not exist, and grants the user privileges
+on the schema.  The schema is intended as a workspace for the user.
+
 ==== DROP DATA SOURCE
 
 Remove a data source configuration

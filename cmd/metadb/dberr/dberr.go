@@ -1,4 +1,4 @@
-package errors
+package dberr
 
 type Error struct {
 	Err  error

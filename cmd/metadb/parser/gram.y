@@ -16,7 +16,7 @@ import (
 
 %type <node> top_level_stmt stmt
 %type <node> select_stmt
-%type <node> create_data_source_stmt alter_data_source_stmt drop_data_source_stmt authorize_stmt
+%type <node> create_data_source_stmt alter_data_source_stmt drop_data_source_stmt authorize_stmt create_user_stmt
 %type <node> create_data_origin_stmt
 %type <optlist> options_clause alter_options_clause option_list alter_option_list option alter_option
 %type <str> option_name option_val
@@ -26,8 +26,8 @@ import (
 */
 
 %token SELECT
-%token CREATE ALTER DATA SOURCE ORIGIN OPTIONS
-%token AUTHORIZE ON ALL TABLES IN TO
+%token CREATE ALTER DATA SOURCE ORIGIN OPTIONS USER
+%token AUTHORIZE ON ALL TABLES IN TO MAPPING
 %token TYPE
 %token TRUE FALSE
 %token <str> VERSION
@@ -61,6 +61,10 @@ stmt:
 			$$ = $1
 		}
 	| create_data_origin_stmt
+		{
+			$$ = $1
+		}
+	| create_user_stmt
 		{
 			$$ = $1
 		}
@@ -101,7 +105,7 @@ select_stmt:
 	SELECT
 		{
 			yylex.(*lexer).pass = true
-			// $$ = &ast.SelectStmt{}
+			$$ = &ast.SelectStmt{}
 		}
 
 create_data_source_stmt:
@@ -114,6 +118,17 @@ create_data_origin_stmt:
 	CREATE DATA ORIGIN name ';'
 		{
 			$$ = &ast.CreateDataOriginStmt{OriginName: $4}
+		}
+
+create_user_stmt:
+	CREATE USER name
+		{
+			yylex.(*lexer).pass = true
+			$$ = &ast.CreateUserStmt{UserName: $3}
+		}
+	| CREATE USER MAPPING
+		{
+			yylex.(*lexer).pass = true
 		}
 
 alter_data_source_stmt:

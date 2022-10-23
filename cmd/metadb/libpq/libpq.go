@@ -12,8 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/metadb-project/metadb/cmd/metadb/ast"
+	"github.com/metadb-project/metadb/cmd/metadb/dberr"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/errors"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/parser"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
@@ -63,6 +63,7 @@ func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB) {
 		log.Info("%v", err)
 		return
 	}
+	//log.Trace("connected to database")
 	// TODO Close
 
 	if err = startup(conn, backend); err != nil {
@@ -81,7 +82,7 @@ func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB) {
 		case *pgproto3.Parse:
 			log.Info("*pgproto3.Parse: not yet implemented")
 		case *pgproto3.Query:
-			if err = processQuery(conn, m, dbconn); err != nil {
+			if err = processQuery(conn, m, db, dbconn); err != nil {
 				log.Info("%v", err)
 				return
 			}
@@ -132,7 +133,7 @@ func startup(conn net.Conn, backend *pgproto3.Backend) error {
 	}
 }
 
-func processQuery(conn net.Conn, query *pgproto3.Query, dbconn *pgx.Conn) error {
+func processQuery(conn net.Conn, query *pgproto3.Query, db *dbx.DB, dbconn *pgx.Conn) error {
 	var e string
 	node, err, pass := parser.Parse(query.String)
 	if err != nil {
@@ -140,7 +141,7 @@ func processQuery(conn net.Conn, query *pgproto3.Query, dbconn *pgx.Conn) error 
 	}
 	log.Trace("query received: query=%q node=%#v err=%q pass=%v\n", query.String, node, e, pass)
 	if pass {
-		err = passthroughQuery(conn, query, dbconn)
+		err = proxyQuery(conn, query, node, db, dbconn)
 		if err != nil {
 			return write(conn, encode(nil, []pgproto3.Message{
 				&pgproto3.ErrorResponse{Message: "ERROR:  " + err.Error()},
@@ -183,12 +184,13 @@ func processQuery(conn net.Conn, query *pgproto3.Query, dbconn *pgx.Conn) error 
 	if err != nil {
 		log.Error("%v: %s", err, query.String)
 		hint := ""
-		errs, ok := err.(*errors.Error)
+		errs, ok := err.(*dberr.Error)
 		if ok {
 			hint = errs.Hint
 		}
+		_ = hint // suppress hints until they also can be returned for proxied queries
 		return write(conn, encode(nil, []pgproto3.Message{
-			&pgproto3.ErrorResponse{Severity: "ERROR", Message: err.Error(), Hint: hint},
+			&pgproto3.ErrorResponse{Severity: "ERROR", Message: err.Error(), Hint: "" /*hint*/},
 			&pgproto3.ReadyForQuery{TxStatus: 'I'},
 		}))
 	}
@@ -201,39 +203,6 @@ func handleStartup(conn net.Conn, msg *pgproto3.StartupMessage) error {
 		//&pgproto3.ParameterStatus{Name: "server_version", Value: "14.3.0"},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	}))
-}
-
-func passthroughQuery(conn net.Conn, query *pgproto3.Query, dbconn *pgx.Conn) error {
-	var err error
-	var rows pgx.Rows
-	if rows, err = dbconn.Query(context.TODO(), query.String); err != nil {
-		var ok bool
-		var e *pgconn.PgError
-		if e, ok = err.(*pgconn.PgError); !ok {
-			panic("passthroughQuery(): casting error to *pgconn.PgError")
-		}
-		var s = e.Severity + ":  " + e.Message + "\n" + parser.WriteErrorContext(query.String, int(e.Position-1))
-		return write(conn, encode(nil, []pgproto3.Message{
-			&pgproto3.ErrorResponse{Message: s},
-			&pgproto3.ReadyForQuery{TxStatus: 'I'},
-		}))
-	}
-	defer rows.Close()
-	var cols []pgconn.FieldDescription = rows.FieldDescriptions()
-	var b []byte = encodeFieldDesc(nil, cols)
-	for rows.Next() {
-		if b, err = encodeRow(b, rows, cols); err != nil {
-			return err
-		}
-	}
-	if err = rows.Err(); err != nil {
-		return err
-	}
-	b = encode(b, []pgproto3.Message{
-		&pgproto3.CommandComplete{CommandTag: []byte("SELECT 1")},
-		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	})
-	return write(conn, b)
 }
 
 func encodeFieldDesc(buffer []byte, cols []pgconn.FieldDescription) []byte {
@@ -391,7 +360,7 @@ func alterSourceOptions(dc *pgx.Conn, node *ast.AlterDataSourceStmt) error {
 		case "module":
 			// NOP
 		default:
-			return &errors.Error{
+			return &dberr.Error{
 				Err: fmt.Errorf("invalid option %q", opt.Name),
 				Hint: "Valid options in this context are: " +
 					"brokers, security, topics, consumergroup, schemapassfilter, trimschemaprefix, addschemaprefix, module",
@@ -486,7 +455,7 @@ func createSourceOptions(options []ast.Option) (*sysdb.SourceConnector, error) {
 		case "module":
 			s.Module = opt.Val
 		default:
-			return nil, &errors.Error{
+			return nil, &dberr.Error{
 				Err: fmt.Errorf("invalid option %q", opt.Name),
 				Hint: "Valid options in this context are: " +
 					"brokers, security, topics, consumergroup, schemapassfilter, trimschemaprefix, addschemaprefix, module",
@@ -518,7 +487,7 @@ func authorize(conn net.Conn, node *ast.AuthorizeStmt, dc *pgx.Conn) error {
 
 	exists, err = userExists(dc, node.RoleName)
 	if err != nil {
-		return fmt.Errorf("selecting data source: %v", err)
+		return fmt.Errorf("selecting role: %v", err)
 	}
 	if !exists {
 		return fmt.Errorf("role %q does not exist", node.RoleName)

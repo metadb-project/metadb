@@ -16,7 +16,6 @@ type Stmt interface {
 }
 
 type SelectStmt struct {
-	Fn string
 }
 
 func (*SelectStmt) node()     {}
@@ -60,3 +59,10 @@ type AuthorizeStmt struct {
 
 func (*AuthorizeStmt) node()     {}
 func (*AuthorizeStmt) stmtNode() {}
+
+type CreateUserStmt struct {
+	UserName string
+}
+
+func (*CreateUserStmt) node()     {}
+func (*CreateUserStmt) stmtNode() {}
