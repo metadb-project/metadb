@@ -349,7 +349,7 @@ func alterSourceOptions(dc *pgx.Conn, node *ast.AlterDataSourceStmt) error {
 			fallthrough
 		case "topics":
 			fallthrough
-		case "group":
+		case "consumergroup":
 			fallthrough
 		case "schemapassfilter":
 			fallthrough
