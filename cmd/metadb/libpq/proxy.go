@@ -22,15 +22,21 @@ func proxyQuery(conn net.Conn, query *pgproto3.Query, node ast.Node, db *dbx.DB,
 	case *ast.CreateUserStmt:
 		return createUser(conn, query, n, db)
 	}
-	ctag, err := dc.Exec(context.TODO(), query.String)
-	if err != nil {
-		return errors.New(strings.TrimLeft(strings.TrimPrefix(err.Error(), "ERROR:"), " "))
-	}
-	b := encode(nil, []pgproto3.Message{
-		&pgproto3.CommandComplete{CommandTag: []byte(ctag.String())},
+
+	return write(conn, encode(nil, []pgproto3.Message{
+		&pgproto3.ErrorResponse{Severity: "ERROR", Message: "syntax error"},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	})
-	return write(conn, b)
+	}))
+
+	//ctag, err := dc.Exec(context.TODO(), query.String)
+	//if err != nil {
+	//	return errors.New(strings.TrimLeft(strings.TrimPrefix(err.Error(), "ERROR:"), " "))
+	//}
+	//b := encode(nil, []pgproto3.Message{
+	//	&pgproto3.CommandComplete{CommandTag: []byte(ctag.String())},
+	//	&pgproto3.ReadyForQuery{TxStatus: 'I'},
+	//})
+	//return write(conn, b)
 }
 
 func createUser(conn net.Conn, query *pgproto3.Query, node *ast.CreateUserStmt, db *dbx.DB) error {
