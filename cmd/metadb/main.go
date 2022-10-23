@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/metadb-project/metadb/cmd/internal/color"
-	"github.com/metadb-project/metadb/cmd/internal/common"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/clean"
 	"github.com/metadb-project/metadb/cmd/metadb/initsys"
@@ -491,38 +490,38 @@ func traceLogFlag(cmd *cobra.Command, trace *bool) string {
 	return ""
 }
 
-func listenFlag(cmd *cobra.Command, listen *string) string {
-	if cmd != nil {
-		cmd.Flags().StringVar(listen, "listen", "", "")
-	}
-	return "" +
-		"      --listen <a>            - Address to listen on (default: 127.0.0.1)\n"
-}
+//func listenFlag(cmd *cobra.Command, listen *string) string {
+//	if cmd != nil {
+//		cmd.Flags().StringVar(listen, "listen", "", "")
+//	}
+//	return "" +
+//		"      --listen <a>            - Address to listen on (default: 127.0.0.1)\n"
+//}
 
-func adminPortFlag(cmd *cobra.Command, adminPort *string) string {
-	if cmd != nil {
-		cmd.Flags().StringVar(adminPort, "adminport", common.DefaultAdminPort, "")
-	}
-	return "" +
-		"      --adminport <p>         - Admin port to listen on (default: " + common.DefaultAdminPort + ")\n"
-}
+//func adminPortFlag(cmd *cobra.Command, adminPort *string) string {
+//	if cmd != nil {
+//		cmd.Flags().StringVar(adminPort, "adminport", common.DefaultAdminPort, "")
+//	}
+//	return "" +
+//		"      --adminport <p>         - Admin port to listen on (default: " + common.DefaultAdminPort + ")\n"
+//}
 
-func certFlag(cmd *cobra.Command, cert *string) string {
-	if cmd != nil {
-		cmd.Flags().StringVar(cert, "cert", "", "")
-	}
-	return "" +
-		"      --cert <f>              - File name of server certificate, including the\n" +
-		"                                CA's certificate and intermediates\n"
-}
+//func certFlag(cmd *cobra.Command, cert *string) string {
+//	if cmd != nil {
+//		cmd.Flags().StringVar(cert, "cert", "", "")
+//	}
+//	return "" +
+//		"      --cert <f>              - File name of server certificate, including the\n" +
+//		"                                CA's certificate and intermediates\n"
+//}
 
-func keyFlag(cmd *cobra.Command, key *string) string {
-	if cmd != nil {
-		cmd.Flags().StringVar(key, "key", "", "")
-	}
-	return "" +
-		"      --key <f>               - File name of server private key\n"
-}
+//func keyFlag(cmd *cobra.Command, key *string) string {
+//	if cmd != nil {
+//		cmd.Flags().StringVar(key, "key", "", "")
+//	}
+//	return "" +
+//		"      --key <f>               - File name of server private key\n"
+//}
 
 func logFlag(cmd *cobra.Command, logfile *string) string {
 	if cmd != nil {
@@ -532,13 +531,13 @@ func logFlag(cmd *cobra.Command, logfile *string) string {
 		"  -l, --log <f>               - File name for server log output\n"
 }
 
-func csvlogFlag(cmd *cobra.Command, logfile *string) string {
-	if cmd != nil {
-		cmd.Flags().StringVar(logfile, "csvlog", "", "")
-	}
-	return "" +
-		"      --csvlog <f>            - File name for server log CSV output\n"
-}
+//func csvlogFlag(cmd *cobra.Command, logfile *string) string {
+//	if cmd != nil {
+//		cmd.Flags().StringVar(logfile, "csvlog", "", "")
+//	}
+//	return "" +
+//		"      --csvlog <f>            - File name for server log CSV output\n"
+//}
 
 func dirFlag(cmd *cobra.Command, datadir *string) string {
 	if cmd != nil {
@@ -557,14 +556,14 @@ func dirFlag(cmd *cobra.Command, datadir *string) string {
 }
 */
 
-func noTLSFlag(cmd *cobra.Command, noTLS *bool) string {
-	if cmd != nil {
-		cmd.Flags().BoolVar(noTLS, "notls", false, "")
-	}
-	return "" +
-		"      --notls                 - Disable TLS in client connections [insecure,\n" +
-		"                                use for testing only]\n"
-}
+//func noTLSFlag(cmd *cobra.Command, noTLS *bool) string {
+//	if cmd != nil {
+//		cmd.Flags().BoolVar(noTLS, "notls", false, "")
+//	}
+//	return "" +
+//		"      --notls                 - Disable TLS in client connections [insecure,\n" +
+//		"                                use for testing only]\n"
+//}
 
 func setupLog(logfile, csvlogfile string, debug bool, trace bool) (*os.File, *os.File, error) {
 	var err error
