@@ -60,6 +60,29 @@ systemuser_password = ZHivGie5juxGJZmTObHU
 sslmode = require
 ----
 
+=== Starting the server
+
+To start the server:
+
+[source,bash]
+----
+metadb start -D data
+----
+
+To connect to the server:
+
+[source,bash]
+----
+psql -h localhost -p 8440
+----
+
+To stop the server:
+
+[source,bash]
+----
+metadb stop -D data
+----
+
 === Resynchronizing a data source
 
 If a Kafka data stream fails and cannot be resumed, it may be
