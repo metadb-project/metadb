@@ -181,7 +181,7 @@ func mainServer(svr *server) error {
 
 	go goCreateFunctions(*(svr.db))
 
-	go libpq.Listen(svr.opt.Listen, svr.opt.AdminPort, svr.db)
+	go libpq.Listen(svr.opt.Listen, svr.opt.Port, svr.db)
 
 	go goPollLoop(svr)
 
@@ -232,7 +232,7 @@ func listenAndServe(svr *server) {
 	} else {
 		host = svr.opt.Listen
 	}
-	// var port = svr.opt.AdminPort
+	// var port = svr.opt.Port
 	port := "8441"
 	var httpsvr = http.Server{
 		Addr:    net.JoinHostPort(host, port),

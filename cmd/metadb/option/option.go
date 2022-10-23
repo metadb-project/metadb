@@ -27,7 +27,7 @@ type Server struct {
 	SourceFilename string
 	LogSource      string
 	Listen         string
-	AdminPort      string
+	Port           string
 	TLSCert        string
 	TLSKey         string
 	NoTLS          bool

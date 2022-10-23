@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/metadb-project/metadb/cmd/internal/color"
+	"github.com/metadb-project/metadb/cmd/internal/common"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/clean"
 	"github.com/metadb-project/metadb/cmd/metadb/initsys"
@@ -124,10 +125,11 @@ func run() error {
 			if logf, csvlogf, err = setupLog(logfile, csvlogfile, serverOpt.Debug, serverOpt.Trace); err != nil {
 				return err
 			}
-			//if serverOpt.AdminPort == "" {
-			//        serverOpt.AdminPort = metadbAdminPort
+			//if serverOpt.Port == "" {
+			//        serverOpt.Port = metadbAdminPort
 			//}
 			serverOpt.RewriteJSON = rewriteJSON == "1"
+			serverOpt.Listen = "127.0.0.1"
 			if err = server.Start(&serverOpt); err != nil {
 				return logFatal(err, logf, csvlogf)
 			}
@@ -144,7 +146,7 @@ func run() error {
 	_ = logFlag(cmdStart, &logfile)
 	//_ = csvlogFlag(cmdStart, &csvlogfile)
 	//_ = listenFlag(cmdStart, &serverOpt.Listen)
-	//_ = adminPortFlag(cmdStart, &serverOpt.AdminPort)
+	_ = portFlag(cmdStart, &serverOpt.Port)
 	//_ = certFlag(cmdStart, &serverOpt.TLSCert)
 	//_ = keyFlag(cmdStart, &serverOpt.TLSKey)
 	_ = debugFlag(cmdStart, &serverOpt.Debug)
@@ -320,7 +322,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			logFlag(nil, nil) +
 			//csvlogFlag(nil, nil) +
 			//listenFlag(nil, nil) +
-			//adminPortFlag(nil, nil) +
+			portFlag(nil, nil) +
 			//certFlag(nil, nil) +
 			//keyFlag(nil, nil) +
 			debugFlag(nil, nil) +
@@ -498,13 +500,13 @@ func traceLogFlag(cmd *cobra.Command, trace *bool) string {
 //		"      --listen <a>            - Address to listen on (default: 127.0.0.1)\n"
 //}
 
-//func adminPortFlag(cmd *cobra.Command, adminPort *string) string {
-//	if cmd != nil {
-//		cmd.Flags().StringVar(adminPort, "adminport", common.DefaultAdminPort, "")
-//	}
-//	return "" +
-//		"      --adminport <p>         - Admin port to listen on (default: " + common.DefaultAdminPort + ")\n"
-//}
+func portFlag(cmd *cobra.Command, adminPort *string) string {
+	if cmd != nil {
+		cmd.Flags().StringVarP(adminPort, "port", "p", common.DefaultPort, "")
+	}
+	return "" +
+		"  -p, --port <p>              - Port to listen on (default: " + common.DefaultPort + ")\n"
+}
 
 //func certFlag(cmd *cobra.Command, cert *string) string {
 //	if cmd != nil {

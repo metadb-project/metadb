@@ -502,10 +502,10 @@ func hostFlag(cmd *cobra.Command, host *string) string {
 
 func adminPortFlag(cmd *cobra.Command, adminPort *string) string {
 	if cmd != nil {
-		cmd.Flags().StringVar(adminPort, "adminport", common.DefaultAdminPort, "")
+		cmd.Flags().StringVar(adminPort, "adminport", common.DefaultPort, "")
 	}
 	return "" +
-		"      --adminport <p>         - Metadb server admin port (default: " + common.DefaultAdminPort + ")\n"
+		"      --adminport <p>         - Metadb server admin port (default: " + common.DefaultPort + ")\n"
 }
 
 func validateGlobalOptions(opt *option.Global) error {
