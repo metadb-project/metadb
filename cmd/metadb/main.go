@@ -143,17 +143,17 @@ func run() error {
 	cmdStart.SetHelpFunc(help)
 	_ = dirFlag(cmdStart, &serverOpt.Datadir)
 	_ = logFlag(cmdStart, &logfile)
-	_ = csvlogFlag(cmdStart, &csvlogfile)
-	_ = listenFlag(cmdStart, &serverOpt.Listen)
-	_ = adminPortFlag(cmdStart, &serverOpt.AdminPort)
-	_ = certFlag(cmdStart, &serverOpt.TLSCert)
-	_ = keyFlag(cmdStart, &serverOpt.TLSKey)
+	//_ = csvlogFlag(cmdStart, &csvlogfile)
+	//_ = listenFlag(cmdStart, &serverOpt.Listen)
+	//_ = adminPortFlag(cmdStart, &serverOpt.AdminPort)
+	//_ = certFlag(cmdStart, &serverOpt.TLSCert)
+	//_ = keyFlag(cmdStart, &serverOpt.TLSKey)
 	_ = debugFlag(cmdStart, &serverOpt.Debug)
 	_ = traceLogFlag(cmdStart, &serverOpt.Trace)
 	_ = noKafkaCommitFlag(cmdStart, &serverOpt.NoKafkaCommit)
 	_ = sourceFileFlag(cmdStart, &serverOpt.SourceFilename)
 	_ = logSourceFlag(cmdStart, &serverOpt.LogSource)
-	_ = noTLSFlag(cmdStart, &serverOpt.NoTLS)
+	//_ = noTLSFlag(cmdStart, &serverOpt.NoTLS)
 
 	var cmdStop = &cobra.Command{
 		Use: "stop",
@@ -319,13 +319,13 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"Options:\n" +
 			dirFlag(nil, nil) +
 			logFlag(nil, nil) +
-			csvlogFlag(nil, nil) +
-			listenFlag(nil, nil) +
-			adminPortFlag(nil, nil) +
-			certFlag(nil, nil) +
-			keyFlag(nil, nil) +
+			//csvlogFlag(nil, nil) +
+			//listenFlag(nil, nil) +
+			//adminPortFlag(nil, nil) +
+			//certFlag(nil, nil) +
+			//keyFlag(nil, nil) +
 			debugFlag(nil, nil) +
-			noTLSFlag(nil, nil) +
+			//noTLSFlag(nil, nil) +
 			traceLogFlag(nil, nil) +
 			noKafkaCommitFlag(nil, nil) +
 			sourceFileFlag(nil, nil) +
