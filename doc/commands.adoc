@@ -11,9 +11,46 @@
 |Description
 
 |`metadb_version()`
-|`*varchar*`
+|`*text*`
 |Metadb version
 |===
+
+===== Examples
+
+Show the current Metadb version:
+
+----
+SELECT metadb_version();
+----
+
+==== Administrative functions
+
+[%header,cols="1,1,3"]
+|===
+|Name
+|Return type
+|Description
+
+|`list_authorizations()`
+|`*table*`
+|List of authorized users
+
+|`list_data_origins()`
+|`*table*`
+|List of configured data origins
+
+|`list_data_sources()`
+|`*table*`
+|List of configured data sources
+|===
+
+===== Examples
+
+Show configured data sources:
+
+----
+SELECT * FROM list_data_sources();
+----
 
 === Statements
 
