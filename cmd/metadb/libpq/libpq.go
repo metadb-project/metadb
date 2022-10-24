@@ -19,7 +19,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 )
 
-func Listen(host string, port string, db *dbx.DB) {
+func Listen(host string, port string, db *dbx.DB, sources *[]*sysdb.SourceConnector) {
 	// var h string
 	// if host == "" {
 	// 	h = "127.0.0.1"
@@ -52,11 +52,11 @@ func Listen(host string, port string, db *dbx.DB) {
 		backend = pgproto3.NewBackend(conn, conn)
 		//log.Trace("connection received: %s", conn.RemoteAddr().String())
 		log.Trace("connection received") // domain socket
-		go serve(conn, backend, db)
+		go serve(conn, backend, db, sources)
 	}
 }
 
-func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB) {
+func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, sources *[]*sysdb.SourceConnector) {
 	dbconn, err := db.Connect()
 	if err != nil {
 		// TODO handle error
@@ -82,7 +82,7 @@ func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB) {
 		case *pgproto3.Parse:
 			log.Info("*pgproto3.Parse: not yet implemented")
 		case *pgproto3.Query:
-			if err = processQuery(conn, m, db, dbconn); err != nil {
+			if err = processQuery(conn, m, db, dbconn, sources); err != nil {
 				log.Info("%v", err)
 				return
 			}
@@ -133,7 +133,7 @@ func startup(conn net.Conn, backend *pgproto3.Backend) error {
 	}
 }
 
-func processQuery(conn net.Conn, query *pgproto3.Query, db *dbx.DB, dbconn *pgx.Conn) error {
+func processQuery(conn net.Conn, query *pgproto3.Query, db *dbx.DB, dbconn *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
 	var e string
 	node, err, pass := parser.Parse(query.String)
 	if err != nil {
@@ -167,6 +167,8 @@ func processQuery(conn net.Conn, query *pgproto3.Query, db *dbx.DB, dbconn *pgx.
 		err = authorize(conn, n, dbconn)
 	case *ast.CreateDataOriginStmt:
 		err = createDataOrigin(conn, n, dbconn)
+	case *ast.ListStatusStmt:
+		err = listStatus(conn, n, dbconn, sources)
 	//case *ast.SelectStmt:
 	//	if n.Fn == "version" {
 	//		return version(conn, query)
@@ -200,7 +202,7 @@ func processQuery(conn net.Conn, query *pgproto3.Query, db *dbx.DB, dbconn *pgx.
 func handleStartup(conn net.Conn, msg *pgproto3.StartupMessage) error {
 	return write(conn, encode(nil, []pgproto3.Message{
 		&pgproto3.AuthenticationOk{},
-		//&pgproto3.ParameterStatus{Name: "server_version", Value: "14.3.0"},
+		&pgproto3.ParameterStatus{Name: "server_version", Value: "14.3.0"},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	}))
 }
@@ -246,6 +248,52 @@ func encodeRow(buffer []byte, rows pgx.Rows, cols []pgconn.FieldDescription) ([]
 		}
 	}
 	return row.Encode(buffer), nil
+}
+
+func listStatus(conn net.Conn, node *ast.ListStatusStmt, dc *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
+	m := []pgproto3.Message{
+		&pgproto3.RowDescription{Fields: []pgproto3.FieldDescription{
+			{
+				Name:                 []byte("type"),
+				TableOID:             0,
+				TableAttributeNumber: 0,
+				DataTypeOID:          25,
+				DataTypeSize:         -1,
+				TypeModifier:         -1,
+				Format:               0,
+			},
+			{
+				Name:                 []byte("name"),
+				TableOID:             0,
+				TableAttributeNumber: 0,
+				DataTypeOID:          25,
+				DataTypeSize:         -1,
+				TypeModifier:         -1,
+				Format:               0,
+			},
+			{
+				Name:                 []byte("status"),
+				TableOID:             0,
+				TableAttributeNumber: 0,
+				DataTypeOID:          25,
+				DataTypeSize:         -1,
+				TypeModifier:         -1,
+				Format:               0,
+			},
+		}},
+	}
+	for _, s := range *sources {
+		m = append(m, &pgproto3.DataRow{Values: [][]byte{
+			[]byte("data source"),
+			[]byte(s.Name),
+			[]byte(s.Status.GetString()),
+		}})
+	}
+	ctag := fmt.Sprintf("SELECT %d", len(*sources))
+	m = append(m, &pgproto3.CommandComplete{CommandTag: []byte(ctag)})
+	m = append(m, &pgproto3.ReadyForQuery{TxStatus: 'I'})
+	b := encode(nil, m)
+	return write(conn, b)
 }
 
 func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Conn) error {

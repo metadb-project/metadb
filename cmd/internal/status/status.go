@@ -2,8 +2,6 @@ package status
 
 import (
 	"sync/atomic"
-
-	"github.com/metadb-project/metadb/cmd/internal/color"
 )
 
 type Status int32
@@ -16,20 +14,37 @@ const (
 	ErrorStatus
 )
 
+//func (st *Status) GetString() string {
+//	switch st.Get() {
+//	case InactiveStatus:
+//		return color.Error.SprintFunc()("inactive")
+//	case WaitingStatus:
+//		return color.Active.SprintFunc()("waiting")
+//	case StartingStatus:
+//		return color.Active.SprintFunc()("starting")
+//	case ActiveStatus:
+//		return color.Active.SprintFunc()("active")
+//	case ErrorStatus:
+//		return color.Error.SprintFunc()("error")
+//	default:
+//		return color.Error.SprintFunc()("unknown")
+//	}
+//}
+
 func (st *Status) GetString() string {
 	switch st.Get() {
 	case InactiveStatus:
-		return color.Error.SprintFunc()("inactive")
+		return "inactive"
 	case WaitingStatus:
-		return color.Active.SprintFunc()("waiting")
+		return "waiting"
 	case StartingStatus:
-		return color.Active.SprintFunc()("starting")
+		return "starting"
 	case ActiveStatus:
-		return color.Active.SprintFunc()("active")
+		return "active"
 	case ErrorStatus:
-		return color.Error.SprintFunc()("error")
+		return "error"
 	default:
-		return color.Error.SprintFunc()("unknown")
+		return "unknown"
 	}
 }
 

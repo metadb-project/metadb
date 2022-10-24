@@ -263,3 +263,23 @@ Drop a data source `example`:
 ----
 DROP DATA SOURCE example;
 ----
+
+==== LIST STATUS
+
+Show system status
+
+[source,subs="verbatim,quotes"]
+----
+LIST STATUS
+----
+
+===== Description
+
+LIST STATUS shows the status of system components.
+
+===== Examples
+
+----
+LIST STATUS;
+----
+

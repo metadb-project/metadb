@@ -181,7 +181,7 @@ func mainServer(svr *server) error {
 
 	go goCreateFunctions(*(svr.db))
 
-	go libpq.Listen(svr.opt.Listen, svr.opt.Port, svr.db)
+	go libpq.Listen(svr.opt.Listen, svr.opt.Port, svr.db, &svr.state.sources)
 
 	go goPollLoop(svr)
 
