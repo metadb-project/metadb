@@ -105,8 +105,8 @@ AUTHORIZE SELECT
 ===== Description
 
 The AUTHORIZE command grants access to tables.  It differs from GRANT
-in that the authorization continues to apply to tables created at a
-later time.
+in that the authorization will also apply to tables created at a later
+time in the data source.
 
 ===== Parameters
 
