@@ -44,6 +44,9 @@ The `build.sh` script creates a `bin/` subdirectory and builds the
 $ ./bin/metadb help
 ----
 
+It is suggested that a `metadb` user be created and the server run by
+that user, for example, in `/home/metadb`.
+
 === Server configuration
 
 Metadb makes use of local storage in a "data directory," which is
@@ -134,10 +137,18 @@ Restart=on-abort
 WantedBy=multi-user.target
 ----
 
+Then:
+
+----
+systemctl enable metadb
+
+systemctl start metadb
+----
+
 === Connecting to the server
 
 The PostgreSQL terminal client, `psql`, can be used to connect to the
-server:
+Metadb server:
 
 ----
 psql -h localhost -p 8440
@@ -177,8 +188,9 @@ To allow capturing data changes in the source PostgreSQL database,
 logical decoding must be enabled, in particular by setting `wal_level
 = logical` in `postgresql.conf`.
 
-Then to begin streaming to Kafka, "POST" a connector configuration to
-Kafka Connect at `/connectors`, for example:
+Next, to begin streaming to Kafka, "POST" a connector configuration to
+Kafka Connect at `/connectors`, for example creating a file
+`connector.json`:
 
 ----
 {
@@ -200,9 +212,17 @@ Kafka Connect at `/connectors`, for example:
 }
 ----
 
-Note the `1` included in the `name` and `database.server.name`.  This
-is suggested as a version number, which can be incremented if the data
-stream needs to be resynchronized with a new connector.
+Then:
+
+----
+curl -X POST -i -H "Accept: application/json" -H "Content-Type: application/json" \
+     -d @connector.json https://kafka.connect.server/connectors
+----
+
+Note the `1` included in `name` and `database.server.name` in the
+connector configuration.  This is suggested as a version number, which
+can be incremented if the data stream needs to be resynchronized with
+a new connector.
 
 Metadb requires all streamed tables to have a primary key defined or a
 replica identity of `FULL`.  Tables that do not meet this requirement
@@ -216,16 +236,17 @@ configuration to avoid spikes in disk space consumption within the
 source database.  (See the Debezium PostgreSQL connector documentation
 for more details.)
 
-The replication slot disk usage must be monitored, because in some
-cases it can grow too large and fill up the disk.  To show the disk
-usage (in the source database):
+The replication slot disk usage must be monitored, because under
+certain error conditions it can grow too large and possibly fill up
+the disk.  To show the disk usage (in the source database):
 
 ----
 select slot_name, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(),
     restart_lsn)) as replicationSlotLag, active from pg_replication_slots;
 ----
 
-To drop the replication slot (in the source database):
+To drop the replication slot (in the source database) after deleting a
+connector:
 
 ----
 SELECT pg_drop_replication_slot('debezium');
