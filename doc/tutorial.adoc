@@ -35,7 +35,7 @@ columns, with names that begin with two underscores:
 
 Consider a table that stores categories of patrons in a library:
 
-[source,sql]
+[source]
 ----
 SELECT __id, __start, __source, __origin, id, groupname, description FROM patrongroup;
 ----
@@ -112,7 +112,7 @@ two additional columns:
 
 For instance:
 
-[source,sql]
+[source]
 ----
 SELECT __start, __end, __current, id, groupname, description FROM patrongroup__;
 ----
@@ -170,11 +170,11 @@ A current table contains the same data as the corresponding history
 table where `__current` = `TRUE`.  So for example, these two
 statements are equivalent:
 
-[source,sql]
+[source]
 ----
 SELECT id, groupname, description FROM patrongroup;
 ----
-[source,sql]
+[source]
 ----
 SELECT id, groupname, description FROM patrongroup__ WHERE __current = TRUE;
 ----
@@ -187,7 +187,7 @@ transformed in this way is JSON objects.  Suppose that our
 `patrongroup` table had contained the `groupname` and `description`
 data in JSON fields, for example:
 
-[source,sql]
+[source]
 ----
 SELECT __id, __start, id, jsondata FROM patrongroup;
 ----
@@ -247,7 +247,7 @@ a|
 Metadb would attempt to generate a table called `patrongroup__t` with
 JSON fields extracted into columns.
 
-[source,sql]
+[source]
 ----
 SELECT __id, __start, id, groupname, description FROM patrongroup__t;
 ----
@@ -296,7 +296,7 @@ and it can be used as an area within the database for creating
 tables. This can be useful for saving the results of queries or
 importing external data sets.  For example:
 
-[source,sql]
+[source]
 ----
 CREATE TABLE u.groups AS SELECT * FROM patrongroup;
 ----
@@ -306,7 +306,7 @@ generally be the default schema when no schema is specified.  In that
 case the following query, leaving out the schema name, would have the
 same effect as above:
 
-[source,sql]
+[source]
 ----
 CREATE TABLE groups AS SELECT * FROM patrongroup;
 ----

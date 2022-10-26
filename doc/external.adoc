@@ -10,10 +10,20 @@ CREATE DATA SOURCE folio TYPE kafka OPTIONS (
     module 'folio',
     trimschemaprefix 'tenant_',
     brokers 'kafka:29092',
-    topics '^folio_example[.].*',
-    consumergroup 'folio_example'
+    topics '^metadb_example_1.*',
+    consumergroup 'metadb_example_1_1',
 );
 ----
+
+It is recommended to use a separate Kafka cluster, rather than the
+FOLIO Kafka instance, until one has experience with administration of
+Kafka.
+
+In the Debezium PostgreSQL connector configuration, it is suggested
+that credentials (`.+mod_login`), the public schema, the Okapi
+supertenant (`supertenant_mod_.+`), and mod-pubsub data
+(`pubsub_config,.+_mod_pubsub`) be excluded using the
+`schema.exclude.list` setting.
 
 === ReShare
 
@@ -34,8 +44,8 @@ Then use the `module 'reshare'` option when creating the data source.
 CREATE DATA SOURCE reshare TYPE kafka OPTIONS (
     module 'reshare',
     brokers 'kafka:29092',
-    topics '^reshare_example[.].*',
-    consumergroup 'reshare_example'
+    topics '^metadb_example_1.*',
+    consumergroup 'metadb_example_1_1',
 );
 ----
 
@@ -44,3 +54,9 @@ created before the data source is created so that schema names of
 incoming data will be processed correctly.  Later, whenever a new
 consortial tenant is to be added, it should be defined in Metadb using
 `CREATE DATA ORIGIN` before the tenant is added to ReShare.
+
+In the Debezium PostgreSQL connector configuration, it is suggested
+that credentials (`.+mod_login`), the public schema, the Okapi
+supertenant (`supertenant_mod_.+`), and mod-pubsub data
+(`pubsub_config,.+_mod_pubsub`) be excluded using the
+`schema.exclude.list` setting.

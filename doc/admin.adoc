@@ -7,16 +7,41 @@
 * https://www.postgresql.org/[PostgreSQL] 14.5 or later
 * Required to build from source:
 ** https://golang.org/[Go] 1.19 or later
-** goyacc
+** goyacc (installation instructions below)
 ** https://gcc.gnu.org/[GCC C compiler] 9.3.0 or later
 
-To install goyacc:
+=== Building the software
+
+First set the `GOPATH` environment variable to specify a path that can
+serve as the build workspace for Go, e.g.:
+
+[source,bash]
+----
+$ export GOPATH=$HOME/go
+----
+
+Then install goyacc:
 
 [source,bash]
 ----
 go install golang.org/x/tools/cmd/goyacc@master
 
 export PATH=$PATH:$GOPATH/bin
+----
+
+Then to build the server:
+
+[source,bash]
+----
+$ ./build.sh
+----
+
+The `build.sh` script creates a `bin/` subdirectory and builds the
+`metadb` executable there:
+
+[source,bash]
+----
+$ ./bin/metadb help
 ----
 
 === Server configuration
@@ -60,27 +85,152 @@ systemuser_password = ZHivGie5juxGJZmTObHU
 sslmode = require
 ----
 
-=== Starting the server
+Metadb will assume that the database, superuser, and systemuser
+defined here already exist; so they should be created before
+continuing.
+
+It is also recommended to revoke `CREATE` privileges on the `public`
+schema.
+
+----
+REVOKE CREATE ON SCHEMA public FROM public;
+----
+
+=== Running the server
 
 To start the server:
 
 [source,bash]
 ----
-metadb start -D data
+nohup metadb start -D data -l metadb.log &
 ----
 
-To connect to the server:
-
-[source,bash]
-----
-psql -h localhost -p 8440
-----
+The server listens on port 8440 by default.  The `--debug` option can
+be used to enable verbose logging.
 
 To stop the server:
 
 [source,bash]
 ----
 metadb stop -D data
+----
+
+The server can be set up to run with systemd via a file such as
+`/etc/systemd/system/metadb.service`, for example:
+
+[source,ini]
+----
+[Unit]
+Description=Metadb
+After=network.target remote-fs.target
+
+[Service]
+Type=simple
+User=metadb
+ExecStart=/bin/bash -ce "exec /home/metadb/bin/metadb start -D /home/metadb/data -l /home/metadb/metadb.log"
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
+----
+
+=== Connecting to the server
+
+The PostgreSQL terminal client, `psql`, can be used to connect to the
+server:
+
+----
+psql -h localhost -p 8440
+----
+
+Then for example to show the software version:
+
+----
+SELECT metadb_version();
+----
+
+=== Configuring a Kafka data source
+
+A data source is defined using the `CREATE DATA SOURCE` statement, for
+example:
+
+----
+CREATE DATA SOURCE example TYPE kafka OPTIONS (
+    brokers 'kafka:29092',
+    topics '^metadb_example_1.*',
+    consumergroup 'metadb_example_1_1',
+    addschemaprefix 'example_'
+);
+----
+
+Metadb currently supports reading Kafka messages produced by the
+Debezium PostgreSQL connector for Kafka Connect.  Configuration of
+Kafka, Kafka Connect, Debezium, and PostgreSQL logical decoding is
+beyond the scope of this documentation, but a few notes are included
+here.
+
+Data flows from (1) a source PostgreSQL database to (2) the Debezium
+PostgreSQL connector in Kafka Connect to (3) Kafka to (4) Metadb and
+its PostgreSQL database.
+
+To allow capturing data changes in the source PostgreSQL database,
+logical decoding must be enabled, in particular by setting `wal_level
+= logical` in `postgresql.conf`.
+
+Then to begin streaming to Kafka, "POST" a connector configuration to
+Kafka Connect at `/connectors`, for example:
+
+----
+{
+    "name": "example-1-connector",
+    "config": {
+        "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+        "database.dbname": "sourcedb",
+        "database.hostname": "example.host.name",
+        "database.password": "eHrkGrZL8mMJOFgToqqL",
+        "database.port": "5432",
+        "database.server.name": "metadb_example_1",
+        "database.user": "dbuser",
+        "plugin.name": "pgoutput",
+        "snapshot.mode": "exported",
+        "tasks.max": "1",
+        "truncate.handling.mode": "include",
+        "publication.autocreate.mode", "filtered"
+    }
+}
+----
+
+Note the `1` included in the `name` and `database.server.name`.  This
+is suggested as a version number, which can be incremented if the data
+stream needs to be resynchronized with a new connector.
+
+Metadb requires all streamed tables to have a primary key defined or a
+replica identity of `FULL`.  Tables that do not meet this requirement
+should be filtered out in the Debezium PostgreSQL connector
+configuration by setting `schema.exclude.list` or
+`table.exclude.list`.  Otherwise they will generate error messages in
+the Metadb log.
+
+It is recommended to use the `heartbeat.action.query` connector
+configuration to avoid spikes in disk space consumption within the
+source database.  (See the Debezium PostgreSQL connector documentation
+for more details.)
+
+The replication slot disk usage must be monitored, because in some
+cases it can grow too large and fill up the disk.  To show the disk
+usage (in the source database):
+
+----
+select slot_name, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(),
+    restart_lsn)) as replicationSlotLag, active from pg_replication_slots;
+----
+
+To drop the replication slot (in the source database):
+
+----
+SELECT pg_drop_replication_slot('debezium');
+
+DROP PUBLICATION dbz_publication;
 ----
 
 === Resynchronizing a data source
@@ -95,10 +245,10 @@ procedure:
 1. Update the `topics` and `consumergroup` configuration settings for
    the new data stream.
 +
-[source,sql]
+[source]
 ----
 ALTER DATA SOURCE example OPTIONS
-    (SET topics '^metadb_2.*', SET consumergroup 'metadb_2_1');
+    (SET topics '^metadb_example_2.*', SET consumergroup 'metadb_example_2_1');
 ----
 
 2. Stop the Metadb server, and then "reset" the analytic database to

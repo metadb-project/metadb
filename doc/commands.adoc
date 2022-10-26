@@ -221,9 +221,8 @@ Create `example` as a `kafka` data source:
 ----
 CREATE DATA SOURCE example TYPE kafka OPTIONS (
     brokers 'kafka:29092',
-    topics '^metadb_example[.].*',
-    consumergroup 'metadb_example',
-    schemapassfilter 'example_.+',
+    topics '^metadb_example_1.*',
+    consumergroup 'metadb_example_1_1',
     addschemaprefix 'example_'
 );
 ----
