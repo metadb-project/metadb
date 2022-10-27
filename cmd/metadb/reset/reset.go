@@ -82,19 +82,20 @@ func Reset(opt *option.Reset) error {
 		if err = dc.VacuumAnalyzeTable(&t); err != nil {
 			return err
 		}
-		if err = dc.VacuumAnalyzeTable(dc.HistoryTable(&t)); err != nil {
-			return err
-		}
 		q := "UPDATE " + dc.TableSQL(&t) + " SET __cf=FALSE WHERE __cf AND __source='" + opt.Source + "'"
 		if _, err = dc.Exec(nil, q); err != nil {
+			return err
+		}
+		if err = dc.VacuumAnalyzeTable(&t); err != nil {
+			return err
+		}
+		// History table
+		if err = dc.VacuumAnalyzeTable(dc.HistoryTable(&t)); err != nil {
 			return err
 		}
 		q = "UPDATE " + dc.HistoryTableSQL(&t) + " SET __cf=FALSE WHERE __cf AND __current AND " +
 			"__source='" + opt.Source + "'"
 		if _, err = dc.Exec(nil, q); err != nil {
-			return err
-		}
-		if err = dc.VacuumAnalyzeTable(&t); err != nil {
 			return err
 		}
 		if err = dc.VacuumAnalyzeTable(dc.HistoryTable(&t)); err != nil {

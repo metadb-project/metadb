@@ -77,11 +77,15 @@ func Clean(opt *option.Clean) error {
 		if err = dc.VacuumAnalyzeTable(&t); err != nil {
 			return err
 		}
-		if err = dc.VacuumAnalyzeTable(dc.HistoryTable(&t)); err != nil {
-			return err
-		}
 		q := "DELETE FROM " + dc.TableSQL(&t) + " WHERE NOT __cf AND __source='" + opt.Source + "'"
 		if _, err = dc.Exec(nil, q); err != nil {
+			return err
+		}
+		if err = dc.VacuumAnalyzeTable(&t); err != nil {
+			return err
+		}
+		// History table
+		if err = dc.VacuumAnalyzeTable(dc.HistoryTable(&t)); err != nil {
 			return err
 		}
 		q = "UPDATE " + dc.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + now + "',__current=FALSE " +
@@ -93,9 +97,6 @@ func Clean(opt *option.Clean) error {
 		q = "UPDATE " + dc.HistoryTableSQL(&t) + " SET __cf=TRUE WHERE NOT __cf AND __source='" + opt.Source +
 			"'"
 		if _, err = dc.Exec(nil, q); err != nil {
-			return err
-		}
-		if err = dc.VacuumAnalyzeTable(&t); err != nil {
 			return err
 		}
 		if err = dc.VacuumAnalyzeTable(dc.HistoryTable(&t)); err != nil {
