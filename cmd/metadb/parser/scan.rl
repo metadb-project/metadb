@@ -67,7 +67,6 @@ func (lex *lexer) Lex(out *yySymType) int {
 			'user'i => { tok = USER; fbreak; };
 			'mapping'i => { tok = MAPPING; fbreak; };
 			'list'i => { tok = LIST; fbreak; };
-			'status'i => { tok = STATUS; fbreak; };
 			'version'i => { out.str = "version"; tok = VERSION; fbreak; };
 			identifier => { out.str = string(lex.data[lex.ts:lex.te]); tok = IDENT; fbreak; };
 			sliteral => { out.str = string(lex.data[lex.ts+1:lex.te-1]); tok = SLITERAL; fbreak; };

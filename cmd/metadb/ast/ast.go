@@ -67,8 +67,9 @@ type CreateUserStmt struct {
 func (*CreateUserStmt) node()     {}
 func (*CreateUserStmt) stmtNode() {}
 
-type ListStatusStmt struct {
+type ListStmt struct {
+	Name string
 }
 
-func (*ListStatusStmt) node()     {}
-func (*ListStatusStmt) stmtNode() {}
+func (*ListStmt) node()     {}
+func (*ListStmt) stmtNode() {}

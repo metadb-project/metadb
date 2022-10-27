@@ -18,7 +18,7 @@ import (
 func proxyQuery(conn net.Conn, query *pgproto3.Query, node ast.Node, db *dbx.DB, dc *pgx.Conn) error {
 	switch n := node.(type) {
 	case *ast.SelectStmt:
-		return proxySelect(conn, query, dc)
+		return proxySelect(conn, query.String, dc)
 	case *ast.CreateUserStmt:
 		return createUser(conn, query, n, db)
 	}
@@ -28,7 +28,7 @@ func proxyQuery(conn net.Conn, query *pgproto3.Query, node ast.Node, db *dbx.DB,
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	}))
 
-	//ctag, err := dc.Exec(context.TODO(), query.String)
+	//ctag, err := dc.Exec(context.TODO(), query)
 	//if err != nil {
 	//	return errors.New(strings.TrimLeft(strings.TrimPrefix(err.Error(), "ERROR:"), " "))
 	//}
@@ -84,16 +84,16 @@ func createUser(conn net.Conn, query *pgproto3.Query, node *ast.CreateUserStmt, 
 	return write(conn, b)
 }
 
-func proxySelect(conn net.Conn, query *pgproto3.Query, dbconn *pgx.Conn) error {
+func proxySelect(conn net.Conn, query string, dbconn *pgx.Conn) error {
 	var err error
 	var rows pgx.Rows
-	if rows, err = dbconn.Query(context.TODO(), query.String); err != nil {
+	if rows, err = dbconn.Query(context.TODO(), query); err != nil {
 		var ok bool
 		var e *pgconn.PgError
 		if e, ok = err.(*pgconn.PgError); !ok {
 			panic("passthroughQuery(): casting error to *pgconn.PgError")
 		}
-		var s = e.Severity + ":  " + e.Message + "\n" + parser.WriteErrorContext(query.String, int(e.Position-1))
+		var s = e.Severity + ":  " + e.Message + "\n" + parser.WriteErrorContext(query, int(e.Position-1))
 		return write(conn, encode(nil, []pgproto3.Message{
 			&pgproto3.ErrorResponse{Message: s},
 			&pgproto3.ReadyForQuery{TxStatus: 'I'},

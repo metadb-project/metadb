@@ -17,7 +17,7 @@ import (
 %type <node> top_level_stmt stmt
 %type <node> select_stmt
 %type <node> create_data_source_stmt alter_data_source_stmt drop_data_source_stmt authorize_stmt create_user_stmt
-%type <node> create_data_origin_stmt list_status_stmt
+%type <node> create_data_origin_stmt list_stmt
 %type <optlist> options_clause alter_options_clause option_list alter_option_list option alter_option
 %type <str> option_name option_val
 %type <str> name unreserved_keyword
@@ -27,7 +27,7 @@ import (
 
 %token SELECT
 %token CREATE ALTER DATA SOURCE ORIGIN OPTIONS USER
-%token AUTHORIZE ON ALL TABLES IN TO MAPPING LIST STATUS
+%token AUTHORIZE ON ALL TABLES IN TO MAPPING LIST
 %token TYPE
 %token TRUE FALSE
 %token <str> VERSION
@@ -95,7 +95,7 @@ stmt:
 		{
 			$$ = $1
 		}
-	| list_status_stmt
+	| list_stmt
 		{
 			$$ = $1
 		}
@@ -221,10 +221,10 @@ authorize_stmt:
 			$$ = &ast.AuthorizeStmt{DataSourceName: $9, RoleName: $11}
 		}
 
-list_status_stmt:
-    LIST STATUS ';'
+list_stmt:
+    LIST name ';'
 		{
-			$$ = &ast.ListStatusStmt{}
+			$$ = &ast.ListStmt{Name: $2}
 		}
 
 name:

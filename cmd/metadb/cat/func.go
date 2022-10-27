@@ -15,59 +15,7 @@ var functionDefs = [][]string{
 CREATE FUNCTION public.metadb_version() RETURNS text
     AS $$ SELECT 'Metadb ` + util.MetadbVersion + `' $$
     LANGUAGE SQL`},
-	{"list_authorizations()", `
-CREATE FUNCTION public.list_authorizations()
-    RETURNS TABLE (
-        username text,
-        note text
-    )
-    AS $$
-    SELECT username,
-           CASE WHEN (NOT dbupdated) THEN 'pending restart'
-                WHEN (tables='.*' AND dbupdated) THEN 'authorized'
-                ELSE 'not authorized'
-           END note
-    FROM metadb.auth
-    $$ LANGUAGE SQL`},
-	{"list_data_sources()", `
-CREATE FUNCTION public.list_data_sources()
-    RETURNS TABLE (
-        name text,
-        brokers text,
-        security text,
-        topics text,
-        consumergroup text,
-        schemapassfilter text,
-        trimschemaprefix text,
-        addschemaprefix text,
-        module text
-    )
-    AS $$
-    SELECT name,
-           brokers,
-           security,
-           topics,
-           consumergroup,
-           schemapassfilter,
-           trimschemaprefix,
-           addschemaprefix,
-           module
-    FROM metadb.source
-    $$ LANGUAGE SQL`},
-	{"list_data_origins()", `
-CREATE FUNCTION public.list_data_origins()
-    RETURNS TABLE (
-        name text
-    )
-    AS $$
-    SELECT name
-    FROM metadb.origin
-    $$ LANGUAGE SQL`},
 }
-
-/*
-  list_status_data_sources()
-*/
 
 func CreateAllFunctions(dcsuper, dc *pgx.Conn, systemuser string) error {
 	q := "GRANT CREATE, USAGE ON SCHEMA public TO " + systemuser

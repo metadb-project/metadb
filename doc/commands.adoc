@@ -23,35 +23,6 @@ Show the current Metadb version:
 SELECT metadb_version();
 ----
 
-==== Administrative functions
-
-[%header,cols="1,1,3"]
-|===
-|Name
-|Return type
-|Description
-
-|`list_authorizations()`
-|`*table*`
-|List of authorized users
-
-|`list_data_origins()`
-|`*table*`
-|List of configured data origins
-
-|`list_data_sources()`
-|`*table*`
-|List of configured data sources
-|===
-
-===== Examples
-
-Show configured data sources:
-
-----
-SELECT * FROM list_data_sources();
-----
-
 === Statements
 
 ==== ALTER DATA SOURCE
@@ -263,22 +234,47 @@ Drop a data source `example`:
 DROP DATA SOURCE example;
 ----
 
-==== LIST STATUS
+==== LIST
 
-Show system status
+Show the value of a system variable
 
 [source,subs="verbatim,quotes"]
 ----
-LIST STATUS
+LIST `*_name_*`
 ----
 
 ===== Description
 
-LIST STATUS shows the status of system components.
+LIST shows the current setting of various system configurations and
+other variables.
+
+===== Parameters
+
+[frame=none,grid=none,cols="1,3,8"]
+|===
+|`*_name_*`
+|
+|
+
+|
+|`authorizations`
+|Authorized users.
+
+|
+|`data_origins`
+|Configured data origins.
+
+|
+|`data_sources`
+|Configured data sources.
+
+|
+|`status`
+|Current status of system components.
+|===
 
 ===== Examples
 
 ----
-LIST STATUS;
+LIST status;
 ----
-

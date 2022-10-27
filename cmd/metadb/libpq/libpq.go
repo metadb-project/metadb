@@ -167,8 +167,8 @@ func processQuery(conn net.Conn, query *pgproto3.Query, db *dbx.DB, dbconn *pgx.
 		err = authorize(conn, n, dbconn)
 	case *ast.CreateDataOriginStmt:
 		err = createDataOrigin(conn, n, dbconn)
-	case *ast.ListStatusStmt:
-		err = listStatus(conn, n, dbconn, sources)
+	case *ast.ListStmt:
+		err = list(conn, n, dbconn, sources)
 	//case *ast.SelectStmt:
 	//	if n.Fn == "version" {
 	//		return version(conn, query)
@@ -250,7 +250,38 @@ func encodeRow(buffer []byte, rows pgx.Rows, cols []pgconn.FieldDescription) ([]
 	return row.Encode(buffer), nil
 }
 
-func listStatus(conn net.Conn, node *ast.ListStatusStmt, dc *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
+func list(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
+	switch strings.ToLower(node.Name) {
+	case "authorizations":
+		return proxySelect(conn, ""+
+			"SELECT username,"+
+			"       CASE WHEN (NOT dbupdated) THEN 'pending restart'"+
+			"            WHEN (tables='.*' AND dbupdated) THEN 'authorized'"+
+			"            ELSE 'not authorized'"+
+			"       END note"+
+			"    FROM metadb.auth", dc)
+	case "data_origins":
+		return proxySelect(conn, "SELECT name FROM metadb.origin", dc)
+	case "data_sources":
+		return proxySelect(conn, ""+
+			"SELECT name,"+
+			"       brokers,"+
+			"       security,"+
+			"       topics,"+
+			"       consumergroup,"+
+			"       schemapassfilter,"+
+			"       trimschemaprefix,"+
+			"       addschemaprefix,"+
+			"       module"+
+			"    FROM metadb.source", dc)
+	case "status":
+		return listStatus(conn, node, dc, sources)
+	default:
+		return fmt.Errorf("unrecognized parameter %q", node.Name)
+	}
+}
+
+func listStatus(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
 	m := []pgproto3.Message{
 		&pgproto3.RowDescription{Fields: []pgproto3.FieldDescription{
 			{
