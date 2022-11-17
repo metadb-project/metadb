@@ -40,13 +40,13 @@ func proxyQuery(conn net.Conn, query *pgproto3.Query, node ast.Node, db *dbx.DB,
 }
 
 func createUser(conn net.Conn, query *pgproto3.Query, node *ast.CreateUserStmt, db *dbx.DB) error {
-	dc, err := db.ConnectSuper()
+	dcsuper, err := db.ConnectSuper()
 	if err != nil {
 		return err
 	}
-	defer dbx.Close(dc)
+	defer dbx.Close(dcsuper)
 
-	exists, err := userExists(dc, node.UserName)
+	exists, err := userExists(dcsuper, node.UserName)
 	if err != nil {
 		return fmt.Errorf("selecting role: %v", err)
 	}
@@ -55,21 +55,22 @@ func createUser(conn net.Conn, query *pgproto3.Query, node *ast.CreateUserStmt, 
 			Message: fmt.Sprintf("role %q already exists, skipping", node.UserName)},
 		}))
 	} else {
-		_, err = dc.Exec(context.TODO(), query.String)
+		_, err = dcsuper.Exec(context.TODO(), query.String)
 		if err != nil {
 			return errors.New(strings.TrimLeft(strings.TrimPrefix(err.Error(), "ERROR:"), " "))
 		}
 	}
 
+	dc, err := db.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
 	q := "CREATE SCHEMA IF NOT EXISTS " + node.UserName
 	_, err = dc.Exec(context.TODO(), q)
 	if err != nil {
 		return fmt.Errorf("creating schema %s: %s", node.UserName, err)
-	}
-	q = "ALTER SCHEMA " + node.UserName + " OWNER TO " + db.User
-	_, err = dc.Exec(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("setting owner of schema %s: %s", node.UserName, err)
 	}
 	q = "GRANT CREATE, USAGE ON SCHEMA " + node.UserName + " TO " + node.UserName
 	_, err = dc.Exec(context.TODO(), q)
