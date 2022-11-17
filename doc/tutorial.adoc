@@ -11,9 +11,9 @@ database originally come from another place: a *data source* such as a
 *transaction processing database*.  Metadb updates the analytic
 database continuously based on changes in a data source.
 
-Users connect to a Metadb server over the network using a database
-client such as https://dbeaver.io[DBeaver] or
-https://www.postgresql.org/docs/current/app-psql.html[psql].
+// Users connect to a Metadb server over the network using a database
+// client such as https://dbeaver.io[DBeaver] or
+// https://www.postgresql.org/docs/current/app-psql.html[psql].
 
 === Current tables
 

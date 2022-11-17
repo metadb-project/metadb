@@ -15,31 +15,31 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/parser"
 )
 
-func proxyQuery(conn net.Conn, query *pgproto3.Query, node ast.Node, db *dbx.DB, dc *pgx.Conn) error {
+func proxyQuery(conn net.Conn, query string, args []any, node ast.Node, db *dbx.DB, dc *pgx.Conn) error {
 	switch n := node.(type) {
 	case *ast.SelectStmt:
-		return proxySelect(conn, query.String, dc)
+		return proxySelect(conn, query, args, dc)
 	case *ast.CreateUserStmt:
 		return createUser(conn, query, n, db)
 	}
 
-	return write(conn, encode(nil, []pgproto3.Message{
-		&pgproto3.ErrorResponse{Severity: "ERROR", Message: "syntax error"},
-		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	}))
-
-	//ctag, err := dc.Exec(context.TODO(), query)
-	//if err != nil {
-	//	return errors.New(strings.TrimLeft(strings.TrimPrefix(err.Error(), "ERROR:"), " "))
-	//}
-	//b := encode(nil, []pgproto3.Message{
-	//	&pgproto3.CommandComplete{CommandTag: []byte(ctag.String())},
+	//return write(conn, encode(nil, []pgproto3.Message{
+	//	&pgproto3.ErrorResponse{Severity: "ERROR", Message: "syntax error"},
 	//	&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	//})
-	//return write(conn, b)
+	//}))
+
+	ctag, err := dc.Exec(context.TODO(), query)
+	if err != nil {
+		return errors.New(strings.TrimLeft(strings.TrimPrefix(err.Error(), "ERROR:"), " "))
+	}
+	b := encode(nil, []pgproto3.Message{
+		&pgproto3.CommandComplete{CommandTag: []byte(ctag.String())},
+		&pgproto3.ReadyForQuery{TxStatus: 'I'},
+	})
+	return write(conn, b)
 }
 
-func createUser(conn net.Conn, query *pgproto3.Query, node *ast.CreateUserStmt, db *dbx.DB) error {
+func createUser(conn net.Conn, query string, node *ast.CreateUserStmt, db *dbx.DB) error {
 	dc, err := db.ConnectSuper()
 	if err != nil {
 		return err
@@ -55,7 +55,7 @@ func createUser(conn net.Conn, query *pgproto3.Query, node *ast.CreateUserStmt, 
 			Message: fmt.Sprintf("role %q already exists, skipping", node.UserName)},
 		}))
 	} else {
-		_, err = dc.Exec(context.TODO(), query.String)
+		_, err = dc.Exec(context.TODO(), query)
 		if err != nil {
 			return errors.New(strings.TrimLeft(strings.TrimPrefix(err.Error(), "ERROR:"), " "))
 		}
@@ -84,10 +84,10 @@ func createUser(conn net.Conn, query *pgproto3.Query, node *ast.CreateUserStmt, 
 	return write(conn, b)
 }
 
-func proxySelect(conn net.Conn, query string, dbconn *pgx.Conn) error {
+func proxySelect(conn net.Conn, query string, args []any, dbconn *pgx.Conn) error {
 	var err error
 	var rows pgx.Rows
-	if rows, err = dbconn.Query(context.TODO(), query); err != nil {
+	if rows, err = dbconn.Query(context.TODO(), query, args...); err != nil {
 		var ok bool
 		var e *pgconn.PgError
 		if e, ok = err.(*pgconn.PgError); !ok {
@@ -100,8 +100,8 @@ func proxySelect(conn net.Conn, query string, dbconn *pgx.Conn) error {
 		}))
 	}
 	defer rows.Close()
-	var cols []pgconn.FieldDescription = rows.FieldDescriptions()
-	var b []byte = encodeFieldDesc(nil, cols)
+	var cols = rows.FieldDescriptions()
+	var b = encodeFieldDesc(nil, cols)
 	for rows.Next() {
 		if b, err = encodeRow(b, rows, cols); err != nil {
 			return err

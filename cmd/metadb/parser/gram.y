@@ -99,6 +99,11 @@ stmt:
 		{
 			$$ = $1
 		}
+	| SET
+		{
+			yylex.(*lexer).pass = true
+			// $$ = nil
+		}
 	| IDENT
 		{
 			yylex.(*lexer).pass = true

@@ -1,3 +1,5 @@
+// asciidoctor -a docinfo=shared *.adoc
+
 = Metadb Documentation
 :toc: left
 :toclevels: 3

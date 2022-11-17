@@ -78,11 +78,18 @@ func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, sources *[]*sys
 			_ = err
 			return
 		}
+		log.Trace("*** %#v", msg)
+
 		switch m := msg.(type) {
 		case *pgproto3.Parse:
-			log.Info("*pgproto3.Parse: not yet implemented")
+			// Extended query
+			if err = processParse(conn, backend, m, db, dbconn, sources); err != nil {
+				log.Info("%v", err)
+				return
+			}
+			//log.Info("*pgproto3.Parse: not yet implemented")
 		case *pgproto3.Query:
-			if err = processQuery(conn, m, db, dbconn, sources); err != nil {
+			if err = processQuery(conn, m.String, nil, db, dbconn, sources); err != nil {
 				log.Info("%v", err)
 				return
 			}
@@ -91,7 +98,7 @@ func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, sources *[]*sys
 		case *pgproto3.Terminate:
 			return
 		default:
-			log.Info("unknown message: %v", msg)
+			log.Info("unknown message: %#v", msg)
 			// TODO handle error
 			_ = err
 			return
@@ -133,15 +140,105 @@ func startup(conn net.Conn, backend *pgproto3.Backend) error {
 	}
 }
 
-func processQuery(conn net.Conn, query *pgproto3.Query, db *dbx.DB, dbconn *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
+func processParse(conn net.Conn, backend *pgproto3.Backend, parse *pgproto3.Parse, db *dbx.DB, dc *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
+	query := parse.Query
+	log.Trace("prepared statement: %s", query)
+
+	// Prepare the query.
+	stmt, err := dc.Prepare(context.TODO(), parse.Name, query)
+	if err != nil {
+		return fmt.Errorf("preparing extended query: %w", err)
+	}
+
+	//var rows pgx.Rows
+	//var cols []pgconn.FieldDescription
+	//var binds []interface{}
+	//exec := func() (err error) {
+	//	if rows != nil {
+	//		return nil
+	//	}
+	//	if rows, err = dc.Query(context.TODO(), binds...); err != nil {
+	//		return fmt.Errorf("query: %w", err)
+	//	}
+	//	cols = rows.FieldDescriptions()
+	//	return nil
+	//}
+
+	args := make([]any, 0)
+	_ = args
+	for {
+		msg, err := backend.Receive()
+		if err != nil {
+			return fmt.Errorf("unexpected message in extended query: %v", err)
+		}
+		log.Trace("*** %#v", msg)
+
+		_ = stmt
+		switch m := msg.(type) {
+		case *pgproto3.Bind:
+			args = make([]any, 0)
+			for _, p := range m.Parameters {
+				args = append(args, string(p))
+			}
+
+		case *pgproto3.Describe:
+			return fmt.Errorf("pgproto3.Describe not yet implemented")
+			//if err := exec(); err != nil {
+			//	return fmt.Errorf("exec: %w", err)
+			//}
+			//if _, err := c.Write(toRowDescription(cols).Encode(nil)); err != nil {
+			//	return err
+			//}
+
+		case *pgproto3.Execute:
+			//func processQuery(conn net.Conn, query string, db *dbx.DB, dbconn *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
+			err := processQuery(conn, query, args, db, dc, sources)
+			//err := proxySelect(conn, query, args, dc)
+			if err != nil {
+				return fmt.Errorf("executing prepared statement: %v", err)
+			}
+
+			//// TODO: Send pgproto3.ParseComplete?
+			//if err := exec(); err != nil {
+			//	return fmt.Errorf("exec: %w", err)
+			//}
+			//
+			//var buf []byte
+			//for rows.Next() {
+			//	row, err := scanRow(rows, cols)
+			//	if err != nil {
+			//		return fmt.Errorf("scan: %w", err)
+			//	}
+			//	buf = row.Encode(buf)
+			//}
+			//if err := rows.Err(); err != nil {
+			//	return fmt.Errorf("rows: %w", err)
+			//}
+			//
+			//// Mark command complete and ready for next query.
+			//buf = (&pgproto3.CommandComplete{CommandTag: []byte("SELECT 1")}).Encode(buf)
+			//buf = (&pgproto3.ReadyForQuery{TxStatus: 'I'}).Encode(buf)
+			//_, err := c.Write(buf)
+			//return err
+
+		case *pgproto3.Sync:
+			// NOP
+
+		default:
+			return fmt.Errorf("unexpected message during parse: %#v", msg)
+		}
+	}
+}
+
+func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
 	var e string
-	node, err, pass := parser.Parse(query.String)
+	node, err, pass := parser.Parse(query)
 	if err != nil {
 		e = err.Error()
 	}
-	log.Trace("query received: query=%q node=%#v err=%q pass=%v\n", query.String, node, e, pass)
+	log.Trace("query received: query=%q node=%#v err=%q pass=%v\n", query, node, e, pass)
 	if pass {
-		err = proxyQuery(conn, query, node, db, dbconn)
+		err = proxyQuery(conn, query, args, node, db, dbconn)
 		if err != nil {
 			return write(conn, encode(nil, []pgproto3.Message{
 				&pgproto3.ErrorResponse{Message: "ERROR:  " + err.Error()},
@@ -184,7 +281,7 @@ func processQuery(conn net.Conn, query *pgproto3.Query, db *dbx.DB, dbconn *pgx.
 		}))
 	}
 	if err != nil {
-		log.Error("%v: %s", err, query.String)
+		log.Error("%v: %s", err, query)
 		hint := ""
 		errs, ok := err.(*dberr.Error)
 		if ok {
@@ -259,9 +356,9 @@ func list(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.Sou
 			"            WHEN (tables='.*' AND dbupdated) THEN 'authorized'"+
 			"            ELSE 'not authorized'"+
 			"       END note"+
-			"    FROM metadb.auth", dc)
+			"    FROM metadb.auth", nil, dc)
 	case "data_origins":
-		return proxySelect(conn, "SELECT name FROM metadb.origin", dc)
+		return proxySelect(conn, "SELECT name FROM metadb.origin", nil, dc)
 	case "data_sources":
 		return proxySelect(conn, ""+
 			"SELECT name,"+
@@ -273,7 +370,7 @@ func list(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.Sou
 			"       trimschemaprefix,"+
 			"       addschemaprefix,"+
 			"       module"+
-			"    FROM metadb.source", dc)
+			"    FROM metadb.source", nil, dc)
 	case "status":
 		return listStatus(conn, node, dc, sources)
 	default:

@@ -2,5 +2,12 @@ cmd/metadb/parser/gram.go
 cmd/metadb/parser/scan.go
 cmd/metadb/parser/y.output
 bin
-*.html
 *~
+
+admin.html
+commands.html
+external.html
+metadb.html
+streamproc.html
+tutorial.html
+
