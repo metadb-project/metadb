@@ -5,11 +5,11 @@ databases and the basics of SQL.
 
 === Getting started
 
-Metadb provides an *analytic database* which can be used for SQL
-analytics and data science.  The data contained in the analytic
+Metadb extends PostgreSQL to provide a database tailored for SQL
+analytics and data science.  The data contained in this analytic
 database originally come from another place: a *data source* such as a
-*transaction processing database*.  Metadb updates the analytic
-database continuously based on changes in a data source.
+transaction processing database.  Metadb updates the analytic database
+continuously based on changes in a data source.
 
 // Users connect to a Metadb server over the network using a database
 // client such as https://dbeaver.io[DBeaver] or
