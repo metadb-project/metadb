@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
+	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
 func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
@@ -19,8 +20,8 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 	var rows pgx.Rows
 	rows, err = dbc.Query(context.TODO(), ""+
 		"SELECT name,enable,coalesce(brokers,''),coalesce(security,''),coalesce(topics,''),"+
-		"coalesce(consumergroup,''),coalesce(schemapassfilter,''),coalesce(trimschemaprefix,''),"+
-		"coalesce(addschemaprefix,''),coalesce(module,'') FROM metadb.source")
+		"coalesce(consumergroup,''),coalesce(schemapassfilter,''),coalesce(schemastopfilter,''),"+
+		"coalesce(trimschemaprefix,''),coalesce(addschemaprefix,''),coalesce(module,'') FROM metadb.source")
 	if err != nil {
 		return nil, err
 	}
@@ -32,11 +33,12 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 		var topics string
 		var consumergroup string
 		var schemapassfilter string
+		var schemastopfilter string
 		var trimschemaprefix string
 		var addschemaprefix string
 		var module string
 		if err := rows.Scan(&name, &enable, &brokers, &security, &topics, &consumergroup, &schemapassfilter,
-			&trimschemaprefix, &addschemaprefix, &module); err != nil {
+			&schemastopfilter, &trimschemaprefix, &addschemaprefix, &module); err != nil {
 			return nil, err
 		}
 		if security == "" {
@@ -49,7 +51,8 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 			Security:         security,
 			Topics:           strings.Split(topics, ","),
 			Group:            consumergroup,
-			SchemaPassFilter: strings.Split(schemapassfilter, ","),
+			SchemaPassFilter: util.SplitList(schemapassfilter),
+			SchemaStopFilter: util.SplitList(schemastopfilter),
 			TrimSchemaPrefix: trimschemaprefix,
 			AddSchemaPrefix:  addschemaprefix,
 			Module:           module,

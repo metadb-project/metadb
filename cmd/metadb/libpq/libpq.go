@@ -270,6 +270,7 @@ func list(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.Sou
 			"       topics,"+
 			"       consumergroup,"+
 			"       schemapassfilter,"+
+			"       schemastopfilter,"+
 			"       trimschemaprefix,"+
 			"       addschemaprefix,"+
 			"       module"+
@@ -359,8 +360,8 @@ func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Con
 	}
 
 	q = "INSERT INTO metadb.source" +
-		"(name,brokers,security,topics,consumergroup,schemapassfilter,trimschemaprefix,addschemaprefix,module,enable)" +
-		"VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)"
+		"(name,brokers,security,topics,consumergroup,schemapassfilter,schemastopfilter,trimschemaprefix,addschemaprefix,module,enable)" +
+		"VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)"
 	_, err = dc.Exec(context.TODO(), q,
 		name, src.Brokers, src.Security, strings.Join(src.Topics, ","), src.Group,
 		strings.Join(src.SchemaPassFilter, ","), src.TrimSchemaPrefix, src.AddSchemaPrefix, src.Module,
@@ -432,6 +433,8 @@ func alterSourceOptions(dc *pgx.Conn, node *ast.AlterDataSourceStmt) error {
 			fallthrough
 		case "schemapassfilter":
 			fallthrough
+		case "schemastopfilter":
+			fallthrough
 		case "trimschemaprefix":
 			fallthrough
 		case "addschemaprefix":
@@ -442,7 +445,7 @@ func alterSourceOptions(dc *pgx.Conn, node *ast.AlterDataSourceStmt) error {
 			return &dberr.Error{
 				Err: fmt.Errorf("invalid option %q", opt.Name),
 				Hint: "Valid options in this context are: " +
-					"brokers, security, topics, consumergroup, schemapassfilter, trimschemaprefix, addschemaprefix, module",
+					"brokers, security, topics, consumergroup, schemapassfilter, schemastopfilter, trimschemaprefix, addschemaprefix, module",
 			}
 		}
 		isnull, err := isSourceOptionNull(dc, node.DataSourceName, opt.Name)
@@ -525,6 +528,8 @@ func createSourceOptions(options []ast.Option) (*sysdb.SourceConnector, error) {
 			s.Group = opt.Val
 		case "schemapassfilter":
 			s.SchemaPassFilter = strings.Split(opt.Val, ",")
+		case "schemastopfilter":
+			s.SchemaStopFilter = strings.Split(opt.Val, ",")
 		case "trimschemaprefix":
 			s.TrimSchemaPrefix = opt.Val
 		case "addschemaprefix":
@@ -537,7 +542,7 @@ func createSourceOptions(options []ast.Option) (*sysdb.SourceConnector, error) {
 			return nil, &dberr.Error{
 				Err: fmt.Errorf("invalid option %q", opt.Name),
 				Hint: "Valid options in this context are: " +
-					"brokers, security, topics, consumergroup, schemapassfilter, trimschemaprefix, addschemaprefix, module",
+					"brokers, security, topics, consumergroup, schemapassfilter, schemastopfilter, trimschemaprefix, addschemaprefix, module",
 			}
 		}
 	}

@@ -157,6 +157,7 @@ func pollLoop(spr *sproc) error {
 	var consumer *kafka.Consumer
 	if sourceFileScanner == nil {
 		spr.schemaPassFilter = util.CompileRegexps(spr.source.SchemaPassFilter)
+		spr.schemaStopFilter = util.CompileRegexps(spr.source.SchemaStopFilter)
 		var brokers = spr.source.Brokers
 		var topics = spr.source.Topics
 		var group = spr.source.Group
@@ -193,7 +194,7 @@ func pollLoop(spr *sproc) error {
 		var cl = &command.CommandList{}
 
 		// Parse
-		eventReadCount, err := parseChangeEvents(consumer, cl, spr.schemaPassFilter,
+		eventReadCount, err := parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.schemaStopFilter,
 			spr.source.TrimSchemaPrefix, spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog)
 		if err != nil {
 			return fmt.Errorf("parser: %s", err)
@@ -234,7 +235,7 @@ func pollLoop(spr *sproc) error {
 	}
 }
 
-func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter []*regexp.Regexp,
+func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter, schemaStopFilter []*regexp.Regexp,
 	trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
 	var err error
 	var eventReadCount int
@@ -264,7 +265,7 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 			break
 		}
 		eventReadCount++
-		c, err := command.NewCommand(ce, schemaPassFilter, trimSchemaPrefix, addSchemaPrefix)
+		c, err := command.NewCommand(ce, schemaPassFilter, schemaStopFilter, trimSchemaPrefix, addSchemaPrefix)
 		if err != nil {
 			return 0, fmt.Errorf("parsing command: %s\n%v", err, *ce)
 		}
