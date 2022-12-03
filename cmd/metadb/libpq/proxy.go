@@ -40,7 +40,7 @@ func proxyQuery(conn net.Conn, query string, args []any, node ast.Node, db *dbx.
 }
 
 func createUser(conn net.Conn, query string, node *ast.CreateUserStmt, db *dbx.DB) error {
-	dc, err := db.ConnectSuper()
+	dcsuper, err := db.ConnectSuper()
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func createUser(conn net.Conn, query string, node *ast.CreateUserStmt, db *dbx.D
 			Message: fmt.Sprintf("role %q already exists, skipping", node.UserName)},
 		}))
 	} else {
-		_, err = dc.Exec(context.TODO(), query)
+		_, err = dcsuper.Exec(context.TODO(), query)
 		if err != nil {
 			return errors.New(strings.TrimLeft(strings.TrimPrefix(err.Error(), "ERROR:"), " "))
 		}
