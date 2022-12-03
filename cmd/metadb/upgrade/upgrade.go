@@ -369,6 +369,7 @@ var updbList = []updbFunc{
 	nil,
 	nil,
 	updb8,
+	updb9,
 }
 
 /*
@@ -630,6 +631,38 @@ func updb8(opt *dbopt) error {
 		eout.Warning("renaming %q to %q: %v", sysdir, sysdirOld, err)
 	}
 
+	return nil
+}
+
+func updb9(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DBAdmin.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+	// Begin transaction
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+
+	q := "ALTER TABLE metadb.source ADD COLUMN schemastopfilter text"
+	_, err = dc.Exec(context.TODO(), q)
+	if err != nil {
+		return err
+	}
+
+	// Write new version number
+	err = metadata.WriteDatabaseVersion(tx, 9)
+	if err != nil {
+		return err
+	}
+	err = tx.Commit(context.TODO())
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

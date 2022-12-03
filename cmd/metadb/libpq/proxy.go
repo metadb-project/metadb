@@ -44,9 +44,9 @@ func createUser(conn net.Conn, query string, node *ast.CreateUserStmt, db *dbx.D
 	if err != nil {
 		return err
 	}
-	defer dbx.Close(dc)
+	defer dbx.Close(dcsuper)
 
-	exists, err := userExists(dc, node.UserName)
+	exists, err := userExists(dcsuper, node.UserName)
 	if err != nil {
 		return fmt.Errorf("selecting role: %v", err)
 	}
@@ -61,15 +61,16 @@ func createUser(conn net.Conn, query string, node *ast.CreateUserStmt, db *dbx.D
 		}
 	}
 
+	dc, err := db.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
 	q := "CREATE SCHEMA IF NOT EXISTS " + node.UserName
 	_, err = dc.Exec(context.TODO(), q)
 	if err != nil {
 		return fmt.Errorf("creating schema %s: %s", node.UserName, err)
-	}
-	q = "ALTER SCHEMA " + node.UserName + " OWNER TO " + db.User
-	_, err = dc.Exec(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("setting owner of schema %s: %s", node.UserName, err)
 	}
 	q = "GRANT CREATE, USAGE ON SCHEMA " + node.UserName + " TO " + node.UserName
 	_, err = dc.Exec(context.TODO(), q)

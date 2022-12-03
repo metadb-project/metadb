@@ -611,7 +611,7 @@ func structScale(data any) (int32, string, error) {
 // var FolioTenant string
 var ReshareTenants []string
 
-func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string) (*Command, error) {
+func NewCommand(ce *change.Event, schemaPassFilter, schemaStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string) (*Command, error) {
 	// Note: this function returns nil, nil in some cases.
 	if ce == nil {
 		return nil, fmt.Errorf("missing change event")
@@ -657,6 +657,10 @@ func NewCommand(ce *change.Event, schemaPassFilter []*regexp.Regexp, trimSchemaP
 	c.SourceTimestamp = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000000") + "Z"
 	if ce.Value.Payload.Source.Schema != nil {
 		if len(schemaPassFilter) > 0 && !util.MatchRegexps(schemaPassFilter, *ce.Value.Payload.Source.Schema) {
+			log.Trace("filter: reject: %s", *ce.Value.Payload.Source.Schema)
+			return nil, nil
+		}
+		if len(schemaStopFilter) > 0 && util.MatchRegexps(schemaStopFilter, *ce.Value.Payload.Source.Schema) {
 			log.Trace("filter: reject: %s", *ce.Value.Payload.Source.Schema)
 			return nil, nil
 		}
