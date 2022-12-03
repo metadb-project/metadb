@@ -47,6 +47,7 @@ type serverstate struct {
 type sproc struct {
 	db               []sqlx.DB
 	schemaPassFilter []*regexp.Regexp
+	schemaStopFilter []*regexp.Regexp
 	source           *sysdb.SourceConnector
 	databases        []*sysdb.DatabaseConnector
 	sourceLog        *log.SourceLog

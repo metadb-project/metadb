@@ -141,6 +141,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 		"    topics text,"+
 		"    consumergroup text,"+
 		"    schemapassfilter text,"+
+		"    schemastopfilter text,"+
 		"    trimschemaprefix text,"+
 		"    addschemaprefix text,"+
 		"    module text"+

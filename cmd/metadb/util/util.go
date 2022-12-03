@@ -19,7 +19,8 @@ import (
 
 // Version 7 = 0.11
 // Version 8 = 0.12
-const DatabaseVersion = 8
+// Version 9 = 0.12.4
+const DatabaseVersion = 9
 
 // MetadbVersion is defined at build time via -ldflags.
 var MetadbVersion = "(unknown version)"
