@@ -4,7 +4,10 @@
 
 * Architecture: x86-64 (AMD64)
 * Operating system: Debian 11
-* https://www.postgresql.org/[PostgreSQL] 14.5 or later
+* https://www.postgresql.org/[PostgreSQL] 14.6 or later
+** PostgreSQL 15.1 or later is recommended
+** AWS RDS PostgreSQL optionally may be used (with servers in the same
+   zone/subnet); Aurora is not supported
 * Required to build from source:
 ** https://golang.org/[Go] 1.19 or later
 ** goyacc (installation instructions below)
