@@ -293,20 +293,20 @@ created.
 Metadb creates a schema name space for each user to serve as an
 individual workspace.  The schema has the same name as the user name,
 and it can be used as an area within the database for creating
-tables. This can be useful for saving the results of queries or
-importing external data sets.  For example:
+tables.  This can be useful for saving the results of queries or
+importing external data sets.
 
-[source]
-----
-CREATE TABLE u.groups AS SELECT * FROM patrongroup;
-----
+To use this workspace, it is not necessary to specify the schema name;
+it will be selected by default if no schema is specified.
 
-If you are logged in as the user `u`, then the `u` schema will
-generally be the default schema when no schema is specified.  In that
-case the following query, leaving out the schema name, would have the
-same effect as above:
+For example:
 
 [source]
 ----
 CREATE TABLE groups AS SELECT * FROM patrongroup;
+----
+
+[source]
+----
+SELECT * FROM groups;
 ----
