@@ -222,10 +222,11 @@ func pollLoop(spr *sproc) error {
 		if eventReadCount > 0 && sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
 			_, err = consumer.Commit()
 			if err != nil {
-				//if err.(kafka.Error).Code() == kafka.ErrNoOffset {
-				//        log.Warning("kafka: %s", err)
-				//}
-				return fmt.Errorf("kafka commit: %s", err)
+				if err.(kafka.Error).IsFatal() {
+					return fmt.Errorf("kafka commit: %s", err)
+				} else {
+					log.Warning("kafka commit: %s", err)
+				}
 			}
 		}
 
