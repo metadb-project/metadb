@@ -288,6 +288,11 @@ SELECT __id, __start, id, groupname, description FROM patrongroup__t;
 A corresponding history table called `patrongroup\\__t__` is also
 created.
 
+Note that JSON data are treated as "schemaless," so that nothing is
+known about fields that do not exist in the JSON data.  As a result, a
+column is only created from a JSON field if the field is present in at
+least one JSON record.
+
 === Workspaces
 
 Metadb creates a schema name space for each user to serve as an
