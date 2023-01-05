@@ -30,6 +30,9 @@ func Initialize(db *dbx.DB) error {
 		if err = createCatalogSchema(dbc); err != nil {
 			return err
 		}
+		if err = RevokeCreateOnSchemaPublic(db); err != nil {
+			return err
+		}
 		return nil
 	}
 
@@ -176,6 +179,18 @@ func createCatalogSchema(dc *pgx.Conn) error {
 
 	if err = tx.Commit(context.TODO()); err != nil {
 		return fmt.Errorf("initializing system database: committing changes: %v", err)
+	}
+	return nil
+}
+
+func RevokeCreateOnSchemaPublic(db *dbx.DB) error {
+	dcsuper, err := db.ConnectSuper()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dcsuper)
+	if _, err := dcsuper.Exec(context.TODO(), "REVOKE CREATE ON SCHEMA public FROM public"); err != nil {
+		return err
 	}
 	return nil
 }

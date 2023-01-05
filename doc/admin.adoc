@@ -96,13 +96,6 @@ Metadb will assume that the database, superuser, and systemuser
 defined here already exist; so they should be created before
 continuing.
 
-It is also recommended to revoke `CREATE` privileges on the `public`
-schema.
-
-----
-REVOKE CREATE ON SCHEMA public FROM public;
-----
-
 === Running the server
 
 To start the server:

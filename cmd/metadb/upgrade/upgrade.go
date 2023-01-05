@@ -666,6 +666,14 @@ func updb9(opt *dbopt) error {
 	return nil
 }
 
+///////////////////////////////////////////////////////////////////////////
+// TODO include cat.RevokeCreateOnSchemaPublic(), as below, in updb10().
+// func updb10(opt *dbopt) error {
+//	if err := cat.RevokeCreateOnSchemaPublic(opt.DBSuper); err != nil {
+//		return err
+//	}
+///////////////////////////////////////////////////////////////////////////
+
 //func toPostgresArray(slice []string) string {
 //	var b strings.Builder
 //	b.WriteString("ARRAY[")
