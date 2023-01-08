@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
@@ -14,34 +15,56 @@ import (
 
 var catalogSchema = "metadb"
 
-func Initialize(db *dbx.DB) error {
-	dbc, err := db.Connect()
-	if err != nil {
-		return err
-	}
-	defer dbx.Close(dbc)
+type Catalog struct {
+	mu        sync.Mutex
+	partYears map[string]map[string]bool
+	dc        *pgx.Conn
+}
 
-	exists, err := catalogSchemaExists(dbc)
+func Initialize(db *dbx.DB) (*Catalog, error) {
+	dc, err := db.Connect()
 	if err != nil {
-		return fmt.Errorf("checking if database initialized: %v", err)
+		return nil, err
+	}
+
+	exists, err := catalogSchemaExists(dc)
+	if err != nil {
+		dbx.Close(dc)
+		return nil, fmt.Errorf("checking if database initialized: %v", err)
 	}
 	if !exists {
 		log.Info("initializing database")
-		if err = createCatalogSchema(dbc); err != nil {
-			return err
+		if err = createCatalogSchema(dc); err != nil {
+			dbx.Close(dc)
+			return nil, err
 		}
 		if err = RevokeCreateOnSchemaPublic(db); err != nil {
-			return err
+			dbx.Close(dc)
+			return nil, err
 		}
-		return nil
+	} else {
+		// Check that database version is compatible
+		err = checkDatabaseCompatible(dc)
+		if err != nil {
+			dbx.Close(dc)
+			return nil, err
+		}
 	}
 
-	// Check that database version is compatible
-	err = checkDatabaseCompatible(dbc)
-	if err != nil {
-		return err
+	c := &Catalog{
+		dc: dc,
 	}
-	return nil
+	if err := c.initPartYears(); err != nil {
+		return nil, err
+	}
+
+	return c, nil
+}
+
+func (c *Catalog) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	dbx.Close(c.dc)
 }
 
 func checkDatabaseCompatible(dc *pgx.Conn) error {
@@ -72,11 +95,11 @@ func DatabaseVersion(dc *pgx.Conn) (int64, error) {
 	}
 }
 
-func catalogSchemaExists(dbconn *pgx.Conn) (bool, error) {
+func catalogSchemaExists(dc *pgx.Conn) (bool, error) {
 	var err error
-	var q = "SELECT 1 FROM pg_namespace WHERE nspname='" + catalogSchema + "'"
+	var q = "SELECT 1 FROM pg_namespace WHERE nspname=$1"
 	var n int32
-	err = dbconn.QueryRow(context.TODO(), q).Scan(&n)
+	err = dc.QueryRow(context.TODO(), q, catalogSchema).Scan(&n)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return false, nil

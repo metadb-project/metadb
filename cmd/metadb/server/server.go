@@ -158,9 +158,11 @@ func mainServer(svr *server) error {
 	//defer dbx.Close(svr.dcsuper)
 
 	// Check that database is initialized and compatible
-	if err = cat.Initialize(svr.db); err != nil {
+	catalog, err := cat.Initialize(svr.db)
+	if err != nil {
 		return err
 	}
+	_ = catalog
 
 	// Check that database version is compatible
 	// err = sysdb.ValidateSysdbVersion(svr.db)
