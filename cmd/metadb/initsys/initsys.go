@@ -175,7 +175,7 @@ func InitSys(opt *option.Init) error {
 	// }
 	/*
 		eout.Verbose("initializing database")
-		if err = cat.Initialize(db); err != nil {
+		if err = catalog.Initialize(db); err != nil {
 			return fmt.Errorf("initializing database: %v", err)
 		}
 	*/

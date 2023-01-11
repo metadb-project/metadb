@@ -40,10 +40,10 @@ func NewSchema(db sqlx.DB, track *Track) (*Schema, error) {
 func getColumnSchemas(db sqlx.DB) ([]*sqlx.ColumnSchema, error) {
 	cs := make([]*sqlx.ColumnSchema, 0)
 	rows, err := db.Query(nil, ""+
-		"SELECT table_schema, table_name, column_name, data_type, character_maximum_length "+
+		"SELECT table_schema, left(table_name, -2) table_name, column_name, data_type, character_maximum_length "+
 		"FROM information_schema.columns "+
 		"WHERE lower(table_schema) NOT IN ('information_schema', 'pg_catalog')"+
-		" AND right(table_name, 2) <> '__'"+
+		" AND right(table_name, 2) = '__'"+
 		" AND lower(column_name) NOT IN ('__id', '__cf', '__start', '__end', '__current', '__source', '__origin');")
 	if err != nil {
 		return nil, fmt.Errorf("querying database schema: %s", err)

@@ -7,19 +7,20 @@ import (
 	"strings"
 
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
+	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-func execCommandList(cl *command.CommandList, db sqlx.DB, track *cache.Track, cschema *cache.Schema, users *cache.Users, source string) error {
+func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, track *cache.Track, cschema *cache.Schema, users *cache.Users, source string) error {
 	var clt []command.CommandList = partitionTxn(cl, cschema)
 	for _, cc := range clt {
 		if len(cc.Cmd) == 0 {
 			continue
 		}
 		// exec schema changes
-		if err := execCommandSchema(&cc.Cmd[0], db, track, cschema, users); err != nil {
+		if err := execCommandSchema(cat, &cc.Cmd[0], db, track, cschema, users); err != nil {
 			return fmt.Errorf("schema: %s", err)
 		}
 		err := execCommandListData(db, cc, cschema, source)
@@ -34,7 +35,7 @@ func execCommandList(cl *command.CommandList, db sqlx.DB, track *cache.Track, cs
 	return nil
 }
 
-func execCommandSchema(cmd *command.Command, db sqlx.DB, track *cache.Track, schema *cache.Schema, users *cache.Users) error {
+func execCommandSchema(cat *catalog.Catalog, cmd *command.Command, db sqlx.DB, track *cache.Track, schema *cache.Schema, users *cache.Users) error {
 	if cmd.Op == command.DeleteOp {
 		return nil
 	}
@@ -43,8 +44,10 @@ func execCommandSchema(cmd *command.Command, db sqlx.DB, track *cache.Track, sch
 	if delta, err = findDeltaSchema(cmd, schema); err != nil {
 		return err
 	}
-	// TODO can we skip adding the table if we confirm it in sysdb?
 	if err = addTable(cmd, db, track, users); err != nil {
+		return err
+	}
+	if err = addPartition(cat, cmd, db); err != nil {
 		return err
 	}
 	// Note that execDeltaSchema() may adjust data types in cmd.
@@ -233,9 +236,7 @@ func selectMaxStringLength(db sqlx.DB, table *sqlx.Table, column string) (int64,
 		return 0, err
 	}
 	defer tx.Rollback()
-	q := "SELECT coalesce(max(m), 0) FROM (" +
-		"SELECT max(length(\"" + column + "\"::varchar)) AS m FROM " + db.TableSQL(table) +
-		" UNION ALL SELECT max(length(\"" + column + "\"::varchar)) AS m FROM " + db.HistoryTableSQL(table) + ") a"
+	q := "SELECT coalesce(max(length(\"" + column + "\"::varchar)), 0) FROM " + db.HistoryTableSQL(table)
 	err = db.QueryRow(tx, q).Scan(&maxlen)
 	if err != nil {
 		return 0, err
@@ -349,43 +350,19 @@ func execCommandData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) 
 func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
 	// Check if current record is identical.
-	ident, id, cf, err := isCurrentIdentical(c, tx, db, &t, source)
+	ident, cf, err := isCurrentIdentical(c, tx, db, &t, source)
 	if err != nil {
 		return err
 	}
 	if ident {
 		if cf == "false" {
 			// log.Trace("matcher cf")
-			return updateRowCF(c, tx, db, &t, id, source)
+			return updateRowCF(c, tx, db, &t, source)
 		}
 		// log.Trace("matcher ok")
 		return nil
 	}
 	exec := make([]string, 0)
-	// Current table:
-	// Delete the record.
-	if id != "" {
-		delcur := "DELETE FROM " + db.TableSQL(&t) + " WHERE __id='" + id + "'"
-		exec = append(exec, delcur)
-	}
-	// Insert new record.
-	var inscur strings.Builder
-	inscur.WriteString("INSERT INTO " + db.TableSQL(&t) + "(__start,__source")
-	if c.Origin != "" {
-		inscur.WriteString(",__origin")
-	}
-	for _, c := range c.Column {
-		inscur.WriteString("," + db.IdentiferSQL(c.Name))
-	}
-	inscur.WriteString(")VALUES('" + c.SourceTimestamp + "','" + source + "'")
-	if c.Origin != "" {
-		inscur.WriteString(",'" + c.Origin + "'")
-	}
-	for _, c := range c.Column {
-		inscur.WriteString("," + encodeSQLData(c.SQLData, c.DType, db))
-	}
-	inscur.WriteString(")")
-	exec = append(exec, inscur.String())
 	// History table:
 	// Select matching current record in history table and mark as not current.
 	var uphist strings.Builder
@@ -421,38 +398,34 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) er
 	return nil
 }
 
-func updateRowCF(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, id string, source string) error {
-	// Current table:
-	upcur := "UPDATE " + db.TableSQL(t) + " SET __cf=TRUE WHERE __id='" + id + "'"
-	// History table: select matching current record in history table.
+func updateRowCF(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, source string) error {
+	// Select matching current record in history table.
 	var uphist strings.Builder
 	uphist.WriteString("UPDATE " + db.HistoryTableSQL(t) + " SET __cf=TRUE WHERE __id=(SELECT __id FROM " + db.HistoryTableSQL(t) + " WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(db, &uphist, c.Column); err != nil {
 		return err
 	}
 	uphist.WriteString(" LIMIT 1)")
-	// Run SQL.
-	err := db.ExecMultiple(tx, []string{upcur, uphist.String()})
-	if err != nil {
+	if _, err := db.Exec(tx, uphist.String()); err != nil {
 		return err
 	}
 	return nil
 }
 
-func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, source string) (bool, string, string, error) {
+func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, source string) (bool, string, error) {
 	var b strings.Builder
 	b.WriteString("SELECT * FROM " + db.TableSQL(t) + " WHERE __source='" + source + "' AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(db, &b, c.Column); err != nil {
-		return false, "", "", err
+		return false, "", err
 	}
 	b.WriteString(" LIMIT 1")
 	rows, err := db.Query(tx, b.String())
 	if err != nil {
-		return false, "", "", err
+		return false, "", err
 	}
 	cols, err := rows.Columns()
 	if err != nil {
-		return false, "", "", err
+		return false, "", err
 	}
 	ptrs := make([]interface{}, len(cols))
 	results := make([][]byte, len(cols))
@@ -462,11 +435,11 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 	defer func(rows *sql.Rows) {
 		_ = rows.Close()
 	}(rows)
-	var id, cf string
+	var cf string
 	attrs := make(map[string]*string)
 	if rows.Next() {
 		if err = rows.Scan(ptrs...); err != nil {
-			return false, "", "", err
+			return false, "", err
 		}
 		for i, r := range results {
 			if r != nil {
@@ -474,7 +447,6 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 				val := string(r)
 				switch attr {
 				case "__id":
-					id = val
 				case "__cf":
 					cf = val
 				case "__start":
@@ -491,7 +463,7 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 		}
 	} else {
 		// log.Trace("matcher: %s: row not found in database: %s", t, command.ColumnsString(c.Column))
-		return false, "", "", nil
+		return false, "", nil
 	}
 	for _, col := range c.Column {
 		var cdata, ddata *string
@@ -506,11 +478,11 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 		}
 		if (cdata == nil && ddata != nil) || (cdata != nil && ddata == nil) {
 			// log.Trace("matcher: %s (%s): cdata(%v) != ddata(%v)", t, col.Name, cdata, ddata)
-			return false, id, cf, nil
+			return false, cf, nil
 		}
 		if cdata != nil && ddata != nil && cdatas != ddatas {
 			// log.Trace("matcher: %s (%s): cdatas(%s) != ddatas(%s)", t, col.Name, cdatas, ddatas)
-			return false, id, cf, nil
+			return false, cf, nil
 		}
 		delete(attrs, col.Name)
 	}
@@ -518,21 +490,14 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 	for _, v := range attrs {
 		if v != nil {
 			// log.Trace("matcher: %s (%s): database has extra value: %v", t, k, v)
-			return false, id, cf, nil
+			return false, cf, nil
 		}
 	}
-	return true, id, cf, nil
+	return true, cf, nil
 }
 
 func execDeleteData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
-	// Current table: delete the record.
-	var delcur strings.Builder
-	delcur.WriteString("DELETE FROM " + db.TableSQL(&t) + " WHERE __id=(SELECT __id FROM " + db.TableSQL(&t) + " WHERE __source='" + source + "' AND __origin='" + c.Origin + "'")
-	if err := wherePKDataEqual(db, &delcur, c.Column); err != nil {
-		return err
-	}
-	delcur.WriteString(" LIMIT 1)")
 	// History table: subselect matching current record in history table and mark as not current.
 	var uphist strings.Builder
 	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __id=(SELECT __id FROM " + db.HistoryTableSQL(&t) + " WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
@@ -541,8 +506,7 @@ func execDeleteData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) e
 	}
 	uphist.WriteString(" LIMIT 1)")
 	// Run SQL.
-	err := db.ExecMultiple(tx, []string{delcur.String(), uphist.String()})
-	if err != nil {
+	if _, err := db.Exec(tx, uphist.String()); err != nil {
 		return err
 	}
 	return nil
@@ -550,14 +514,11 @@ func execDeleteData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) e
 
 func execTruncateData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
-	// Current table: delete all records from origin.
-	delcur := "DELETE FROM " + db.TableSQL(&t) + " WHERE __source='" + source + "' AND __origin='" + c.Origin + "'"
 	// History table: mark as not current.
 	var uphist strings.Builder
 	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
 	// Run SQL.
-	err := db.ExecMultiple(tx, []string{delcur, uphist.String()})
-	if err != nil {
+	if _, err := db.Exec(tx, uphist.String()); err != nil {
 		return err
 	}
 	return nil

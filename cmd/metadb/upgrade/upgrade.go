@@ -5,17 +5,16 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
-
-	"github.com/metadb-project/metadb/cmd/metadb/cat"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
+	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/metadata"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
-	"gopkg.in/ini.v1"
 )
 
 func Upgrade(opt *option.Upgrade) error {
@@ -228,31 +227,38 @@ func upgradeDatabase(datadir string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("checking for file %s: %v", confFileName, err)
 	}
-	var dbsuper, dbadmin *dbx.DB
+	//var dbsuper, dbadmin *dbx.DB
+	var db *dbx.DB
 	if confExists {
 		// Read from config file
-		var cfg *ini.File
-		cfg, err = ini.Load(confFileName)
+		db, err = util.ReadConfigDatabase(datadir)
 		if err != nil {
-			return false, fmt.Errorf("reading file %s: %v", confFileName, err)
+			return false, fmt.Errorf("reading configuration file: %v", err)
 		}
-		s := cfg.Section("main")
-		dbsuper = &dbx.DB{
-			Host:     s.Key("host").String(),
-			Port:     s.Key("port").String(),
-			User:     s.Key("superuser").String(),
-			Password: s.Key("superuser_password").String(),
-			DBName:   s.Key("database").String(),
-			SSLMode:  s.Key("sslmode").String(),
-		}
-		dbadmin = &dbx.DB{
-			Host:     s.Key("host").String(),
-			Port:     s.Key("port").String(),
-			User:     s.Key("systemuser").String(),
-			Password: s.Key("systemuser_password").String(),
-			DBName:   s.Key("database").String(),
-			SSLMode:  s.Key("sslmode").String(),
-		}
+		/*
+			var cfg *ini.File
+			cfg, err = ini.Load(confFileName)
+			if err != nil {
+				return false, fmt.Errorf("reading file %s: %v", confFileName, err)
+			}
+			s := cfg.Section("main")
+			dbsuper = &dbx.DB{
+				Host:     s.Key("host").String(),
+				Port:     s.Key("port").String(),
+				User:     s.Key("superuser").String(),
+				Password: s.Key("superuser_password").String(),
+				DBName:   s.Key("database").String(),
+				SSLMode:  s.Key("sslmode").String(),
+			}
+			dbadmin = &dbx.DB{
+				Host:     s.Key("host").String(),
+				Port:     s.Key("port").String(),
+				User:     s.Key("systemuser").String(),
+				Password: s.Key("systemuser_password").String(),
+				DBName:   s.Key("database").String(),
+				SSLMode:  s.Key("sslmode").String(),
+			}
+		*/
 	} else {
 		// Read from sysdb
 		var cs []*databaseConnector
@@ -261,21 +267,33 @@ func upgradeDatabase(datadir string) (bool, error) {
 			return false, fmt.Errorf("reading database connectors: %v", err)
 		}
 		c := cs[0]
-		dbsuper = &dbx.DB{
-			Host:     c.DBHost,
-			Port:     "5432",
-			User:     "postgres",
-			Password: c.DBSuperPassword,
-			DBName:   c.DBName,
-			SSLMode:  "require",
-		}
-		dbadmin = &dbx.DB{
-			Host:     c.DBHost,
-			Port:     "5432",
-			User:     c.DBAdminUser,
-			Password: c.DBAdminPassword,
-			DBName:   c.DBName,
-			SSLMode:  "require",
+		/*
+			dbsuper = &dbx.DB{
+				Host:     c.DBHost,
+				Port:     "5432",
+				User:     "postgres",
+				Password: c.DBSuperPassword,
+				DBName:   c.DBName,
+				SSLMode:  "require",
+			}
+			dbadmin = &dbx.DB{
+				Host:     c.DBHost,
+				Port:     "5432",
+				User:     c.DBAdminUser,
+				Password: c.DBAdminPassword,
+				DBName:   c.DBName,
+				SSLMode:  "require",
+			}
+		*/
+		db = &dbx.DB{
+			Host:          c.DBHost,
+			Port:          "5432",
+			User:          c.DBAdminUser,
+			Password:      c.DBAdminPassword,
+			SuperUser:     c.DBSuperUser,
+			SuperPassword: c.DBSuperPassword,
+			DBName:        c.DBName,
+			SSLMode:       "require",
 		}
 		// Create configuration file
 		err = createConfigFile(datadir, c)
@@ -284,7 +302,8 @@ func upgradeDatabase(datadir string) (bool, error) {
 		}
 	}
 
-	dbversion, err := getDatabaseVersion(dbadmin)
+	//dbversion, err := getDatabaseVersion(dbadmin)
+	dbversion, err := getDatabaseVersion(db)
 	if err != nil {
 		return false, fmt.Errorf("%s", err)
 	}
@@ -292,9 +311,10 @@ func upgradeDatabase(datadir string) (bool, error) {
 		return false, nil
 	}
 	if dbversion > util.DatabaseVersion {
-		return false, fmt.Errorf("database version incompatible with server (%d > %d)", dbversion, util.DatabaseVersion)
+		return false, fmt.Errorf("schema version incompatible with server (%d > %d)", dbversion, util.DatabaseVersion)
 	}
-	err = upgradeDatabaseAll(datadir, dbsuper, dbadmin, dbversion)
+	//err = upgradeDatabaseAll(datadir, dbsuper, dbadmin, dbversion)
+	err = upgradeDatabaseAll(datadir, db, dbversion)
 	if err != nil {
 		return false, err
 	}
@@ -332,25 +352,24 @@ func getDatabaseVersion(db *dbx.DB) (int64, error) {
 		return 0, err
 	}
 	defer dbx.Close(dc)
-	dbversion, err := cat.DatabaseVersion(dc)
+	dbversion, err := catalog.DatabaseVersion(dc)
 	if err != nil {
 		return 0, err
 	}
 	if dbversion < 7 {
-		return 0, fmt.Errorf("version < 7 not supported")
+		return 0, fmt.Errorf("schema version < 7 not supported")
 	}
 	return dbversion, err
 }
 
-func upgradeDatabaseAll(datadir string, dbsuper, dbadmin *dbx.DB, dbversion int64) error {
+func upgradeDatabaseAll(datadir string, db *dbx.DB, dbversion int64) error {
 	for v := dbversion + 1; v <= util.DatabaseVersion; v++ {
 		opt := dbopt{
 			Datadir:   datadir,
-			DBSuper:   dbsuper,
-			DBAdmin:   dbadmin,
+			DB:        db,
 			DBVersion: v,
 		}
-		eout.Info("upgrading: version %d", v)
+		eout.Info("upgrading: schema version %d", v)
 		err := updbList[v](&opt)
 		if err != nil {
 			return err
@@ -370,6 +389,7 @@ var updbList = []updbFunc{
 	nil,
 	updb8,
 	updb9,
+	updb10,
 }
 
 /*
@@ -525,7 +545,7 @@ func updb7(opt *dbopt) error {
 
 func updb8(opt *dbopt) error {
 	// Open database
-	dc, err := opt.DBAdmin.Connect()
+	dc, err := opt.DB.Connect()
 	if err != nil {
 		return err
 	}
@@ -636,7 +656,7 @@ func updb8(opt *dbopt) error {
 
 func updb9(opt *dbopt) error {
 	// Open database
-	dc, err := opt.DBAdmin.Connect()
+	dc, err := opt.DB.Connect()
 	if err != nil {
 		return err
 	}
@@ -666,13 +686,267 @@ func updb9(opt *dbopt) error {
 	return nil
 }
 
-///////////////////////////////////////////////////////////////////////////
-// TODO include cat.RevokeCreateOnSchemaPublic(), as below, in updb10().
-// func updb10(opt *dbopt) error {
-//	if err := cat.RevokeCreateOnSchemaPublic(opt.DBSuper); err != nil {
-//		return err
-//	}
-///////////////////////////////////////////////////////////////////////////
+func updb10(opt *dbopt) error {
+	if err := catalog.RevokeCreateOnSchemaPublic(opt.DB); err != nil {
+		return err
+	}
+
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	// Read list of tracked tables.
+	q := "SELECT schemaname, tablename FROM metadb.track ORDER BY schemaname, tablename"
+	rows, err := dc.Query(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("selecting table list: %v", err)
+	}
+	type attrschema struct {
+		attrname      string
+		attrtype      string
+		varcharLength int64
+	}
+	type tableschema struct {
+		name  string
+		attrs []attrschema
+		years []int
+	}
+	tables := make([]tableschema, 0)
+	for rows.Next() {
+		var schema, table string
+		err = rows.Scan(&schema, &table)
+		if err != nil {
+			rows.Close()
+			return fmt.Errorf("reading table list: %v", err)
+		}
+		t := tableschema{
+			name:  schema + "." + table,
+			attrs: make([]attrschema, 0),
+			years: make([]int, 0),
+		}
+		tables = append(tables, t)
+	}
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("reading table list: %v", err)
+	}
+	rows.Close()
+	// Read table attributes.
+	for i, t := range tables {
+		q = "SELECT a.attname," +
+			" t.typname," +
+			" CASE WHEN t.typname='varchar' THEN a.atttypmod-4 ELSE 0 END varchar_length " +
+			"FROM pg_class c" +
+			" JOIN pg_namespace n ON c.relnamespace=n.oid" +
+			" JOIN pg_attribute a ON c.oid=a.attrelid" +
+			" JOIN pg_type t ON a.atttypid=t.oid " +
+			"WHERE n.nspname||'.'||c.relname=$1" +
+			" AND a.attnum>0" +
+			" AND a.attname NOT IN" +
+			" ('__id', '__cf', '__start', '__end', '__current', '__source', '__origin') " +
+			"ORDER BY a.attnum"
+		rows, err = dc.Query(context.TODO(), q, t.name)
+		if err != nil {
+			return fmt.Errorf("selecting attributes: %v", err)
+		}
+		for rows.Next() {
+			var attname, typname string
+			var varcharLength int64
+			err = rows.Scan(&attname, &typname, &varcharLength)
+			if err != nil {
+				rows.Close()
+				return fmt.Errorf("reading attributes: %v", err)
+			}
+			a := attrschema{
+				attrname:      attname,
+				attrtype:      typname,
+				varcharLength: varcharLength,
+			}
+			tables[i].attrs = append(tables[i].attrs, a)
+		}
+		if err = rows.Err(); err != nil {
+			rows.Close()
+			return fmt.Errorf("reading attributes: %v", err)
+		}
+		rows.Close()
+	}
+	// Read years from existing rows.
+	for i, t := range tables {
+		eout.Info("scanning: %s", t.name)
+		q = "SELECT DISTINCT EXTRACT(YEAR FROM __start)::smallint AS year FROM " + t.name + "__ ORDER BY year"
+		rows, err = dc.Query(context.TODO(), q)
+		if err != nil {
+			return fmt.Errorf("selecting year list: %v", err)
+		}
+		for rows.Next() {
+			var year int
+			err = rows.Scan(&year)
+			if err != nil {
+				rows.Close()
+				return fmt.Errorf("reading year list: %v", err)
+			}
+			tables[i].years = append(tables[i].years, year)
+		}
+		if err = rows.Err(); err != nil {
+			rows.Close()
+			return fmt.Errorf("reading year list: %v", err)
+		}
+		rows.Close()
+	}
+
+	// Begin transaction
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+
+	// Upgrade tables.
+	for _, t := range tables {
+		table := t.name
+		htable := table + "__"
+		oldhtable := htable + "old___"
+		eout.Info("upgrading: %s", table)
+		q := "DROP TABLE " + table
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+		q = "ALTER TABLE " + htable + " RENAME TO " + strings.Split(oldhtable, ".")[1]
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+		q = "CREATE TABLE IF NOT EXISTS " + htable + " (" +
+			"__id bigint GENERATED BY DEFAULT AS IDENTITY, " +
+			"__cf boolean NOT NULL DEFAULT TRUE, " +
+			"__start timestamp with time zone NOT NULL, " +
+			"__end timestamp with time zone NOT NULL, " +
+			"__current boolean NOT NULL, " +
+			"__source varchar(63) NOT NULL, " +
+			"__origin varchar(63) NOT NULL DEFAULT ''"
+		for _, a := range t.attrs {
+			q = q + ", \"" + a.attrname + "\" " + a.attrtype
+			if a.attrtype == "varchar" {
+				q = q + "(" + strconv.FormatInt(a.varcharLength, 10) + ")"
+			}
+		}
+		q = q + ") PARTITION BY LIST (__current)"
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+		// Create partitions.
+		q = "CREATE TABLE " + table + " PARTITION OF " + htable + " FOR VALUES IN (TRUE)"
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+		st := strings.Split(table, ".")
+		nctable := st[0] + ".zzz___" + st[1] + "___"
+		q = "CREATE TABLE " + nctable + " PARTITION OF " + htable + " FOR VALUES IN (FALSE) " +
+			"PARTITION BY RANGE (__start)"
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+		for _, year := range t.years {
+			yearStr := strconv.Itoa(year)
+			start := yearStr + "-01-01"
+			end := strconv.Itoa(year+1) + "-01-01"
+			q = "CREATE TABLE " + nctable + yearStr + " PARTITION OF " + nctable +
+				" FOR VALUES FROM ('" + start + "') TO ('" + end + "')"
+			if _, err = dc.Exec(context.TODO(), q); err != nil {
+				return err
+			}
+		}
+		// Copy data to new table.
+		q = "INSERT INTO " + htable + " (__cf, __start, __end, __current, __source, __origin"
+		for _, a := range t.attrs {
+			q = q + ", \"" + a.attrname + "\""
+		}
+		q = q + ") SELECT __cf, __start, __end, __current, __source, __origin"
+		for _, a := range t.attrs {
+			q = q + ", \"" + a.attrname + "\""
+		}
+		q = q + " FROM " + oldhtable + " ORDER BY __id"
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+		// Drop old table.
+		q = "DROP TABLE " + oldhtable
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+		// Create indexes.
+		indexSystemAttrs := []string{"__id", "__source", "__origin"}
+		for _, a := range indexSystemAttrs {
+			q = "CREATE INDEX ON " + htable + " (" + a + ")"
+			if _, err = dc.Exec(context.TODO(), q); err != nil {
+				return err
+			}
+		}
+		for _, a := range t.attrs {
+			if (a.attrtype == "varchar" && a.varcharLength > util.MaximumTypeSizeIndex) ||
+				a.attrtype == "jsonb" {
+				continue
+			}
+			q = "CREATE INDEX ON " + htable + " (\"" + a.attrname + "\")"
+			if _, err = dc.Exec(context.TODO(), q); err != nil {
+				return err
+			}
+		}
+		// Set permissions.
+		q = "SELECT username FROM metadb.auth WHERE tables='.*'"
+		rows, err = dc.Query(context.TODO(), q)
+		if err != nil {
+			return fmt.Errorf("selecting user authorizations: %v", err)
+		}
+		users := make([]string, 0)
+		for rows.Next() {
+			var username string
+			err = rows.Scan(&username)
+			if err != nil {
+				rows.Close()
+				return fmt.Errorf("reading user authorizations: %v", err)
+			}
+			users = append(users, username)
+		}
+		if err = rows.Err(); err != nil {
+			rows.Close()
+			return fmt.Errorf("reading user authorizations: %v", err)
+		}
+		rows.Close()
+		for _, u := range users {
+			q := "GRANT SELECT ON " + htable + " TO " + u
+			if _, err = dc.Exec(context.TODO(), q); err != nil {
+				return err
+			}
+			q = "GRANT SELECT ON " + table + " TO " + u
+			if _, err = dc.Exec(context.TODO(), q); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Write new version number
+	err = metadata.WriteDatabaseVersion(tx, 10)
+	if err != nil {
+		return err
+	}
+	err = tx.Commit(context.TODO())
+	if err != nil {
+		return err
+	}
+
+	for _, t := range tables {
+		eout.Info("vacuuming: %s", t.name)
+		q := "VACUUM ANALYZE " + t.name + "__"
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 //func toPostgresArray(slice []string) string {
 //	var b strings.Builder
@@ -693,8 +967,7 @@ type updbFunc func(opt *dbopt) error
 
 type dbopt struct {
 	Datadir   string
-	DBSuper   *dbx.DB
-	DBAdmin   *dbx.DB
+	DB        *dbx.DB
 	DBVersion int64
 }
 

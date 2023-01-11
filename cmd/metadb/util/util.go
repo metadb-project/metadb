@@ -17,10 +17,7 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-// Version 7 = 0.11
-// Version 8 = 0.12
-// Version 9 = 0.12.4
-const DatabaseVersion = 9
+const DatabaseVersion = 10
 
 // MetadbVersion is defined at build time via -ldflags.
 var MetadbVersion = "(unknown version)"
@@ -28,6 +25,8 @@ var MetadbVersion = "(unknown version)"
 func MetadbVersionString() string {
 	return "Metadb " + MetadbVersion
 }
+
+const MaximumTypeSizeIndex = 2500
 
 // ModePermRW is the umask "-rw-------".
 const ModePermRW = 0600

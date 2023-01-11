@@ -706,7 +706,7 @@ func sourceExists(dc *pgx.Conn, sourceName string) (bool, error) {
 	}
 }
 
-// TODO move to cat package
+// TODO move to catalog package
 func userExists(dc *pgx.Conn, username string) (bool, error) {
 	q := "SELECT 1 FROM pg_catalog.pg_user WHERE usename=$1"
 	var i int64

@@ -1,4 +1,4 @@
-package cat
+package catalog
 
 import (
 	"context"
@@ -17,7 +17,7 @@ var catalogSchema = "metadb"
 
 type Catalog struct {
 	mu        sync.Mutex
-	partYears map[string]map[string]bool
+	partYears map[string]map[int]bool
 	dc        *pgx.Conn
 }
 

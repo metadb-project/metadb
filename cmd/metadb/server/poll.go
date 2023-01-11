@@ -12,7 +12,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
-	"github.com/metadb-project/metadb/cmd/metadb/cat"
+	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
@@ -23,7 +23,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func goPollLoop(svr *server) {
+func goPollLoop(cat *catalog.Catalog, svr *server) {
 	if svr.opt.NoKafkaCommit {
 		log.Info("Kafka commits disabled")
 	}
@@ -34,7 +34,7 @@ func goPollLoop(svr *server) {
 		os.Exit(1)
 	}
 	for {
-		err := launchPollLoop(svr, spr)
+		err := launchPollLoop(cat, svr, spr)
 		if err == nil {
 			break
 		}
@@ -44,21 +44,21 @@ func goPollLoop(svr *server) {
 	}
 }
 
-func launchPollLoop(svr *server, spr *sproc) (reterr error) {
+func launchPollLoop(cat *catalog.Catalog, svr *server, spr *sproc) (reterr error) {
 	defer func() {
 		if r := recover(); r != nil {
 			reterr = fmt.Errorf("%v", r)
 			log.Fatal("%s", reterr)
 		}
 	}()
-	reterr = outerPollLoop(svr, spr)
+	reterr = outerPollLoop(cat, svr, spr)
 	if reterr != nil {
 		panic(reterr.Error())
 	}
 	return
 }
 
-func outerPollLoop(svr *server, spr *sproc) error {
+func outerPollLoop(cat *catalog.Catalog, svr *server, spr *sproc) error {
 	var err error
 	// Set up source log
 	if svr.opt.LogSource != "" {
@@ -70,27 +70,27 @@ func outerPollLoop(svr *server, spr *sproc) error {
 	//// TMP
 	// set command.FolioTenant
 	/*	var folioTenant string
-		if folioTenant, err = cat.FolioTenant(svr.db); err != nil {
+		if folioTenant, err = catalog.FolioTenant(svr.db); err != nil {
 			return err
 		}
 		command.FolioTenant = folioTenant
 	*/
 	// set command.ReshareTenants
-	command.ReshareTenants, err = cat.Origins(svr.db)
+	command.ReshareTenants, err = catalog.Origins(svr.db)
 	if err != nil {
 		return err
 	}
 	////
 
 	log.Debug("starting stream processor")
-	if err = pollLoop(spr); err != nil {
+	if err = pollLoop(cat, spr); err != nil {
 		log.Error("%s", err)
 		return err
 	}
 	return nil
 }
 
-func pollLoop(spr *sproc) error {
+func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 	var err error
 	// var database0 *sysdb.DatabaseConnector = spr.databases[0]
 	//if database0.Type == "postgresql" && database0.DBPort == "" {
@@ -215,7 +215,7 @@ func pollLoop(spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cl, spr.db[0], track, schema, users, spr.source.Name); err != nil {
+		if err = execCommandList(cat, cl, spr.db[0], track, schema, users, spr.source.Name); err != nil {
 			return fmt.Errorf("executor: %s", err)
 		}
 

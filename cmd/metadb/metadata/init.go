@@ -39,7 +39,7 @@ import (
 	}
 */
 
-// moved to cat/init.go
+// moved to catalog/init.go
 /*
 	// Initialize
 	_, err = db.Exec(nil, "CREATE SCHEMA metadb")

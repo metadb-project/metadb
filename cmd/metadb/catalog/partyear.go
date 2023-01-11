@@ -1,4 +1,4 @@
-package cat
+package catalog
 
 import (
 	"context"
@@ -19,7 +19,7 @@ func (c *Catalog) initPartYears() error {
 		return fmt.Errorf("selecting partition years: %v", err)
 	}
 	defer rows.Close()
-	part := make(map[string]map[string]bool)
+	part := make(map[string]map[int]bool)
 	for rows.Next() {
 		var currentTable, yearTable string
 		err := rows.Scan(&currentTable, &yearTable)
@@ -28,14 +28,15 @@ func (c *Catalog) initPartYears() error {
 		}
 		p := part[currentTable]
 		if p == nil {
-			p = make(map[string]bool)
+			p = make(map[int]bool)
 			part[currentTable] = p
 		}
 		year := yearTable[len(yearTable)-4:]
-		if _, err := strconv.Atoi(year); err != nil {
+		yearInt, err := strconv.Atoi(year)
+		if err != nil {
 			return fmt.Errorf("invalid partition: %s", yearTable)
 		}
-		p[year] = true
+		p[yearInt] = true
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("reading partition years: %v", err)
@@ -44,22 +45,21 @@ func (c *Catalog) initPartYears() error {
 	return nil
 }
 
-func (c *Catalog) AddPartYearIfNotExists(schema, table string, year string) error {
+func (c *Catalog) AddPartYearIfNotExists(schema, table string, year int) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	// Check if exists.
+	// If partition already exists, do nothing.
 	if c.partYearExists(schema, table, year) {
 		return nil
 	}
 	// Add partition in database.
-	yearInt, err := strconv.Atoi(year)
-	if err != nil {
-		return fmt.Errorf("invalid partition year: %s", year)
-	}
-	nextYear := strconv.Itoa(yearInt + 1)
-	q := "CREATE TABLE " + schema + ".zzz___" + table + "___" + year +
-		" PARTITION OF " + schema + ".zzz___" + table + "___" +
-		" FOR VALUES FROM ('" + year + "-01-01') to ('" + nextYear + "-01-01')"
+	yearStr := strconv.Itoa(year)
+	nextYearStr := strconv.Itoa(year + 1)
+	nctable := "\"" + schema + "\".\"zzz___" + table + "___\""
+	nctableYear := "\"" + schema + "\".\"zzz___" + table + "___" + yearStr + "\""
+	q := "CREATE TABLE " + nctableYear +
+		" PARTITION OF " + nctable +
+		" FOR VALUES FROM ('" + yearStr + "-01-01') TO ('" + nextYearStr + "-01-01')"
 	if _, err := c.dc.Exec(context.TODO(), q); err != nil {
 		return err
 	}
@@ -67,14 +67,14 @@ func (c *Catalog) AddPartYearIfNotExists(schema, table string, year string) erro
 	schemaTable := schema + "." + table
 	p := c.partYears[schemaTable]
 	if p == nil {
-		p = make(map[string]bool)
+		p = make(map[int]bool)
 		c.partYears[schemaTable] = p
 	}
 	p[year] = true
 	return nil
 }
 
-func (c *Catalog) partYearExists(schema, table string, year string) bool {
+func (c *Catalog) partYearExists(schema, table string, year int) bool {
 	p := c.partYears[schema+"."+table]
 	if p == nil {
 		return false

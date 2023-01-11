@@ -1,4 +1,4 @@
-package cat
+package catalog
 
 //func FolioTenant(db *dbx.DB) (string, error) {
 //	dc, err := db.Connect()

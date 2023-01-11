@@ -14,7 +14,7 @@ import (
 
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/internal/status"
-	"github.com/metadb-project/metadb/cmd/metadb/cat"
+	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/libpq"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
@@ -158,11 +158,10 @@ func mainServer(svr *server) error {
 	//defer dbx.Close(svr.dcsuper)
 
 	// Check that database is initialized and compatible
-	catalog, err := cat.Initialize(svr.db)
+	cat, err := catalog.Initialize(svr.db)
 	if err != nil {
 		return err
 	}
-	_ = catalog
 
 	// Check that database version is compatible
 	// err = sysdb.ValidateSysdbVersion(svr.db)
@@ -186,7 +185,7 @@ func mainServer(svr *server) error {
 
 	go libpq.Listen(svr.opt.Listen, svr.opt.Port, svr.db, &svr.state.sources)
 
-	go goPollLoop(svr)
+	go goPollLoop(cat, svr)
 
 	for {
 		if process.Stop() {
@@ -194,6 +193,8 @@ func mainServer(svr *server) error {
 		}
 		time.Sleep(5 * time.Second)
 	}
+
+	cat.Close()
 
 	return nil
 }
@@ -213,7 +214,7 @@ func goCreateFunctions(db dbx.DB) {
 	}
 	defer dbx.Close(dcsuper)
 
-	err = cat.CreateAllFunctions(dcsuper, dc, db.User)
+	err = catalog.CreateAllFunctions(dcsuper, dc, db.User)
 	if err != nil {
 		log.Error("%v", err)
 		return
