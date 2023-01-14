@@ -416,7 +416,7 @@ func updb5(opt *dbopt) error {
 	return nil
 }
 
-func updb5Table(opt *dbopt, schema *cache.Schema, table *sqlx.Table) error {
+func updb5Table(opt *dbopt, schema *cache.S, table *sqlx.T) error {
 	alterColumns := make([]string, 0)
 	tableSchema := schema.TableSchema(table)
 	for colname, coltype := range tableSchema {
@@ -455,7 +455,7 @@ func updb5Table(opt *dbopt, schema *cache.Schema, table *sqlx.Table) error {
 	return nil
 }
 
-func updb5UUID(db sqlx.DB, table *sqlx.Table, colname string) (bool, error) {
+func updb5UUID(db sqlx.DB, table *sqlx.T, colname string) (bool, error) {
 	var count int64
 	q := "SELECT count(*) FROM " + db.TableSQL(table) + " WHERE " + colname + " NOT LIKE '________-_________-____-____________'"
 	err := db.QueryRow(nil, q).Scan(&count)
@@ -496,7 +496,7 @@ func updb6(opt *dbopt) error {
 	return nil
 }
 
-func updb6Table(opt *dbopt, schema *cache.Schema, table *sqlx.Table) error {
+func updb6Table(opt *dbopt, schema *cache.S, table *sqlx.T) error {
 	q := "ALTER TABLE " + opt.DB.TableSQL(table) + " ADD COLUMN __source varchar(63);"
 	_, _ = opt.DB.Exec(nil, q)
 	q = "UPDATE " + opt.DB.TableSQL(table) + " SET __source='';"
@@ -877,13 +877,6 @@ func updb10(opt *dbopt) error {
 			return err
 		}
 		// Create indexes.
-		indexSystemAttrs := []string{"__id", "__source", "__origin"}
-		for _, a := range indexSystemAttrs {
-			q = "CREATE INDEX ON " + htable + " (" + a + ")"
-			if _, err = dc.Exec(context.TODO(), q); err != nil {
-				return err
-			}
-		}
 		for _, a := range t.attrs {
 			if (a.attrtype == "varchar" && a.varcharLength > util.MaximumTypeSizeIndex) ||
 				a.attrtype == "jsonb" {

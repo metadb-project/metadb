@@ -8,18 +8,20 @@ import (
 	"strings"
 
 	"github.com/metadb-project/metadb/cmd/internal/api"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func UpdateUserPerms(adb sqlx.DB, tables []sqlx.Table) error {
+func UpdateUserPerms(adb sqlx.DB, tables []dbx.Table) error {
 	users, err := userRead(adb, true)
 	if err != nil {
 		return err
 	}
 	for u, re := range users {
-		for _, t := range tables {
+		for _, oldt := range tables {
+			t := sqlx.Table{Schema: oldt.S, Table: oldt.T}
 			if re.String == "" {
 				// Revoke
 				_, _ = adb.Exec(nil, "REVOKE USAGE ON SCHEMA "+adb.IdentiferSQL(t.Schema)+" FROM "+u)

@@ -1,5 +1,6 @@
 package metadata
 
+/*
 import (
 	"database/sql"
 	"fmt"
@@ -37,3 +38,4 @@ func TrackWrite(db sqlx.DB, table *sqlx.Table, transformed bool, parentTable *sq
 	}
 	return nil
 }
+*/

@@ -53,7 +53,7 @@ func multiStatementContext(dbtype DBType, count int) (context.Context, error) {
 //	return false
 //}
 //
-//func (d *Snowflake) CreateIndex(name string, table *Table, columns []string) string {
+//func (d *Snowflake) CreateIndex(name string, table *T, columns []string) string {
 //	_ = name
 //	_ = table
 //	_ = columns

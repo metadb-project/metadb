@@ -122,17 +122,13 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 	//if err = metadata.Init(spr.svr.db, spr.svr.opt.MetadbVersion); err != nil {
 	//	return err
 	//}
-	track, err := cache.NewTrack(db)
-	if err != nil {
-		return fmt.Errorf("caching track: %s", err)
-	}
 	// Cache schema
-	schema, err := cache.NewSchema(db, track)
+	schema, err := cache.NewSchema(db, cat)
 	if err != nil {
 		return fmt.Errorf("caching schema: %s", err)
 	}
 	// Update user permissions in database
-	if err = sysdb.UpdateUserPerms(db, track.All()); err != nil {
+	if err = sysdb.UpdateUserPerms(db, cat.AllTables()); err != nil {
 		return err
 	}
 	// Cache users
@@ -215,7 +211,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cat, cl, spr.db[0], track, schema, users, spr.source.Name); err != nil {
+		if err = execCommandList(cat, cl, spr.db[0], schema, users, spr.source.Name); err != nil {
 			return fmt.Errorf("executor: %s", err)
 		}
 

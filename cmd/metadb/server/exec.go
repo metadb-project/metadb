@@ -9,21 +9,22 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, track *cache.Track, cschema *cache.Schema, users *cache.Users, source string) error {
+func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, cschema *cache.Schema, users *cache.Users, source string) error {
 	var clt []command.CommandList = partitionTxn(cl, cschema)
 	for _, cc := range clt {
 		if len(cc.Cmd) == 0 {
 			continue
 		}
 		// exec schema changes
-		if err := execCommandSchema(cat, &cc.Cmd[0], db, track, cschema, users); err != nil {
+		if err := execCommandSchema(cat, &cc.Cmd[0], db, cschema, users); err != nil {
 			return fmt.Errorf("schema: %s", err)
 		}
-		err := execCommandListData(db, cc, cschema, source)
+		err := execCommandListData(cat, db, cc, cschema, source)
 		if err != nil {
 			return fmt.Errorf("data: %s", err)
 		}
@@ -35,7 +36,7 @@ func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, 
 	return nil
 }
 
-func execCommandSchema(cat *catalog.Catalog, cmd *command.Command, db sqlx.DB, track *cache.Track, schema *cache.Schema, users *cache.Users) error {
+func execCommandSchema(cat *catalog.Catalog, cmd *command.Command, db sqlx.DB, schema *cache.Schema, users *cache.Users) error {
 	if cmd.Op == command.DeleteOp {
 		return nil
 	}
@@ -44,10 +45,10 @@ func execCommandSchema(cat *catalog.Catalog, cmd *command.Command, db sqlx.DB, t
 	if delta, err = findDeltaSchema(cmd, schema); err != nil {
 		return err
 	}
-	if err = addTable(cmd, db, track, users); err != nil {
+	if err = addTable(cmd, db, cat, users); err != nil {
 		return err
 	}
-	if err = addPartition(cat, cmd, db); err != nil {
+	if err = addPartition(cat, cmd); err != nil {
 		return err
 	}
 	// Note that execDeltaSchema() may adjust data types in cmd.
@@ -220,7 +221,7 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		}
 		dtypesql, _, _ := command.DataTypeToSQL(col.newType, col.newTypeSize)
 		log.Trace("table %s.%s: new column %s %s", tschema, tableName, col.name, dtypesql)
-		t := &sqlx.Table{Schema: tschema, Table: tableName}
+		t := &sqlx.T{S: tschema, T: tableName}
 		if err := addColumn(t, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
 			return err
 		}
@@ -244,7 +245,7 @@ func selectMaxStringLength(db sqlx.DB, table *sqlx.Table, column string) (int64,
 	return maxlen, nil
 }
 
-func execCommandListData(db sqlx.DB, cc command.CommandList, cschema *cache.Schema, source string) error {
+func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandList, cschema *cache.Schema, source string) error {
 	// Begin txn
 	tx, err := db.BeginTx()
 	if err != nil {
@@ -268,7 +269,7 @@ func execCommandListData(db sqlx.DB, cc command.CommandList, cschema *cache.Sche
 			}
 		}
 		// Execute data part of command
-		if err = execCommandData(&c, tx, db, source); err != nil {
+		if err = execCommandData(cat, &c, tx, db, source); err != nil {
 			return fmt.Errorf("%s\n%v", err, c)
 		}
 	}
@@ -334,14 +335,14 @@ func requiresSchemaChanges(c, o *command.Command, cschema *cache.Schema) bool {
 	return false
 }
 
-func execCommandData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
+func execCommandData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
 	switch c.Op {
 	case command.MergeOp:
 		return execMergeData(c, tx, db, source)
 	case command.DeleteOp:
-		return execDeleteData(c, tx, db, source)
+		return execDeleteData(cat, c, tx, db, source)
 	case command.TruncateOp:
-		return execTruncateData(c, tx, db, source)
+		return execTruncateData(cat, c, tx, db, source)
 	default:
 		return fmt.Errorf("unknown command op: %v", c.Op)
 	}
@@ -366,11 +367,10 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) er
 	// History table:
 	// Select matching current record in history table and mark as not current.
 	var uphist strings.Builder
-	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __id=(SELECT __id FROM " + db.HistoryTableSQL(&t) + " WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
+	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
 	if err = wherePKDataEqual(db, &uphist, c.Column); err != nil {
 		return err
 	}
-	uphist.WriteString(" LIMIT 1)")
 	exec = append(exec, uphist.String())
 	// insert new record
 	var inshist strings.Builder
@@ -401,11 +401,10 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) er
 func updateRowCF(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, source string) error {
 	// Select matching current record in history table.
 	var uphist strings.Builder
-	uphist.WriteString("UPDATE " + db.HistoryTableSQL(t) + " SET __cf=TRUE WHERE __id=(SELECT __id FROM " + db.HistoryTableSQL(t) + " WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
+	uphist.WriteString("UPDATE " + db.HistoryTableSQL(t) + " SET __cf=TRUE WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(db, &uphist, c.Column); err != nil {
 		return err
 	}
-	uphist.WriteString(" LIMIT 1)")
 	if _, err := db.Exec(tx, uphist.String()); err != nil {
 		return err
 	}
@@ -496,30 +495,35 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 	return true, cf, nil
 }
 
-func execDeleteData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
-	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
-	// History table: subselect matching current record in history table and mark as not current.
-	var uphist strings.Builder
-	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __id=(SELECT __id FROM " + db.HistoryTableSQL(&t) + " WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
-	if err := wherePKDataEqual(db, &uphist, c.Column); err != nil {
-		return err
-	}
-	uphist.WriteString(" LIMIT 1)")
-	// Run SQL.
-	if _, err := db.Exec(tx, uphist.String()); err != nil {
-		return err
+func execDeleteData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
+	tables := cat.DescendantTables(dbx.Table{S: c.SchemaName, T: c.TableName})
+	// Find matching current record and mark as not current.
+	// TODO Use pgx.Batch
+	for _, t := range tables {
+		var b strings.Builder
+		b.WriteString("UPDATE " + t.MainSQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
+		if err := wherePKDataEqual(db, &b, c.Column); err != nil {
+			return err
+		}
+		// Run SQL.
+		if _, err := db.Exec(tx, b.String()); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func execTruncateData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
-	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
-	// History table: mark as not current.
-	var uphist strings.Builder
-	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
-	// Run SQL.
-	if _, err := db.Exec(tx, uphist.String()); err != nil {
-		return err
+func execTruncateData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
+	tables := cat.DescendantTables(dbx.Table{S: c.SchemaName, T: c.TableName})
+	// Mark as not current.
+	// TODO Use pgx.Batch
+	for _, t := range tables {
+		var b strings.Builder
+		b.WriteString("UPDATE " + t.MainSQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
+		// Run SQL.
+		if _, err := db.Exec(tx, b.String()); err != nil {
+			return err
+		}
 	}
 	return nil
 }

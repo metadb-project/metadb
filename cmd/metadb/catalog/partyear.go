@@ -19,16 +19,16 @@ func (c *Catalog) initPartYears() error {
 		return fmt.Errorf("selecting partition years: %v", err)
 	}
 	defer rows.Close()
-	part := make(map[string]map[int]bool)
+	part := make(map[string]map[int]struct{})
 	for rows.Next() {
 		var currentTable, yearTable string
 		err := rows.Scan(&currentTable, &yearTable)
 		if err != nil {
 			return fmt.Errorf("reading partition years: %v", err)
 		}
-		p := part[currentTable]
-		if p == nil {
-			p = make(map[int]bool)
+		p, ok := part[currentTable]
+		if !ok {
+			p = make(map[int]struct{})
 			part[currentTable] = p
 		}
 		year := yearTable[len(yearTable)-4:]
@@ -36,7 +36,7 @@ func (c *Catalog) initPartYears() error {
 		if err != nil {
 			return fmt.Errorf("invalid partition: %s", yearTable)
 		}
-		p[yearInt] = true
+		p[yearInt] = struct{}{}
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("reading partition years: %v", err)
@@ -61,16 +61,16 @@ func (c *Catalog) AddPartYearIfNotExists(schema, table string, year int) error {
 		" PARTITION OF " + nctable +
 		" FOR VALUES FROM ('" + yearStr + "-01-01') TO ('" + nextYearStr + "-01-01')"
 	if _, err := c.dc.Exec(context.TODO(), q); err != nil {
-		return err
+		fmt.Errorf("creating partition: %v", err)
 	}
 	// Update the cache.
 	schemaTable := schema + "." + table
 	p := c.partYears[schemaTable]
 	if p == nil {
-		p = make(map[int]bool)
+		p = make(map[int]struct{})
 		c.partYears[schemaTable] = p
 	}
-	p[year] = true
+	p[year] = struct{}{}
 	return nil
 }
 
@@ -79,5 +79,6 @@ func (c *Catalog) partYearExists(schema, table string, year int) bool {
 	if p == nil {
 		return false
 	}
-	return p[year]
+	_, ok := p[year]
+	return ok
 }

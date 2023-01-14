@@ -4,12 +4,14 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/metadb-project/metadb/cmd/metadb/catalog"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
 type Schema struct {
 	columns map[sqlx.Column]ColumnType
-	track   *Track
+	cat     *catalog.Catalog
 }
 
 type ColumnType struct {
@@ -17,7 +19,7 @@ type ColumnType struct {
 	CharMaxLen int64
 }
 
-func NewSchema(db sqlx.DB, track *Track) (*Schema, error) {
+func NewSchema(db sqlx.DB, cat *catalog.Catalog) (*Schema, error) {
 	columns := make(map[sqlx.Column]ColumnType)
 	// Read column schemas from database.
 	columnSchemas, err := getColumnSchemas(db)
@@ -25,16 +27,16 @@ func NewSchema(db sqlx.DB, track *Track) (*Schema, error) {
 		return nil, fmt.Errorf("reading column schemas: %s", err)
 	}
 	for _, col := range columnSchemas {
-		if !track.Contains(sqlx.NewTable(col.Schema, col.Table)) {
+		if !cat.TableExists(dbx.Table{S: col.Schema, T: col.Table}) {
 			continue
 		}
-		//if !track.Contains(&sqlx.Table{Schema: col.Schema, Table: col.Table}) {
+		//if !track.Contains(&sqlx.T{S: col.S, T: col.T}) {
 		//	continue
 		//}
 		c := sqlx.Column{Schema: col.Schema, Table: col.Table, Column: col.Column}
 		columns[c] = ColumnType{DataType: col.DataType, CharMaxLen: *col.CharMaxLen}
 	}
-	return &Schema{columns: columns, track: track}, nil
+	return &Schema{columns: columns, cat: cat}, nil
 }
 
 func getColumnSchemas(db sqlx.DB) ([]*sqlx.ColumnSchema, error) {

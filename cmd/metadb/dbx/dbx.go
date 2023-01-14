@@ -7,6 +7,23 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+type Table struct {
+	S string
+	T string
+}
+
+func (t *Table) String() string {
+	return t.S + "." + t.T
+}
+
+func (t *Table) SQL() string {
+	return "\"" + t.S + "\".\"" + t.T + "\""
+}
+
+func (t *Table) MainSQL() string {
+	return "\"" + t.S + "\".\"" + t.T + "__\""
+}
+
 type DB struct {
 	Host          string
 	Port          string
@@ -61,8 +78,8 @@ func (d *DB) connectUser(user, password string) (*pgx.Conn, error) {
 	return dc, nil
 }
 
-func Close(dbc *pgx.Conn) {
-	_ = dbc.Close(context.TODO())
+func Close(dc *pgx.Conn) {
+	_ = dc.Close(context.TODO())
 }
 
 func Rollback(tx pgx.Tx) {

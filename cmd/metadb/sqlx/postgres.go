@@ -197,7 +197,7 @@ func (d *PostgresDB) BeginTx() (*sql.Tx, error) {
 //	return true
 //}
 
-//func (d *Postgres) CreateIndex(name string, table *Table, columns []string) string {
+//func (d *Postgres) CreateIndex(name string, table *T, columns []string) string {
 //	var clist strings.Builder
 //	for i, c := range columns {
 //		if i != 0 {

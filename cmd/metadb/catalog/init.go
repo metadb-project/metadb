@@ -17,7 +17,8 @@ var catalogSchema = "metadb"
 
 type Catalog struct {
 	mu        sync.Mutex
-	partYears map[string]map[int]bool
+	tableDir  map[dbx.Table]tableEntry
+	partYears map[string]map[int]struct{}
 	dc        *pgx.Conn
 }
 
@@ -53,6 +54,9 @@ func Initialize(db *dbx.DB) (*Catalog, error) {
 
 	c := &Catalog{
 		dc: dc,
+	}
+	if err := c.initTableDir(); err != nil {
+		return nil, err
 	}
 	if err := c.initPartYears(); err != nil {
 		return nil, err
@@ -123,7 +127,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 		return fmt.Errorf("creating schema: "+catalogSchema+": %v", err)
 	}
 
-	// Table init
+	// T init
 	_, err = tx.Exec(context.TODO(), ""+
 		"CREATE TABLE "+catalogSchema+".init (\n"+
 		"    version VARCHAR(80) NOT NULL,\n"+
@@ -139,7 +143,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 		return fmt.Errorf("writing to table "+catalogSchema+".init: %v", err)
 	}
 
-	// Table auth
+	// T auth
 	_, err = tx.Exec(context.TODO(), ""+
 		"CREATE TABLE "+catalogSchema+".auth ("+
 		"    username text PRIMARY KEY,"+
@@ -149,7 +153,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 	if err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".auth: %v", err)
 	}
-	// Table origin
+	// T origin
 	_, err = tx.Exec(context.TODO(), ""+
 		"CREATE TABLE "+catalogSchema+".origin ("+
 		"    name text PRIMARY KEY"+
@@ -157,7 +161,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 	if err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".origin: %v", err)
 	}
-	// Table source
+	// T source
 	_, err = tx.Exec(context.TODO(), ""+
 		"CREATE TABLE "+catalogSchema+".source ("+
 		"    name text PRIMARY KEY,"+
@@ -175,7 +179,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 	if err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".source: %v", err)
 	}
-	// Table track
+	// T track
 	_, err = tx.Exec(context.TODO(), ""+
 		"CREATE TABLE "+catalogSchema+".track (\n"+
 		"    schemaname varchar(63) NOT NULL,\n"+
@@ -188,7 +192,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 	if err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".track: %v", err)
 	}
-	/*	// Table userperm
+	/*	// T userperm
 		_, err = tx.Exec(context.TODO(), ""+
 			"CREATE TABLE "+catalogSchema+".userperm (\n"+
 			"    username TEXT PRIMARY KEY,\n"+

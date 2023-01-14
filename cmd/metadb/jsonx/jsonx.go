@@ -166,7 +166,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				Op:              command.MergeOp,
 				SchemaName:      cmd.SchemaName,
 				TableName:       table,
-				ParentTable:     sqlx.Table{cmd.SchemaName, cmd.TableName},
+				ParentTable:     sqlx.T{cmd.SchemaName, cmd.TableName},
 				Origin:          cmd.Origin,
 				Column:          cols,
 				ChangeEvent:     cmd.ChangeEvent,

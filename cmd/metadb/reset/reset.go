@@ -1,16 +1,17 @@
 package reset
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
-	"github.com/metadb-project/metadb/cmd/metadb/metadata"
+	"github.com/metadb-project/metadb/cmd/metadb/catalog"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -25,32 +26,15 @@ func Reset(opt *option.Reset) error {
 			return nil
 		}
 	}
-	// Initialize sysdb
-	// if err := sysdb.Init(util.SysdbFileName(opt.Datadir)); err != nil {
-	// 	return fmt.Errorf("initializing system database: %s", err)
-	// }
-	// Open database
-	// dbtype, dsn, err := sysdb.ReadDataSource(opt.Connector)
-	// if err != nil {
-	// 	return err
-	// }
 	db, err := util.ReadConfigDatabase(opt.Datadir)
 	if err != nil {
 		return err
 	}
-	dsn := &sqlx.DSN{
-		Host:     db.Host,
-		Port:     db.Port,
-		User:     db.User,
-		Password: db.Password,
-		DBName:   db.DBName,
-		SSLMode:  db.SSLMode,
-	}
-	dc, err := sqlx.Open("postgresql", dsn)
+	dc, err := db.Connect()
 	if err != nil {
 		return err
 	}
-	defer dc.Close()
+	defer dbx.Close(dc)
 	exists, err := sourceExists(dc, opt.Source)
 	if err != nil {
 		return err
@@ -66,28 +50,28 @@ func Reset(opt *option.Reset) error {
 		}
 	*/
 	// Get list of tables
-	tmap, err := metadata.TrackRead(dc)
+	cat, err := catalog.Initialize(db)
 	if err != nil {
 		return err
 	}
-	var tables []sqlx.Table
-	for t := range tmap {
-		tables = append(tables, t)
-	}
+	tables := cat.AllTables()
 	sort.Slice(tables, func(i, j int) bool {
 		return tables[i].String() < tables[j].String()
 	})
 	for _, t := range tables {
 		eout.Info("resetting: %s", t.String())
-		if err = dc.VacuumAnalyzeTable(dc.HistoryTable(&t)); err != nil {
+		mainTable := t.MainSQL()
+		q := "VACUUM ANALYZE " + mainTable
+		if _, err := dc.Exec(context.TODO(), q); err != nil {
 			return err
 		}
-		q := "UPDATE " + dc.HistoryTableSQL(&t) + " SET __cf=FALSE WHERE __cf AND __current AND " +
+		q = "UPDATE " + mainTable + " SET __cf=FALSE WHERE __cf AND __current AND " +
 			"__source='" + opt.Source + "'"
-		if _, err = dc.Exec(nil, q); err != nil {
+		if _, err := dc.Exec(context.TODO(), q); err != nil {
 			return err
 		}
-		if err = dc.VacuumAnalyzeTable(dc.HistoryTable(&t)); err != nil {
+		q = "VACUUM ANALYZE " + mainTable
+		if _, err := dc.Exec(context.TODO(), q); err != nil {
 			return err
 		}
 	}
@@ -95,12 +79,12 @@ func Reset(opt *option.Reset) error {
 	return nil
 }
 
-func sourceExists(dc sqlx.DB, sourceName string) (bool, error) {
-	q := "SELECT 1 FROM metadb.source WHERE name='" + sourceName + "'"
+func sourceExists(dc *pgx.Conn, sourceName string) (bool, error) {
+	q := "SELECT 1 FROM metadb.source WHERE name=$1"
 	var i int64
-	err := dc.QueryRow(nil, q).Scan(&i)
+	err := dc.QueryRow(context.TODO(), q, sourceName).Scan(&i)
 	switch {
-	case err == sql.ErrNoRows:
+	case err == pgx.ErrNoRows:
 		return false, nil
 	case err != nil:
 		return false, err
