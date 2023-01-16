@@ -58,7 +58,9 @@ func (c *Catalog) TableExists(table dbx.Table) bool {
 }
 
 func (c *Catalog) AddTableEntry(table dbx.Table, transformed bool, parentTable dbx.Table) error {
-	c.updateTableEntryWithLock(table, transformed, parentTable)
+	if err := c.updateTableEntryWithLock(table, transformed, parentTable); err != nil {
+		return fmt.Errorf("updating table entry: %v", err)
+	}
 	q := "INSERT INTO " + catalogSchema + ".track(schemaname,tablename,transformed,parentschema,parenttable)VALUES($1,$2,$3,$4,$5)"
 	if _, err := c.dc.Exec(context.TODO(), q, table.S, table.T, transformed, parentTable.S, parentTable.T); err != nil {
 		return fmt.Errorf("writing table metadata: %s: %s", table, err)

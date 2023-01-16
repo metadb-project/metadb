@@ -61,7 +61,7 @@ func (c *Catalog) AddPartYearIfNotExists(schema, table string, year int) error {
 		" PARTITION OF " + nctable +
 		" FOR VALUES FROM ('" + yearStr + "-01-01') TO ('" + nextYearStr + "-01-01')"
 	if _, err := c.dc.Exec(context.TODO(), q); err != nil {
-		fmt.Errorf("creating partition: %v", err)
+		return fmt.Errorf("creating partition: %v", err)
 	}
 	// Update the cache.
 	schemaTable := schema + "." + table
