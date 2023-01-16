@@ -309,3 +309,25 @@ resynchronization process.
 Until a failed stream is re-streamed by following the process above,
 the analytic database may continue to be unsynchronized with the
 source.
+
+=== Configuring database users
+
+To create a new database user account:
+
+[source]
+----
+CREATE USER tiggy PASSWORD 'LZn2DCajcNHpGR3ZXWHD';
+----
+
+In addition to creating the user, this also creates a schema with the
+same name as the user which can be used as a workspace.
+
+To give the user access to all tables generated from a data source
+(including tables not yet created):
+
+[source]
+----
+AUTHORIZE SELECT
+    ON ALL TABLES IN DATA SOURCE example
+    TO tiggy;
+----
