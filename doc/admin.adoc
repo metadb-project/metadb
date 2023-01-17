@@ -2,10 +2,22 @@
 
 === System requirements
 
+==== Hardware requirements
+
+* Metadb software:
+** Memory: 2 GB
+** Storage: 500 GB SSD
+* PostgreSQL database:
+** CPU: 4 cores
+** Memory: 32 GB
+** Storage: 2 TB SSD
+
+==== Software requirements
+
 * Architecture: x86-64 (AMD64)
 * Operating system: Debian 11
-* https://www.postgresql.org/[PostgreSQL] 14.6 or later
-** PostgreSQL 15.1 or later is recommended
+* https://www.postgresql.org/[PostgreSQL] 14 or later
+** PostgreSQL 15 or later is recommended
 ** AWS RDS PostgreSQL optionally may be used (with servers in the same
    zone/subnet); Aurora is not supported
 * Required to build from source:
@@ -13,6 +25,20 @@
 ** goyacc (installation instructions below)
 ** https://www.colm.net/open-source/ragel/[Ragel] 6.10 or later
 ** https://gcc.gnu.org/[GCC C compiler] 9.3.0 or later
+
+==== PostgreSQL configuration
+
+* `checkpoint_timeout`: `3600`
+* `cpu_tuple_cost`: `0.03`
+* `default_statistics_target`: `1000`
+* `effective_io_concurrency`: `200`
+* `idle_in_transaction_session_timeout`: `3600000`
+* `idle_session_timeout`: `604800000`
+* `maintenance_work_mem`: `1000000`
+* `max_wal_size`: `10240`
+* `shared_buffers`: `1250000`
+* `statement_timeout`: `3600000`
+* `work_mem`: `350000`
 
 === Building the software
 
