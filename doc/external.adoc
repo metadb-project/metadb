@@ -22,11 +22,15 @@ It is recommended to use a separate Kafka cluster, rather than the
 FOLIO Kafka instance, until one has experience with administration of
 Kafka.
 
-In the Debezium PostgreSQL connector configuration, it is suggested
-that credentials (`.+mod_login`), the public schema, the Okapi
-supertenant (`supertenant_mod_.+`), and mod-pubsub data
-(`pubsub_config,.+_mod_pubsub`) be excluded using the
-`schema.exclude.list` setting.
+In the Debezium PostgreSQL connector configuration, the following
+exclusions are suggested:
+
+----
+"schema.exclude.list": "public,.*_mod_login,.*_mod_pubsub,.*pubsub_config,supertenant_mod_.*,.*_mod_kb_ebsco_java,.*_mod_data_export_spring"
+----
+----
+"table.exclude.list": ".*_mod_agreements.alternate_resource_name,.*_mod_service_interaction.dashboard_access,.*_mod_agreements.availability_constraint,.*_mod_agreements\\.package_description_url,.*_mod_agreements\\.content_type,.*_mod_agreements\\.entitlement_tag,.*_mod_agreements\\.erm_resource_tag,.*_mod_agreements\\.string_template,.*_mod_agreements\\.string_template_scopes,.*_mod_agreements\\.templated_url,.*_mod_oai_pmh\\.instances,.*_mod_remote_storage\\.original_locations,.*_mod_remote_storage\\.item_notes,.*app_setting,.*alternate_name,.*databasechangelog,.*databasechangeloglock,.*directory_entry_tag,.*license_document_attachment,.*license_supp_doc,.*license_tag,.*log_entry_additional_info,.*subscription_agreement_supp_doc,.*subscription_agreement_document_attachment,.*subscription_agreement_ext_lic_doc,.*subscription_agreement_tag,.*tenant_changelog,.*tenant_changelog_lock,.*marc_indexers.*,.*rmb_internal.*,.*rmb_job.*,.*_mod_agreements\\.match_key,.*system_changelog"
+----
 
 === ReShare
 
