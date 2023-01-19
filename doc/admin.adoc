@@ -193,7 +193,8 @@ CREATE DATA SOURCE example TYPE kafka OPTIONS (
     brokers 'kafka:29092',
     topics '^metadb_example_1.*',
     consumergroup 'metadb_example_1_1',
-    addschemaprefix 'example_'
+    addschemaprefix 'example_',
+    schemastopfilter 'admin'
 );
 ----
 
@@ -211,9 +212,7 @@ To allow capturing data changes in the source PostgreSQL database,
 logical decoding must be enabled, in particular by setting `wal_level
 = logical` in `postgresql.conf`.
 
-Next, to begin streaming to Kafka, "POST" a connector configuration to
-Kafka Connect at `/connectors`, for example creating a file
-`connector.json`:
+Next we create a connector configuration file for Kafka Connect:
 
 ----
 {
@@ -231,11 +230,30 @@ Kafka Connect at `/connectors`, for example creating a file
         "tasks.max": "1",
         "truncate.handling.mode": "include",
         "publication.autocreate.mode", "filtered"
+        "heartbeat.interval.ms": "30000",
+        "heartbeat.action.query": "UPDATE admin.heartbeat set last_heartbeat_ts = now();"
     }
 }
 ----
 
-Then:
+It is recommended to use the connector configuration settings
+`heartbeat.interval.ms` and `heartbeat.action.query` as above to avoid
+spikes in disk space consumption within the source database.  (See the
+Debezium PostgreSQL connector documentation for more details.)  The
+`schemastopfilter` option of the `CREATE DATA SOURCE` command is used
+to filter out the heartbeat table.
+
+In the source database:
+
+----
+CREATE SCHEMA admin;
+
+CREATE TABLE admin.heartbeat (last_heartbeat_ts timestamptz PRIMARY KEY);
+
+INSERT INTO admin.heartbeat (last_heartbeat_ts) VALUES (now());
+----
+
+Then to create the connector:
 
 ----
 curl -X POST -i -H "Accept: application/json" -H "Content-Type: application/json" \
@@ -253,15 +271,6 @@ should be filtered out in the Debezium PostgreSQL connector
 configuration by setting `schema.exclude.list` or
 `table.exclude.list`.  Otherwise they will generate error messages in
 the Metadb log.
-
-It is recommended to use the connector configuration settings
-`heartbeat.interval.ms` and `heartbeat.action.query` to avoid spikes
-in disk space consumption within the source database.  (See the
-Debezium PostgreSQL connector documentation for more details.)  It is
-best to place the heartbeat table in a schema apart from the data that
-will be read by Metadb, and then the `schemastopfilter` option of the
-`CREATE DATA SOURCE` command can be used to filter out the heartbeat
-table.
 
 The replication slot disk usage must be monitored, because under
 certain error conditions it can grow too large and possibly fill up
