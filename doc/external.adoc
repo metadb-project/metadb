@@ -14,7 +14,8 @@ CREATE DATA SOURCE folio TYPE kafka OPTIONS (
     addschemaprefix 'folio_',
     brokers 'kafka:29092',
     topics '^metadb_example_1.*',
-    consumergroup 'metadb_example_1_1'
+    consumergroup 'metadb_example_1_1',
+    schemastopfilter 'admin'
 );
 ----
 
@@ -55,7 +56,8 @@ CREATE DATA SOURCE reshare TYPE kafka OPTIONS (
     addschemaprefix 'reshare_',
     brokers 'kafka:29092',
     topics '^metadb_example_1.*',
-    consumergroup 'metadb_example_1_1'
+    consumergroup 'metadb_example_1_1',
+    schemastopfilter 'admin'
 );
 ----
 
