@@ -124,7 +124,14 @@ continuing.
 
 === Running the server
 
-To start the server:
+If upgrading from a previous version, first run the upgrade process in
+case changes are needed:
+
+----
+metadb upgrade -D data
+----
+
+Then to start the server:
 
 [source,bash]
 ----
