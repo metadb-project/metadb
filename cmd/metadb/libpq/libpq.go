@@ -123,7 +123,7 @@ func startup(conn net.Conn, backend *pgproto3.Backend) error {
 		}
 		return nil
 	case *pgproto3.StartupMessage:
-		fmt.Printf("%#v\n", m)
+		//fmt.Printf("%#v\n", m)
 		// &pgproto3.StartupMessage{
 		//ProtocolVersion:0x30000,
 		//Parameters:map[string]string{"application_name":"psql",
@@ -735,6 +735,10 @@ func createDataOrigin(conn net.Conn, node *ast.CreateDataOriginStmt, dc *pgx.Con
 	if err != nil {
 		return fmt.Errorf("writing origin configuration: %v", err)
 	}
+
+	_ = write(conn, encode(nil, []pgproto3.Message{
+		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server for new origin to take effect"},
+	}))
 
 	b := encode(nil, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("CREATE DATA ORIGIN")},
