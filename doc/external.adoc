@@ -46,6 +46,9 @@ CREATE DATA ORIGIN tenant2;
 CREATE DATA ORIGIN tenant3;
 ----
 
+Note: CREATE DATA ORIGIN currently requires restarting the server
+before it will take effect.
+
 Then use the `module 'reshare'` option when creating the data source,
 and set `addschemaprefix` to add a `reshare_` prefix to the schema
 names:
@@ -65,8 +68,8 @@ Note that the order of commands is important: The initial set of data
 origins should be created before the data source is created so that
 schema names of incoming data will be processed correctly.  Later,
 whenever a new consortial tenant is to be added, it should be defined
-in Metadb using `CREATE DATA ORIGIN` before the tenant is added to
-ReShare.
+in Metadb using `CREATE DATA ORIGIN` (and the server restarted) before
+the tenant is added to ReShare.
 
 In the Debezium PostgreSQL connector configuration, it is suggested
 that credentials (`.+mod_login`), the public schema, the Okapi

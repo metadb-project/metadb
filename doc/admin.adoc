@@ -366,3 +366,7 @@ AUTHORIZE SELECT
     ON ALL TABLES IN DATA SOURCE example
     TO tiggy;
 ----
+
+Note: AUTHORIZE currently requires restarting the server before it
+will take effect.
+
