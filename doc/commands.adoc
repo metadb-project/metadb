@@ -79,8 +79,12 @@ The AUTHORIZE command grants access to tables.  It differs from GRANT
 in that the authorization will also apply to tables created at a later
 time in the data source.
 
-Note: AUTHORIZE currently requires restarting the server before it
-will take effect.
+.Note
+****
+[.text-center]
+AUTHORIZE currently requires restarting the server before it will take
+effect.
+****
 
 ===== Parameters
 
@@ -114,8 +118,12 @@ CREATE DATA ORIGIN `*_origin_name_*`
 
 CREATE DATA ORIGIN defines a new origin.
 
-Note: CREATE DATA ORIGIN currently requires restarting the server
-before it will take effect.
+.Note
+****
+[.text-center]
+CREATE DATA ORIGIN currently requires restarting the server before it
+will take effect.
+****
 
 ===== Parameters
 

@@ -367,6 +367,9 @@ AUTHORIZE SELECT
     TO tiggy;
 ----
 
-Note: AUTHORIZE currently requires restarting the server before it
-will take effect.
-
+.Note
+****
+[.text-center]
+AUTHORIZE currently requires restarting the server before it will take
+effect.
+****
