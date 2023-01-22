@@ -488,6 +488,10 @@ func alterDataSource(conn net.Conn, node *ast.AlterDataSourceStmt, dc *pgx.Conn)
 		return err
 	}
 
+	_ = write(conn, encode(nil, []pgproto3.Message{
+		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server for data source changes to take effect"},
+	}))
+
 	b := encode(nil, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("ALTER DATA SOURCE")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
