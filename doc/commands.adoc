@@ -39,6 +39,13 @@ ALTER DATA SOURCE `*_source_name_*`
 
 ALTER DATA SOURCE changes connection settings for a data source.
 
+.Note
+****
+[.text-center]
+ALTER DATA SOURCE currently requires restarting the server before it
+will take effect.
+****
+
 ===== Parameters
 
 [frame=none,grid=none,cols="1,2"]

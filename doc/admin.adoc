@@ -323,9 +323,12 @@ procedure:
 ALTER DATA SOURCE example OPTIONS
     (SET topics '^metadb_example_2.*', SET consumergroup 'metadb_example_2_1');
 ----
++
+*Do not restart the Metadb server but continue directly to Step 2.*
 
-2. Stop the Metadb server, and then "reset" the analytic database to
-   mark current data as old.  This may take some time to run.
+2. Stop the Metadb server and (before starting it again) "reset" the
+   analytic database to mark current data as old.  This may take some
+   time to run.
 +
 [source,bash]
 ----
