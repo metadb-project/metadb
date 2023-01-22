@@ -5,6 +5,7 @@
 ==== Hardware requirements
 
 * Metadb software:
+** CPU: 2 cores
 ** Memory: 2 GB
 ** Storage: 500 GB SSD
 * PostgreSQL database:
@@ -138,8 +139,16 @@ Then to start the server:
 nohup metadb start -D data -l metadb.log &
 ----
 
-The server listens on port 8440 by default.  The `--debug` option can
-be used to enable verbose logging.
+The `--memlimit` option can be used to set a soft memory limit (in
+GiB) if needed, for example:
+
+[source,bash]
+----
+nohup metadb start -D data -l metadb.log --memlimit 2 &
+----
+
+The server listens on port 8440 by default, but this can be set using
+the `--port` option.  The `--debug` option enables verbose logging.
 
 To stop the server:
 

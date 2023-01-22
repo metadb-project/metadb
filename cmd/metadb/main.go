@@ -155,6 +155,7 @@ func run() error {
 	_ = sourceFileFlag(cmdStart, &serverOpt.SourceFilename)
 	_ = logSourceFlag(cmdStart, &serverOpt.LogSource)
 	//_ = noTLSFlag(cmdStart, &serverOpt.NoTLS)
+	_ = memoryLimitFlag(cmdStart, &serverOpt.MemoryLimit)
 
 	var cmdStop = &cobra.Command{
 		Use: "stop",
@@ -331,6 +332,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			noKafkaCommitFlag(nil, nil) +
 			sourceFileFlag(nil, nil) +
 			logSourceFlag(nil, nil) +
+			memoryLimitFlag(nil, nil) +
 			"")
 	case "stop":
 		fmt.Printf("" +
@@ -566,6 +568,14 @@ func dirFlag(cmd *cobra.Command, datadir *string) string {
 //		"      --notls                 - Disable TLS in client connections [insecure,\n" +
 //		"                                use for testing only]\n"
 //}
+
+func memoryLimitFlag(cmd *cobra.Command, memoryLimit *float64) string {
+	if cmd != nil {
+		cmd.Flags().Float64Var(memoryLimit, "memlimit", 16.0, "")
+	}
+	return "" +
+		"      --memlimit <m>          - Approximate limit on memory usage in GiB\n"
+}
 
 func setupLog(logfile, csvlogfile string, debug bool, trace bool) (*os.File, *os.File, error) {
 	var err error

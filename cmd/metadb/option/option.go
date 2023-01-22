@@ -32,6 +32,7 @@ type Server struct {
 	TLSKey         string
 	NoTLS          bool
 	RewriteJSON    bool
+	MemoryLimit    float64
 }
 
 type Stop struct {

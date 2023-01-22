@@ -3,11 +3,13 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"regexp"
+	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -117,10 +119,17 @@ func runServer(svr *server) error {
 	// if svr.opt.RewriteJSON {
 	// 	log.Info("enabled JSON rewriting")
 	// }
+	setMemoryLimit(svr.opt.MemoryLimit)
+
 	if svr.opt.NoTLS {
 		log.Warning("TLS disabled for all client connections")
 	}
 	return launchServer(svr)
+}
+
+func setMemoryLimit(limit float64) {
+	// limit is specified in GiB.
+	debug.SetMemoryLimit(int64(math.Min(math.Max(0.122, limit), 16.0) * 1073741824))
 }
 
 func launchServer(svr *server) error {
