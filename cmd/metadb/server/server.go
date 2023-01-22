@@ -1,7 +1,9 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -14,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
@@ -196,6 +199,8 @@ func mainServer(svr *server) error {
 
 	go goPollLoop(cat, svr)
 
+	go goVacuum(*(svr.db))
+
 	for {
 		if process.Stop() {
 			break
@@ -206,6 +211,60 @@ func mainServer(svr *server) error {
 	cat.Close()
 
 	return nil
+}
+
+func goVacuum(db dbx.DB) {
+	for {
+		checkTimeVacuumAll(db)
+		time.Sleep(5 * time.Minute)
+	}
+}
+
+func checkTimeVacuumAll(db dbx.DB) {
+	dc, err := db.Connect()
+	if err != nil {
+		log.Error("%v", err)
+		return
+	}
+	defer dbx.Close(dc)
+
+	var overdue bool
+	q := "SELECT CURRENT_TIMESTAMP > next_maintenance_time FROM metadb.maintenance"
+	err = dc.QueryRow(context.TODO(), q).Scan(&overdue)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		fallthrough
+	case err != nil:
+		log.Error("error checking maintenance time: %v", err)
+		return
+	default:
+		if !overdue {
+			return
+		}
+	}
+
+	log.Info("starting maintenance")
+
+	q = "UPDATE metadb.maintenance SET next_maintenance_time = next_maintenance_time + INTERVAL '1' DAY"
+	if _, err = dc.Exec(context.TODO(), q); err != nil {
+		log.Error("error updating maintenance time: %v", err)
+		return
+	}
+
+	dcsuper, err := db.ConnectSuper()
+	if err != nil {
+		log.Error("%v", err)
+		return
+	}
+	defer dbx.Close(dcsuper)
+
+	q = "VACUUM ANALYZE"
+	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+		log.Error("error running vacuum analyze: %v", err)
+		return
+	}
+
+	log.Info("completed maintenance")
 }
 
 func goCreateFunctions(db dbx.DB) {

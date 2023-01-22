@@ -127,7 +127,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 		return fmt.Errorf("creating schema: "+catalogSchema+": %v", err)
 	}
 
-	// T init
+	// Table init
 	_, err = tx.Exec(context.TODO(), ""+
 		"CREATE TABLE "+catalogSchema+".init (\n"+
 		"    version VARCHAR(80) NOT NULL,\n"+
@@ -143,7 +143,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 		return fmt.Errorf("writing to table "+catalogSchema+".init: %v", err)
 	}
 
-	// T auth
+	// Table auth
 	_, err = tx.Exec(context.TODO(), ""+
 		"CREATE TABLE "+catalogSchema+".auth ("+
 		"    username text PRIMARY KEY,"+
@@ -153,7 +153,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 	if err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".auth: %v", err)
 	}
-	// T origin
+	// Table origin
 	_, err = tx.Exec(context.TODO(), ""+
 		"CREATE TABLE "+catalogSchema+".origin ("+
 		"    name text PRIMARY KEY"+
@@ -161,7 +161,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 	if err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".origin: %v", err)
 	}
-	// T source
+	// Table source
 	_, err = tx.Exec(context.TODO(), ""+
 		"CREATE TABLE "+catalogSchema+".source ("+
 		"    name text PRIMARY KEY,"+
@@ -179,7 +179,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 	if err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".source: %v", err)
 	}
-	// T track
+	// Table track
 	_, err = tx.Exec(context.TODO(), ""+
 		"CREATE TABLE "+catalogSchema+".track (\n"+
 		"    schemaname varchar(63) NOT NULL,\n"+
@@ -192,7 +192,7 @@ func createCatalogSchema(dc *pgx.Conn) error {
 	if err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".track: %v", err)
 	}
-	/*	// T userperm
+	/*	// Table userperm
 		_, err = tx.Exec(context.TODO(), ""+
 			"CREATE TABLE "+catalogSchema+".userperm (\n"+
 			"    username TEXT PRIMARY KEY,\n"+
@@ -203,6 +203,19 @@ func createCatalogSchema(dc *pgx.Conn) error {
 			return fmt.Errorf("creating table "+catalogSchema+".userperm: %v", err)
 		}
 	*/
+
+	q = "CREATE TABLE " + catalogSchema + ".maintenance (" +
+		"next_maintenance_time timestamptz" +
+		")"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "INSERT INTO " + catalogSchema + ".maintenance " +
+		"(next_maintenance_time) VALUES " +
+		"(CURRENT_DATE::timestamptz)"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
 
 	if err = tx.Commit(context.TODO()); err != nil {
 		return fmt.Errorf("initializing system database: committing changes: %v", err)

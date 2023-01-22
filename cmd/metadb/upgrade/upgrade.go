@@ -390,6 +390,7 @@ var updbList = []updbFunc{
 	updb8,
 	updb9,
 	updb10,
+	updb11,
 }
 
 /*
@@ -938,6 +939,43 @@ func updb10(opt *dbopt) error {
 		}
 	}
 
+	return nil
+}
+
+func updb11(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+	// Begin transaction
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+
+	q := "CREATE TABLE metadb.maintenance (" +
+		"next_maintenance_time timestamptz" +
+		")"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "INSERT INTO metadb.maintenance (next_maintenance_time) VALUES (CURRENT_DATE::timestamptz)"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+
+	// Write new version number
+	err = metadata.WriteDatabaseVersion(tx, 11)
+	if err != nil {
+		return err
+	}
+	err = tx.Commit(context.TODO())
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
