@@ -247,7 +247,7 @@ Next we create a connector configuration file for Kafka Connect:
         "truncate.handling.mode": "include",
         "publication.autocreate.mode", "filtered"
         "heartbeat.interval.ms": "30000",
-        "heartbeat.action.query": "UPDATE admin.heartbeat set last_heartbeat_ts = now();"
+        "heartbeat.action.query": "UPDATE admin.heartbeat set last_heartbeat = now();"
     }
 }
 ----
@@ -264,9 +264,9 @@ In the source database:
 ----
 CREATE SCHEMA admin;
 
-CREATE TABLE admin.heartbeat (last_heartbeat_ts timestamptz PRIMARY KEY);
+CREATE TABLE admin.heartbeat (last_heartbeat timestamptz PRIMARY KEY);
 
-INSERT INTO admin.heartbeat (last_heartbeat_ts) VALUES (now());
+INSERT INTO admin.heartbeat (last_heartbeat) VALUES (now());
 ----
 
 Then to create the connector:
