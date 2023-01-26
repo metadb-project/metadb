@@ -962,7 +962,8 @@ func updb11(opt *dbopt) error {
 	if _, err = tx.Exec(context.TODO(), q); err != nil {
 		return err
 	}
-	q = "INSERT INTO metadb.maintenance (next_maintenance_time) VALUES (CURRENT_DATE::timestamptz)"
+	q = "INSERT INTO metadb.maintenance (next_maintenance_time) " +
+		"VALUES (CURRENT_DATE::timestamptz + INTERVAL '1 day')"
 	if _, err = tx.Exec(context.TODO(), q); err != nil {
 		return err
 	}
