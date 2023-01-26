@@ -199,7 +199,7 @@ func mainServer(svr *server) error {
 
 	go goPollLoop(cat, svr)
 
-	go goVacuum(*(svr.db))
+	go goVacuum(*(svr.db), cat)
 
 	for {
 		if process.Stop() {
@@ -213,14 +213,14 @@ func mainServer(svr *server) error {
 	return nil
 }
 
-func goVacuum(db dbx.DB) {
+func goVacuum(db dbx.DB, cat *catalog.Catalog) {
 	for {
-		checkTimeVacuumAll(db)
+		checkTimeVacuumAll(db, cat)
 		time.Sleep(5 * time.Minute)
 	}
 }
 
-func checkTimeVacuumAll(db dbx.DB) {
+func checkTimeVacuumAll(db dbx.DB, cat *catalog.Catalog) {
 	dc, err := db.Connect()
 	if err != nil {
 		log.Error("%v", err)
@@ -260,10 +260,14 @@ func checkTimeVacuumAll(db dbx.DB) {
 	}
 	defer dbx.Close(dcsuper)
 
-	q = "VACUUM ANALYZE"
-	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		log.Error("error running vacuum analyze: %v", err)
-		return
+	for _, t := range cat.AllTables() {
+		q = "VACUUM ANALYZE " + t.String()
+		log.Trace(q)
+		if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+			log.Error("error running vacuum analyze: %s: %v", t, err)
+			return
+		}
+
 	}
 
 	log.Info("completed maintenance")
