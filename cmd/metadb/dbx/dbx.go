@@ -12,7 +12,7 @@ type Table struct {
 	T string
 }
 
-func (t *Table) String() string {
+func (t Table) String() string {
 	return t.S + "." + t.T
 }
 
