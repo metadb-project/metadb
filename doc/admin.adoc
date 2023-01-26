@@ -123,16 +123,24 @@ Metadb will assume that the database, superuser, and systemuser
 defined here already exist; so they should be created before
 continuing.
 
-=== Running the server
+=== Upgrading from a previous version
 
 If upgrading from a previous version, first run the upgrade process in
-case changes are needed:
+case changes are required:
 
 ----
 metadb upgrade -D data
 ----
 
-Then to start the server:
+If no changes are needed, the process outputs:
+
+----
+metadb: "data" is up to date
+----
+
+=== Running the server
+
+To start the server:
 
 [source,bash]
 ----
