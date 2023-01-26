@@ -260,9 +260,19 @@ func checkTimeVacuumAll(db dbx.DB, cat *catalog.Catalog) {
 	}
 	defer dbx.Close(dcsuper)
 
-	for _, t := range cat.AllTables() {
+	for _, t := range catalog.SystemTables() {
+		log.Trace("vacuuming table %s", t)
 		q = "VACUUM ANALYZE " + t.String()
-		log.Trace(q)
+		if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+			log.Error("error running vacuum analyze: %s: %v", t, err)
+			return
+		}
+
+	}
+	for _, table := range cat.AllTables() {
+		t := table.String() + "__"
+		log.Trace("vacuuming table %s", t)
+		q = "VACUUM ANALYZE " + t
 		if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
 			log.Error("error running vacuum analyze: %s: %v", t, err)
 			return
