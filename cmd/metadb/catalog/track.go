@@ -43,6 +43,9 @@ func (c *Catalog) initTableDir() error {
 	// Fill in children.
 	for t, e := range tableDir {
 		if e.transformed {
+			if _, ok := tableDir[e.parentTable]; !ok {
+				return fmt.Errorf("table %s has parent %s not found in catalog", t, e.parentTable)
+			}
 			tableDir[e.parentTable].children[t] = struct{}{}
 		}
 	}
