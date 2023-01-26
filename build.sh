@@ -73,15 +73,15 @@ fi
 bindir=bin
 
 if ! $fast; then
-    if ! $quiet; then
-        echo 'build.sh: removing executables' 1>&2
-    fi
+    # if ! $quiet; then
+    #     echo 'build.sh: removing executables' 1>&2
+    # fi
     rm -f ./$bindir/metadb ./$bindir/mdb ./cmd/metadb/parser/gram.go ./cmd/metadb/parser/scan.go ./cmd/metadb/parser/y.output
 fi
 
-if ! $quiet; then
-    echo 'build.sh: compiling Metadb' 1>&2
-fi
+# if ! $quiet; then
+#     echo 'build.sh: compiling Metadb' 1>&2
+# fi
 
 version=`git describe --tags --always`
 
