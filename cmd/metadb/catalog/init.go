@@ -114,6 +114,30 @@ func catalogSchemaExists(dc *pgx.Conn) (bool, error) {
 	}
 }
 
+type createTableFunc func(pgx.Tx) error
+
+type systemTableDef struct {
+	table  dbx.Table
+	create createTableFunc
+}
+
+var systemTables = []systemTableDef{
+	{table: dbx.Table{S: catalogSchema, T: "auth"}, create: createTableAuth},
+	{table: dbx.Table{S: catalogSchema, T: "init"}, create: createTableInit},
+	{table: dbx.Table{S: catalogSchema, T: "maintenance"}, create: createTableMaintenance},
+	{table: dbx.Table{S: catalogSchema, T: "origin"}, create: createTableOrigin},
+	{table: dbx.Table{S: catalogSchema, T: "source"}, create: createTableSource},
+	{table: dbx.Table{S: catalogSchema, T: "track"}, create: createTableTrack},
+}
+
+func SystemTables() []dbx.Table {
+	var tables []dbx.Table
+	for _, t := range systemTables {
+		tables = append(tables, t.table)
+	}
+	return tables
+}
+
 func createCatalogSchema(dc *pgx.Conn) error {
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
@@ -121,104 +145,106 @@ func createCatalogSchema(dc *pgx.Conn) error {
 	}
 	defer dbx.Rollback(tx)
 
+	log.Trace("creating schema %s", catalogSchema)
 	var q = "CREATE SCHEMA " + catalogSchema
 	_, err = tx.Exec(context.TODO(), q)
 	if err != nil {
 		return fmt.Errorf("creating schema: "+catalogSchema+": %v", err)
 	}
 
-	// Table init
-	_, err = tx.Exec(context.TODO(), ""+
-		"CREATE TABLE "+catalogSchema+".init (\n"+
-		"    version VARCHAR(80) NOT NULL,\n"+
-		"    dbversion INTEGER NOT NULL\n"+
-		")")
-	if err != nil {
+	for _, t := range systemTables {
+		log.Trace("creating table %s", t.table)
+		if err = t.create(tx); err != nil {
+			return fmt.Errorf("creating table %s: %v", t.table, err)
+		}
+	}
+
+	if err = tx.Commit(context.TODO()); err != nil {
+		return fmt.Errorf("initializing system database: committing changes: %v", err)
+	}
+	return nil
+}
+
+func createTableAuth(tx pgx.Tx) error {
+	q := "CREATE TABLE " + catalogSchema + ".auth (" +
+		"username text PRIMARY KEY, " +
+		"tables text NOT NULL, " +
+		"dbupdated boolean NOT NULL)"
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("creating table "+catalogSchema+".auth: %v", err)
+	}
+	return nil
+}
+
+func createTableInit(tx pgx.Tx) error {
+	q := "CREATE TABLE " + catalogSchema + ".init (" +
+		"version VARCHAR(80) NOT NULL, " +
+		"dbversion INTEGER NOT NULL)"
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".track: %v", err)
 	}
 	mver := util.MetadbVersionString()
 	dbver := strconv.FormatInt(util.DatabaseVersion, 10)
-	_, err = tx.Exec(context.TODO(), "INSERT INTO "+catalogSchema+".init (version, dbversion) VALUES ('"+mver+"', "+dbver+")")
-	if err != nil {
+	q = "INSERT INTO " + catalogSchema + ".init (version, dbversion) VALUES ('" + mver + "', " + dbver + ")"
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("writing to table "+catalogSchema+".init: %v", err)
 	}
+	return nil
+}
 
-	// Table auth
-	_, err = tx.Exec(context.TODO(), ""+
-		"CREATE TABLE "+catalogSchema+".auth ("+
-		"    username text PRIMARY KEY,"+
-		"    tables text NOT NULL,"+
-		"    dbupdated boolean NOT NULL"+
-		")")
-	if err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".auth: %v", err)
-	}
-	// Table origin
-	_, err = tx.Exec(context.TODO(), ""+
-		"CREATE TABLE "+catalogSchema+".origin ("+
-		"    name text PRIMARY KEY"+
-		")")
-	if err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".origin: %v", err)
-	}
-	// Table source
-	_, err = tx.Exec(context.TODO(), ""+
-		"CREATE TABLE "+catalogSchema+".source ("+
-		"    name text PRIMARY KEY,"+
-		"    enable boolean NOT NULL,"+
-		"    brokers text,"+
-		"    security text,"+
-		"    topics text,"+
-		"    consumergroup text,"+
-		"    schemapassfilter text,"+
-		"    schemastopfilter text,"+
-		"    trimschemaprefix text,"+
-		"    addschemaprefix text,"+
-		"    module text"+
-		")")
-	if err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".source: %v", err)
-	}
-	// Table track
-	_, err = tx.Exec(context.TODO(), ""+
-		"CREATE TABLE "+catalogSchema+".track (\n"+
-		"    schemaname varchar(63) NOT NULL,\n"+
-		"    tablename varchar(63) NOT NULL,\n"+
-		"    PRIMARY KEY (schemaname, tablename),\n"+
-		"    transformed boolean NOT NULL,\n"+
-		"    parentschema varchar(63) NOT NULL,\n"+
-		"    parenttable varchar(63) NOT NULL\n"+
-		")")
-	if err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".track: %v", err)
-	}
-	/*	// Table userperm
-		_, err = tx.Exec(context.TODO(), ""+
-			"CREATE TABLE "+catalogSchema+".userperm (\n"+
-			"    username TEXT PRIMARY KEY,\n"+
-			"    tables TEXT NOT NULL,\n"+
-			"    dbupdated BOOLEAN NOT NULL\n"+
-			")")
-		if err != nil {
-			return fmt.Errorf("creating table "+catalogSchema+".userperm: %v", err)
-		}
-	*/
-
-	q = "CREATE TABLE " + catalogSchema + ".maintenance (" +
-		"next_maintenance_time timestamptz" +
-		")"
-	if _, err = tx.Exec(context.TODO(), q); err != nil {
+func createTableMaintenance(tx pgx.Tx) error {
+	q := "CREATE TABLE " + catalogSchema + ".maintenance (" +
+		"next_maintenance_time timestamptz)"
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return err
 	}
 	q = "INSERT INTO " + catalogSchema + ".maintenance " +
 		"(next_maintenance_time) VALUES " +
 		"(CURRENT_DATE::timestamptz)"
-	if _, err = tx.Exec(context.TODO(), q); err != nil {
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return err
 	}
+	return nil
+}
 
-	if err = tx.Commit(context.TODO()); err != nil {
-		return fmt.Errorf("initializing system database: committing changes: %v", err)
+func createTableOrigin(tx pgx.Tx) error {
+	q := "CREATE TABLE " + catalogSchema + ".origin (" +
+		"name text PRIMARY KEY)"
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("creating table "+catalogSchema+".origin: %v", err)
+	}
+	return nil
+}
+
+func createTableSource(tx pgx.Tx) error {
+	q := "CREATE TABLE " + catalogSchema + ".source (" +
+		"name text PRIMARY KEY, " +
+		"enable boolean NOT NULL, " +
+		"brokers text, " +
+		"security text, " +
+		"topics text, " +
+		"consumergroup text, " +
+		"schemapassfilter text, " +
+		"schemastopfilter text, " +
+		"trimschemaprefix text, " +
+		"addschemaprefix text, " +
+		"module text)"
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("creating table "+catalogSchema+".source: %v", err)
+	}
+	return nil
+}
+
+func createTableTrack(tx pgx.Tx) error {
+	q := "CREATE TABLE " + catalogSchema + ".track (" +
+		"schemaname varchar(63) NOT NULL, " +
+		"tablename varchar(63) NOT NULL, " +
+		"PRIMARY KEY (schemaname, tablename), " +
+		"transformed boolean NOT NULL, " +
+		"parentschema varchar(63) NOT NULL, " +
+		"parenttable varchar(63) NOT NULL)"
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("creating table "+catalogSchema+".track: %v", err)
 	}
 	return nil
 }
