@@ -245,7 +245,9 @@ func checkTimeVacuumAll(db dbx.DB) {
 
 	log.Info("starting maintenance")
 
-	q = "UPDATE metadb.maintenance SET next_maintenance_time = next_maintenance_time + INTERVAL '1' DAY"
+	q = "UPDATE metadb.maintenance " +
+		"SET next_maintenance_time = next_maintenance_time +" +
+		" make_interval(0, 0, 0, (EXTRACT(DAY FROM (CURRENT_TIMESTAMP - next_maintenance_time)) + 1)::integer)"
 	if _, err = dc.Exec(context.TODO(), q); err != nil {
 		log.Error("error updating maintenance time: %v", err)
 		return
