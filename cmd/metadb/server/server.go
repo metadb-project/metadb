@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/library-data-platform/ldpmarc/marc"
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
@@ -199,7 +200,11 @@ func mainServer(svr *server) error {
 
 	go goPollLoop(cat, svr)
 
-	go goVacuum(*(svr.db), cat)
+	marctab, err := isFolioModulePresent(svr.db)
+	if err != nil {
+		return fmt.Errorf("checking if marctab should be enabled: %v", err)
+	}
+	go goVacuum(svr.opt.Datadir, *(svr.db), cat, marctab, svr.opt.Trace)
 
 	for {
 		if process.Stop() {
@@ -213,18 +218,87 @@ func mainServer(svr *server) error {
 	return nil
 }
 
-func goVacuum(db dbx.DB, cat *catalog.Catalog) {
-	for {
-		checkTimeVacuumAll(db, cat)
-		time.Sleep(5 * time.Minute)
+func isFolioModulePresent(db *dbx.DB) (bool, error) {
+	dc, err := db.Connect()
+	if err != nil {
+		return false, fmt.Errorf("connecting to database: %v", err)
+	}
+	defer dbx.Close(dc)
+	q := "SELECT 1 FROM metadb.source WHERE module='folio' LIMIT 1"
+	var n int32
+	err = dc.QueryRow(context.TODO(), q).Scan(&n)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return false, nil
+	case err != nil:
+		return false, fmt.Errorf("selecting module: %v", err)
+	default:
+		return true, nil
 	}
 }
 
-func checkTimeVacuumAll(db dbx.DB, cat *catalog.Catalog) {
+func goVacuum(datadir string, db dbx.DB, cat *catalog.Catalog, marctab, trace bool) {
+	for {
+		time.Sleep(30 * time.Minute)
+		runMarctab(db, datadir, marctab, trace)
+		_ = checkTimeVacuumAll(db, cat, marctab)
+		time.Sleep(30 * time.Minute)
+	}
+}
+
+var marctabTablesVacuum = []dbx.Table{{S: "marctab", T: "cksum"}, {S: "folio_source_record", T: "marctab"}}
+
+func runMarctab(db dbx.DB, datadir string, marctab, trace bool) {
+	if marctab {
+		dcsuper, err := db.ConnectSuper()
+		if err != nil {
+			log.Error("%v", err)
+			return
+		}
+		defer dbx.Close(dcsuper)
+
+		users := []string{}
+		verbose := 0
+		if trace {
+			verbose = 1
+		}
+		opt := &marc.TransformOptions{
+			FullUpdate:   false,
+			Datadir:      datadir,
+			Users:        users,
+			TrigramIndex: false,
+			NoIndexes:    false,
+			Verbose:      verbose,
+			CSVFileName:  "",
+			SRSRecords:   "",
+			SRSMarc:      "",
+			SRSMarcAttr:  "",
+			Metadb:       true,
+			Vacuum:       false,
+			PrintErr: func(format string, v ...any) {
+				log.Warning("marctab: %s\n", fmt.Sprintf(format, v...))
+			},
+		}
+		if err := marc.Run(opt); err != nil {
+			log.Error("marctab: %v", err)
+			return
+		}
+		for _, t := range marctabTablesVacuum {
+			log.Trace("vacuuming table %s", t)
+			if err := dbx.Vacuum(dcsuper, t); err != nil {
+				log.Error("%v", err)
+				return
+			}
+		}
+		log.Debug("marctab: updated table folio_source_record.marctab")
+	}
+}
+
+func checkTimeVacuumAll(db dbx.DB, cat *catalog.Catalog, marctab bool) bool {
 	dc, err := db.Connect()
 	if err != nil {
 		log.Error("%v", err)
-		return
+		return false
 	}
 	defer dbx.Close(dc)
 
@@ -236,51 +310,57 @@ func checkTimeVacuumAll(db dbx.DB, cat *catalog.Catalog) {
 		fallthrough
 	case err != nil:
 		log.Error("error checking maintenance time: %v", err)
-		return
+		return false
 	default:
 		if !overdue {
-			return
+			return false
 		}
 	}
 
-	log.Info("starting maintenance")
+	log.Debug("starting maintenance")
 
 	q = "UPDATE metadb.maintenance " +
 		"SET next_maintenance_time = next_maintenance_time +" +
 		" make_interval(0, 0, 0, (EXTRACT(DAY FROM (CURRENT_TIMESTAMP - next_maintenance_time)) + 1)::integer)"
 	if _, err = dc.Exec(context.TODO(), q); err != nil {
 		log.Error("error updating maintenance time: %v", err)
-		return
+		return false
 	}
 
 	dcsuper, err := db.ConnectSuper()
 	if err != nil {
 		log.Error("%v", err)
-		return
+		return false
 	}
 	defer dbx.Close(dcsuper)
 
 	for _, t := range catalog.SystemTables() {
 		log.Trace("vacuuming table %s", t)
-		q = "VACUUM ANALYZE " + t.String()
-		if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-			log.Error("error running vacuum analyze: %s: %v", t, err)
-			return
+		if err = dbx.VacuumAnalyze(dcsuper, t); err != nil {
+			log.Error("%v", err)
+			return false
 		}
-
 	}
-	for _, table := range cat.AllTables() {
-		t := table.String() + "__"
-		log.Trace("vacuuming table %s", t)
-		q = "VACUUM ANALYZE " + t
-		if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-			log.Error("error running vacuum analyze: %s: %v", t, err)
-			return
+	for _, t := range cat.AllTables() {
+		m := t.Main()
+		log.Trace("vacuuming table %s", m)
+		if err = dbx.VacuumAnalyze(dcsuper, m); err != nil {
+			log.Error("%v", err)
+			return false
 		}
-
+	}
+	if marctab {
+		for _, t := range marctabTablesVacuum {
+			log.Trace("vacuuming table %s", t)
+			if err = dbx.VacuumAnalyze(dcsuper, t); err != nil {
+				log.Error("%v", err)
+				return false
+			}
+		}
 	}
 
-	log.Info("completed maintenance")
+	log.Debug("completed maintenance")
+	return true
 }
 
 func goCreateFunctions(db dbx.DB) {

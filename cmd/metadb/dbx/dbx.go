@@ -16,11 +16,15 @@ func (t Table) String() string {
 	return t.S + "." + t.T
 }
 
-func (t *Table) SQL() string {
+func (t Table) Main() Table {
+	return Table{S: t.S, T: t.T + "__"}
+}
+
+func (t Table) SQL() string {
 	return "\"" + t.S + "\".\"" + t.T + "\""
 }
 
-func (t *Table) MainSQL() string {
+func (t Table) MainSQL() string {
 	return "\"" + t.S + "\".\"" + t.T + "__\""
 }
 
@@ -84,6 +88,32 @@ func Close(dc *pgx.Conn) {
 
 func Rollback(tx pgx.Tx) {
 	_ = tx.Rollback(context.TODO())
+}
+
+func VacuumAnalyze(dc *pgx.Conn, table Table) error {
+	if err := Vacuum(dc, table); err != nil {
+		return err
+	}
+	if err := Analyze(dc, table); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Vacuum(dc *pgx.Conn, table Table) error {
+	q := "VACUUM (PARALLEL 0) " + table.SQL()
+	if _, err := dc.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("vacuum: %s: %v", table, err)
+	}
+	return nil
+}
+
+func Analyze(dc *pgx.Conn, table Table) error {
+	q := "ANALYZE " + table.SQL()
+	if _, err := dc.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("analyze: %s: %v", table, err)
+	}
+	return nil
 }
 
 /*
