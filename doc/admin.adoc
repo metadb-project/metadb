@@ -349,14 +349,14 @@ metadb clean -D data --source example
 ----
 +
 Note that the metadb server currently does not give an indication that
-it has finished re-streaming, except that running it with `--debug`
-will typically show updates slowing down.  (Having the server report
-that initial streaming or re-streaming has finished is a planned
-feature.)
+it has finished re-streaming.  (Having the server report that initial
+streaming or re-streaming has finished is a planned feature.)
 +
 The precise timing of when "metadb clean" is run is not important, but
-it must be run to remove redundant data and to complete the
-resynchronization process.
+*it must be run to remove redundant data and to complete the
+resynchronization process*.  The only disadvantage of running it too
+early is that data will appear to be missing until they are
+re-streamed.
 
 5. Start the server.
 +

@@ -422,7 +422,7 @@ func logDebugCommand(c *command.Command) {
 		}
 		_, _ = fmt.Fprintf(&b, ")")
 	}
-	log.Debug("%s", b.String())
+	log.Trace("%s", b.String())
 }
 
 func waitForConfig(svr *server) (*sproc, error) {
