@@ -314,3 +314,16 @@ CREATE TABLE westgroup AS SELECT * FROM library.patrongroup WHERE __origin = 'we
 ----
 SELECT * FROM westgroup;
 ----
+
+=== System log
+
+Metadb reports errors and other information in a logging table called
+`metadb.log`.  For instance to view all log messages from January,
+2023:
+
+----
+SELECT *
+    FROM metadb.log
+    WHERE log_time >= '2023-01-01' AND log_time < '2023-02-01'
+    ORDER BY log_time;
+----
