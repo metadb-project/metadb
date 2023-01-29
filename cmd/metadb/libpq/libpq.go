@@ -41,7 +41,7 @@ func Listen(host string, port string, db *dbx.DB, sources *[]*sysdb.SourceConnec
 		// TODO handle error
 		_ = err
 	}
-	log.Info("server is ready to accept connections")
+	log.Debug("server is ready to accept connections")
 	for {
 		var conn net.Conn
 		if conn, err = ln.Accept(); err != nil {

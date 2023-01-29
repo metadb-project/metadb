@@ -158,7 +158,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		var topics = spr.source.Topics
 		var group = spr.source.Group
 		log.Debug("connecting to %q, topics %q", brokers, topics)
-		log.Info("connecting to source %q", spr.source.Name)
+		log.Debug("connecting to source %q", spr.source.Name)
 		var config = &kafka.ConfigMap{
 			"auto.offset.reset":    "earliest",
 			"bootstrap.servers":    brokers,
@@ -198,7 +198,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		}
 		if firstEvent {
 			firstEvent = false
-			log.Info("receiving data")
+			log.Debug("receiving data from source %q", spr.source.Name)
 		}
 
 		// Rewrite
