@@ -18,13 +18,13 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/library-data-platform/ldpmarc/marc"
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/libpq"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/marctab"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
@@ -208,11 +208,11 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 
 	go goPollLoop(cat, svr)
 
-	marctab, err := isFolioModulePresent(svr.db)
+	folio, err := isFolioModulePresent(svr.db)
 	if err != nil {
 		return fmt.Errorf("checking if marctab should be enabled: %v", err)
 	}
-	go goVacuum(svr.opt.Datadir, *(svr.db), cat, marctab, svr.opt.Trace)
+	go goMaintenance(svr.opt.Datadir, *(svr.db), cat, folio, svr.opt.Trace)
 
 	for {
 		if process.Stop() {
@@ -245,82 +245,20 @@ func isFolioModulePresent(db *dbx.DB) (bool, error) {
 	}
 }
 
-func goVacuum(datadir string, db dbx.DB, cat *catalog.Catalog, marctab, trace bool) {
+func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, folio, trace bool) {
 	for {
-		time.Sleep(30 * time.Minute)
-		runMarctab(db, datadir, cat, marctab, trace)
-		_ = checkTimeVacuumAll(db, cat, marctab)
-		time.Sleep(30 * time.Minute)
-	}
-}
-
-var marctabTablesVacuum = []dbx.Table{{S: "marctab", T: "cksum"}, {S: "folio_source_record", T: "marctab"}}
-
-func runMarctab(db dbx.DB, datadir string, cat *catalog.Catalog, marctab, trace bool) {
-	if marctab {
-		dc, err := db.Connect()
-		if err != nil {
-			log.Error("%v", err)
-			return
-		}
-		defer dbx.Close(dc)
-		dcsuper, err := db.ConnectSuper()
-		if err != nil {
-			log.Error("%v", err)
-			return
-		}
-		defer dbx.Close(dcsuper)
-
-		users := []string{}
-		verbose := 0
-		if trace {
-			verbose = 1
-		}
-		opt := &marc.TransformOptions{
-			FullUpdate:   false,
-			Datadir:      datadir,
-			Users:        users,
-			TrigramIndex: false,
-			NoIndexes:    false,
-			Verbose:      verbose,
-			CSVFileName:  "",
-			SRSRecords:   "",
-			SRSMarc:      "",
-			SRSMarcAttr:  "",
-			Metadb:       true,
-			Vacuum:       false,
-			PrintErr: func(format string, v ...any) {
-				log.Warning("marctab: %s\n", fmt.Sprintf(format, v...))
-			},
-		}
-		if err = marc.Run(opt); err != nil {
-			log.Error("marctab: %v", err)
-			return
-		}
-		if err = cat.TableUpdatedNow(dbx.Table{S: "folio_source_record", T: "marctab"}); err != nil {
-			log.Error("writing table updated time: %v", err)
-			return
-		}
-		users, err = catalog.AllUsers(dc)
-		if err != nil {
-			log.Error("%v", err)
-			return
-		}
-		for _, u := range users {
-			_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON folio_source_record.marctab TO "+u)
-		}
-		for _, t := range marctabTablesVacuum {
-			log.Trace("vacuuming table %s", t)
-			if err := dbx.Vacuum(dcsuper, t); err != nil {
-				log.Error("%v", err)
-				return
+		//time.Sleep(30 * time.Minute)
+		if folio {
+			if err := marctab.RunMarctab(db, datadir, cat, trace); err != nil {
+				log.Error("marctab: %v", err)
 			}
 		}
-		log.Debug("marctab: updated table folio_source_record.marctab")
+		_ = checkTimeVacuumAll(db, cat, folio)
+		time.Sleep(30 * time.Minute)
 	}
 }
 
-func checkTimeVacuumAll(db dbx.DB, cat *catalog.Catalog, marctab bool) bool {
+func checkTimeVacuumAll(db dbx.DB, cat *catalog.Catalog, folio bool) bool {
 	dc, err := db.Connect()
 	if err != nil {
 		log.Error("%v", err)
@@ -375,8 +313,8 @@ func checkTimeVacuumAll(db dbx.DB, cat *catalog.Catalog, marctab bool) bool {
 			return false
 		}
 	}
-	if marctab {
-		for _, t := range marctabTablesVacuum {
+	if folio {
+		for _, t := range []dbx.Table{{S: "marctab", T: "cksum"}, {S: "folio_source_record", T: "marctab"}} {
 			log.Trace("vacuuming table %s", t)
 			if err = dbx.VacuumAnalyze(dcsuper, t); err != nil {
 				log.Error("%v", err)
@@ -432,8 +370,8 @@ func listenAndServe(svr *server) {
 		Addr:    net.JoinHostPort(host, port),
 		Handler: setupHandlers(svr),
 	}
-	log.Info("listening on address \"%s\", port %s", host, port)
-	log.Info("server is ready to accept connections")
+	//log.Info("listening on address \"%s\", port %s", host, port)
+	//log.Info("server is ready to accept connections")
 	if svr.opt.Listen == "" || svr.opt.NoTLS {
 		if err = httpsvr.ListenAndServe(); err != nil {
 			// TODO error handling

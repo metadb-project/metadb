@@ -76,7 +76,7 @@ func (d *DB) ConnectSuper() (*pgx.Conn, error) {
 func (d *DB) connect(user, password string) (*pgx.Conn, error) {
 	dc, err := pgx.Connect(context.TODO(), d.ConnString(user, password))
 	if err != nil {
-		return nil, fmt.Errorf("connecting to database: %v: %v", d, err)
+		return nil, fmt.Errorf("connecting to database: %s: %v", user, err)
 	}
 	return dc, nil
 }
