@@ -128,6 +128,12 @@ func runServer(svr *server) error {
 		return fmt.Errorf("reading configuration file: %v", err)
 	}
 
+	// Check that database is initialized and compatible
+	cat, err := catalog.Initialize(svr.db)
+	if err != nil {
+		return err
+	}
+
 	svr.dcpool, err = pgxpool.New(context.TODO(), svr.db.ConnString(svr.db.User, svr.db.Password))
 	if err != nil {
 		return fmt.Errorf("creating database connection pool: %v", err)
@@ -143,7 +149,7 @@ func runServer(svr *server) error {
 	if svr.opt.NoTLS {
 		log.Warning("TLS disabled for all client connections")
 	}
-	return launchServer(svr)
+	return launchServer(svr, cat)
 }
 
 func setMemoryLimit(limit float64) {
@@ -151,11 +157,11 @@ func setMemoryLimit(limit float64) {
 	debug.SetMemoryLimit(int64(math.Min(math.Max(0.122, limit), 16.0) * 1073741824))
 }
 
-func launchServer(svr *server) error {
-	return mainServer(svr)
+func launchServer(svr *server, cat *catalog.Catalog) error {
+	return mainServer(svr, cat)
 }
 
-func mainServer(svr *server) error {
+func mainServer(svr *server, cat *catalog.Catalog) error {
 	var sigc = make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGTERM)
 	go func() {
@@ -177,12 +183,6 @@ func mainServer(svr *server) error {
 	//	return err
 	//}
 	//defer dbx.Close(svr.dcsuper)
-
-	// Check that database is initialized and compatible
-	cat, err := catalog.Initialize(svr.db)
-	if err != nil {
-		return err
-	}
 
 	// Check that database version is compatible
 	// err = sysdb.ValidateSysdbVersion(svr.db)
