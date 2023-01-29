@@ -2,6 +2,8 @@
 
 === FOLIO
 
+==== Configuration
+
 When creating a FOLIO data source, use the `module 'folio'` option,
 and set `trimschemaprefix` to remove the tenant from schema names and
 `addschemaprefix` to add a `folio_` prefix to the schema names.  For
@@ -31,6 +33,20 @@ exclusions are suggested:
 ----
 ----
 "table.exclude.list": ".*__system,.*_mod_agreements.alternate_resource_name,.*_mod_service_interaction.dashboard_access,.*_mod_agreements.availability_constraint,.*_mod_agreements\\.package_description_url,.*_mod_agreements\\.content_type,.*_mod_agreements\\.entitlement_tag,.*_mod_agreements\\.erm_resource_tag,.*_mod_agreements\\.string_template,.*_mod_agreements\\.string_template_scopes,.*_mod_agreements\\.templated_url,.*_mod_oai_pmh\\.instances,.*_mod_remote_storage\\.original_locations,.*_mod_remote_storage\\.item_notes,.*app_setting,.*alternate_name,.*databasechangelog,.*databasechangeloglock,.*directory_entry_tag,.*license_document_attachment,.*license_supp_doc,.*license_tag,.*log_entry_additional_info,.*subscription_agreement_supp_doc,.*subscription_agreement_document_attachment,.*subscription_agreement_ext_lic_doc,.*subscription_agreement_tag,.*tenant_changelog,.*tenant_changelog_lock,.*marc_indexers.*,.*rmb_internal.*,.*rmb_job.*,.*_mod_agreements\\.match_key,.*system_changelog"
+----
+
+==== MARC transformation
+
+Metadb transforms MARC records in the table
+`folio_source_record.marc_records_lb` to a tabular form which is
+stored in a new table `folio_source_record.marctab`.  This
+transformation runs automatically, usually every few hours.  The time
+of the most recent update can be retrieved via SQL:
+
+----
+SELECT updated
+    FROM metadb.table_update
+    WHERE schemaname = 'folio_source_record' AND tablename = 'marctab';
 ----
 
 === ReShare

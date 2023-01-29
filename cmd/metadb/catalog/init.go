@@ -127,6 +127,7 @@ var systemTables = []systemTableDef{
 	{table: dbx.Table{S: catalogSchema, T: "maintenance"}, create: createTableMaintenance},
 	{table: dbx.Table{S: catalogSchema, T: "origin"}, create: createTableOrigin},
 	{table: dbx.Table{S: catalogSchema, T: "source"}, create: createTableSource},
+	{table: dbx.Table{S: catalogSchema, T: "table_update"}, create: createTableUpdate},
 	{table: dbx.Table{S: catalogSchema, T: "track"}, create: createTableTrack},
 }
 
@@ -235,6 +236,18 @@ func createTableSource(tx pgx.Tx) error {
 	return nil
 }
 
+func createTableUpdate(tx pgx.Tx) error {
+	q := "CREATE TABLE " + catalogSchema + ".table_update (" +
+		"schemaname text, " +
+		"tablename text, " +
+		"PRIMARY KEY (schemaname, tablename), " +
+		"updated timestamptz)"
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("creating table "+catalogSchema+".table_update: %v", err)
+	}
+	return nil
+}
+
 func createTableTrack(tx pgx.Tx) error {
 	q := "CREATE TABLE " + catalogSchema + ".track (" +
 		"schemaname varchar(63) NOT NULL, " +
@@ -245,6 +258,16 @@ func createTableTrack(tx pgx.Tx) error {
 		"parenttable varchar(63) NOT NULL)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".track: %v", err)
+	}
+	return nil
+}
+
+func (c *Catalog) TableUpdatedNow(table dbx.Table) error {
+	q := "INSERT INTO " + catalogSchema + ".table_update(schemaname,tablename,updated)" +
+		"VALUES($1,$2,now())" +
+		"ON CONFLICT (schemaname,tablename) DO UPDATE SET updated=now()"
+	if _, err := c.dc.Exec(context.TODO(), q, table.S, table.T); err != nil {
+		return fmt.Errorf("creating table "+catalogSchema+".table_update: %v", err)
 	}
 	return nil
 }
