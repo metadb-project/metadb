@@ -166,8 +166,8 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 	signal.Notify(sigc, syscall.SIGTERM)
 	go func() {
 		<-sigc
-		log.Info("received shutdown request")
-		log.Info("shutting down")
+		log.Debug("received shutdown request")
+		log.Debug("shutting down")
 		process.SetStop()
 	}()
 	// TODO also need to catch signals and call RemovePIDFile
