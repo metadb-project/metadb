@@ -34,7 +34,7 @@ func Listen(host string, port string, db *dbx.DB, sources *[]*sysdb.SourceConnec
 		_ = syscall.Unlink(addr)
 		ln, err = net.Listen("unix", addr)
 	} else {
-		log.Info("listening on address \"%s\", port %s", host, port)
+		log.Debug("listening on address %q, port %s", host, port)
 		ln, err = net.Listen("tcp", net.JoinHostPort(host, port))
 	}
 	if err != nil {
