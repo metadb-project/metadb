@@ -144,7 +144,7 @@ func printf(c *fcolor.Color, logToDatabase bool, level string, format string, ar
 	//if csv != nil {
 	//	csv.log.Printf("%q,%q,%q", nowRFC, level, msg)
 	//}
-	if logToDatabase {
+	if logToDatabase && std.dcpool != nil {
 		//dc, err := std.dcpool.Acquire(context.TODO())
 		//if err != nil {
 		//	printf(c, false, "ERROR", "logging to database: %v", err)
