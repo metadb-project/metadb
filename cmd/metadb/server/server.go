@@ -210,9 +210,13 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 
 	folio, err := isFolioModulePresent(svr.db)
 	if err != nil {
-		return fmt.Errorf("checking if marctab should be enabled: %v", err)
+		return fmt.Errorf("checking for folio module: %v", err)
 	}
-	go goMaintenance(svr.opt.Datadir, *(svr.db), cat, folio, svr.opt.Trace)
+	reshare, err := isFolioModulePresent(svr.db)
+	if err != nil {
+		return fmt.Errorf("checking for reshare module: %v", err)
+	}
+	go goMaintenance(svr.opt.Datadir, *(svr.db), cat, folio, reshare, svr.opt.Trace)
 
 	for {
 		if process.Stop() {
@@ -245,9 +249,28 @@ func isFolioModulePresent(db *dbx.DB) (bool, error) {
 	}
 }
 
-func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, folio, trace bool) {
+func isReshareModulePresent(db *dbx.DB) (bool, error) {
+	dc, err := db.Connect()
+	if err != nil {
+		return false, fmt.Errorf("connecting to database: %v", err)
+	}
+	defer dbx.Close(dc)
+	q := "SELECT 1 FROM metadb.source WHERE module='reshare' LIMIT 1"
+	var n int32
+	err = dc.QueryRow(context.TODO(), q).Scan(&n)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return false, nil
+	case err != nil:
+		return false, fmt.Errorf("selecting module: %v", err)
+	default:
+		return true, nil
+	}
+}
+
+func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, folio, reshare, trace bool) {
 	for {
-		//time.Sleep(30 * time.Minute)
+		time.Sleep(30 * time.Minute)
 		if folio {
 			if err := marctab.RunMarctab(db, datadir, cat, trace); err != nil {
 				log.Error("marctab: %v", err)
