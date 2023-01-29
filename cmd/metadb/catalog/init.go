@@ -124,6 +124,7 @@ type systemTableDef struct {
 var systemTables = []systemTableDef{
 	{table: dbx.Table{S: catalogSchema, T: "auth"}, create: createTableAuth},
 	{table: dbx.Table{S: catalogSchema, T: "init"}, create: createTableInit},
+	{table: dbx.Table{S: catalogSchema, T: "log"}, create: createTableLog},
 	{table: dbx.Table{S: catalogSchema, T: "maintenance"}, create: createTableMaintenance},
 	{table: dbx.Table{S: catalogSchema, T: "origin"}, create: createTableOrigin},
 	{table: dbx.Table{S: catalogSchema, T: "source"}, create: createTableSource},
@@ -189,6 +190,18 @@ func createTableInit(tx pgx.Tx) error {
 	q = "INSERT INTO " + catalogSchema + ".init (version, dbversion) VALUES ('" + mver + "', " + dbver + ")"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("writing to table "+catalogSchema+".init: %v", err)
+	}
+	return nil
+}
+
+func createTableLog(tx pgx.Tx) error {
+	q := "CREATE TABLE " + catalogSchema + ".log (" +
+		"log_time timestamptz(3), " +
+		"error_severity text, " +
+		"message text" +
+		") PARTITION BY RANGE (log_time)"
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
+		return err
 	}
 	return nil
 }

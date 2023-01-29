@@ -587,15 +587,15 @@ func setupLog(logfile, csvlogfile string, debug bool, trace bool) (*os.File, *os
 				return nil, nil, err
 			}
 		}
-		if csvlogfile != "" {
-			if csvlogf, err = log.OpenLogFile(csvlogfile); err != nil {
-				return nil, nil, err
-			}
-		}
-		log.Init(logf, csvlogf, debug, trace)
+		//if csvlogfile != "" {
+		//	if csvlogf, err = log.OpenLogFile(csvlogfile); err != nil {
+		//		return nil, nil, err
+		//	}
+		//}
+		log.Init(logf, debug, trace)
 		return logf, csvlogf, nil
 	}
-	log.Init(os.Stderr, nil, debug, trace)
+	log.Init(os.Stderr, debug, trace)
 	return nil, nil, nil
 }
 

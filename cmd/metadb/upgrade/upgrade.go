@@ -1015,6 +1015,15 @@ func updb12(opt *dbopt) error {
 	}
 	defer dbx.Rollback(tx)
 
+	q = "CREATE TABLE metadb.log (" +
+		"log_time timestamptz(3), " +
+		"error_severity text, " +
+		"message text" +
+		") PARTITION BY RANGE (log_time)"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+
 	q = "CREATE TABLE metadb.table_update (" +
 		"schemaname text, " +
 		"tablename text, " +
@@ -1026,7 +1035,7 @@ func updb12(opt *dbopt) error {
 
 	for _, u := range users {
 		_, _ = dc.Exec(context.TODO(), "GRANT USAGE ON SCHEMA metadb TO "+u)
-		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON metadb.table_update TO "+u)
+		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON metadb.log TO "+u)
 		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON metadb.table_update TO "+u)
 	}
 

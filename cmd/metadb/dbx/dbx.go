@@ -66,20 +66,24 @@ func (d *DB) String() string {
 }
 
 func (d *DB) Connect() (*pgx.Conn, error) {
-	return d.connectUser(d.User, d.Password)
+	return d.connect(d.User, d.Password)
 }
 
 func (d *DB) ConnectSuper() (*pgx.Conn, error) {
-	return d.connectUser(d.SuperUser, d.SuperPassword)
+	return d.connect(d.SuperUser, d.SuperPassword)
 }
 
-func (d *DB) connectUser(user, password string) (*pgx.Conn, error) {
-	dsn := "connect_timeout=30 host=" + d.Host + " port=" + d.Port + " user=" + user + " password=" + password + " dbname=" + d.DBName + " sslmode=" + d.SSLMode
-	dc, err := pgx.Connect(context.TODO(), dsn)
+func (d *DB) connect(user, password string) (*pgx.Conn, error) {
+	dc, err := pgx.Connect(context.TODO(), d.ConnString(user, password))
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %v: %v", d, err)
 	}
 	return dc, nil
+}
+
+func (d DB) ConnString(user, password string) string {
+	return "connect_timeout=30 host=" + d.Host + " port=" + d.Port + " user=" + user + " password=" + password +
+		" dbname=" + d.DBName + " sslmode=" + d.SSLMode
 }
 
 func Close(dc *pgx.Conn) {

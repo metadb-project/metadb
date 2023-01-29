@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/library-data-platform/ldpmarc/marc"
 	"github.com/metadb-project/metadb/cmd/internal/api"
 	"github.com/metadb-project/metadb/cmd/internal/status"
@@ -40,6 +41,7 @@ type server struct {
 	db    *dbx.DB
 	//dc      *pgx.Conn
 	//dcsuper *pgx.Conn
+	dcpool *pgxpool.Pool
 }
 
 // serverstate is shared between goroutines.
@@ -119,6 +121,19 @@ func isServerRunning(datadir string) (bool, int, error) {
 }
 
 func runServer(svr *server) error {
+	// Read database URL from config file.
+	var err error
+	svr.db, err = util.ReadConfigDatabase(svr.opt.Datadir)
+	if err != nil {
+		return fmt.Errorf("reading configuration file: %v", err)
+	}
+
+	svr.dcpool, err = pgxpool.New(context.TODO(), svr.db.ConnString(svr.db.User, svr.db.Password))
+	if err != nil {
+		return fmt.Errorf("creating database connection pool: %v", err)
+	}
+	log.SetDatabase(svr.dcpool)
+
 	log.Info("starting Metadb %s", util.MetadbVersion)
 	// if svr.opt.RewriteJSON {
 	// 	log.Info("enabled JSON rewriting")
@@ -150,13 +165,6 @@ func mainServer(svr *server) error {
 		process.SetStop()
 	}()
 	// TODO also need to catch signals and call RemovePIDFile
-
-	// Read database URL from config file.
-	var err error
-	svr.db, err = util.ReadConfigDatabase(svr.opt.Datadir)
-	if err != nil {
-		return fmt.Errorf("reading configuration file: %v", err)
-	}
 
 	//svr.dc, err = svr.db.Connect()
 	//if err != nil {
