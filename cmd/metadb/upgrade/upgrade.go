@@ -391,6 +391,7 @@ var updbList = []updbFunc{
 	updb9,
 	updb10,
 	updb11,
+	updb12,
 }
 
 /*
@@ -970,6 +971,67 @@ func updb11(opt *dbopt) error {
 
 	// Write new version number
 	err = metadata.WriteDatabaseVersion(tx, 11)
+	if err != nil {
+		return err
+	}
+	err = tx.Commit(context.TODO())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb12(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	q := "SELECT username FROM metadb.auth"
+	rows, err := dc.Query(context.TODO(), q)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	users := make([]string, 0)
+	for rows.Next() {
+		var username string
+		err = rows.Scan(&username)
+		if err != nil {
+			return err
+		}
+		users = append(users, username)
+	}
+	if err = rows.Err(); err != nil {
+		return err
+	}
+
+	// Begin transaction
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+
+	q = "CREATE TABLE metadb.table_update (" +
+		"schemaname text, " +
+		"tablename text, " +
+		"PRIMARY KEY (schemaname, tablename), " +
+		"updated timestamptz)"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+
+	for _, u := range users {
+		_, _ = dc.Exec(context.TODO(), "GRANT USAGE ON SCHEMA metadb TO "+u)
+		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON metadb.table_update TO "+u)
+		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON metadb.table_update TO "+u)
+	}
+
+	// Write new version number
+	err = metadata.WriteDatabaseVersion(tx, 12)
 	if err != nil {
 		return err
 	}

@@ -14,11 +14,18 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func UpdateUserPerms(adb sqlx.DB, tables []dbx.Table) error {
+func UpdateUserPerms(adb sqlx.DB, trackedTables []dbx.Table) error {
 	users, err := userRead(adb, true)
 	if err != nil {
 		return err
 	}
+	tables := make([]dbx.Table, len(trackedTables))
+	copy(tables, trackedTables)
+	for _, t := range trackedTables {
+		tables = append(tables, t.Main())
+	}
+	tables = append(tables, dbx.Table{S: "metadb", T: "table_update"})
+	tables = append(tables, dbx.Table{S: "folio_source_record", T: "marctab"})
 	for u, re := range users {
 		for _, oldt := range tables {
 			t := sqlx.Table{Schema: oldt.S, Table: oldt.T}
@@ -26,16 +33,16 @@ func UpdateUserPerms(adb sqlx.DB, tables []dbx.Table) error {
 				// Revoke
 				_, _ = adb.Exec(nil, "REVOKE USAGE ON SCHEMA "+adb.IdentiferSQL(t.Schema)+" FROM "+u)
 				_, _ = adb.Exec(nil, "REVOKE SELECT ON "+adb.TableSQL(&t)+" FROM "+u)
-				_, _ = adb.Exec(nil, "REVOKE SELECT ON "+adb.HistoryTableSQL(&t)+" FROM "+u)
+				//_, _ = adb.Exec(nil, "REVOKE SELECT ON "+adb.HistoryTableSQL(&t)+" FROM "+u)
 			} else {
 				// Grant if regex matches
 				if util.UserPerm(re, &t) {
 					_, _ = adb.Exec(nil, "GRANT USAGE ON SCHEMA "+adb.IdentiferSQL(t.Schema)+" TO "+u)
 					_, _ = adb.Exec(nil, "GRANT SELECT ON "+adb.TableSQL(&t)+" TO "+u)
-					_, _ = adb.Exec(nil, "GRANT SELECT ON "+adb.HistoryTableSQL(&t)+" TO "+u)
+					//_, _ = adb.Exec(nil, "GRANT SELECT ON "+adb.HistoryTableSQL(&t)+" TO "+u)
 				} else {
 					_, _ = adb.Exec(nil, "REVOKE SELECT ON "+adb.TableSQL(&t)+" FROM "+u)
-					_, _ = adb.Exec(nil, "REVOKE SELECT ON "+adb.HistoryTableSQL(&t)+" FROM "+u)
+					//_, _ = adb.Exec(nil, "REVOKE SELECT ON "+adb.HistoryTableSQL(&t)+" FROM "+u)
 				}
 			}
 

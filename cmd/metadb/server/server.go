@@ -240,7 +240,7 @@ func isFolioModulePresent(db *dbx.DB) (bool, error) {
 func goVacuum(datadir string, db dbx.DB, cat *catalog.Catalog, marctab, trace bool) {
 	for {
 		time.Sleep(30 * time.Minute)
-		runMarctab(db, datadir, marctab, trace)
+		runMarctab(db, datadir, cat, marctab, trace)
 		_ = checkTimeVacuumAll(db, cat, marctab)
 		time.Sleep(30 * time.Minute)
 	}
@@ -248,8 +248,14 @@ func goVacuum(datadir string, db dbx.DB, cat *catalog.Catalog, marctab, trace bo
 
 var marctabTablesVacuum = []dbx.Table{{S: "marctab", T: "cksum"}, {S: "folio_source_record", T: "marctab"}}
 
-func runMarctab(db dbx.DB, datadir string, marctab, trace bool) {
+func runMarctab(db dbx.DB, datadir string, cat *catalog.Catalog, marctab, trace bool) {
 	if marctab {
+		dc, err := db.Connect()
+		if err != nil {
+			log.Error("%v", err)
+			return
+		}
+		defer dbx.Close(dc)
 		dcsuper, err := db.ConnectSuper()
 		if err != nil {
 			log.Error("%v", err)
@@ -279,9 +285,21 @@ func runMarctab(db dbx.DB, datadir string, marctab, trace bool) {
 				log.Warning("marctab: %s\n", fmt.Sprintf(format, v...))
 			},
 		}
-		if err := marc.Run(opt); err != nil {
+		if err = marc.Run(opt); err != nil {
 			log.Error("marctab: %v", err)
 			return
+		}
+		if err = cat.TableUpdatedNow(dbx.Table{S: "folio_source_record", T: "marctab"}); err != nil {
+			log.Error("writing table updated time: %v", err)
+			return
+		}
+		users, err = catalog.AllUsers(dc)
+		if err != nil {
+			log.Error("%v", err)
+			return
+		}
+		for _, u := range users {
+			_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON folio_source_record.marctab TO "+u)
 		}
 		for _, t := range marctabTablesVacuum {
 			log.Trace("vacuuming table %s", t)
