@@ -27,6 +27,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/marctab"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
+	"github.com/metadb-project/metadb/cmd/metadb/runsql"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
@@ -212,11 +213,11 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 	if err != nil {
 		return fmt.Errorf("checking for folio module: %v", err)
 	}
-	reshare, err := isFolioModulePresent(svr.db)
+	reshare, err := isReshareModulePresent(svr.db)
 	if err != nil {
 		return fmt.Errorf("checking for reshare module: %v", err)
 	}
-	go goMaintenance(svr.opt.Datadir, *(svr.db), cat, folio, reshare, svr.opt.Trace)
+	go goMaintenance(svr.opt.Datadir, *(svr.db), cat, folio, reshare)
 
 	for {
 		if process.Stop() {
@@ -268,24 +269,25 @@ func isReshareModulePresent(db *dbx.DB) (bool, error) {
 	}
 }
 
-func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, folio, reshare, trace bool) {
+func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, folio, reshare bool) {
 	for {
 		time.Sleep(30 * time.Minute)
 		if folio {
-			if err := marctab.RunMarctab(db, datadir, cat, trace); err != nil {
+			if err := marctab.RunMarctab(db, datadir, cat); err != nil {
 				log.Error("marctab: %v", err)
 			}
 		}
-		_ = checkTimeVacuumAll(db, cat, folio)
+		if err := checkTimeDailyMaintenance(datadir, db, cat, folio, reshare); err != nil {
+			log.Error("%v", err)
+		}
 		time.Sleep(30 * time.Minute)
 	}
 }
 
-func checkTimeVacuumAll(db dbx.DB, cat *catalog.Catalog, folio bool) bool {
+func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, folio, reshare bool) error {
 	dc, err := db.Connect()
 	if err != nil {
-		log.Error("%v", err)
-		return false
+		return err
 	}
 	defer dbx.Close(dc)
 
@@ -296,58 +298,99 @@ func checkTimeVacuumAll(db dbx.DB, cat *catalog.Catalog, folio bool) bool {
 	case errors.Is(err, pgx.ErrNoRows):
 		fallthrough
 	case err != nil:
-		log.Error("error checking maintenance time: %v", err)
-		return false
+		return fmt.Errorf("error checking maintenance time: %v", err)
 	default:
 		if !overdue {
-			return false
+			return nil
 		}
 	}
 
 	log.Debug("starting maintenance")
 
+	// Schedule next maintenance
 	q = "UPDATE metadb.maintenance " +
 		"SET next_maintenance_time = next_maintenance_time +" +
 		" make_interval(0, 0, 0, (EXTRACT(DAY FROM (CURRENT_TIMESTAMP - next_maintenance_time)) + 1)::integer)"
 	if _, err = dc.Exec(context.TODO(), q); err != nil {
-		log.Error("error updating maintenance time: %v", err)
-		return false
+		return fmt.Errorf("error updating maintenance time: %v", err)
 	}
 
+	if folio {
+		tries := 0
+		for {
+			tries++
+			url := "https://github.com/folio-org/folio-analytics.git"
+			tag := "v1.5.0"
+			path := "sql_metadb/derived_tables"
+			schema := "folio_derived"
+			if err := runsql.RunSQL(datadir, db, url, tag, path, schema); err != nil {
+				log.Error("%v: repository=%s tag=%s path=%s", err, url, tag, path)
+				if tries >= 3 {
+					break
+				}
+				time.Sleep(1 * time.Hour)
+				continue
+			}
+			break
+		}
+	}
+	if reshare {
+		tries := 0
+		for {
+			tries++
+			url := "https://github.com/openlibraryenvironment/reshare-analytics.git"
+			tag := "v0.2.0-beta7"
+			path := "sql/derived_tables"
+			schema := "reshare_derived"
+			if err := runsql.RunSQL(datadir, db, url, tag, path, schema); err != nil {
+				log.Error("%v: repository=%s tag=%s path=%s", err, url, tag, path)
+				if tries >= 3 {
+					break
+				}
+				time.Sleep(1 * time.Hour)
+				continue
+			}
+			break
+		}
+	}
+
+	if err := vacuumAll(db, cat, folio); err != nil {
+		return fmt.Errorf("vacuuming: %v", err)
+	}
+
+	log.Debug("completed maintenance")
+	return nil
+}
+
+func vacuumAll(db dbx.DB, cat *catalog.Catalog, folio bool) error {
 	dcsuper, err := db.ConnectSuper()
 	if err != nil {
-		log.Error("%v", err)
-		return false
+		return err
 	}
 	defer dbx.Close(dcsuper)
 
 	for _, t := range catalog.SystemTables() {
 		log.Trace("vacuuming table %s", t)
 		if err = dbx.VacuumAnalyze(dcsuper, t); err != nil {
-			log.Error("%v", err)
-			return false
+			return err
 		}
 	}
 	for _, t := range cat.AllTables() {
 		m := t.Main()
 		log.Trace("vacuuming table %s", m)
 		if err = dbx.VacuumAnalyze(dcsuper, m); err != nil {
-			log.Error("%v", err)
-			return false
+			return err
 		}
 	}
 	if folio {
 		for _, t := range []dbx.Table{{S: "marctab", T: "cksum"}, {S: "folio_source_record", T: "marctab"}} {
 			log.Trace("vacuuming table %s", t)
 			if err = dbx.VacuumAnalyze(dcsuper, t); err != nil {
-				log.Error("%v", err)
-				return false
+				return err
 			}
 		}
 	}
-
-	log.Debug("completed maintenance")
-	return true
+	return nil
 }
 
 func goCreateFunctions(db dbx.DB) {
