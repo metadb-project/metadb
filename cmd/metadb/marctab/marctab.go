@@ -10,7 +10,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 )
 
-func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog, trace bool) error {
+func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 	dc, err := db.Connect()
 	if err != nil {
 		return fmt.Errorf("%v", err)
@@ -23,17 +23,13 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog, trace bool) err
 	defer dbx.Close(dcsuper)
 
 	users := []string{}
-	verbose := 0
-	if trace {
-		verbose = 1
-	}
 	opt := &marc.TransformOptions{
 		FullUpdate:   false,
 		Datadir:      datadir,
 		Users:        users,
 		TrigramIndex: false,
 		NoIndexes:    false,
-		Verbose:      verbose,
+		Verbose:      0,
 		CSVFileName:  "",
 		SRSRecords:   "",
 		SRSMarc:      "",
