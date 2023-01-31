@@ -49,6 +49,11 @@ SELECT updated
     WHERE schemaname = 'folio_source_record' AND tablename = 'marctab';
 ----
 
+==== Derived tables
+
+FOLIO derived tables are automatically updated once per day, usually
+at about 00:00:00 UTC by default.
+
 === ReShare
 
 Before defining a ReShare data source, create a data origin for each
@@ -96,3 +101,8 @@ that credentials (`.+mod_login`), the public schema, the Okapi
 supertenant (`supertenant_mod_.+`), and mod-pubsub data
 (`pubsub_config,.+_mod_pubsub`) be excluded using the
 `schema.exclude.list` setting.
+
+==== Derived tables
+
+ReShare derived tables are automatically updated once per day, usually
+at about 00:00:00 UTC by default.
