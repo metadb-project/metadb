@@ -315,7 +315,13 @@ CREATE TABLE westgroup AS SELECT * FROM library.patrongroup WHERE __origin = 'we
 SELECT * FROM westgroup;
 ----
 
-=== System log
+=== System tables and functions
+
+To show the current Metadb version:
+
+----
+SELECT metadb_version();
+----
 
 Metadb reports errors and other information in a logging table called
 `metadb.log`.  For instance to view all log messages from January,
@@ -326,4 +332,12 @@ SELECT *
     FROM metadb.log
     WHERE log_time >= '2023-01-01' AND log_time < '2023-02-01'
     ORDER BY log_time;
+----
+
+[.aqua-background]#Metadb v1.0.4# When executing a long-running query,
+the `ps()` function can be used to check on the status of the query
+from another session:
+
+----
+SELECT * FROM ps();
 ----
