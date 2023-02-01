@@ -186,12 +186,15 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		}
 		spr.source.Status.Active()
 	}
+	// pkerr keeps track of "primary key not defined" errors that have been logged, in order to reduce duplication
+	// of the error messages.
+	pkerr := make(map[string]struct{}) // "primary key not defined" errors reported
 	var firstEvent = true
 	for {
 		var cl = &command.CommandList{}
 
 		// Parse
-		eventReadCount, err := parseChangeEvents(consumer, cl, spr.schemaPassFilter, spr.schemaStopFilter,
+		eventReadCount, err := parseChangeEvents(pkerr, consumer, cl, spr.schemaPassFilter, spr.schemaStopFilter,
 			spr.source.TrimSchemaPrefix, spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog)
 		if err != nil {
 			return fmt.Errorf("parser: %s", err)
@@ -233,7 +236,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 	}
 }
 
-func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter, schemaStopFilter []*regexp.Regexp,
+func parseChangeEvents(pkerr map[string]struct{}, consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter, schemaStopFilter []*regexp.Regexp,
 	trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
 	var err error
 	var eventReadCount int
@@ -263,7 +266,7 @@ func parseChangeEvents(consumer *kafka.Consumer, cl *command.CommandList, schema
 			break
 		}
 		eventReadCount++
-		c, err := command.NewCommand(ce, schemaPassFilter, schemaStopFilter, trimSchemaPrefix, addSchemaPrefix)
+		c, err := command.NewCommand(pkerr, ce, schemaPassFilter, schemaStopFilter, trimSchemaPrefix, addSchemaPrefix)
 		if err != nil {
 			return 0, fmt.Errorf("parsing command: %s\n%v", err, *ce)
 		}
