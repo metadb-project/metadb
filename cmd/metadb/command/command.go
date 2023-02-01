@@ -314,7 +314,7 @@ func convertTypeSize(data *string, coltype string, datatype DataType) (int64, er
 	}
 }
 
-func extractPrimaryKey(ce *change.Event) (map[string]int, error) {
+func extractPrimaryKey(pkerr map[string]struct{}, ce *change.Event) (map[string]int, error) {
 	var ok bool
 	if ce.Key == nil {
 		var topic string
@@ -323,7 +323,11 @@ func extractPrimaryKey(ce *change.Event) (map[string]int, error) {
 		} else {
 			topic = "(unknown)"
 		}
-		log.Error("primary key not defined: %s", topic)
+		_, ok = pkerr[topic]
+		if !ok {
+			log.Error("primary key not defined: %s", topic)
+			pkerr[topic] = struct{}{}
+		}
 		return nil, nil
 	}
 	if ce.Key.Schema == nil || ce.Key.Schema.Fields == nil {
@@ -350,7 +354,7 @@ func extractPrimaryKey(ce *change.Event) (map[string]int, error) {
 	return primaryKey, nil
 }
 
-func extractColumns(ce *change.Event) ([]CommandColumn, error) {
+func extractColumns(pkerr map[string]struct{}, ce *change.Event) ([]CommandColumn, error) {
 	var err error
 	var ok bool
 	// Extract field data from payload
@@ -391,7 +395,7 @@ func extractColumns(ce *change.Event) ([]CommandColumn, error) {
 		return nil, fmt.Errorf("value: $.schema.fields: \"fields\" not expected type")
 	}
 	var primaryKey map[string]int
-	if primaryKey, err = extractPrimaryKey(ce); err != nil {
+	if primaryKey, err = extractPrimaryKey(pkerr, ce); err != nil {
 		return nil, err
 	}
 	if primaryKey == nil {
@@ -611,7 +615,7 @@ func structScale(data any) (int32, string, error) {
 // var FolioTenant string
 var ReshareTenants []string
 
-func NewCommand(ce *change.Event, schemaPassFilter, schemaStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string) (*Command, error) {
+func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, schemaStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string) (*Command, error) {
 	// Note: this function returns nil, nil in some cases.
 	if ce == nil {
 		return nil, fmt.Errorf("missing change event")
@@ -758,7 +762,7 @@ func NewCommand(ce *change.Event, schemaPassFilter, schemaStopFilter []*regexp.R
 		}
 		return c, nil
 	}
-	if c.Column, err = extractColumns(ce); err != nil {
+	if c.Column, err = extractColumns(pkerr, ce); err != nil {
 		return nil, err
 	}
 	if c.Column == nil {
