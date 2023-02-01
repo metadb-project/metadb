@@ -355,7 +355,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, 
 	}
 
 	if err := vacuumAll(db, cat, folio); err != nil {
-		return fmt.Errorf("vacuuming: %v", err)
+		return err
 	}
 
 	log.Debug("completed maintenance")
@@ -385,9 +385,7 @@ func vacuumAll(db dbx.DB, cat *catalog.Catalog, folio bool) error {
 	if folio {
 		for _, t := range []dbx.Table{{S: "marctab", T: "cksum"}, {S: "folio_source_record", T: "marctab"}} {
 			log.Trace("vacuuming table %s", t)
-			if err = dbx.VacuumAnalyze(dcsuper, t); err != nil {
-				return err
-			}
+			_ = dbx.VacuumAnalyze(dcsuper, t)
 		}
 	}
 	return nil
