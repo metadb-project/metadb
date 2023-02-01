@@ -107,7 +107,7 @@ func VacuumAnalyze(dc *pgx.Conn, table Table) error {
 func Vacuum(dc *pgx.Conn, table Table) error {
 	q := "VACUUM (PARALLEL 0) " + table.SQL()
 	if _, err := dc.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("vacuum: %s: %v", table, err)
+		return fmt.Errorf("vacuuming: %s: %v", table, err)
 	}
 	return nil
 }
@@ -115,7 +115,7 @@ func Vacuum(dc *pgx.Conn, table Table) error {
 func Analyze(dc *pgx.Conn, table Table) error {
 	q := "ANALYZE " + table.SQL()
 	if _, err := dc.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("analyze: %s: %v", table, err)
+		return fmt.Errorf("analyzing: %s: %v", table, err)
 	}
 	return nil
 }

@@ -56,7 +56,7 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 	for _, t := range []dbx.Table{{S: "marctab", T: "cksum"}, {S: "folio_source_record", T: "marctab"}} {
 		log.Trace("vacuuming table %s", t)
 		if err := dbx.Vacuum(dcsuper, t); err != nil {
-			return fmt.Errorf("%v", err)
+			return err
 		}
 	}
 	log.Debug("marctab: updated table folio_source_record.marctab")
