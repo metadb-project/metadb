@@ -84,7 +84,7 @@ func outerPollLoop(cat *catalog.Catalog, svr *server, spr *sproc) error {
 
 	log.Debug("starting stream processor")
 	if err = pollLoop(cat, spr); err != nil {
-		log.Error("%s", err)
+		//log.Error("%s", err)
 		return err
 	}
 	return nil
@@ -268,7 +268,8 @@ func parseChangeEvents(pkerr map[string]struct{}, consumer *kafka.Consumer, cl *
 		eventReadCount++
 		c, err := command.NewCommand(pkerr, ce, schemaPassFilter, schemaStopFilter, trimSchemaPrefix, addSchemaPrefix)
 		if err != nil {
-			return 0, fmt.Errorf("parsing command: %s\n%v", err, *ce)
+			log.Debug("%v", *ce)
+			return 0, fmt.Errorf("parsing command: %v", err)
 		}
 		if c == nil {
 			continue
