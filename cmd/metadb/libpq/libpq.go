@@ -281,7 +281,7 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 		}))
 	}
 	if err != nil {
-		log.Error("%v: %s", err, query)
+		//log.Error("%v: %s", err, query)
 		hint := ""
 		errs, ok := err.(*dberr.Error)
 		if ok {
