@@ -334,7 +334,7 @@ SELECT *
     ORDER BY log_time;
 ----
 
-[.aqua-background]#Metadb 1.1# When executing a long-running query,
+[.aqua-background]#Metadb v1.0.4# When executing a long-running query,
 the `ps()` function can be used to check on the status of the query
 from another session:
 
