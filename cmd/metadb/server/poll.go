@@ -222,10 +222,17 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		if eventReadCount > 0 && sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
 			_, err = consumer.Commit()
 			if err != nil {
-				if err.(kafka.Error).IsFatal() {
-					return fmt.Errorf("kafka commit: %s", err)
+				e := err.(kafka.Error)
+				if e.IsFatal() {
+					//return fmt.Errorf("Kafka commit: %v", e)
+					log.Warning("Kafka commit: %v", e)
 				} else {
-					log.Warning("kafka commit: %s", err)
+					switch e.Code() {
+					case kafka.ErrNoOffset:
+						log.Debug("Kafka commit: %v", e)
+					default:
+						log.Info("Kafka commit: %v", e)
+					}
 				}
 			}
 		}
@@ -392,14 +399,18 @@ func readChangeEvent(consumer *kafka.Consumer, sourceLog *log.SourceLog) (*chang
 				// client can be reported and ignored,
 				// because the client will
 				// automatically try to recover.
-				log.Error("%v: %v", e.Code(), e)
+				if e.IsFatal() {
+					log.Warning("Kafka poll: %v", e)
+				} else {
+					log.Info("Kafka poll: %v", e)
+				}
 				// We could take some action if
 				// desired:
 				//if e.Code() == kafka.ErrAllBrokersDown {
 				//        // some action
 				//}
 			default:
-				log.Warning("ignoring: %v", e)
+				log.Debug("ignoring: %v", e)
 			}
 		}
 	}

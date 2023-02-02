@@ -616,9 +616,6 @@ func structScale(data any) (int32, string, error) {
 var ReshareTenants []string
 
 func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, schemaStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string) (*Command, error) {
-	if true {
-		return nil, fmt.Errorf("TEST ERROR")
-	}
 	// Note: this function returns nil, nil in some cases.
 	if ce == nil {
 		return nil, fmt.Errorf("missing change event")
