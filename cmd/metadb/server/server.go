@@ -307,14 +307,6 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, 
 
 	log.Debug("starting maintenance")
 
-	// Schedule next maintenance
-	q = "UPDATE metadb.maintenance " +
-		"SET next_maintenance_time = next_maintenance_time +" +
-		" make_interval(0, 0, 0, (EXTRACT(DAY FROM (CURRENT_TIMESTAMP - next_maintenance_time)) + 1)::integer)"
-	if _, err = dc.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("error updating maintenance time: %v", err)
-	}
-
 	if folio {
 		tries := 0
 		for {
@@ -323,7 +315,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, 
 			tag := "v1.5.1"
 			path := "sql_metadb/derived_tables"
 			schema := "folio_derived"
-			if err := runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {
+			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {
 				log.Error("%v: repository=%s tag=%s path=%s", err, url, tag, path)
 				if tries >= 3 {
 					break
@@ -342,7 +334,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, 
 			tag := "v0.2.0-beta7"
 			path := "sql/derived_tables"
 			schema := "reshare_derived"
-			if err := runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {
+			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {
 				log.Error("%v: repository=%s tag=%s path=%s", err, url, tag, path)
 				if tries >= 3 {
 					break
@@ -354,7 +346,15 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, 
 		}
 	}
 
-	if err := vacuumAll(db, cat, folio); err != nil {
+	// Schedule next maintenance
+	q = "UPDATE metadb.maintenance " +
+		"SET next_maintenance_time = next_maintenance_time +" +
+		" make_interval(0, 0, 0, (EXTRACT(DAY FROM (CURRENT_TIMESTAMP - next_maintenance_time)) + 1)::integer)"
+	if _, err = dc.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("error updating maintenance time: %v", err)
+	}
+
+	if err = vacuumAll(db, cat, folio); err != nil {
 		return err
 	}
 
