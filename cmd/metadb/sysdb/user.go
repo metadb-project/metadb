@@ -61,6 +61,9 @@ func GoUpdateUserPerms(dsn sqlx.DSN, trackedTables []dbx.Table) {
 			_, _ = adb.Exec(nil, "REVOKE SELECT ON ALL TABLES IN SCHEMA folio_derived FROM "+u)
 			_, _ = adb.Exec(nil, "REVOKE USAGE ON SCHEMA reshare_derived FROM "+u)
 			_, _ = adb.Exec(nil, "REVOKE SELECT ON ALL TABLES IN SCHEMA reshare_derived FROM "+u)
+			_, _ = adb.Exec(nil, "REVOKE EXECUTE ON FUNCTION public.metadb_version FROM "+u)
+			_, _ = adb.Exec(nil, "REVOKE EXECUTE ON FUNCTION public.ps FROM "+u)
+			_, _ = adb.Exec(nil, "REVOKE USAGE ON SCHEMA public FROM "+u)
 		} else {
 			_, _ = adb.Exec(nil, "GRANT USAGE ON SCHEMA folio_derived TO "+u)
 			_, _ = adb.Exec(nil, "GRANT SELECT ON ALL TABLES IN SCHEMA folio_derived TO "+u)
