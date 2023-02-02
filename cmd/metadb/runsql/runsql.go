@@ -17,7 +17,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func RunSQL(datadir string, db dbx.DB, url, tag, path, schema string) error {
+func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, schema string) error {
 	dc, err := db.Connect()
 	if err != nil {
 		return err
@@ -74,7 +74,7 @@ func RunSQL(datadir string, db dbx.DB, url, tag, path, schema string) error {
 		}
 		log.Trace("running file: %d %s", i, f)
 		file := filepath.Join(workdir, f)
-		if err = runFile(dc, file); err != nil {
+		if err = runFile(cat, dc, schema, file); err != nil {
 			log.Error("%v: repository=%s tag=%s path=%s", err, url, tag, filepath.Join(path, f))
 		}
 		for _, u := range users {
@@ -90,7 +90,8 @@ func RunSQL(datadir string, db dbx.DB, url, tag, path, schema string) error {
 	return nil
 }
 
-func runFile(dc *pgx.Conn, file string) error {
+func runFile(cat *catalog.Catalog, dc *pgx.Conn, schema string, file string) error {
+	var table string
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return err
@@ -101,11 +102,32 @@ func runFile(dc *pgx.Conn, file string) error {
 		if q == "" {
 			continue
 		}
-		if _, err := dc.Exec(context.TODO(), q); err != nil {
+		checkForTableName(q, &table)
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			if table != "" {
+				_ = cat.TableUpdatedNow(dbx.Table{S: schema, T: table}, false)
+			}
 			return fmt.Errorf("%s", strings.TrimPrefix(err.Error(), "ERROR: "))
+		}
+	}
+	if table != "" {
+		if err = cat.TableUpdatedNow(dbx.Table{S: schema, T: table}, true); err != nil {
+			return fmt.Errorf("writing table updated time: %v", err)
 		}
 	}
 	return nil
 }
 
 var sqlSeparator = regexp.MustCompile("\\n\\s*\\n")
+
+func checkForTableName(input string, table *string) {
+	if strings.HasPrefix(input, "--metadb:table ") {
+		s := spaceSeparator.Split(input, -1)
+		if len(s) < 2 {
+			return
+		}
+		*table = strings.TrimSpace(s[1])
+	}
+}
+
+var spaceSeparator = regexp.MustCompile("\\s+")

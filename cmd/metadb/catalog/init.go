@@ -275,10 +275,14 @@ func createTableTrack(tx pgx.Tx) error {
 	return nil
 }
 
-func (c *Catalog) TableUpdatedNow(table dbx.Table) error {
+func (c *Catalog) TableUpdatedNow(table dbx.Table, timestamp bool) error {
+	t := "NULL"
+	if timestamp {
+		t = "now()"
+	}
 	q := "INSERT INTO " + catalogSchema + ".table_update(schemaname,tablename,updated)" +
-		"VALUES($1,$2,now())" +
-		"ON CONFLICT (schemaname,tablename) DO UPDATE SET updated=now()"
+		"VALUES($1,$2," + t + ")" +
+		"ON CONFLICT (schemaname,tablename) DO UPDATE SET updated=" + t
 	if _, err := c.dc.Exec(context.TODO(), q, table.S, table.T); err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".table_update: %v", err)
 	}
