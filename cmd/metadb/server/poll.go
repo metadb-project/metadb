@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"regexp"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -128,9 +129,12 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		return fmt.Errorf("caching schema: %s", err)
 	}
 	// Update user permissions in database
-	if err = sysdb.UpdateUserPerms(db, cat.AllTables()); err != nil {
-		return err
-	}
+	var waitUserPerms sync.WaitGroup
+	waitUserPerms.Add(1)
+	go func(dsn sqlx.DSN, trackedTables []dbx.Table) {
+		defer waitUserPerms.Done()
+		sysdb.GoUpdateUserPerms(dsn, trackedTables)
+	}(*dsn, cat.AllTables())
 	// Cache users
 	users, err := cache.NewUsers(db)
 	if err != nil {
@@ -186,6 +190,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		}
 		spr.source.Status.Active()
 	}
+	waitUserPerms.Wait()
 	// pkerr keeps track of "primary key not defined" errors that have been logged, in order to reduce duplication
 	// of the error messages.
 	pkerr := make(map[string]struct{}) // "primary key not defined" errors reported

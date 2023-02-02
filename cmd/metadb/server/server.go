@@ -317,7 +317,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, 
 			schema := "folio_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {
 				log.Error("%v: repository=%s tag=%s path=%s", err, url, tag, path)
-				if tries >= 3 {
+				if tries >= 12 {
 					break
 				}
 				time.Sleep(1 * time.Hour)
@@ -336,7 +336,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, 
 			schema := "reshare_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {
 				log.Error("%v: repository=%s tag=%s path=%s", err, url, tag, path)
-				if tries >= 3 {
+				if tries >= 12 {
 					break
 				}
 				time.Sleep(1 * time.Hour)

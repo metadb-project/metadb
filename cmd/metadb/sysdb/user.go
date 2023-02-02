@@ -14,16 +14,24 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func UpdateUserPerms(adb sqlx.DB, trackedTables []dbx.Table) error {
+func GoUpdateUserPerms(dsn sqlx.DSN, trackedTables []dbx.Table) {
+	adb, err := sqlx.Open("postgresql", &dsn)
+	if err != nil {
+		log.Error("updating user permissions: opening database connection: %v", err)
+		return
+	}
+	defer adb.Close()
 	users, err := userRead(adb, true)
 	if err != nil {
-		return err
+		log.Error("updating user permissions: reading users: %v", err)
+		return
 	}
 	tables := make([]dbx.Table, len(trackedTables))
 	copy(tables, trackedTables)
 	for _, t := range trackedTables {
 		tables = append(tables, t.Main())
 	}
+	tables = append(tables, dbx.Table{S: "metadb", T: "log"})
 	tables = append(tables, dbx.Table{S: "metadb", T: "table_update"})
 	tables = append(tables, dbx.Table{S: "folio_source_record", T: "marctab"})
 	for u, re := range users {
@@ -47,14 +55,29 @@ func UpdateUserPerms(adb sqlx.DB, trackedTables []dbx.Table) error {
 			}
 
 		}
+		////////
+		if re.String == "" {
+			_, _ = adb.Exec(nil, "REVOKE USAGE ON SCHEMA folio_derived FROM "+u)
+			_, _ = adb.Exec(nil, "REVOKE SELECT ON ALL TABLES IN SCHEMA folio_derived FROM "+u)
+			_, _ = adb.Exec(nil, "REVOKE USAGE ON SCHEMA reshare_derived FROM "+u)
+			_, _ = adb.Exec(nil, "REVOKE SELECT ON ALL TABLES IN SCHEMA reshare_derived FROM "+u)
+		} else {
+			_, _ = adb.Exec(nil, "GRANT USAGE ON SCHEMA folio_derived TO "+u)
+			_, _ = adb.Exec(nil, "GRANT SELECT ON ALL TABLES IN SCHEMA folio_derived TO "+u)
+			_, _ = adb.Exec(nil, "GRANT USAGE ON SCHEMA reshare_derived TO "+u)
+			_, _ = adb.Exec(nil, "GRANT SELECT ON ALL TABLES IN SCHEMA reshare_derived TO "+u)
+		}
+		////////
 	}
 	if _, err := adb.Exec(nil, "UPDATE metadb.auth SET dbupdated=TRUE"); err != nil {
-		return fmt.Errorf("sysdb: update: %s", err)
+		log.Error("updating user authorizations: %v", err)
+		return
 	}
 	if _, err := adb.Exec(nil, "DELETE FROM metadb.auth WHERE tables=''"); err != nil {
-		return fmt.Errorf("sysdb: update: %s", err)
+		log.Error("cleaning up user authorizations: %v", err)
+		return
 	}
-	return nil
+	log.Trace("updated user permissions")
 }
 
 /*
