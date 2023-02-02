@@ -131,10 +131,18 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 	// Update user permissions in database
 	var waitUserPerms sync.WaitGroup
 	waitUserPerms.Add(1)
-	go func(dsn sqlx.DSN, trackedTables []dbx.Table) {
+	dsnsuper := sqlx.DSN{
+		Host:     spr.svr.db.Host,
+		Port:     "5432",
+		User:     spr.svr.db.SuperUser,
+		Password: spr.svr.db.SuperPassword,
+		DBName:   spr.svr.db.DBName,
+		SSLMode:  "require",
+	}
+	go func(dsnsuper sqlx.DSN, trackedTables []dbx.Table) {
 		defer waitUserPerms.Done()
-		sysdb.GoUpdateUserPerms(dsn, trackedTables)
-	}(*dsn, cat.AllTables())
+		sysdb.GoUpdateUserPerms(dsnsuper, trackedTables)
+	}(dsnsuper, cat.AllTables())
 	// Cache users
 	users, err := cache.NewUsers(db)
 	if err != nil {
