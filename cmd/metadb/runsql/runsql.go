@@ -105,13 +105,13 @@ func runFile(cat *catalog.Catalog, dc *pgx.Conn, schema string, file string) err
 		checkForTableName(q, &table)
 		if _, err = dc.Exec(context.TODO(), q); err != nil {
 			if table != "" {
-				_ = cat.TableUpdatedNow(dbx.Table{S: schema, T: table}, false)
+				_ = cat.TableUpdatedNow(dbx.Table{S: schema, T: table})
 			}
 			return fmt.Errorf("%s", strings.TrimPrefix(err.Error(), "ERROR: "))
 		}
 	}
 	if table != "" {
-		if err = cat.TableUpdatedNow(dbx.Table{S: schema, T: table}, true); err != nil {
+		if err = cat.TableUpdatedNow(dbx.Table{S: schema, T: table}); err != nil {
 			return fmt.Errorf("writing table updated time: %v", err)
 		}
 	}
