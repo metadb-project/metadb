@@ -43,7 +43,7 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 	if err = marc.Run(opt); err != nil {
 		return fmt.Errorf("%v", err)
 	}
-	if err = cat.TableUpdatedNow(dbx.Table{S: "folio_source_record", T: "marctab"}, true); err != nil {
+	if err = cat.TableUpdatedNow(dbx.Table{S: "folio_source_record", T: "marctab"}); err != nil {
 		return fmt.Errorf("writing table updated time: %v", err)
 	}
 	users, err = catalog.AllUsers(dc)
