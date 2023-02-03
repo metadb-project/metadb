@@ -12,13 +12,13 @@ import (
 
 var functionDefs = [][]string{
 	{"metadb_version()", `
-CREATE OR REPLACE FUNCTION public.metadb_version() RETURNS text
+CREATE FUNCTION public.metadb_version() RETURNS text
     AS $$ SELECT 'Metadb ` + util.MetadbVersion + `' $$
     LANGUAGE SQL`},
 	{"ps()", `
-CREATE OR REPLACE FUNCTION public.ps() RETURNS TABLE(username text, state text, elapsed text, query text)
+CREATE FUNCTION public.ps() RETURNS TABLE(username text, state text, realtime text, query text)
     AS $$
-       SELECT usename::text username, state, to_char(now() - query_start, 'HH24:MI:SS') AS elapsed, query
+       SELECT usename::text username, state, to_char(now() - query_start, 'HH24:MI:SS') AS realtime, query
            FROM pg_stat_activity
            WHERE leader_pid IS NULL AND pid <> pg_backend_pid() AND state <> 'idle'
            ORDER BY query_start
@@ -61,12 +61,18 @@ func createFunction(dc *pgx.Conn, fname, fdef string, users []string) error {
 	}
 	defer dbx.Rollback(tx)
 
+	q := "DROP FUNCTION IF EXISTS public." + fname
+	_, err = tx.Exec(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("dropping function: %s: %v", fname, err)
+	}
+
 	_, err = tx.Exec(context.TODO(), fdef)
 	if err != nil {
 		return fmt.Errorf("creating function: %s: %v", fname, err)
 	}
 
-	q := "REVOKE EXECUTE ON FUNCTION public." + fname + " FROM public;"
+	q = "REVOKE EXECUTE ON FUNCTION public." + fname + " FROM public;"
 	_, err = tx.Exec(context.TODO(), q)
 	if err != nil {
 		return fmt.Errorf("revoking public access to function: %s: %v", fname, err)
