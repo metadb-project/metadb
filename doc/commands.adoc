@@ -4,26 +4,101 @@
 
 ==== System information
 
-[%header,cols="1,1,3"]
+[%header,cols="1,2l,2"]
 |===
 |Name
 |Return type
 |Description
 
-|`metadb_version()`
-|`*text*`
-|Metadb version
+|`mdblog(interval)` [.aqua-background]#Metadb v1.0.5#
+|table (
+    log_time timestamptz(3),
+    error_severity text,
+    message text
+)
+|Returns recent log messages during the specified interval, or during
+ the past 24 hours if no interval is given
+
+|`mdbversion()`
+|text
+|Returns the Metadb version
+
+|`ps()`
+|table (
+    username text,
+    state text,
+    realtime text,
+    query text
+)
+|Returns the status and elapsed running time of current query processes
 |===
 
 ===== Examples
 
+Show log messages from the past hour, and from the past 24 hours:
+
+----
+SELECT * FROM mdblog(interval '1 hour');
+----
+----
+SELECT * FROM mdblog();
+----
+
 Show the current Metadb version:
 
 ----
-SELECT metadb_version();
+SELECT mdbversion();
 ----
 
+=== System tables
+
+==== metadb.log
+
+[%header,cols="1l,1l,3"]
+|===
+|Column name
+|Column type
+|Description
+
+|log_time
+|timestamptz(3)
+|Timestamp when the log entry was written
+
+|error_severity
+|text
+|Logging level: (from least to most severe) INFO, WARNING, ERROR, FATAL
+
+|message
+|text
+|The log message
+|===
+
+==== metadb.table_update
+
+[%header,cols="1l,1l,3"]
+|===
+|Column name
+|Column type
+|Description
+
+|schemaname
+|text
+|Schema name of the updated table
+
+|tablename
+|text
+|Table name of the updated table
+
+|updated
+|timestamptz
+|Timestamp when the table was last updated
+|===
+
 === Statements
+
+Metadb extends SQL with statements for configuring and administering
+the server.  These statements are only available when connecting to
+the Metadb server (not the database).
 
 ==== ALTER DATA SOURCE
 

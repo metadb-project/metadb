@@ -315,13 +315,26 @@ CREATE TABLE westgroup AS SELECT * FROM library.patrongroup WHERE __origin = 'we
 SELECT * FROM westgroup;
 ----
 
-=== System tables and functions
+=== Querying system information
+
+==== Metadb version
 
 To show the current Metadb version:
 
 ----
-SELECT metadb_version();
+SELECT mdbversion();
 ----
+
+==== Data update times
+
+Information about when certain tables were last updated is available
+in a table called `metadb.table_update`:
+
+----
+SELECT * FROM metadb.table_update;
+----
+
+==== System log
 
 Metadb reports errors and other information in a logging table called
 `metadb.log`.  For instance to view all log messages from January,
@@ -334,9 +347,18 @@ SELECT *
     ORDER BY log_time;
 ----
 
-[.aqua-background]#Metadb v1.0.4# When executing a long-running query,
-the `ps()` function can be used to check on the status of the query
-from another session:
+[.aqua-background]#Metadb v1.0.5# The `mdblog()` function is provided
+for convenience and returns ordered log messages, from the past 24
+hours by default (or optionally from a specified interval):
+
+----
+SELECT * FROM mdblog();
+----
+
+==== Status of query process
+
+When executing a long-running query, the `ps()` function can be used
+to check on the status of the query from another session:
 
 ----
 SELECT * FROM ps();
