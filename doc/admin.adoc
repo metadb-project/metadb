@@ -125,14 +125,27 @@ continuing.
 
 === Running the server
 
-If upgrading from a previous version, first run the upgrade process in
-case changes are needed:
+To upgrade from any previous version of Metadb, stop the server (if
+running), and then run the upgrade process in case changes are
+required:
 
 ----
 metadb upgrade -D data
 ----
 
-Then to start the server:
+The upgrade process may, in some instances, take a significant amount
+of time to run.  The database generally remains available to users
+during this period.
+
+If no changes are needed, the process outputs:
+
+----
+metadb: "data" is up to date
+----
+
+=== Running the server
+
+To start the server:
 
 [source,bash]
 ----
@@ -196,7 +209,7 @@ psql -h localhost -p 8440
 Then for example to show the software version:
 
 ----
-SELECT metadb_version();
+SELECT mdbversion();
 ----
 
 === Configuring a Kafka data source
@@ -220,13 +233,17 @@ Kafka, Kafka Connect, Debezium, and PostgreSQL logical decoding is
 beyond the scope of this documentation, but a few notes are included
 here.
 
-Data flows from (1) a source PostgreSQL database to (2) the Debezium
-PostgreSQL connector in Kafka Connect to (3) Kafka to (4) Metadb and
-its PostgreSQL database.
+Data flow in this direction:
+
+1. A source PostgreSQL database
+2. Kafka Connect/Debezium
+3. Kafka
+4. Metadb
+5. The analytics database
 
 To allow capturing data changes in the source PostgreSQL database,
-logical decoding must be enabled, in particular by setting `wal_level
-= logical` in `postgresql.conf`.
+logical decoding has to be enabled, in particular by setting
+`wal_level = logical` in `postgresql.conf`.
 
 Next we create a connector configuration file for Kafka Connect:
 
@@ -288,14 +305,17 @@ configuration by setting `schema.exclude.list` or
 `table.exclude.list`.  Otherwise they will generate error messages in
 the Metadb log.
 
-The replication slot disk usage must be monitored, because under
+*The replication slot disk usage must be monitored, because under
 certain error conditions it can grow too large and possibly fill up
-the disk.  To show the disk usage (in the source database):
+the disk.* To show the disk usage (in the source database):
 
 ----
 select slot_name, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(),
     restart_lsn)) as replicationSlotLag, active from pg_replication_slots;
 ----
+
+*It is also recommended to allocate plenty of extra disk space in the
+source database.*
 
 To drop the replication slot (in the source database) after deleting a
 connector:
@@ -312,8 +332,14 @@ If a Kafka data stream fails and cannot be resumed, it may be
 necessary to re-stream data to Metadb.  For example, a source database
 may become unsynchronized with the analytic database, requiring a new
 snapshot of the source database to be streamed.  Metadb can accept
-re-streamed data in order to resynchronize with the source, using this
-procedure:
+re-streamed data in order to resynchronize with the source, using the
+following procedure.
+
+Note that during the resynchronization process, the analytics database
+continues to be available to users.  However, streaming updates will
+be slower than usual, and there temporarily may be missing records
+(until they are re-streamed) or "extra" records (recently deleted in
+the source database).
 
 1. Update the `topics` and `consumergroup` configuration settings for
    the new data stream.
@@ -327,8 +353,8 @@ ALTER DATA SOURCE example OPTIONS
 *Do not restart the Metadb server but continue directly to Step 2.*
 
 2. Stop the Metadb server and (before starting it again) "reset" the
-   analytic database to mark current data as old.  This may take some
-   time to run.
+   analytics database to mark all current data as old.  This may take
+   some time to run.
 +
 [source,bash]
 ----
@@ -340,8 +366,9 @@ metadb reset -D data --source example
 3. Start the Metadb server to begin streaming the data.
 
 4. Once the new data have finished (or nearly finished) re-streaming,
-   stop the Metadb server, and "clean" the analytic database to remove
-   old data.
+   stop the Metadb server, and "clean" the analytics database to
+   remove any old data that have not been refreshed by the new data
+   stream.
 +
 [source,bash]
 ----
@@ -352,11 +379,11 @@ Note that the metadb server currently does not give an indication that
 it has finished re-streaming.  (Having the server report that initial
 streaming or re-streaming has finished is a planned feature.)
 +
-The precise timing of when "metadb clean" is run is not important, but
-*it must be run to remove redundant data and to complete the
-resynchronization process*.  The only disadvantage of running it too
-early is that data will appear to be missing until they are
-re-streamed.
+The precise timing of when "metadb clean" should be run is up to the
+admninistrator, but *it must be run to remove redundant data and to
+complete the resynchronization process*.  The only disadvantage of
+running it too early is that data will appear to be missing until they
+are re-streamed.
 
 5. Start the server.
 +

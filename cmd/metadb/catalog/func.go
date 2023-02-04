@@ -11,8 +11,8 @@ import (
 )
 
 var functionDefs = [][]string{
-	{"metadb_version()", `
-CREATE FUNCTION public.metadb_version() RETURNS text
+	{"mdbversion()", `
+CREATE FUNCTION public.mdbversion() RETURNS text
     AS $$ SELECT 'Metadb ` + util.MetadbVersion + `' $$
     LANGUAGE SQL`},
 	{"ps()", `
@@ -22,6 +22,15 @@ CREATE FUNCTION public.ps() RETURNS TABLE(username text, state text, realtime te
            FROM pg_stat_activity
            WHERE leader_pid IS NULL AND pid <> pg_backend_pid() AND state <> 'idle'
            ORDER BY query_start
+       $$
+    LANGUAGE SQL`},
+	{"mdblog()", `
+CREATE FUNCTION public.mdblog(v interval default interval '24 hours') RETURNS TABLE(log_time timestamp(3) with time zone, error_severity text, message text)
+    AS $$
+       SELECT log_time, error_severity, message
+           FROM metadb.log
+           WHERE log_time >= now() - v
+           ORDER BY log_time
        $$
     LANGUAGE SQL`},
 }
@@ -41,7 +50,7 @@ func CreateAllFunctions(dcsuper, dc *pgx.Conn, systemuser string) error {
 	for _, f := range functionDefs {
 		err := createFunction(dc, f[0], f[1], users)
 		if err != nil {
-			return err
+			return fmt.Errorf("creatig function %q: %v", f[0], err)
 		}
 	}
 
@@ -72,10 +81,9 @@ func createFunction(dc *pgx.Conn, fname, fdef string, users []string) error {
 		return fmt.Errorf("creating function: %s: %v", fname, err)
 	}
 
-	q = "REVOKE EXECUTE ON FUNCTION public." + fname + " FROM public;"
-	_, err = tx.Exec(context.TODO(), q)
+	err = tx.Commit(context.TODO())
 	if err != nil {
-		return fmt.Errorf("revoking public access to function: %s: %v", fname, err)
+		return err
 	}
 
 	for _, u := range users {
@@ -83,9 +91,5 @@ func createFunction(dc *pgx.Conn, fname, fdef string, users []string) error {
 		_, _ = tx.Exec(context.TODO(), q)
 	}
 
-	err = tx.Commit(context.TODO())
-	if err != nil {
-		return err
-	}
 	return nil
 }

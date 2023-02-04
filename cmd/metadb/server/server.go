@@ -408,7 +408,7 @@ func goCreateFunctions(db dbx.DB) {
 
 	err = catalog.CreateAllFunctions(dcsuper, dc, db.User)
 	if err != nil {
-		log.Error("%v", err)
+		log.Error("creating functions: %v", err)
 		return
 	}
 }
