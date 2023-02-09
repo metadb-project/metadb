@@ -89,9 +89,9 @@ func (d DataType) String() string {
 	}
 }
 
-func MakeDataTypeNew(dataType string, charMaxLen int64) (DataType, int64) {
+func MakeDataType(dataType string, charMaxLen int64) (DataType, int64) {
 	switch strings.ToLower(dataType) {
-	case "character varying", "text":
+	case "character varying", "varchar", "text":
 		return VarcharType, charMaxLen
 	case "smallint":
 		return IntegerType, 2
@@ -109,18 +109,18 @@ func MakeDataTypeNew(dataType string, charMaxLen int64) (DataType, int64) {
 		return BooleanType, 0
 	case "date":
 		return DateType, 0
-	case "time without time zone":
+	case "time without time zone", "time":
 		return TimeType, 0
-	case "time with time zone":
+	case "time with time zone", "timetz":
 		return TimetzType, 0
-	case "timestamp without time zone":
+	case "timestamp without time zone", "timestamp":
 		fallthrough
-	case "timestamp_ntz":
-		return TimestampType, 0
-	case "timestamp with time zone":
+	//case "timestamp_ntz":
+	//	return TimestampType, 0
+	case "timestamp with time zone", "timestamptz":
 		fallthrough
-	case "timestamp_tz":
-		return TimestamptzType, 0
+	//case "timestamp_tz":
+	//	return TimestamptzType, 0
 	case "uuid":
 		return UUIDType, 0
 	case "jsonb":
@@ -130,38 +130,6 @@ func MakeDataTypeNew(dataType string, charMaxLen int64) (DataType, int64) {
 		return UnknownType, 0
 	}
 }
-
-/*
-func MakeDataType(dtype string) DataType {
-	switch dtype {
-	case "varchar":
-		return VarcharType
-	case "integer":
-		return IntegerType
-	case "float":
-		return FloatType
-	case "boolean":
-		return BooleanType
-	case "date":
-		return DateType
-	case "time":
-		return TimeType
-	case "timetz":
-		return TimetzType
-	case "timestamp":
-		return TimestampType
-	case "timestamptz":
-		return TimestamptzType
-	case "uuid":
-		return UUIDType
-	case "jsonb":
-		return JSONType
-	default:
-		log.Error("make data type: unknown data type: %s", dtype)
-		return UnknownType
-	}
-}
-*/
 
 // DataTypeToSQL convert a data type and type size to a database type, with and
 // without a character maximum length (charMaxLen).  It returns three values:

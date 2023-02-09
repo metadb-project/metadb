@@ -2,17 +2,17 @@
 
 === Data type conversion
 
-When reading data from a data source, Metadb will automatically adjust
-column data types in a number of cases:
+When reading data from a data source, Metadb will automatically adjust column
+data types in a number of cases:
 
-* A data type in the source has changed in a way that cannot be
-  applied safely by Metadb without more information.
+* A data type in the source has changed in a way that cannot be applied safely
+  by Metadb without more information.
 
-* A data type in the source has changed to a type that is not
-  supported by Metadb.
+* A data type in the source has changed to a type that is not supported by
+  Metadb.
 
-* A data type in the source can be converted safely to a type that is
-  more performant.
+* A data type in the source can be converted safely to a type that is more
+  performant.
 
 This table summarizes the type adjustments that are performed:
 

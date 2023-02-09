@@ -14,7 +14,7 @@ func (c *Catalog) initPartYears() error {
 		"JOIN pg_namespace n ON c.relnamespace=n.oid AND t.schemaname=n.nspname " +
 		"JOIN pg_partitioned_table p ON c.oid=p.partrelid " +
 		"JOIN pg_inherits i ON p.partrelid=i.inhparent"
-	rows, err := c.dc.Query(context.TODO(), q)
+	rows, err := c.dp.Query(context.TODO(), q)
 	if err != nil {
 		return fmt.Errorf("selecting partition years: %v", err)
 	}
@@ -60,7 +60,7 @@ func (c *Catalog) AddPartYearIfNotExists(schema, table string, year int) error {
 	q := "CREATE TABLE " + nctableYear +
 		" PARTITION OF " + nctable +
 		" FOR VALUES FROM ('" + yearStr + "-01-01') TO ('" + nextYearStr + "-01-01')"
-	if _, err := c.dc.Exec(context.TODO(), q); err != nil {
+	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating partition: %v", err)
 	}
 	// Update the cache.

@@ -1,4 +1,8 @@
-// asciidoctor -a docinfo=shared *.adoc
+
+// To build HTML:
+//     asciidoctor -a docinfo=shared *.adoc
+
+// Text is styled using "pre-wrap" and wrapped at column 79.
 
 = Metadb Documentation
 :toc: left

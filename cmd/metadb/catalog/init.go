@@ -8,8 +8,10 @@ import (
 	"sync"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -19,60 +21,50 @@ type Catalog struct {
 	mu        sync.Mutex
 	tableDir  map[dbx.Table]tableEntry
 	partYears map[string]map[int]struct{}
-	dc        *pgx.Conn
+	users     map[string]*util.RegexList
+	columns   map[sqlx.Column]ColumnType
+	dp        *pgxpool.Pool
 }
 
-func Initialize(db *dbx.DB) (*Catalog, error) {
-	dc, err := db.Connect()
+func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
+	exists, err := catalogSchemaExists(dp)
 	if err != nil {
-		return nil, err
-	}
-
-	exists, err := catalogSchemaExists(dc)
-	if err != nil {
-		dbx.Close(dc)
 		return nil, fmt.Errorf("checking if database initialized: %v", err)
 	}
 	if !exists {
 		log.Info("initializing database")
-		if err = createCatalogSchema(dc); err != nil {
-			dbx.Close(dc)
+		if err = createCatalogSchema(dp); err != nil {
 			return nil, err
 		}
 		if err = RevokeCreateOnSchemaPublic(db); err != nil {
-			dbx.Close(dc)
 			return nil, err
 		}
 	} else {
 		// Check that database version is compatible
-		err = checkDatabaseCompatible(dc)
-		if err != nil {
-			dbx.Close(dc)
+		if err = checkDatabaseCompatible(dp); err != nil {
 			return nil, err
 		}
 	}
 
-	c := &Catalog{
-		dc: dc,
-	}
+	c := &Catalog{dp: dp}
 	if err := c.initTableDir(); err != nil {
 		return nil, err
 	}
 	if err := c.initPartYears(); err != nil {
 		return nil, err
 	}
+	if err := c.initUsers(); err != nil {
+		return nil, err
+	}
+	if err := c.initSchema(); err != nil {
+		return nil, err
+	}
 
 	return c, nil
 }
 
-func (c *Catalog) Close() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	dbx.Close(c.dc)
-}
-
-func checkDatabaseCompatible(dc *pgx.Conn) error {
-	dbversion, err := DatabaseVersion(dc)
+func checkDatabaseCompatible(dp *pgxpool.Pool) error {
+	dbversion, err := DatabaseVersion(dp)
 	if err != nil {
 		return err
 	}
@@ -86,11 +78,11 @@ func checkDatabaseCompatible(dc *pgx.Conn) error {
 	return nil
 }
 
-func DatabaseVersion(dc *pgx.Conn) (int64, error) {
+func DatabaseVersion(dq dbx.Queryable) (int64, error) {
 	var dbversion int64
-	err := dc.QueryRow(context.TODO(), "SELECT dbversion FROM metadb.init").Scan(&dbversion)
+	err := dq.QueryRow(context.TODO(), "SELECT dbversion FROM metadb.init").Scan(&dbversion)
 	switch {
-	case err == pgx.ErrNoRows:
+	case errors.Is(err, pgx.ErrNoRows):
 		return 0, fmt.Errorf("unable to query database version")
 	case err != nil:
 		return 0, fmt.Errorf("querying database version: %s", err)
@@ -99,11 +91,11 @@ func DatabaseVersion(dc *pgx.Conn) (int64, error) {
 	}
 }
 
-func catalogSchemaExists(dc *pgx.Conn) (bool, error) {
+func catalogSchemaExists(dp *pgxpool.Pool) (bool, error) {
 	var err error
 	var q = "SELECT 1 FROM pg_namespace WHERE nspname=$1"
 	var n int32
-	err = dc.QueryRow(context.TODO(), q, catalogSchema).Scan(&n)
+	err = dp.QueryRow(context.TODO(), q, catalogSchema).Scan(&n)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return false, nil
@@ -140,8 +132,8 @@ func SystemTables() []dbx.Table {
 	return tables
 }
 
-func createCatalogSchema(dc *pgx.Conn) error {
-	tx, err := dc.Begin(context.TODO())
+func createCatalogSchema(dp *pgxpool.Pool) error {
+	tx, err := dp.Begin(context.TODO())
 	if err != nil {
 		return err
 	}
@@ -279,7 +271,7 @@ func (c *Catalog) TableUpdatedNow(table dbx.Table) error {
 	q := "INSERT INTO " + catalogSchema + ".table_update(schemaname,tablename,updated)" +
 		"VALUES($1,$2,now())" +
 		"ON CONFLICT (schemaname,tablename) DO UPDATE SET updated=now()"
-	if _, err := c.dc.Exec(context.TODO(), q, table.S, table.T); err != nil {
+	if _, err := c.dp.Exec(context.TODO(), q, table.S, table.T); err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".table_update: %v", err)
 	}
 	return nil

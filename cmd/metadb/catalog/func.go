@@ -24,7 +24,7 @@ CREATE FUNCTION public.ps() RETURNS TABLE(username text, state text, realtime te
            ORDER BY query_start
        $$
     LANGUAGE SQL`},
-	{"mdblog()", `
+	{"mdblog(interval)", `
 CREATE FUNCTION public.mdblog(v interval default interval '24 hours') RETURNS TABLE(log_time timestamp(3) with time zone, error_severity text, message text)
     AS $$
        SELECT log_time, error_severity, message
@@ -50,7 +50,7 @@ func CreateAllFunctions(dcsuper, dc *pgx.Conn, systemuser string) error {
 	for _, f := range functionDefs {
 		err := createFunction(dc, f[0], f[1], users)
 		if err != nil {
-			return fmt.Errorf("creatig function %q: %v", f[0], err)
+			return fmt.Errorf("creating %q: %v", f[0], err)
 		}
 	}
 
@@ -66,19 +66,19 @@ func CreateAllFunctions(dcsuper, dc *pgx.Conn, systemuser string) error {
 func createFunction(dc *pgx.Conn, fname, fdef string, users []string) error {
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
-		return fmt.Errorf("starting transaction for function: %s: %v", fname, err)
+		return fmt.Errorf("starting transaction for function: %v", err)
 	}
 	defer dbx.Rollback(tx)
 
 	q := "DROP FUNCTION IF EXISTS public." + fname
 	_, err = tx.Exec(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("dropping function: %s: %v", fname, err)
+		return fmt.Errorf("dropping function: %v", err)
 	}
 
 	_, err = tx.Exec(context.TODO(), fdef)
 	if err != nil {
-		return fmt.Errorf("creating function: %s: %v", fname, err)
+		return fmt.Errorf("creating function: %v", err)
 	}
 
 	err = tx.Commit(context.TODO())

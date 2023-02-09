@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
@@ -14,17 +13,17 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, cschema *cache.Schema, users *cache.Users, source string) error {
-	var clt []command.CommandList = partitionTxn(cl, cschema)
+func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, source string) error {
+	var clt []command.CommandList = partitionTxn(cat, cl)
 	for _, cc := range clt {
 		if len(cc.Cmd) == 0 {
 			continue
 		}
 		// exec schema changes
-		if err := execCommandSchema(cat, &cc.Cmd[0], db, cschema, users); err != nil {
+		if err := execCommandSchema(cat, &cc.Cmd[0], db); err != nil {
 			return fmt.Errorf("schema: %s", err)
 		}
-		err := execCommandListData(cat, db, cc, cschema, source)
+		err := execCommandListData(cat, db, cc, source)
 		if err != nil {
 			return fmt.Errorf("data: %s", err)
 		}
@@ -36,29 +35,29 @@ func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, 
 	return nil
 }
 
-func execCommandSchema(cat *catalog.Catalog, cmd *command.Command, db sqlx.DB, schema *cache.Schema, users *cache.Users) error {
+func execCommandSchema(cat *catalog.Catalog, cmd *command.Command, db sqlx.DB) error {
 	if cmd.Op == command.DeleteOp {
 		return nil
 	}
 	var err error
 	var delta *deltaSchema
-	if delta, err = findDeltaSchema(cmd, schema); err != nil {
+	if delta, err = findDeltaSchema(cat, cmd); err != nil {
 		return err
 	}
-	if err = addTable(cmd, db, cat, users); err != nil {
+	if err = addTable(cmd, db, cat); err != nil {
 		return err
 	}
 	if err = addPartition(cat, cmd); err != nil {
 		return err
 	}
 	// Note that execDeltaSchema() may adjust data types in cmd.
-	if err = execDeltaSchema(cmd, delta, cmd.SchemaName, cmd.TableName, db, schema); err != nil {
+	if err = execDeltaSchema(cat, cmd, delta, cmd.SchemaName, cmd.TableName, db); err != nil {
 		return err
 	}
 	return nil
 }
 
-func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, tableName string, db sqlx.DB, schema *cache.Schema) error {
+func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSchema, tschema string, tableName string, db sqlx.DB) error {
 	//if len(delta.column) == 0 {
 	//        log.Trace("table %s: no schema changes", util.JoinSchemaTable(tschema, tableName))
 	//}
@@ -67,8 +66,8 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		if col.newColumn {
 			dtypesql, _, _ := command.DataTypeToSQL(col.newType, col.newTypeSize)
 			log.Trace("table %s.%s: new column: %s %s", tschema, tableName, col.name, dtypesql)
-			t := &sqlx.Table{Schema: tschema, Table: tableName}
-			if err := addColumn(t, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
+			t := dbx.Table{S: tschema, T: tableName}
+			if err := cat.AddColumn(t, col.name, col.newType, col.newTypeSize); err != nil {
 				return err
 			}
 			continue
@@ -110,7 +109,7 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		if col.oldType == command.VarcharType && col.newType == command.VarcharType {
 			dtypesql, _, _ := command.DataTypeToSQL(col.newType, col.newTypeSize)
 			log.Trace("table %s.%s: alter column: %s %s", tschema, tableName, col.name, dtypesql)
-			if err := alterColumnVarcharSize(sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db, schema); err != nil {
+			if err := alterColumnVarcharSize(cat, sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db); err != nil {
 				return err
 			}
 			continue
@@ -119,7 +118,7 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		// column type to handle the larger size.
 		if col.oldType == command.IntegerType && col.newType == command.IntegerType {
 			// err := alterColumnIntegerSize(sqlx.NewTable(tschema, tableName), col.name, col.newTypeSize, db, schema)
-			err := alterColumnType(db, schema, tschema, tableName, col.name, command.IntegerType, col.newTypeSize, false)
+			err := alterColumnType(cat, db, tschema, tableName, col.name, command.IntegerType, col.newTypeSize, false)
 			if err != nil {
 				return err
 			}
@@ -130,7 +129,7 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		// column type to handle the larger size.
 		if col.oldType == command.FloatType && col.newType == command.FloatType {
 			// err := alterColumnFloatSize(sqlx.NewTable(tschema, tableName), col.name, col.newTypeSize, db, schema)
-			err := alterColumnType(db, schema, tschema, tableName, col.name, command.FloatType, col.newTypeSize, false)
+			err := alterColumnType(cat, db, tschema, tableName, col.name, command.FloatType, col.newTypeSize, false)
 			if err != nil {
 				return err
 			}
@@ -140,7 +139,7 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		// If this is a change from an integer to float type, the
 		// column type can be changed using a cast.
 		if col.oldType == command.IntegerType && col.newType == command.FloatType {
-			err := alterColumnType(db, schema, tschema, tableName, col.name, command.FloatType, col.newTypeSize, false)
+			err := alterColumnType(cat, db, tschema, tableName, col.name, command.FloatType, col.newTypeSize, false)
 			if err != nil {
 				return err
 			}
@@ -150,7 +149,7 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		// If this is a change from an integer or float to numeric
 		// type, the column type can be changed using a cast.
 		if (col.oldType == command.IntegerType || col.oldType == command.FloatType) && col.newType == command.NumericType {
-			err := alterColumnType(db, schema, tschema, tableName, col.name, command.NumericType, 0, false)
+			err := alterColumnType(cat, db, tschema, tableName, col.name, command.NumericType, 0, false)
 			if err != nil {
 				return err
 			}
@@ -160,7 +159,7 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		// If this is a change from a float to integer type, cast the
 		// column to the numeric type.
 		if col.oldType == command.FloatType && col.newType == command.IntegerType {
-			err := alterColumnType(db, schema, tschema, tableName, col.name, command.NumericType, 0, false)
+			err := alterColumnType(cat, db, tschema, tableName, col.name, command.NumericType, 0, false)
 			if err != nil {
 				return err
 			}
@@ -209,7 +208,7 @@ func execDeltaSchema(cmd *command.Command, delta *deltaSchema, tschema string, t
 		}
 
 		// err = alterColumnToVarchar(sqlx.NewTable(tschema, tableName), col.name, maxlen, db, schema)
-		err = alterColumnType(db, schema, tschema, tableName, col.name, command.VarcharType, maxlen, false)
+		err = alterColumnType(cat, db, tschema, tableName, col.name, command.VarcharType, maxlen, false)
 		if err != nil {
 			return err
 		}
@@ -245,7 +244,7 @@ func selectMaxStringLength(db sqlx.DB, table *sqlx.Table, column string) (int64,
 	return maxlen, nil
 }
 
-func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandList, cschema *cache.Schema, source string) error {
+func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandList, source string) error {
 	// Begin txn
 	tx, err := db.BeginTx()
 	if err != nil {
@@ -260,7 +259,7 @@ func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandLis
 		// avoid silent data loss due to optimization errors
 		for _, col := range c.Column {
 			if col.DType == command.VarcharType {
-				schemaCol := cschema.Column(sqlx.NewColumn(c.SchemaName, c.TableName, col.Name))
+				schemaCol := cat.Column(sqlx.NewColumn(c.SchemaName, c.TableName, col.Name))
 				if schemaCol != nil && col.DTypeSize > schemaCol.CharMaxLen {
 					// TODO Factor fatal error exit into function
 					log.Fatal("internal error: schema varchar size not adjusted: %d > %d", col.DTypeSize, schemaCol.CharMaxLen)
@@ -281,12 +280,12 @@ func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandLis
 	return nil
 }
 
-func partitionTxn(cl *command.CommandList, cschema *cache.Schema) []command.CommandList {
+func partitionTxn(cat *catalog.Catalog, cl *command.CommandList) []command.CommandList {
 	var clt []command.CommandList
 	newcl := new(command.CommandList)
 	var c, lastc command.Command
 	for _, c = range cl.Cmd {
-		req := requiresSchemaChanges(&c, &lastc, cschema)
+		req := requiresSchemaChanges(cat, &c, &lastc)
 		if req {
 			if len(newcl.Cmd) > 0 {
 				clt = append(clt, *newcl)
@@ -302,7 +301,7 @@ func partitionTxn(cl *command.CommandList, cschema *cache.Schema) []command.Comm
 	return clt
 }
 
-func requiresSchemaChanges(c, o *command.Command, cschema *cache.Schema) bool {
+func requiresSchemaChanges(cat *catalog.Catalog, c, o *command.Command) bool {
 	if c.Op == command.DeleteOp || c.Op == command.TruncateOp {
 		return false
 	}
@@ -319,7 +318,7 @@ func requiresSchemaChanges(c, o *command.Command, cschema *cache.Schema) bool {
 		}
 		if col.DType == command.VarcharType {
 			// Special case for varchar
-			schemaCol := cschema.Column(&cc)
+			schemaCol := cat.Column(&cc)
 			if schemaCol == nil {
 				return true
 			}

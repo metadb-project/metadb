@@ -115,7 +115,7 @@ func InitSys(opt *option.Init) error {
 		"database = \n" +
 		"superuser = postgres\n" +
 		"superuser_password = \n" +
-		"systemuser = metadb\n" +
+		"systemuser = mdbadmin\n" +
 		"systemuser_password = \n" +
 		"sslmode = require\n"
 	_, err = f.WriteString(s)

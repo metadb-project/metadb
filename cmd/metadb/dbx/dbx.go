@@ -5,11 +5,29 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+type Queryable interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+var _ Queryable = (*pgxpool.Pool)(nil)
+var _ Queryable = (*pgx.Conn)(nil)
+var _ Queryable = (pgx.Tx)(nil)
 
 type Table struct {
 	S string
 	T string
+}
+
+type Column struct {
+	S string
+	T string
+	C string
 }
 
 func (t Table) String() string {
