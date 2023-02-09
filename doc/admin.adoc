@@ -43,8 +43,8 @@
 
 === Building the software
 
-First set the `GOPATH` environment variable to specify a path that can
-serve as the build workspace for Go, e.g.:
+First set the `GOPATH` environment variable to specify a path that can serve as
+the build workspace for Go, e.g.:
 
 [source,bash]
 ----
@@ -67,22 +67,22 @@ Then to build the server:
 $ ./build.sh
 ----
 
-The `build.sh` script creates a `bin/` subdirectory and builds the
-`metadb` executable there:
+The `build.sh` script creates a `bin/` subdirectory and builds the `metadb`
+executable there:
 
 [source,bash]
 ----
 $ ./bin/metadb help
 ----
 
-It is suggested that a `metadb` user be created and the server run by
-that user, for example, in `/home/metadb`.
+It is suggested that a `metadb` user be created and the server run by that
+user, for example, in `/home/metadb`.
 
 === Server configuration
 
-Metadb makes use of local storage in a "data directory," which is
-created using `metadb` with the `init` command.  In this example we
-will create the data directory as `data/`:
+Metadb makes use of local storage in a "data directory," which is created using
+`metadb` with the `init` command.  In this example we will create the data
+directory as `data/`:
 
 [source,bash]
 ----
@@ -114,28 +114,25 @@ port = 5432
 database = mydb
 superuser = postgres
 superuser_password = zpreCaWS7S79dt82zgvD
-systemuser = metadb
+systemuser = mdbadmin
 systemuser_password = ZHivGie5juxGJZmTObHU
 sslmode = require
 ----
 
-Metadb will assume that the database, superuser, and systemuser
-defined here already exist; so they should be created before
-continuing.
+Metadb will assume that the database, superuser, and systemuser defined here
+already exist; so they should be created before continuing.
 
 === Upgrading from a previous version
 
-To upgrade from any previous version of Metadb, stop the server (if
-running), and then run the upgrade process in case changes are
-required:
+To upgrade from any previous version of Metadb, stop the server (if running),
+and then run the upgrade process in case changes are required:
 
 ----
 metadb upgrade -D data
 ----
 
-The upgrade process may, in some instances, take a significant amount
-of time to run.  The database generally remains available to users
-during this period.
+The upgrade process may, in some instances, take a significant amount of time
+to run.  The database generally remains available to users during this period.
 
 If no changes are needed, the process outputs:
 
@@ -152,16 +149,16 @@ To start the server:
 nohup metadb start -D data -l metadb.log &
 ----
 
-The `--memlimit` option can be used to set a soft memory limit (in
-GiB) if needed, for example:
+The `--memlimit` option can be used to set a soft memory limit (in GiB) if
+needed, for example:
 
 [source,bash]
 ----
 nohup metadb start -D data -l metadb.log --memlimit 2 &
 ----
 
-The server listens on port 8440 by default, but this can be set using
-the `--port` option.  The `--debug` option enables verbose logging.
+The server listens on port 8440 by default, but this can be set using the
+`--port` option.  The `--debug` option enables verbose logging.
 
 To stop the server:
 
@@ -199,13 +196,14 @@ systemctl start metadb
 
 === Connecting to the server
 
-The PostgreSQL terminal client, `psql`, can be used to connect to the
-Metadb server:
+The PostgreSQL terminal client, `psql`, can be used to connect to the Metadb
+server:
 
 ----
 psql -h localhost -p 8440
 ----
 
+[.aqua-background]#Metadb v1.0.5#
 Then for example to show the software version:
 
 ----
@@ -214,8 +212,7 @@ SELECT mdbversion();
 
 === Configuring a Kafka data source
 
-A data source is defined using the `CREATE DATA SOURCE` statement, for
-example:
+A data source is defined using the `CREATE DATA SOURCE` statement, for example:
 
 ----
 CREATE DATA SOURCE example TYPE kafka OPTIONS (
@@ -227,11 +224,10 @@ CREATE DATA SOURCE example TYPE kafka OPTIONS (
 );
 ----
 
-Metadb currently supports reading Kafka messages produced by the
-Debezium PostgreSQL connector for Kafka Connect.  Configuration of
-Kafka, Kafka Connect, Debezium, and PostgreSQL logical decoding is
-beyond the scope of this documentation, but a few notes are included
-here.
+Metadb currently supports reading Kafka messages produced by the Debezium
+PostgreSQL connector for Kafka Connect.  Configuration of Kafka, Kafka Connect,
+Debezium, and PostgreSQL logical decoding is beyond the scope of this
+documentation, but a few notes are included here.
 
 Data flow in this direction:
 
@@ -241,9 +237,9 @@ Data flow in this direction:
 4. Metadb
 5. The analytics database
 
-To allow capturing data changes in the source PostgreSQL database,
-logical decoding has to be enabled, in particular by setting
-`wal_level = logical` in `postgresql.conf`.
+To allow capturing data changes in the source PostgreSQL database, logical
+decoding has to be enabled, in particular by setting `wal_level = logical` in
+`postgresql.conf`.
 
 Next we create a connector configuration file for Kafka Connect:
 
@@ -270,11 +266,11 @@ Next we create a connector configuration file for Kafka Connect:
 ----
 
 It is recommended to use the connector configuration settings
-`heartbeat.interval.ms` and `heartbeat.action.query` as above to avoid
-spikes in disk space consumption within the source database.  (See the
-Debezium PostgreSQL connector documentation for more details.)  The
-`schemastopfilter` option of the `CREATE DATA SOURCE` command is used
-to filter out the heartbeat table.
+`heartbeat.interval.ms` and `heartbeat.action.query` as above to avoid spikes
+in disk space consumption within the source database.  (See the Debezium
+PostgreSQL connector documentation for more details.)  The `schemastopfilter`
+option of the `CREATE DATA SOURCE` command is used to filter out the heartbeat
+table.
 
 In the source database:
 
@@ -293,29 +289,27 @@ curl -X POST -i -H "Accept: application/json" -H "Content-Type: application/json
      -d @connector.json https://kafka.connect.server/connectors
 ----
 
-Note the `1` included in `name` and `database.server.name` in the
-connector configuration.  This is suggested as a version number, which
-can be incremented if the data stream needs to be resynchronized with
-a new connector.
+Note the `1` included in `name` and `database.server.name` in the connector
+configuration.  This is suggested as a version number, which can be incremented
+if the data stream needs to be resynchronized with a new connector.
 
-Metadb requires all streamed tables to have a primary key defined or a
-replica identity of `FULL`.  Tables that do not meet this requirement
-should be filtered out in the Debezium PostgreSQL connector
-configuration by setting `schema.exclude.list` or
-`table.exclude.list`.  Otherwise they will generate error messages in
-the Metadb log.
+Metadb requires all streamed tables to have a primary key defined or a replica
+identity of `FULL`.  Tables that do not meet this requirement should be
+filtered out in the Debezium PostgreSQL connector configuration by setting
+`schema.exclude.list` or `table.exclude.list`.  Otherwise they will generate
+error messages in the Metadb log.
 
-*The replication slot disk usage must be monitored, because under
-certain error conditions it can grow too large and possibly fill up
-the disk.* To show the disk usage (in the source database):
+*The replication slot disk usage must be monitored, because under certain error
+conditions it can grow too large and possibly fill up the disk.* To show the
+disk usage (in the source database):
 
 ----
 select slot_name, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(),
     restart_lsn)) as replicationSlotLag, active from pg_replication_slots;
 ----
 
-*It is also recommended to allocate plenty of extra disk space in the
-source database.*
+*It is also recommended to allocate plenty of extra disk space in the source
+database.*
 
 To drop the replication slot (in the source database) after deleting a
 connector:
@@ -328,21 +322,19 @@ DROP PUBLICATION dbz_publication;
 
 === Resynchronizing a data source
 
-If a Kafka data stream fails and cannot be resumed, it may be
-necessary to re-stream data to Metadb.  For example, a source database
-may become unsynchronized with the analytic database, requiring a new
-snapshot of the source database to be streamed.  Metadb can accept
-re-streamed data in order to resynchronize with the source, using the
-following procedure.
+If a Kafka data stream fails and cannot be resumed, it may be necessary to
+re-stream data to Metadb.  For example, a source database may become
+unsynchronized with the analytic database, requiring a new snapshot of the
+source database to be streamed.  Metadb can accept re-streamed data in order to
+resynchronize with the source, using the following procedure.
 
 Note that during the resynchronization process, the analytics database
-continues to be available to users.  However, streaming updates will
-be slower than usual, and there temporarily may be missing records
-(until they are re-streamed) or "extra" records (recently deleted in
-the source database).
+continues to be available to users.  However, streaming updates will be slower
+than usual, and there temporarily may be missing records (until they are
+re-streamed) or "extra" records (recently deleted in the source database).
 
-1. Update the `topics` and `consumergroup` configuration settings for
-   the new data stream.
+1. Update the `topics` and `consumergroup` configuration settings for the new
+   data stream.
 +
 [source]
 ----
@@ -352,9 +344,8 @@ ALTER DATA SOURCE example OPTIONS
 +
 *Do not restart the Metadb server but continue directly to Step 2.*
 
-2. Stop the Metadb server and (before starting it again) "reset" the
-   analytics database to mark all current data as old.  This may take
-   some time to run.
+2. Stop the Metadb server and (before starting it again) "reset" the analytics
+   database to mark all current data as old.  This may take some time to run.
 +
 [source,bash]
 ----
@@ -365,31 +356,28 @@ metadb reset -D data --source example
 
 3. Start the Metadb server to begin streaming the data.
 
-4. Once the new data have finished (or nearly finished) re-streaming,
-   stop the Metadb server, and "clean" the analytics database to
-   remove any old data that have not been refreshed by the new data
-   stream.
+4. Once the new data have finished (or nearly finished) re-streaming, stop the
+   Metadb server, and "clean" the analytics database to remove any old data
+   that have not been refreshed by the new data stream.
 +
 [source,bash]
 ----
 metadb clean -D data --source example
 ----
 +
-Note that the metadb server currently does not give an indication that
-it has finished re-streaming.  (Having the server report that initial
-streaming or re-streaming has finished is a planned feature.)
+Note that the metadb server currently does not give an indication that it has
+finished re-streaming.  (Having the server report that initial streaming or
+re-streaming has finished is a planned feature.)
 +
 The precise timing of when "metadb clean" should be run is up to the
-admninistrator, but *it must be run to remove redundant data and to
-complete the resynchronization process*.  The only disadvantage of
-running it too early is that data will appear to be missing until they
-are re-streamed.
+admninistrator, but *it must be run to remove redundant data and to complete
+the resynchronization process*.  The only disadvantage of running it too early
+is that data will appear to be missing until they are re-streamed.
 
 5. Start the server.
 +
-Until a failed stream is re-streamed by following the process above,
-the analytic database may continue to be unsynchronized with the
-source.
+Until a failed stream is re-streamed by following the process above, the
+analytic database may continue to be unsynchronized with the source.
 
 === Configuring database users
 
@@ -400,11 +388,11 @@ To create a new database user account:
 CREATE USER tiggy PASSWORD 'LZn2DCajcNHpGR3ZXWHD';
 ----
 
-In addition to creating the user, this also creates a schema with the
-same name as the user which can be used as a workspace.
+In addition to creating the user, this also creates a schema with the same name
+as the user which can be used as a workspace.
 
-To give the user access to all tables generated from a data source
-(including tables not yet created):
+To give the user access to all tables generated from a data source (including
+tables not yet created):
 
 [source]
 ----

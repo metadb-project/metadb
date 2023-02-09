@@ -1,15 +1,6 @@
 package cache
 
-import (
-	"database/sql"
-	"fmt"
-
-	"github.com/metadb-project/metadb/cmd/metadb/catalog"
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
-)
-
-type Schema struct {
+/*type Schema struct {
 	columns map[sqlx.Column]ColumnType
 	cat     *catalog.Catalog
 }
@@ -118,3 +109,4 @@ func (s *Schema) Column(column *sqlx.Column) *ColumnType {
 	}
 	return nil
 }
+*/

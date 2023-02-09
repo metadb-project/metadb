@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/metadb-project/metadb/cmd/metadb/cache"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
@@ -117,6 +116,15 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		return fmt.Errorf("connecting to database: ping: %s", err)
 	}
 	//////////////////////////////////////////////////////////////////////////////
+	dc, err := spr.svr.db.Connect()
+	if err != nil {
+		return err
+	}
+	dcsuper, err := spr.svr.db.ConnectSuper()
+	if err != nil {
+		return err
+	}
+	//////////////////////////////////////////////////////////////////////////////
 	spr.databases[0].Status.Active()
 	spr.db = append(spr.db, db)
 	// Cache tracking
@@ -124,11 +132,11 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 	//	return err
 	//}
 	// Cache schema
-	schema, err := cache.NewSchema(db, cat)
-	if err != nil {
-		return fmt.Errorf("caching schema: %s", err)
-	}
-	// Update user permissions in database
+	/*	schema, err := cache.NewSchema(db, cat)
+		if err != nil {
+			return fmt.Errorf("caching schema: %s", err)
+		}
+	*/ // Update user permissions in database
 	var waitUserPerms sync.WaitGroup
 	waitUserPerms.Add(1)
 	dsnsuper := sqlx.DSN{
@@ -141,14 +149,14 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 	}
 	go func(dsnsuper sqlx.DSN, trackedTables []dbx.Table) {
 		defer waitUserPerms.Done()
-		sysdb.GoUpdateUserPerms(dsnsuper, trackedTables)
+		sysdb.GoUpdateUserPerms(dc, dcsuper, trackedTables)
 	}(dsnsuper, cat.AllTables())
 	// Cache users
-	users, err := cache.NewUsers(db)
-	if err != nil {
-		return fmt.Errorf("caching users: %s", err)
-	}
-	// Source file
+	/*	users, err := cache.NewUsers(db)
+		if err != nil {
+			return fmt.Errorf("caching users: %s", err)
+		}
+	*/ // Source file
 	var sourceFile *os.File
 	var sourceFileScanner *bufio.Scanner
 	if spr.svr.opt.SourceFilename != "" {
@@ -228,7 +236,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cat, cl, spr.db[0], schema, users, spr.source.Name); err != nil {
+		if err = execCommandList(cat, cl, spr.db[0], spr.source.Name); err != nil {
 			return fmt.Errorf("executor: %s", err)
 		}
 

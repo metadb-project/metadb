@@ -19,7 +19,7 @@
 |Returns recent log messages during the specified interval, or during
  the past 24 hours if no interval is given
 
-|`mdbversion()`
+|`mdbversion()` [.aqua-background]#Metadb v1.0.5#
 |text
 |Returns the Metadb version
 
@@ -44,6 +44,7 @@ SELECT * FROM mdblog(interval '1 hour');
 SELECT * FROM mdblog();
 ----
 
+[.aqua-background]#Metadb v1.0.5#
 Show the current Metadb version:
 
 ----
@@ -94,11 +95,82 @@ SELECT mdbversion();
 |Timestamp when the table was last updated
 |===
 
+=== External SQL directives
+
+[.aqua-background]#Metadb v1.0.5#
+Metadb allows scheduling external SQL files to run on a regular basis.
+
+Each SQL statement should be separated from others by an empty line, and any
+tables created should not specify a schema name.
+
+Comment lines beginning with `--metadb:` are used for additional directives;
+each directive should be on a separate line.
+
+It is suggested that each SQL file optionally begin with a `--metadb:table`
+directive, optionally followed by `--metadb:require` directives if needed, and
+then followed by an empty line, for example:
+
+----
+--metadb:table library_patrons
+--metadb:require library.patrongroup.id uuid
+--metadb:require library.patrongroup.name varchar
+
+DROP TABLE IF EXISTS library_patrons;
+
+CREATE TABLE library_patrons AS
+SELECT . . . ;
+----
+
+==== --metadb:require
+
+[.aqua-background]#Metadb v1.0.5#
+The `--metadb:require` directive asserts a dependency on a specific table and
+column in the database.  Metadb will ensure that the table and column exist
+before it continues executing the SQL file.  The required table can be a main
+table or a current table; both will be created if either is specified and does
+not exist.
+
+The directive takes the form:
+
+----
+--metadb:require <schema>.<table>.<column> <columntype>
+----
+
+For example:
+
+----
+--metadb:require library.patrongroup.id uuid
+--metadb:require library.patrongroup.name varchar
+----
+
+There is generally no need to list all dependencies.  The intent of this
+directive is to reduce SQL errors by listing tables and columns that are likely
+or known to be missing in some instances.
+
+==== --metadb:table
+
+[.aqua-background]#Metadb v1.0.5#
+The `--metadb:table` directive declares that the SQL file updates a specific
+table.  This allows Metadb to report on the status of the table.  The directive
+takes the form:
+
+----
+--metadb:table <table>
+----
+
+The specified table should not contain a schema name.
+
+For example:
+
+----
+--metadb:table user_group
+----
+
 === Statements
 
-Metadb extends SQL with statements for configuring and administering
-the server.  These statements are only available when connecting to
-the Metadb server (not the database).
+Metadb extends SQL with statements for configuring and administering the
+server.  These statements are only available when connecting to the Metadb
+server (not the database).
 
 ==== ALTER DATA SOURCE
 
@@ -157,9 +229,9 @@ AUTHORIZE SELECT
 
 ===== Description
 
-The AUTHORIZE command grants access to tables.  It differs from GRANT
-in that the authorization will also apply to tables created at a later
-time in the data source.
+The AUTHORIZE command grants access to tables.  It differs from GRANT in that
+the authorization will also apply to tables created at a later time in the data
+source.
 
 .Note
 ****
@@ -203,8 +275,8 @@ CREATE DATA ORIGIN defines a new origin.
 .Note
 ****
 [.text-center]
-CREATE DATA ORIGIN currently requires restarting the server before it
-will take effect.
+CREATE DATA ORIGIN currently requires restarting the server before it will take
+effect.
 ****
 
 ===== Parameters
@@ -272,7 +344,8 @@ CREATE DATA SOURCE defines connection settings for an external data source.
 |Regular expressions matching schema names to accept (comma-separated list).
 
 |`schemastopfilter`
-|Regular expressions matching schema names to ignore (comma-separated list), evaluated after `schemapassfilter`.
+|Regular expressions matching schema names to ignore (comma-separated list),
+ evaluated after `schemapassfilter`.
 
 |`trimschemaprefix`
 |Prefix to remove from schema names.
@@ -299,10 +372,10 @@ CREATE DATA SOURCE example TYPE kafka OPTIONS (
 
 ==== CREATE USER
 
-CREATE USER is mostly equivalent to the PostgreSQL CREATE USER
-statement.  However it also creates a schema having the same name as
-the user, if the schema does not exist, and grants the user privileges
-on the schema.  The schema is intended as a workspace for the user.
+CREATE USER is mostly equivalent to the PostgreSQL CREATE USER statement.
+However it also creates a schema having the same name as the user, if the
+schema does not exist, and grants the user privileges on the schema.  The
+schema is intended as a workspace for the user.
 
 ==== DROP DATA SOURCE
 
@@ -344,8 +417,8 @@ LIST `*_name_*`
 
 ===== Description
 
-LIST shows the current setting of various system configurations and
-other variables.
+LIST shows the current setting of various system configurations and other
+variables.
 
 ===== Parameters
 

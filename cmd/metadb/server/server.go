@@ -2,12 +2,9 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"regexp"
@@ -18,13 +15,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/metadb-project/metadb/cmd/internal/api"
-	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/libpq"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/marctab"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/runsql"
@@ -42,7 +36,7 @@ type server struct {
 	db    *dbx.DB
 	//dc      *pgx.Conn
 	//dcsuper *pgx.Conn
-	dcpool *pgxpool.Pool
+	dp *pgxpool.Pool
 }
 
 // serverstate is shared between goroutines.
@@ -129,17 +123,18 @@ func runServer(svr *server) error {
 		return fmt.Errorf("reading configuration file: %v", err)
 	}
 
-	// Check that database is initialized and compatible
-	cat, err := catalog.Initialize(svr.db)
-	if err != nil {
-		return err
-	}
-
-	svr.dcpool, err = pgxpool.New(context.TODO(), svr.db.ConnString(svr.db.User, svr.db.Password))
+	svr.dp, err = pgxpool.New(context.TODO(), svr.db.ConnString(svr.db.User, svr.db.Password))
 	if err != nil {
 		return fmt.Errorf("creating database connection pool: %v", err)
 	}
-	log.SetDatabase(svr.dcpool)
+	defer svr.dp.Close()
+	log.SetDatabase(svr.dp)
+
+	// Check that database is initialized and compatible
+	cat, err := catalog.Initialize(svr.db, svr.dp)
+	if err != nil {
+		return err
+	}
 
 	log.Info("starting Metadb %s", util.MetadbVersion)
 	// if svr.opt.RewriteJSON {
@@ -226,8 +221,6 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 		time.Sleep(5 * time.Second)
 	}
 
-	cat.Close()
-
 	return nil
 }
 
@@ -271,12 +264,12 @@ func isReshareModulePresent(db *dbx.DB) (bool, error) {
 
 func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, folio, reshare bool) {
 	for {
-		time.Sleep(30 * time.Minute)
-		if folio {
-			if err := marctab.RunMarctab(db, datadir, cat); err != nil {
-				log.Error("marctab: %v", err)
-			}
-		}
+		//time.Sleep(30 * time.Minute)
+		//if folio {
+		//	if err := marctab.RunMarctab(db, datadir, cat); err != nil {
+		//		log.Error("marctab: %v", err)
+		//	}
+		//}
 		if err := checkTimeDailyMaintenance(datadir, db, cat, folio, reshare); err != nil {
 			log.Error("%v", err)
 		}
@@ -312,7 +305,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, 
 		for {
 			tries++
 			url := "https://github.com/folio-org/folio-analytics.git"
-			tag := "v1.5.1"
+			tag := "v1.5.3"
 			path := "sql_metadb/derived_tables"
 			schema := "folio_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {
@@ -408,7 +401,7 @@ func goCreateFunctions(db dbx.DB) {
 
 	err = catalog.CreateAllFunctions(dcsuper, dc, db.User)
 	if err != nil {
-		log.Error("creating functions: %v", err)
+		log.Error("updating functions: %v", err)
 		return
 	}
 }
@@ -420,7 +413,7 @@ func goCreateFunctions(db dbx.DB) {
 //        }
 //}
 
-func listenAndServe(svr *server) {
+/*func listenAndServe(svr *server) {
 	var err error
 	var host string
 	if svr.opt.Listen == "" {
@@ -450,22 +443,22 @@ func listenAndServe(svr *server) {
 		}
 	}
 }
-
-func unsupportedMethod(path string, r *http.Request) string {
+*/
+/*func unsupportedMethod(path string, r *http.Request) string {
 	return fmt.Sprintf("%s: unsupported method: %s", path, r.Method)
 }
-
-func errorWritingResponse(r *http.Request) string {
+*/
+/*func errorWritingResponse(r *http.Request) string {
 	return fmt.Sprintf("%s: error writing HTTP response", r.Method)
 }
-
-func requestString(r *http.Request) string {
+*/
+/*func requestString(r *http.Request) string {
 	var remoteHost, remotePort string
 	remoteHost, remotePort, _ = net.SplitHostPort(r.RemoteAddr)
 	return fmt.Sprintf("host=%s port=%s method=%s uri=%s", remoteHost, remotePort, r.Method, r.URL)
 }
-
-func setupHandlers(svr *server) http.Handler {
+*/
+/*func setupHandlers(svr *server) http.Handler {
 
 	mux := http.NewServeMux()
 
@@ -478,8 +471,8 @@ func setupHandlers(svr *server) http.Handler {
 
 	return mux
 }
-
-func (svr *server) handleConfig(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		log.Debug("request: %s", requestString(r))
 		svr.handleConfigGet(w, r)
@@ -499,8 +492,8 @@ func (svr *server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	log.Info(m)
 	http.Error(w, m, http.StatusMethodNotAllowed)
 }
-
-func (svr *server) handleUser(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleUser(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		log.Debug("request: %s", requestString(r))
 		svr.handleUserGet(w, r)
@@ -520,8 +513,8 @@ func (svr *server) handleUser(w http.ResponseWriter, r *http.Request) {
 	log.Info(m)
 	http.Error(w, m, http.StatusMethodNotAllowed)
 }
-
-func (svr *server) handleEnable(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleEnable(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		log.Debug("request: %s", requestString(r))
 		w.Header().Set("Content-Type", "text/plain")
@@ -541,8 +534,8 @@ func (svr *server) handleEnable(w http.ResponseWriter, r *http.Request) {
 	log.Info(m)
 	http.Error(w, m, http.StatusMethodNotAllowed)
 }
-
-func (svr *server) handleDisable(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleDisable(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		log.Debug("request: %s", requestString(r))
 		w.Header().Set("Content-Type", "text/plain")
@@ -562,8 +555,8 @@ func (svr *server) handleDisable(w http.ResponseWriter, r *http.Request) {
 	log.Info(m)
 	http.Error(w, m, http.StatusMethodNotAllowed)
 }
-
-func (svr *server) handleStatus(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		log.Debug("request: %s", requestString(r))
 		svr.handleStatusGet(w, r)
@@ -573,8 +566,8 @@ func (svr *server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	log.Info(m)
 	http.Error(w, m, http.StatusMethodNotAllowed)
 }
-
-func (svr *server) handleConfigGet(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleConfigGet(w http.ResponseWriter, r *http.Request) {
 	// read request
 	var rq api.ConfigListRequest
 	var ok bool
@@ -595,9 +588,9 @@ func (svr *server) handleConfigGet(w http.ResponseWriter, r *http.Request) {
 		util.HandleError(w, err, http.StatusInternalServerError)
 	}
 }
-
-func (svr *server) handleUserGet(w http.ResponseWriter, r *http.Request) {
-	/*	// read request
+*/
+/*func (svr *server) handleUserGet(w http.ResponseWriter, r *http.Request) {
+		// read request
 		var rq api.UserListRequest
 		var ok bool
 		if ok = util.ReadRequest(w, r, &rq); !ok {
@@ -616,10 +609,9 @@ func (svr *server) handleUserGet(w http.ResponseWriter, r *http.Request) {
 		if err = json.NewEncoder(w).Encode(rs); err != nil {
 			util.HandleError(w, err, http.StatusInternalServerError)
 		}
-	*/
 }
-
-func (svr *server) handleStatusGet(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleStatusGet(w http.ResponseWriter, r *http.Request) {
 	svr.state.mu.Lock()
 	defer svr.state.mu.Unlock()
 
@@ -652,8 +644,8 @@ func (svr *server) handleStatusGet(w http.ResponseWriter, r *http.Request) {
 		_ = err
 	}
 }
-
-func (svr *server) handleConfigDelete(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleConfigDelete(w http.ResponseWriter, r *http.Request) {
 	// read request
 	var rq api.ConfigDeleteRequest
 	var ok bool
@@ -674,8 +666,8 @@ func (svr *server) handleConfigDelete(w http.ResponseWriter, r *http.Request) {
 		util.HandleError(w, err, http.StatusInternalServerError)
 	}
 }
-
-func (svr *server) handleUserDelete(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleUserDelete(w http.ResponseWriter, r *http.Request) {
 	// read request
 	var rq api.UserDeleteRequest
 	var ok bool
@@ -696,8 +688,8 @@ func (svr *server) handleUserDelete(w http.ResponseWriter, r *http.Request) {
 		util.HandleError(w, err, http.StatusInternalServerError)
 	}
 }
-
-func (svr *server) handleConfigPost(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleConfigPost(w http.ResponseWriter, r *http.Request) {
 	// read request
 	var rq api.ConfigUpdateRequest
 	var ok bool
@@ -714,8 +706,8 @@ func (svr *server) handleConfigPost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 }
-
-func (svr *server) handleUserPost(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleUserPost(w http.ResponseWriter, r *http.Request) {
 	// read request
 	var rq api.UserUpdateRequest
 	var ok bool
@@ -738,8 +730,8 @@ func (svr *server) handleUserPost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 }
-
-func (svr *server) createUser(rq *api.UserUpdateRequest) error {
+*/
+/*func (svr *server) createUser(rq *api.UserUpdateRequest) error {
 	svr.state.mu.Lock()
 	defer svr.state.mu.Unlock()
 
@@ -751,8 +743,8 @@ func (svr *server) createUser(rq *api.UserUpdateRequest) error {
 	}
 	return nil
 }
-
-func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) error {
+*/
+/*func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) error {
 	// dsn := &sqlx.DSN{
 	// 	Host:     dbc.DBHost,
 	// 	Port:     dbc.DBPort,
@@ -818,8 +810,8 @@ func createUserInDB(rq *api.UserUpdateRequest, dbc *sysdb.DatabaseConnector) err
 	}
 	return nil
 }
-
-func (svr *server) handleEnablePost(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleEnablePost(w http.ResponseWriter, r *http.Request) {
 	// read request
 	var rq api.EnableRequest
 	var ok bool
@@ -836,8 +828,8 @@ func (svr *server) handleEnablePost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 }
-
-func (svr *server) handleDisablePost(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleDisablePost(w http.ResponseWriter, r *http.Request) {
 	// read request
 	var rq api.DisableRequest
 	var ok bool
@@ -854,9 +846,10 @@ func (svr *server) handleDisablePost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 }
-
-func (svr *server) handleDefault(w http.ResponseWriter, r *http.Request) {
+*/
+/*func (svr *server) handleDefault(w http.ResponseWriter, r *http.Request) {
 	util.HandleError(w, fmt.Errorf("unknown request: %s", requestString(r)), http.StatusNotFound)
 	//log.Error(fmt.Sprintf("unknown request: %s", requestString(r)))
 	//http.Error(w, "404 page not found", http.StatusNotFound)
 }
+*/

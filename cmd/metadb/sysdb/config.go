@@ -1,17 +1,6 @@
 package sysdb
 
-import (
-	"context"
-	"database/sql"
-	"fmt"
-	"strings"
-
-	"github.com/metadb-project/metadb/cmd/internal/api"
-	"github.com/metadb-project/metadb/cmd/metadb/command"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
-)
-
-func ListConfig(rq *api.ConfigListRequest) (*api.ConfigListResponse, error) {
+/*func ListConfig(rq *api.ConfigListRequest) (*api.ConfigListResponse, error) {
 	sysMu.Lock()
 	defer sysMu.Unlock()
 
@@ -46,8 +35,8 @@ func ListConfig(rq *api.ConfigListRequest) (*api.ConfigListResponse, error) {
 	}
 	return rs, nil
 }
-
-func UpdateConfig(rq *api.ConfigUpdateRequest) error {
+*/
+/*func UpdateConfig(rq *api.ConfigUpdateRequest) error {
 	sysMu.Lock()
 	defer sysMu.Unlock()
 
@@ -98,8 +87,8 @@ func UpdateConfig(rq *api.ConfigUpdateRequest) error {
 	////
 	return nil
 }
-
-func DeleteConfig(rq *api.ConfigDeleteRequest) (*api.ConfigDeleteResponse, error) {
+*/
+/*func DeleteConfig(rq *api.ConfigDeleteRequest) (*api.ConfigDeleteResponse, error) {
 	sysMu.Lock()
 	defer sysMu.Unlock()
 
@@ -115,11 +104,6 @@ func DeleteConfig(rq *api.ConfigDeleteRequest) (*api.ConfigDeleteResponse, error
 
 	// check if a value exists for the attribute
 	var exists bool
-	/*
-		if exists, err = attrExists(rq.Attr); err != nil {
-			return nil, err
-		}
-	*/
 	if _, exists, err = getConfig(rq.Attr); err != nil {
 		return nil, err
 	}
@@ -153,15 +137,15 @@ func DeleteConfig(rq *api.ConfigDeleteRequest) (*api.ConfigDeleteResponse, error
 	////
 	return &api.ConfigDeleteResponse{AttrNotFound: !exists}, nil
 }
-
-func GetConfig(attr string) (string, bool, error) {
+*/
+/*func GetConfig(attr string) (string, bool, error) {
 	sysMu.Lock()
 	defer sysMu.Unlock()
 
 	return getConfig(attr)
 }
-
-func getConfig(attr string) (string, bool, error) {
+*/
+/*func getConfig(attr string) (string, bool, error) {
 	// look up config value
 	var err error
 	var q = fmt.Sprintf(""+
@@ -179,8 +163,8 @@ func getConfig(attr string) (string, bool, error) {
 		return val, true, nil
 	}
 }
-
-func readConfigMap(prefix string) (map[string]map[string]string, error) {
+*/
+/*func readConfigMap(prefix string) (map[string]map[string]string, error) {
 	var cmap = make(map[string]map[string]string)
 	var rows *sql.Rows
 	var err error
@@ -218,8 +202,8 @@ func readConfigMap(prefix string) (map[string]map[string]string, error) {
 	}
 	return cmap, nil
 }
-
-func validateAttr(attr string) error {
+*/
+/*func validateAttr(attr string) error {
 	// For now, allow all db.* and src.*
 	if strings.HasPrefix(attr, "db.") || strings.HasPrefix(attr, "src.") {
 		return nil
@@ -229,7 +213,7 @@ func validateAttr(attr string) error {
 	}
 	return nil
 }
-
+*/
 /*func setConfig(attr, val string) error {
 	_, err := db.ExecContext(context.TODO(),
 		"INSERT INTO config (attr, val) VALUES ('"+attr+"', '"+val+"') ON CONFLICT (attr) DO UPDATE SET val='"+val+"'")

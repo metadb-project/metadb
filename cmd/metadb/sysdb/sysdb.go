@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/internal/status"
@@ -45,8 +44,8 @@ type SourceConnector struct {
 	Status           status.Status
 }
 
-var sysMu sync.Mutex
-var db *sql.DB
+//var sysMu sync.Mutex
+//var db *sql.DB
 
 // Deprecated
 func Init(s string) error {
@@ -353,16 +352,4 @@ func getSysdbVersion(dbconnstr string) (int64, error) {
 	default:
 		return dbversion, nil
 	}
-}
-
-func WriteSysdbVersion(version int64) error {
-	sysMu.Lock()
-	defer sysMu.Unlock()
-
-	q := fmt.Sprintf("PRAGMA user_version = %d", version)
-	_, err := db.ExecContext(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("writing database version: %s", err)
-	}
-	return nil
 }

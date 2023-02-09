@@ -2,6 +2,7 @@ package clean
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
@@ -32,12 +34,12 @@ func Clean(opt *option.Clean) error {
 	if err != nil {
 		return err
 	}
-	dc, err := db.Connect()
+	dp, err := pgxpool.New(context.TODO(), db.ConnString(db.User, db.Password))
 	if err != nil {
-		return err
+		return fmt.Errorf("creating database connection pool: %v", err)
 	}
-	defer dbx.Close(dc)
-	exists, err := sourceExists(dc, opt.Source)
+	defer dp.Close()
+	exists, err := sourceExists(dp, opt.Source)
 	if err != nil {
 		return err
 	}
@@ -45,7 +47,7 @@ func Clean(opt *option.Clean) error {
 		return fmt.Errorf("data source %q does not exist", opt.Source)
 	}
 	// Get list of tables
-	cat, err := catalog.Initialize(db)
+	cat, err := catalog.Initialize(db, dp)
 	if err != nil {
 		return err
 	}
@@ -57,22 +59,22 @@ func Clean(opt *option.Clean) error {
 		eout.Info("cleaning: %s", t.String())
 		mainTable := t.MainSQL()
 		q := "VACUUM ANALYZE " + mainTable
-		if _, err := dc.Exec(context.TODO(), q); err != nil {
+		if _, err := dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
 		q = "UPDATE " + mainTable + " SET __cf=TRUE,__end='" + now + "',__current=FALSE " +
 			"WHERE NOT __cf AND __current AND __source='" + opt.Source + "'"
-		if _, err := dc.Exec(context.TODO(), q); err != nil {
+		if _, err := dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
 		// Any non-current historical data can be set to __cf=TRUE.
 		q = "UPDATE " + mainTable + " SET __cf=TRUE WHERE NOT __cf AND __source='" + opt.Source +
 			"'"
-		if _, err := dc.Exec(context.TODO(), q); err != nil {
+		if _, err := dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
 		q = "VACUUM ANALYZE " + mainTable
-		if _, err := dc.Exec(context.TODO(), q); err != nil {
+		if _, err := dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
 	}
@@ -80,12 +82,12 @@ func Clean(opt *option.Clean) error {
 	return nil
 }
 
-func sourceExists(dc *pgx.Conn, sourceName string) (bool, error) {
+func sourceExists(dq dbx.Queryable, sourceName string) (bool, error) {
 	q := "SELECT 1 FROM metadb.source WHERE name=$1"
 	var i int64
-	err := dc.QueryRow(context.TODO(), q, sourceName).Scan(&i)
+	err := dq.QueryRow(context.TODO(), q, sourceName).Scan(&i)
 	switch {
-	case err == pgx.ErrNoRows:
+	case errors.Is(err, pgx.ErrNoRows):
 		return false, nil
 	case err != nil:
 		return false, err
