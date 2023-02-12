@@ -3,7 +3,6 @@ package sqlx
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strings"
 
 	_ "github.com/lib/pq"
@@ -95,13 +94,13 @@ func (d *PostgresDB) Exec(tx *sql.Tx, sql string) (sql.Result, error) {
 	if tx == nil {
 		result, err := d.DB.ExecContext(context.TODO(), sql)
 		if err != nil {
-			return nil, fmt.Errorf("SQL: " + sql)
+			return nil, err
 		}
 		return result, nil
 	} else {
 		result, err := tx.ExecContext(context.TODO(), sql)
 		if err != nil {
-			return nil, fmt.Errorf("SQL: " + sql)
+			return nil, err
 		}
 		return result, nil
 	}
