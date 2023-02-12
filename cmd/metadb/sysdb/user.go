@@ -31,7 +31,7 @@ func GoUpdateUserPerms(dc, dcsuper *pgx.Conn, trackedTables []dbx.Table) {
 	}
 	tables = append(tables, dbx.Table{S: "metadb", T: "log"})
 	tables = append(tables, dbx.Table{S: "metadb", T: "table_update"})
-	tables = append(tables, dbx.Table{S: "folio_source_record", T: "marctab"})
+	tables = append(tables, dbx.Table{S: "folio_source_record", T: "marc__t"})
 	for u, re := range users {
 		for _, t := range tables {
 			//t := sqlx.Table{Schema: oldt.S, Table: oldt.T}
