@@ -42,10 +42,12 @@ func addPartition(cat *catalog.Catalog, cmd *command.Command) error {
 	yearStr := cmd.SourceTimestamp[0:4]
 	year, err := strconv.Atoi(yearStr)
 	if err != nil {
-		return fmt.Errorf("invalid year format: %s", yearStr)
+		return fmt.Errorf("adding partition for table %q: invalid year format: %q",
+			cmd.SchemaName+"."+cmd.TableName, yearStr)
 	}
 	if err = cat.AddPartYearIfNotExists(cmd.SchemaName, cmd.TableName, year); err != nil {
-		return err
+		return fmt.Errorf("adding partition for table %q year %q: %v", cmd.SchemaName+"."+cmd.TableName,
+			yearStr, err)
 	}
 	return nil
 }
@@ -143,14 +145,16 @@ func alterColumnVarcharSize(cat *catalog.Catalog, table *sqlx.Table, column stri
 		log.Trace("disabling index: value too large")
 		_, err = db.Exec(nil, "DROP INDEX IF EXISTS "+db.IdentiferSQL(table.Schema)+"."+db.IdentiferSQL(indexName(db.HistoryTable(table).Table, column)))
 		if err != nil {
-			return err
+			return fmt.Errorf("changing varchar size on column %q in table %q: drop index: %v",
+				column, table, err)
 		}
 	}
 	// Alter table.
 	dtypesql, dataType, charMaxLen := command.DataTypeToSQL(datatype, typesize)
 	_, err = db.Exec(nil, "ALTER TABLE "+db.HistoryTableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+dtypesql)
 	if err != nil {
-		return err
+		return fmt.Errorf("changing varchar size on column %q in table %q: alter column: %v",
+			column, table, err)
 	}
 	// Update schema.
 	cat.UpdateColumn(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: column}, dataType, charMaxLen)
@@ -202,9 +206,9 @@ func alterColumnType(cat *catalog.Catalog, db sqlx.DB, schema string, table stri
 		caststr = " USING \"" + column + "\"::" + sqltype
 	}
 	var q = "ALTER TABLE %s ALTER COLUMN \"" + column + "\" TYPE " + sqltype + caststr
-	_, err := db.Exec(nil, fmt.Sprintf(q, db.HistoryTableSQL(schemaTable)))
-	if err != nil {
-		return err
+	if _, err := db.Exec(nil, fmt.Sprintf(q, db.HistoryTableSQL(schemaTable))); err != nil {
+		return fmt.Errorf("changing type of column %q in table %q to %q: alter column: %v",
+			column, table, sqltype, err)
 	}
 	// Update schema.
 	cat.UpdateColumn(&sqlx.Column{Schema: schema, Table: table, Column: column}, datatypeStr, charMaxLen)

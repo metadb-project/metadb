@@ -5,13 +5,15 @@ import (
 
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/jsonx"
+	"github.com/metadb-project/metadb/cmd/metadb/log"
 )
 
 func rewriteCommandList(cl *command.CommandList, rewriteJSON bool) error {
 	for _, c := range cl.Cmd {
 		// Rewrite command
 		if err := rewriteCommand(cl, &c, rewriteJSON); err != nil {
-			return fmt.Errorf("%s\n%v", err, c)
+			log.Debug("%v", c)
+			return fmt.Errorf("%v", err)
 		}
 	}
 	return nil

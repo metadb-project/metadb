@@ -218,7 +218,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		eventReadCount, err := parseChangeEvents(pkerr, consumer, cl, spr.schemaPassFilter, spr.schemaStopFilter,
 			spr.source.TrimSchemaPrefix, spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog)
 		if err != nil {
-			return fmt.Errorf("parser: %s", err)
+			return fmt.Errorf("parser: %v", err)
 		}
 		if firstEvent {
 			firstEvent = false
@@ -273,7 +273,7 @@ func parseChangeEvents(pkerr map[string]struct{}, consumer *kafka.Consumer, cl *
 		var ce *change.Event
 		if sourceFileScanner != nil {
 			if ce, err = readChangeEventFromFile(sourceFileScanner, sourceLog); err != nil {
-				return 0, fmt.Errorf("reading change event from file: %s", err)
+				return 0, fmt.Errorf("reading change event from file: %v", err)
 			}
 			if ce == nil && len(cl.Cmd) == 0 {
 				log.Info("finished processing source file")
@@ -284,7 +284,7 @@ func parseChangeEvents(pkerr map[string]struct{}, consumer *kafka.Consumer, cl *
 		} else {
 			var partitionEOF bool
 			if ce, partitionEOF, err = readChangeEvent(consumer, sourceLog); err != nil {
-				return 0, fmt.Errorf("reading change event: %s", err)
+				return 0, fmt.Errorf("reading change event: %v", err)
 			}
 			if partitionEOF {
 				break

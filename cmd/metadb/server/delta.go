@@ -78,7 +78,7 @@ func getColumnSchema(tschema *sysdb.TableSchema, columnName string) *sysdb.Colum
 	return nil
 }
 
-func findDeltaColumnSchema(column1 *sysdb.ColumnSchema, column2 *sysdb.ColumnSchema, delta *deltaSchema) error {
+func findDeltaColumnSchema(column1 *sysdb.ColumnSchema, column2 *sysdb.ColumnSchema, delta *deltaSchema) {
 	// If column does not exist, create a new one
 	if column1 == nil {
 		delta.column = append(delta.column, deltaColumnSchema{
@@ -87,12 +87,12 @@ func findDeltaColumnSchema(column1 *sysdb.ColumnSchema, column2 *sysdb.ColumnSch
 			newType:     column2.DType,
 			newTypeSize: column2.DTypeSize,
 		})
-		return nil
+		return
 	}
 	// If the types are the same and the existing type size is larger than
 	// the new one, the columns schema are compatible
 	if column1.DType == column2.DType && column1.DTypeSize >= column2.DTypeSize {
-		return nil
+		return
 	}
 	// Otherwise a type or size change is required.
 	delta.column = append(delta.column, deltaColumnSchema{
@@ -102,7 +102,7 @@ func findDeltaColumnSchema(column1 *sysdb.ColumnSchema, column2 *sysdb.ColumnSch
 		oldTypeSize: column1.DTypeSize,
 		newTypeSize: column2.DTypeSize,
 	})
-	return nil
+	return
 
 	///////////////////////////////////////////////////////////////////////////////
 
@@ -136,9 +136,7 @@ func findDeltaSchema(cat *catalog.Catalog, c *command.Command) (*deltaSchema, er
 	var col2 sysdb.ColumnSchema
 	for _, col2 = range schema2.Column {
 		var col1 *sysdb.ColumnSchema = getColumnSchema(schema1, col2.Name)
-		if err = findDeltaColumnSchema(col1, &col2, delta); err != nil {
-			return nil, err
-		}
+		findDeltaColumnSchema(col1, &col2, delta)
 	}
 	// findDeltaPrimaryKey()
 	return delta, nil

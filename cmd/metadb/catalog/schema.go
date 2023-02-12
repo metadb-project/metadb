@@ -136,14 +136,14 @@ func (c *Catalog) AddColumn(table dbx.Table, columnName string, newType command.
 	dataTypeSQL, dataType, charMaxLen := command.DataTypeToSQL(newType, newTypeSize)
 	_, err := c.dp.Exec(context.TODO(), "ALTER TABLE "+table.MainSQL()+" ADD COLUMN \""+columnName+"\" "+dataTypeSQL)
 	if err != nil {
-		return err
+		return fmt.Errorf("adding column %q in table %q: alter table: %v", columnName, table, err)
 	}
 	// Add index on new column.
 	if newType != command.JSONType && newTypeSize <= util.MaximumTypeSizeIndex {
 		_, err = c.dp.Exec(context.TODO(), ""+
 			"CREATE INDEX ON "+table.MainSQL()+" (\""+columnName+"\")")
 		if err != nil {
-			return err
+			return fmt.Errorf("adding column %q in table %q: creating index: %v", columnName, table, err)
 		}
 	} else {
 		log.Trace("disabling index: value too large")
