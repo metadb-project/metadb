@@ -130,6 +130,7 @@ func runServer(svr *server) error {
 	}
 	defer svr.dp.Close()
 	log.SetDatabase(svr.dp)
+	defer log.SetDatabase(nil)
 
 	// Check that database is initialized and compatible
 	cat, err := catalog.Initialize(svr.db, svr.dp)
