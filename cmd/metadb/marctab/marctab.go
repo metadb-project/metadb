@@ -35,15 +35,14 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 		SRSMarc:      "",
 		SRSMarcAttr:  "",
 		Metadb:       true,
-		Vacuum:       false,
 		PrintErr: func(format string, v ...any) {
-			log.Warning("marctab: %s\n", fmt.Sprintf(format, v...))
+			log.Warning("marc__t: %s\n", fmt.Sprintf(format, v...))
 		},
 	}
 	if err = marc.Run(opt); err != nil {
 		return fmt.Errorf("%v", err)
 	}
-	if err = cat.TableUpdatedNow(dbx.Table{S: "folio_source_record", T: "marctab"}); err != nil {
+	if err = cat.TableUpdatedNow(dbx.Table{S: "folio_source_record", T: "marc__t"}); err != nil {
 		return fmt.Errorf("writing table updated time: %v", err)
 	}
 	users, err = catalog.AllUsers(dc)
@@ -51,14 +50,8 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 		return fmt.Errorf("%v", err)
 	}
 	for _, u := range users {
-		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON folio_source_record.marctab TO "+u)
+		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON folio_source_record.marc__t TO "+u)
 	}
-	for _, t := range []dbx.Table{{S: "marctab", T: "cksum"}, {S: "folio_source_record", T: "marctab"}} {
-		log.Trace("vacuuming table %s", t)
-		if err := dbx.Vacuum(dcsuper, t); err != nil {
-			return err
-		}
-	}
-	log.Debug("marctab: updated table folio_source_record.marctab")
+	log.Debug("marc__t: updated table folio_source_record.marc__t")
 	return nil
 }

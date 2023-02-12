@@ -19,6 +19,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/libpq"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/marctab"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/runsql"
@@ -264,16 +265,16 @@ func isReshareModulePresent(db *dbx.DB) (bool, error) {
 
 func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, folio, reshare bool) {
 	for {
-		//time.Sleep(30 * time.Minute)
-		//if folio {
-		//	if err := marctab.RunMarctab(db, datadir, cat); err != nil {
-		//		log.Error("marctab: %v", err)
-		//	}
-		//}
+		time.Sleep(5 * time.Minute)
+		if folio {
+			if err := marctab.RunMarctab(db, datadir, cat); err != nil {
+				log.Error("marc__t: %v", err)
+			}
+		}
 		if err := checkTimeDailyMaintenance(datadir, db, cat, folio, reshare); err != nil {
 			log.Error("%v", err)
 		}
-		time.Sleep(30 * time.Minute)
+		time.Sleep(55 * time.Minute)
 	}
 }
 
@@ -376,7 +377,7 @@ func vacuumAll(db dbx.DB, cat *catalog.Catalog, folio bool) error {
 		}
 	}
 	if folio {
-		for _, t := range []dbx.Table{{S: "marctab", T: "cksum"}, {S: "folio_source_record", T: "marctab"}} {
+		for _, t := range []dbx.Table{{S: "marctab", T: "cksum"}, {S: "folio_source_record", T: "marc__t"}} {
 			log.Trace("vacuuming table %s", t)
 			_ = dbx.VacuumAnalyze(dcsuper, t)
 		}
