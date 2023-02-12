@@ -71,18 +71,15 @@ func (c *Catalog) AddTableEntry(table dbx.Table, transformed bool, parentTable d
 }
 
 func addTableEntry(c *Catalog, lock bool, table dbx.Table, transformed bool, parentTable dbx.Table) error {
-	err := func(table dbx.Table, transformed bool, parentTable dbx.Table) error {
+	func(table dbx.Table, transformed bool, parentTable dbx.Table) {
 		if lock {
 			c.mu.Lock()
 			defer c.mu.Unlock()
 		}
-		return c.updateCacheTableEntry(table, transformed, parentTable)
+		c.updateCacheTableEntry(table, transformed, parentTable)
 	}(table, transformed, parentTable)
-	if err != nil {
-		return fmt.Errorf("updating cache: %v", err)
-	}
 	if err := insertIntoTableTrack(c, table, transformed, parentTable); err != nil {
-		return fmt.Errorf("updating database: %v", err)
+		return fmt.Errorf("updating catalog in database for table %q: %v", table, err)
 	}
 	return nil
 }
@@ -90,12 +87,12 @@ func addTableEntry(c *Catalog, lock bool, table dbx.Table, transformed bool, par
 func insertIntoTableTrack(c *Catalog, table dbx.Table, transformed bool, parentTable dbx.Table) error {
 	q := "INSERT INTO " + catalogSchema + ".track(schemaname,tablename,transformed,parentschema,parenttable)VALUES($1,$2,$3,$4,$5)"
 	if _, err := c.dp.Exec(context.TODO(), q, table.S, table.T, transformed, parentTable.S, parentTable.T); err != nil {
-		return fmt.Errorf("writing to track table: %s: %s", table, err)
+		return fmt.Errorf("inserting catalog entry for table: %q: %s", table, err)
 	}
 	return nil
 }
 
-func (c *Catalog) updateCacheTableEntry(table dbx.Table, transformed bool, parentTable dbx.Table) error {
+func (c *Catalog) updateCacheTableEntry(table dbx.Table, transformed bool, parentTable dbx.Table) {
 	// If table exists, retain its children map.
 	var children map[dbx.Table]struct{}
 	t, ok := c.tableDir[table]
@@ -118,7 +115,6 @@ func (c *Catalog) updateCacheTableEntry(table dbx.Table, transformed bool, paren
 		}
 		c.tableDir[parentTable].children[table] = struct{}{}
 	}
-	return nil
 }
 
 func (c *Catalog) AllTables() []dbx.Table {
@@ -156,15 +152,14 @@ func (c *Catalog) CreateNewTable(table dbx.Table, transformed bool, parentTable 
 	if tableExists(c, table) {
 		return nil
 	}
-	log.Trace("creating table: %s", table)
 	if err := createSchemaIfNotExists(c, table); err != nil {
-		return err
+		return fmt.Errorf("creating new table %q: %v", table, err)
 	}
 	if err := createMainTableIfNotExists(c, table); err != nil {
-		return err
+		return fmt.Errorf("creating new table %q: %v", table, err)
 	}
 	if err := addTableEntry(c, false, table, transformed, parentTable); err != nil {
-		return err
+		return fmt.Errorf("creating new table %q: %v", table, err)
 	}
 	return nil
 }
@@ -172,12 +167,12 @@ func (c *Catalog) CreateNewTable(table dbx.Table, transformed bool, parentTable 
 func createSchemaIfNotExists(c *Catalog, table dbx.Table) error {
 	q := "CREATE SCHEMA IF NOT EXISTS \"" + table.S + "\""
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
-		return err
+		return fmt.Errorf("creating schema %q: %v", table.S, err)
 	}
 	for _, u := range usersWithPerm(c, sqlx.NewTable(table.S, table.T)) {
 		q = "GRANT USAGE ON SCHEMA \"" + table.S + "\" TO " + u
 		if _, err := c.dp.Exec(context.TODO(), q); err != nil {
-			log.Warning("granting privileges on schema %s to %s: %v", table.S, u, err)
+			log.Warning("granting privileges on schema %q to %q: %v", table.S, u, err)
 		}
 	}
 	return nil
@@ -194,25 +189,26 @@ func createMainTableIfNotExists(c *Catalog, table dbx.Table) error {
 		"__origin varchar(63) NOT NULL DEFAULT ''" +
 		") PARTITION BY LIST (__current)"
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
-		return err
+		return fmt.Errorf("creating partitioned table %q: %v", table.Main(), err)
 	}
 	q = "CREATE TABLE IF NOT EXISTS " + table.SQL() + " PARTITION OF " + table.MainSQL() + " FOR VALUES IN (TRUE)"
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
-		return err
+		return fmt.Errorf("creating partition %q: %v", table, err)
 	}
-	nctable := "\"" + table.S + "\".\"zzz___" + table.T + "___\""
+	partition := "zzz___" + table.T + "___"
+	nctable := "\"" + table.S + "\".\"" + partition + "\""
 	q = "CREATE TABLE IF NOT EXISTS " + nctable + " PARTITION OF " + table.MainSQL() + " FOR VALUES IN (FALSE) " +
 		"PARTITION BY RANGE (__start)"
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
-		return err
+		return fmt.Errorf("creating partition %q: %v", table.S+"."+partition, err)
 	}
 	// Grant permissions on new tables.
 	for _, u := range usersWithPerm(c, sqlx.NewTable(table.S, table.T)) {
 		if _, err := c.dp.Exec(context.TODO(), "GRANT SELECT ON "+table.MainSQL()+" TO "+u+""); err != nil {
-			return err
+			return fmt.Errorf("granting select privilege on %q to %q: %v", table.Main(), u, err)
 		}
 		if _, err := c.dp.Exec(context.TODO(), "GRANT SELECT ON "+table.SQL()+" TO "+u+""); err != nil {
-			return err
+			return fmt.Errorf("granting select privilege on %q to %q: %v", table, u, err)
 		}
 	}
 	return nil
