@@ -269,7 +269,7 @@ func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandLis
 		}
 		// Execute data part of command
 		if err = execCommandData(cat, &c, tx, db, source); err != nil {
-			return fmt.Errorf("%s\n%v", err, c)
+			return err
 		}
 	}
 	// Commit txn
@@ -337,14 +337,21 @@ func requiresSchemaChanges(cat *catalog.Catalog, c, o *command.Command) bool {
 func execCommandData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
 	switch c.Op {
 	case command.MergeOp:
-		return execMergeData(c, tx, db, source)
+		if err := execMergeData(c, tx, db, source); err != nil {
+			return fmt.Errorf("merge: %v", err)
+		}
 	case command.DeleteOp:
-		return execDeleteData(cat, c, tx, db, source)
+		if err := execDeleteData(cat, c, tx, db, source); err != nil {
+			return fmt.Errorf("delete: %v", err)
+		}
 	case command.TruncateOp:
-		return execTruncateData(cat, c, tx, db, source)
+		if err := execTruncateData(cat, c, tx, db, source); err != nil {
+			return fmt.Errorf("truncate: %v", err)
+		}
 	default:
 		return fmt.Errorf("unknown command op: %v", c.Op)
 	}
+	return nil
 }
 
 func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
@@ -352,7 +359,7 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) er
 	// Check if current record is identical.
 	ident, cf, err := isCurrentIdentical(c, tx, db, &t, source)
 	if err != nil {
-		return err
+		return fmt.Errorf("matcher: %v", err)
 	}
 	if ident {
 		if cf == "false" {
@@ -368,7 +375,7 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) er
 	var uphist strings.Builder
 	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
 	if err = wherePKDataEqual(db, &uphist, c.Column); err != nil {
-		return err
+		return fmt.Errorf("primary key columns equal: %v", err)
 	}
 	exec = append(exec, uphist.String())
 	// insert new record
@@ -402,7 +409,7 @@ func updateRowCF(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, sour
 	var uphist strings.Builder
 	uphist.WriteString("UPDATE " + db.HistoryTableSQL(t) + " SET __cf=TRUE WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(db, &uphist, c.Column); err != nil {
-		return err
+		return fmt.Errorf("primary key columns equal: %v", err)
 	}
 	if _, err := db.Exec(tx, uphist.String()); err != nil {
 		return err
@@ -414,7 +421,7 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 	var b strings.Builder
 	b.WriteString("SELECT * FROM " + db.TableSQL(t) + " WHERE __source='" + source + "' AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(db, &b, c.Column); err != nil {
-		return false, "", err
+		return false, "", fmt.Errorf("primary key columns equal: %v", err)
 	}
 	b.WriteString(" LIMIT 1")
 	rows, err := db.Query(tx, b.String())
@@ -423,7 +430,7 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 	}
 	cols, err := rows.Columns()
 	if err != nil {
-		return false, "", err
+		return false, "", fmt.Errorf("columns: %v", err)
 	}
 	ptrs := make([]interface{}, len(cols))
 	results := make([][]byte, len(cols))
