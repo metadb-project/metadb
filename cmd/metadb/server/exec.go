@@ -401,6 +401,7 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) er
 	// Run SQL.
 	err = db.ExecMultiple(tx, exec)
 	if err != nil {
+		log.Debug("%v", exec)
 		return err
 	}
 	return nil
