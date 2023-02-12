@@ -80,7 +80,7 @@ user, for example, in `/home/metadb`.
 
 === Server configuration
 
-Metadb makes use of local storage in a "data directory," which is created using
+Metadb makes use of local storage in a *data directory* which is created using
 `metadb` with the `init` command.  In this example we will create the data
 directory as `data/`:
 
@@ -104,7 +104,7 @@ systemuser_password =
 sslmode =
 ----
 
-This file should be edited to add connection parameters, for example:
+This file should be edited to add database connection parameters, for example:
 
 [source,toml]
 ----
@@ -122,7 +122,18 @@ sslmode = require
 Metadb will assume that the database, superuser, and systemuser defined here
 already exist; so they should be created before continuing.
 
-=== Running the server
+=== Backups
+
+*It is essential to make regular backups of Metadb and to test the backups.*
+
+In general, persistent data are stored in the database, and therefore the
+database is the most important system that should be backed up often.
+
+The data directory contains the `metadb.conf` configuration file and is also
+used for temporary storage.  The `metadb.conf` file should be backed up, or
+alternatively it should be possible to reconstruct the file's contents.
+
+=== Upgrading from a previous version
 
 To upgrade from any previous version of Metadb, stop the server (if running),
 and then run the upgrade process in case changes are required:
@@ -166,6 +177,9 @@ To stop the server:
 ----
 metadb stop -D data
 ----
+
+Note that stopping or restarting the server may delay scheduled data updates or
+cause them to restart.
 
 The server can be set up to run with systemd via a file such as
 `/etc/systemd/system/metadb.service`, for example:
@@ -407,3 +421,27 @@ AUTHORIZE SELECT
 AUTHORIZE currently requires restarting the server before it will take
 effect.
 ****
+
+=== Administrative database changes
+
+It is possible to make administrative-level changes directly in the underlying
+PostgreSQL database, such as providing additional tables for users.  However,
+the following guidelines should be followed strictly to avoid disrupting the
+operation of Metadb:
+
+1. No changes should be made to any database objects created by Metadb.  If it
+should become necessary to make changes to the database objects at the request
+of the Metadb maintainers, the server should be stopped first to prevent it
+from operating with an out-of-date cache.  If changes are made to the database
+objects inadvertently, the server should be stopped as soon as possible and not
+started until the changes have been reversed.
+
+2. Changes generally should be made while logged in as a new database user (not
+a superuser) that is created specifically for that purpose.
+
+3. Any new database objects should be created in a new schema that will not
+coincide with a schema that may be created by Metadb.  This can be ensured by
+always setting `addschemaprefix` in data source configurations and avoiding
+names with those prefixes when creating a new schema.
+
+4. Database views should not be created.

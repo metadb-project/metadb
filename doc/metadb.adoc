@@ -4,14 +4,12 @@
 
 // Text is styled using "pre-wrap" and wrapped at column 79.
 
-= Metadb Documentation
+= Metadb 1.0 Documentation
 :toc: left
 :toclevels: 3
 :toc-title: Contents
 
 include::tutorial.adoc[]
-
-include::streamproc.adoc[]
 
 include::commands.adoc[]
 
