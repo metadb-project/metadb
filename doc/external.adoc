@@ -35,11 +35,12 @@ are suggested:
 
 ==== MARC transformation
 
-Metadb transforms MARC records from the tables
-`folio_source_record.marc_records_lb` and `folio_source_record.records_lb` to a
-tabular form which is stored in a new table `folio_source_record.marc__t`.
-This transformation is updated usually every few hours.  The time of the most
-recent update can be retrieved via SQL:
+[.aqua-background]#Metadb v1.0.5#
+Metadb transforms MARC records from the tables `marc_records_lb` and
+`records_lb` in schema `folio_source_record` to a tabular form which is stored
+in a new table, `folio_source_record.marc__t`.  This transformation is updated
+usually every few hours.  The time of the most recent update can be retrieved
+via SQL:
 
 ----
 SELECT updated

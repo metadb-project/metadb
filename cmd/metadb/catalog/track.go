@@ -66,9 +66,9 @@ func tableExists(c *Catalog, table dbx.Table) bool {
 	return ok
 }
 
-func (c *Catalog) AddTableEntry(table dbx.Table, transformed bool, parentTable dbx.Table) error {
-	return addTableEntry(c, true, table, transformed, parentTable)
-}
+//func (c *Catalog) AddTableEntry(table dbx.Table, transformed bool, parentTable dbx.Table) error {
+//	return addTableEntry(c, true, table, transformed, parentTable)
+//}
 
 func addTableEntry(c *Catalog, lock bool, table dbx.Table, transformed bool, parentTable dbx.Table) error {
 	func(table dbx.Table, transformed bool, parentTable dbx.Table) {

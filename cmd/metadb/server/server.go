@@ -129,14 +129,15 @@ func runServer(svr *server) error {
 		return fmt.Errorf("creating database connection pool: %v", err)
 	}
 	defer svr.dp.Close()
-	log.SetDatabase(svr.dp)
-	defer log.SetDatabase(nil)
 
 	// Check that database is initialized and compatible
 	cat, err := catalog.Initialize(svr.db, svr.dp)
 	if err != nil {
 		return err
 	}
+
+	log.SetDatabase(svr.dp)
+	defer log.SetDatabase(nil)
 
 	log.Info("starting Metadb %s", util.MetadbVersion)
 	// if svr.opt.RewriteJSON {

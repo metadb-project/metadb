@@ -21,7 +21,7 @@ func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, 
 		}
 		// exec schema changes
 		if err := execCommandSchema(cat, &cc.Cmd[0], db); err != nil {
-			return fmt.Errorf("command list: %s", err)
+			return fmt.Errorf("command list: %v", err)
 		}
 		err := execCommandListData(cat, db, cc, source)
 		if err != nil {
@@ -415,7 +415,7 @@ func updateRowCF(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, sour
 		return fmt.Errorf("primary key columns equal: %v", err)
 	}
 	if _, err := db.Exec(tx, uphist.String()); err != nil {
-		return err
+		return fmt.Errorf("setting cf flag: %v", err)
 	}
 	return nil
 }

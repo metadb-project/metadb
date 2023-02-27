@@ -2,7 +2,6 @@ package catalog
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -53,13 +52,13 @@ func getColumnSchemas(dp *pgxpool.Pool) ([]*sqlx.ColumnSchema, error) {
 	defer rows.Close()
 	for rows.Next() {
 		var schema, table, column, dataType string
-		var charMaxLenNull sql.NullInt64
+		var charMaxLenNull *int64
 		if err := rows.Scan(&schema, &table, &column, &dataType, &charMaxLenNull); err != nil {
 			return nil, fmt.Errorf("reading data from database schema: %s", err)
 		}
 		var charMaxLen int64
-		if charMaxLenNull.Valid {
-			charMaxLen = charMaxLenNull.Int64
+		if charMaxLenNull != nil {
+			charMaxLen = *charMaxLenNull
 		}
 		schemaName := schema
 		tableName := table
@@ -74,7 +73,7 @@ func getColumnSchemas(dp *pgxpool.Pool) ([]*sqlx.ColumnSchema, error) {
 		cs = append(cs, c)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("reading data from database schema: %s", err)
+		return nil, fmt.Errorf("reading schema from database catalog: %v", err)
 	}
 	return cs, nil
 }
@@ -129,6 +128,7 @@ func (c *Catalog) Column(column *sqlx.Column) *ColumnType {
 	return nil
 }
 
+// TODO Use txn for ALTER TABLE and CREATE INDEX to ensure database and cache are updated atomically.
 func (c *Catalog) AddColumn(table dbx.Table, columnName string, newType command.DataType, newTypeSize int64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
