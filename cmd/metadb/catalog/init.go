@@ -268,11 +268,21 @@ func createTableTrack(tx pgx.Tx) error {
 }
 
 func (c *Catalog) TableUpdatedNow(table dbx.Table) error {
-	q := "INSERT INTO " + catalogSchema + ".table_update(schemaname,tablename,updated)" +
+	u := catalogSchema + ".table_update"
+	q := "INSERT INTO " + u + "(schemaname,tablename,updated)" +
 		"VALUES($1,$2,now())" +
 		"ON CONFLICT (schemaname,tablename) DO UPDATE SET updated=now()"
 	if _, err := c.dp.Exec(context.TODO(), q, table.S, table.T); err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".table_update: %v", err)
+		return fmt.Errorf("updating table %s in %s: %v", table, u, err)
+	}
+	return nil
+}
+
+func (c *Catalog) RemoveTableUpdated(table dbx.Table) error {
+	u := catalogSchema + ".table_update"
+	q := "DELETE FROM " + u + " WHERE schemaname=$1 AND tablename=$2"
+	if _, err := c.dp.Exec(context.TODO(), q, table.S, table.T); err != nil {
+		return fmt.Errorf("removing table %s from %s: %v", table, u, err)
 	}
 	return nil
 }
