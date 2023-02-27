@@ -149,6 +149,7 @@ This table summarizes the type adjustments that are performed:
 
 |`ps()`
 |table (
+    dbname text,
     username text,
     state text,
     realtime text,
