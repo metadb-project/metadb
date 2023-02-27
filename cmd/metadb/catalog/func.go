@@ -16,9 +16,9 @@ CREATE FUNCTION public.mdbversion() RETURNS text
     AS $$ SELECT 'Metadb ` + util.MetadbVersion + `' $$
     LANGUAGE SQL`},
 	{"ps()", `
-CREATE FUNCTION public.ps() RETURNS TABLE(username text, state text, realtime text, query text)
+CREATE FUNCTION public.ps() RETURNS TABLE(dbname text, username text, state text, realtime text, query text)
     AS $$
-       SELECT usename::text username, state, to_char(now() - query_start, 'HH24:MI:SS') AS realtime, query
+       SELECT datname::text dbname, usename::text username, state, to_char(now() - query_start, 'HH24:MI:SS') AS realtime, query
            FROM pg_stat_activity
            WHERE leader_pid IS NULL AND pid <> pg_backend_pid() AND state <> 'idle'
            ORDER BY query_start
