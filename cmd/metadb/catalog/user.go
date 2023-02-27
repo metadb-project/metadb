@@ -34,8 +34,6 @@ func AllUsers(dc *pgx.Conn) ([]string, error) {
 }
 
 func (c *Catalog) initUsers() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	// read users
 	users, err := sysdb.UserRead(c.dp)
 	if err != nil {

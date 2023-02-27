@@ -114,13 +114,9 @@ func MakeDataType(dataType string, charMaxLen int64) (DataType, int64) {
 	case "time with time zone", "timetz":
 		return TimetzType, 0
 	case "timestamp without time zone", "timestamp":
-		fallthrough
-	//case "timestamp_ntz":
-	//	return TimestampType, 0
+		return TimestampType, 0
 	case "timestamp with time zone", "timestamptz":
-		fallthrough
-	//case "timestamp_tz":
-	//	return TimestamptzType, 0
+		return TimestamptzType, 0
 	case "uuid":
 		return UUIDType, 0
 	case "jsonb":
