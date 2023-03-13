@@ -238,7 +238,7 @@ then followed by an empty line, for example:
 ----
 --metadb:table library_patrons
 --metadb:require library.patrongroup.id uuid
---metadb:require library.patrongroup.name varchar
+--metadb:require library.patrongroup.name text
 
 DROP TABLE IF EXISTS library_patrons;
 
@@ -265,7 +265,7 @@ For example:
 
 ----
 --metadb:require library.patrongroup.id uuid
---metadb:require library.patrongroup.name varchar
+--metadb:require library.patrongroup.name text
 ----
 
 There is generally no need to list all dependencies.  The intent of this
@@ -338,7 +338,7 @@ See CREATE DATA SOURCE
 Change the consumer group:
 
 ----
-ALTER DATA SOURCE example OPTIONS (SET consumergroup 'metadb_example_1');
+ALTER DATA SOURCE sensor OPTIONS (SET consumergroup 'metadb_sensor_1');
 ----
 
 ==== AUTHORIZE
@@ -380,7 +380,7 @@ effect.
 
 ----
 AUTHORIZE SELECT
-    ON ALL TABLES IN DATA SOURCE example
+    ON ALL TABLES IN DATA SOURCE sensor
     TO beatrice;
 ----
 
@@ -484,14 +484,14 @@ CREATE DATA SOURCE defines connection settings for an external data source.
 
 ===== Examples
 
-Create `example` as a `kafka` data source:
+Create `sensor` as a `kafka` data source:
 
 ----
-CREATE DATA SOURCE example TYPE kafka OPTIONS (
+CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
     brokers 'kafka:29092',
-    topics '^metadb_example_1.*',
-    consumergroup 'metadb_example_1_1',
-    addschemaprefix 'example_'
+    topics '^metadb_sensor_1.*',
+    consumergroup 'metadb_sensor_1_1',
+    addschemaprefix 'sensor_'
 );
 ----
 
@@ -525,10 +525,10 @@ DROP DATA SOURCE removes a data source configuration.
 
 ===== Examples
 
-Drop a data source `example`:
+Drop a data source `sensor`:
 
 ----
-DROP DATA SOURCE example;
+DROP DATA SOURCE sensor;
 ----
 
 ==== LIST

@@ -89,29 +89,30 @@ directory as `data/`:
 metadb init -D data
 ----
 
-This will also create a file `metadb.conf` in the data directory:
+This will also create a file `metadb.conf` in the data directory with the
+following structure:
 
-[source,toml]
+[source,subs="verbatim,quotes"]
 ----
 [main]
-host =
-port =
-database =
-superuser =
-superuser_password =
-systemuser =
-systemuser_password =
-sslmode =
+host = _host name of the PostgreSQL server_
+port = _port number of the PostgreSQL server_
+database = _database name, typically "metadb"_
+superuser = _database superuser such as "postgres"_
+superuser_password = _password of superuser_
+systemuser = _database user that is the owner of the database_
+systemuser_password = _password of systemuser_
+sslmode = _should be set to "require" or stronger option_
 ----
 
 This file should be edited to add database connection parameters, for example:
 
-[source,toml]
+[source,subs="verbatim,quotes"]
 ----
 [main]
 host = a.b.c
 port = 5432
-database = mydb
+database = metadb
 superuser = postgres
 superuser_password = zpreCaWS7S79dt82zgvD
 systemuser = mdbadmin
@@ -229,18 +230,18 @@ SELECT mdbversion();
 A data source is defined using the `CREATE DATA SOURCE` statement, for example:
 
 ----
-CREATE DATA SOURCE example TYPE kafka OPTIONS (
+CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
     brokers 'kafka:29092',
-    topics '^metadb_example_1.*',
-    consumergroup 'metadb_example_1_1',
-    addschemaprefix 'example_',
+    topics '^metadb_sensor_1.*',
+    consumergroup 'metadb_sensor_1_1',
+    addschemaprefix 'sensor_',
     schemastopfilter 'admin'
 );
 ----
 
-Metadb currently supports reading Kafka messages produced by the Debezium
-PostgreSQL connector for Kafka Connect.  Configuration of Kafka, Kafka Connect,
-Debezium, and PostgreSQL logical decoding is beyond the scope of this
+Metadb currently supports reading Kafka messages in the format produced by the
+Debezium PostgreSQL connector for Kafka Connect.  Configuration of Kafka, Kafka
+Connect, Debezium, and PostgreSQL logical decoding is beyond the scope of this
 documentation, but a few notes are included here.
 
 Data flow in this direction:
@@ -259,14 +260,14 @@ Next we create a connector configuration file for Kafka Connect:
 
 ----
 {
-    "name": "example-1-connector",
+    "name": "sensor-1-connector",
     "config": {
         "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
         "database.dbname": "sourcedb",
         "database.hostname": "example.host.name",
         "database.password": "eHrkGrZL8mMJOFgToqqL",
         "database.port": "5432",
-        "database.server.name": "metadb_example_1",
+        "database.server.name": "metadb_sensor_1",
         "database.user": "dbuser",
         "plugin.name": "pgoutput",
         "snapshot.mode": "exported",
@@ -352,8 +353,8 @@ re-streamed) or "extra" records (recently deleted in the source database).
 +
 [source]
 ----
-ALTER DATA SOURCE example OPTIONS
-    (SET topics '^metadb_example_2.*', SET consumergroup 'metadb_example_2_1');
+ALTER DATA SOURCE sensor OPTIONS
+    (SET topics '^metadb_sensor_2.*', SET consumergroup 'metadb_sensor_2_1');
 ----
 +
 *Do not restart the Metadb server but continue directly to Step 2.*
@@ -365,7 +366,7 @@ ALTER DATA SOURCE example OPTIONS
 ----
 metadb stop -D data
 
-metadb reset -D data --source example
+metadb reset -D data --source sensor
 ----
 
 3. Start the Metadb server to begin streaming the data.
@@ -376,7 +377,7 @@ metadb reset -D data --source example
 +
 [source,bash]
 ----
-metadb clean -D data --source example
+metadb clean -D data --source sensor
 ----
 +
 Note that the metadb server currently does not give an indication that it has
@@ -399,20 +400,20 @@ To create a new database user account:
 
 [source]
 ----
-CREATE USER tiggy PASSWORD 'LZn2DCajcNHpGR3ZXWHD';
+CREATE USER weg PASSWORD 'LZn2DCajcNHpGR3ZXWHD';
 ----
 
 In addition to creating the user, this also creates a schema with the same name
 as the user which can be used as a workspace.
+
+We recommend user names of 3 to 8 characters in length.
 
 To give the user access to all tables generated from a data source (including
 tables not yet created):
 
 [source]
 ----
-AUTHORIZE SELECT
-    ON ALL TABLES IN DATA SOURCE example
-    TO tiggy;
+AUTHORIZE SELECT ON ALL TABLES IN DATA SOURCE sensor TO weg;
 ----
 
 .Note
