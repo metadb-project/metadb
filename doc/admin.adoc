@@ -445,4 +445,4 @@ coincide with a schema that may be created by Metadb.  This can be ensured by
 always setting `addschemaprefix` in data source configurations and avoiding
 names with those prefixes when creating a new schema.
 
-4. Database views should not be created.
+4. Database views should not be created in the database.
