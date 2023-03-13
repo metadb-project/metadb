@@ -346,24 +346,40 @@ queries, and access to them is generally disabled.
 
 === Workspaces
 
-Metadb creates a schema name space for each user to serve as an individual
-workspace.  The schema has the same name as the user name, and it can be used
-as an area within the database for creating tables.  This can be useful for
-saving the results of queries or importing external data sets.
+In general, users do not have privileges to modify or create tables in the
+database.  However, Metadb creates a schema for each user where the user does
+have these privileges, and this serves as an individual workspace.  The schema
+has the same name as the user name.  This can be useful as an area for saving
+the results of queries or importing external data sets.
 
-To use this workspace, it is not necessary to specify the schema name; it will
-be selected by default if no schema is specified.
+When using one's own workspace, it is not necessary to specify the schema name;
+it will be used by default if no schema is specified.
 
-For example:
+For example, this table `westgroup` created by user `flopsy` will be created in
+schema `flopsy`:
 
-[source]
 ----
 CREATE TABLE westgroup AS SELECT * FROM library.patrongroup WHERE __origin = 'west';
 ----
 
-[source]
 ----
-SELECT * FROM westgroup;
+SELECT * FROM westgroup LIMIT 20;
+----
+
+Unless configured differently, other users do not have privileges to access the
+table by default.  To grant the user `mopsy` read-only access to the schema and
+table:
+
+----
+GRANT USAGE ON SCHEMA flopsy TO mopsy;
+
+GRANT SELECT ON westgroup TO mopsy;
+----
+
+The `mopsy` user will have to include the schema name to access the table:
+
+----
+SELECT * FROM flopsy.westgroup LIMIT 20;
 ----
 
 === Database views
