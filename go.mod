@@ -3,18 +3,18 @@ module github.com/metadb-project/metadb
 go 1.19
 
 require (
-	github.com/confluentinc/confluent-kafka-go v1.9.2
+	github.com/confluentinc/confluent-kafka-go/v2 v2.1.0
 	github.com/fatih/color v1.13.0
 	github.com/go-git/go-git/v5 v5.5.1
 	github.com/jackc/pgx/v5 v5.1.1
 	github.com/lib/pq v1.10.4
 	github.com/library-data-platform/ldpmarc v1.6.1-0.20230212153420-0b3c486ecabe
 	github.com/mattn/go-isatty v0.0.16
-	github.com/mattn/go-sqlite3 v1.14.10
+	github.com/mattn/go-sqlite3 v1.14.14
 	github.com/shopspring/decimal v1.3.1
 	github.com/spf13/cobra v1.6.0
-	golang.org/x/term v0.2.0
-	golang.org/x/tools v0.1.12
+	golang.org/x/term v0.6.0
+	golang.org/x/tools v0.6.0
 	gopkg.in/ini.v1 v1.67.0
 )
 
@@ -52,10 +52,10 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	golang.org/x/crypto v0.3.0 // indirect
-	golang.org/x/net v0.2.0 // indirect
+	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/sys v0.2.0 // indirect
-	golang.org/x/text v0.4.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
