@@ -351,24 +351,19 @@ In general, users do not have privileges to modify or create tables in the
 database.  However, Metadb creates a schema for each user where the user does
 have these privileges, and this serves as an individual workspace.  The schema
 has the same name as the user name.  This can be useful as an area for saving
-the results of queries or importing external data sets.
-
-When using one's own workspace, it is not necessary to specify the schema name;
-it will be used by default if no schema is specified.
-
-For example, this table `westgroup` created by user `celia` will be created in
-schema `celia`:
+the results of queries or importing external data sets.  For example, the user
+`celia` can create a table in the schema `celia`:
 
 ----
-CREATE TABLE westgroup AS SELECT * FROM library.patrongroup WHERE __origin = 'west';
+CREATE TABLE celia.westgroup AS
+    SELECT * FROM library.patrongroup WHERE __origin = 'west';
 ----
 
 ----
-SELECT * FROM westgroup LIMIT 20;
+SELECT * FROM celia.westgroup LIMIT 20;
 ----
 
-Unless configured differently, other users do not have privileges to access the
-table by default.
+Others users typically do not have privileges to access the table by default.
 
 [.aqua-background]#Metadb v1.0.6#
 To grant the user `rosalind` read-only access to the schema and table:
@@ -376,14 +371,63 @@ To grant the user `rosalind` read-only access to the schema and table:
 ----
 GRANT USAGE ON SCHEMA celia TO rosalind;
 
-GRANT SELECT ON westgroup TO rosalind;
+GRANT SELECT ON celia.westgroup TO rosalind;
 ----
 
-The `rosalind` user will have to include the schema name to access the table:
+The `rosalind` user can then access the table:
 
 ----
 SELECT * FROM celia.westgroup LIMIT 20;
 ----
+
+=== Database functions
+
+Database functions are a useful way to package queries so they can accept
+parameters.  This is an effective way to create reports that can be run by
+users.
+
+In the previous section we ran a simple query and stored the results in a
+table:
+
+----
+CREATE TABLE celia.westgroup AS
+    SELECT * FROM library.patrongroup WHERE __origin = 'west';
+----
+
+We can create a function to generalize this query.  Instead of filtering by
+`__origin = 'west'`, we will allow the user to specify the origin.
+
+----
+CREATE FUNCTION celia.origin_group(origin text)
+    RETURNS TABLE(id integer, groupname text, description text) AS
+$$
+SELECT id, groupname, description
+    FROM library.patrongroup
+    WHERE __origin = origin
+$$
+LANGUAGE SQL;
+----
+
+Now the function can be run with different arguments to generate reports:
+
+----
+SELECT * FROM celia.origin_group('west');
+
+SELECT * FROM celia.origin_group('east');
+----
+
+[.aqua-background]#Metadb v1.0.6#
+The user that created this function can share it with other users in a similar
+way as described in the "Workspaces" section above.
+
+----
+GRANT USAGE ON SCHEMA celia TO rosalind;
+
+GRANT EXECUTE ON FUNCTION celia.origin_group TO rosalind;
+----
+
+Note that the `GRANT USAGE ON SCHEMA` command does not have to be run again if
+it was done previously.
 
 === Database views
 
@@ -392,7 +436,9 @@ database.
 
 Views can create dependencies that may block required schema changes during
 data updates.  They also hide query complexity, which in analytical workloads
-can be significant.
+can be significant, behind what appears to be a simple table.  It is
+recommended to use database functions instead, as described in the previous
+section.
 
 === Querying system information
 
