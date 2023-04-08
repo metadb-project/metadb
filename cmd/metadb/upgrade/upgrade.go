@@ -392,6 +392,7 @@ var updbList = []updbFunc{
 	updb10,
 	updb11,
 	updb12,
+	updb13,
 }
 
 /*
@@ -1033,14 +1034,68 @@ func updb12(opt *dbopt) error {
 		return err
 	}
 
+	// Write new version number
+	err = metadata.WriteDatabaseVersion(tx, 12)
+	if err != nil {
+		return err
+	}
+	err = tx.Commit(context.TODO())
+	if err != nil {
+		return err
+	}
+
 	for _, u := range users {
 		_, _ = dc.Exec(context.TODO(), "GRANT USAGE ON SCHEMA metadb TO "+u)
 		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON metadb.log TO "+u)
 		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON metadb.table_update TO "+u)
 	}
 
+	return nil
+}
+
+func updb13(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	q := "SELECT username FROM metadb.auth"
+	rows, err := dc.Query(context.TODO(), q)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	users := make([]string, 0)
+	for rows.Next() {
+		var username string
+		err = rows.Scan(&username)
+		if err != nil {
+			return err
+		}
+		users = append(users, username)
+	}
+	if err = rows.Err(); err != nil {
+		return err
+	}
+
+	for _, u := range users {
+		_, _ = dc.Exec(context.TODO(), "GRANT USAGE ON SCHEMA "+u+" TO "+u+" WITH GRANT OPTION")
+		// Redo grants in updb12() that ran on new tables in an uncommitted txn.
+		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON metadb.log TO "+u)
+		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON metadb.table_update TO "+u)
+	}
+
+	// Begin transaction
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+
 	// Write new version number
-	err = metadata.WriteDatabaseVersion(tx, 12)
+	err = metadata.WriteDatabaseVersion(tx, 13)
 	if err != nil {
 		return err
 	}

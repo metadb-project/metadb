@@ -72,10 +72,15 @@ func createUser(conn net.Conn, query string, node *ast.CreateUserStmt, db *dbx.D
 	if err != nil {
 		return fmt.Errorf("creating schema %s: %s", node.UserName, err)
 	}
-	q = "GRANT CREATE, USAGE ON SCHEMA " + node.UserName + " TO " + node.UserName
+	q = "GRANT CREATE ON SCHEMA " + node.UserName + " TO " + node.UserName
 	_, err = dc.Exec(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("granting privileges on schema %q to role %q: %s", node.UserName, node.UserName, err)
+		return fmt.Errorf("granting create privilege on schema %q to role %q: %s", node.UserName, node.UserName, err)
+	}
+	q = "GRANT USAGE ON SCHEMA " + node.UserName + " TO " + node.UserName + " WITH GRANT OPTION"
+	_, err = dc.Exec(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("granting usage privilege on schema %q to role %q: %s", node.UserName, node.UserName, err)
 	}
 
 	b := encode(nil, []pgproto3.Message{
