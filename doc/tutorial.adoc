@@ -7,9 +7,10 @@ the basics of SQL.
 
 Metadb extends PostgreSQL with features to support analytics such as streaming
 data sources, data model transforms, and historical data.  The data contained
-in the Metadb database originally come from another place: a *data source* such
-as a transaction-processing database.  Metadb updates its database continuously
-based on changes in a data source.
+in the Metadb database originally come from another place: a *data source*
+which could be, for example, a transaction-processing database or a sensor
+network.  Metadb updates its database continuously based on state changes in
+external data sources.
 
 === Main tables
 
@@ -355,8 +356,8 @@ the results of queries or importing external data sets.
 When using one's own workspace, it is not necessary to specify the schema name;
 it will be used by default if no schema is specified.
 
-For example, this table `westgroup` created by user `flopsy` will be created in
-schema `flopsy`:
+For example, this table `westgroup` created by user `celia` will be created in
+schema `celia`:
 
 ----
 CREATE TABLE westgroup AS SELECT * FROM library.patrongroup WHERE __origin = 'west';
@@ -367,19 +368,21 @@ SELECT * FROM westgroup LIMIT 20;
 ----
 
 Unless configured differently, other users do not have privileges to access the
-table by default.  To grant the user `mopsy` read-only access to the schema and
-table:
+table by default.
+
+[.aqua-background]#Metadb v1.0.6#
+To grant the user `rosalind` read-only access to the schema and table:
 
 ----
-GRANT USAGE ON SCHEMA flopsy TO mopsy;
+GRANT USAGE ON SCHEMA celia TO rosalind;
 
-GRANT SELECT ON westgroup TO mopsy;
+GRANT SELECT ON westgroup TO rosalind;
 ----
 
-The `mopsy` user will have to include the schema name to access the table:
+The `rosalind` user will have to include the schema name to access the table:
 
 ----
-SELECT * FROM flopsy.westgroup LIMIT 20;
+SELECT * FROM celia.westgroup LIMIT 20;
 ----
 
 === Database views
