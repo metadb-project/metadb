@@ -16,13 +16,13 @@
 ==== Software requirements
 
 * Architecture: x86-64 (AMD64)
-* Operating system: Debian 11
-* https://www.postgresql.org/[PostgreSQL] 14 or later
-** PostgreSQL 15 or later is recommended
+* Operating system: Debian 11 or later
+* https://www.postgresql.org/[PostgreSQL] 15 or later
+** PostgreSQL 15.2 or later is recommended
 ** AWS RDS PostgreSQL optionally may be used (with servers in the same
    zone/subnet); Aurora is not supported
 * Required to build from source:
-** https://golang.org/[Go] 1.19 or later
+** https://golang.org/[Go] 1.20 or later
 ** goyacc (installation instructions below)
 ** https://www.colm.net/open-source/ragel/[Ragel] 6.10 or later
 ** https://gcc.gnu.org/[GCC C compiler] 9.3.0 or later
@@ -38,7 +38,7 @@
 * `maintenance_work_mem`: `1000000`
 * `max_wal_size`: `10240`
 * `shared_buffers`: `1250000`
-* `statement_timeout`: `3600000`
+* `statement_timeout`: `7200000`
 * `work_mem`: `350000`
 
 === Building the software
