@@ -374,60 +374,70 @@ GRANT USAGE ON SCHEMA celia TO rosalind;
 GRANT SELECT ON celia.westgroup TO rosalind;
 ----
 
-The `rosalind` user can then access the table:
+The user `rosalind` can then access the table:
 
 ----
 SELECT * FROM celia.westgroup LIMIT 20;
 ----
 
-=== Database functions
+=== Parameterized reports
 
-Database functions are a useful way to package queries so they can accept
-parameters.  This is an effective way to create reports that can be run by
-users.
+An effective way to create a report is to package it as a database function.  A
+database function can define a query and associated parameters.  Users can then
+call the function, specifying a value for each parameter.
 
-In the previous section we ran a simple query and stored the results in a
-table:
-
-----
-CREATE TABLE celia.westgroup AS
-    SELECT * FROM library.patrongroup WHERE __origin = 'west';
-----
-
-We can create a function to generalize this query.  Instead of filtering by
-`__origin = 'west'`, we will allow the user to specify the origin.
+For example, suppose that the following query counts the number of loans in a
+library for each circulated item within a range of dates.
 
 ----
-CREATE FUNCTION celia.origin_group(origin text)
-    RETURNS TABLE(id integer, groupname text, description text) AS
+SELECT item_id,
+       count(*) AS loan_count
+    FROM folio_circulation.loan__t
+    WHERE loan_date >= '2023-01-01' AND loan_date < '2024-01-01'
+    GROUP BY item_id;
+----
+
+We can create a function to generalize this query.  Instead of including the
+dates directly within the query, we will define them as parameters:
+`start_date` and `end_date`.
+
+----
+CREATE FUNCTION lisa.count_loans(start_date date, end_date date)
+    RETURNS TABLE(item_id uuid, loan_count integer) AS
 $$
-SELECT id, groupname, description
-    FROM library.patrongroup
-    WHERE __origin = origin
+SELECT item_id,
+       count(*) AS loan_count
+    FROM folio_circulation.loan__t
+    WHERE loan_date >= start_date AND loan_date < end_date
+    GROUP BY item_id
 $$
 LANGUAGE SQL;
 ----
 
-Now the function can be run with different arguments to generate reports:
+Now the function can be called with different arguments to generate reports:
 
 ----
-SELECT * FROM celia.origin_group('west');
+SELECT * FROM lisa.count_loans('2023-01-01', '2024-01-01');
 
-SELECT * FROM celia.origin_group('east');
+SELECT * FROM lisa.count_loans('2022-01-01', '2023-01-01');
 ----
 
 [.aqua-background]#Metadb v1.0.6#
-The user that created this function can share it with other users in a similar
-way as described in the "Workspaces" section above.
+The user `lisa` who created this function can share it with other users in a
+similar way as described in the "Workspaces" section above.
 
 ----
-GRANT USAGE ON SCHEMA celia TO rosalind;
+GRANT USAGE ON SCHEMA lisa TO rosalind;
 
-GRANT EXECUTE ON FUNCTION celia.origin_group TO rosalind;
+GRANT EXECUTE ON FUNCTION lisa.count_loans TO rosalind;
 ----
 
 Note that the `GRANT USAGE ON SCHEMA` command does not have to be run again if
 it was done previously.
+
+Defining shared functions in this way can be used together with a web-based
+database tool such as CloudBeaver to make reports available to a wider group of
+users.
 
 === Database views
 
