@@ -76,8 +76,9 @@ func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, sch
 		}
 		log.Trace("running file: %d %s", i, f)
 		file := filepath.Join(workdir, f)
-		if err = runFile(cat, dc, schema, file); err != nil {
-			log.Error("%v: repository=%s tag=%s path=%s", err, url, tag, filepath.Join(path, f))
+		fullpath := filepath.Join(path, f)
+		if err = runFile(cat, url, tag, fullpath, dc, schema, file); err != nil {
+			log.Warning("runsql: %v: repository=%s tag=%s path=%s", err, url, tag, fullpath)
 		}
 		for _, u := range users {
 			q = "GRANT SELECT ON ALL TABLES IN SCHEMA " + schema + " TO " + u
@@ -92,7 +93,7 @@ func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, sch
 	return nil
 }
 
-func runFile(cat *catalog.Catalog, dc *pgx.Conn, schema string, file string) error {
+func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, schema string, file string) error {
 	var table string
 	data, err := os.ReadFile(file)
 	if err != nil {
@@ -104,7 +105,7 @@ func runFile(cat *catalog.Catalog, dc *pgx.Conn, schema string, file string) err
 		if q == "" {
 			continue
 		}
-		if err = checkForDirectives(cat, q, &table); err != nil {
+		if err = checkForDirectives(cat, url, tag, fullpath, q, &table); err != nil {
 			return err
 		}
 		if _, err = dc.Exec(context.TODO(), q); err != nil {
@@ -124,7 +125,7 @@ func runFile(cat *catalog.Catalog, dc *pgx.Conn, schema string, file string) err
 
 var sqlSeparator = regexp.MustCompile("\\n\\s*\\n")
 
-func checkForDirectives(cat *catalog.Catalog, input string, table *string) error {
+func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input string, table *string) error {
 	if !strings.HasPrefix(strings.TrimSpace(input), "--metadb:") {
 		return nil
 	}
@@ -153,7 +154,8 @@ func checkForDirectives(cat *catalog.Catalog, input string, table *string) error
 			case strings.HasSuffix(requireTable.T, "_"),
 				strings.HasSuffix(requireTable.T, "___"),
 				strings.HasSuffix(requireTable.T, "____"):
-				log.Warning("table name may be invalid in %q", line)
+				log.Warning("runsql: table name may be invalid in %q: repository=%s tag=%s path=%s",
+					line, url, tag, fullpath)
 				continue
 			}
 			requireColumn := c[2]
@@ -163,7 +165,8 @@ func checkForDirectives(cat *catalog.Catalog, input string, table *string) error
 				requireTable.T != strings.TrimSpace(requireTable.T) ||
 				requireColumn != strings.TrimSpace(requireColumn) ||
 				requireColumnType != strings.TrimSpace(requireColumnType) {
-				log.Error("invalid identifier in %q", line)
+				log.Warning("runsql: invalid identifier in %q: repository=%s tag=%s path=%s",
+					line, url, tag, fullpath)
 				continue
 			}
 			if cat.Column(&sqlx.Column{
