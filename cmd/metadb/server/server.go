@@ -331,7 +331,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, 
 			path := "sql/derived_tables"
 			schema := "reshare_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {
-				log.Error("%v: repository=%s tag=%s path=%s", err, url, tag, path)
+				log.Warning("runsql: %v: repository=%s tag=%s path=%s", err, url, tag, path)
 				if tries >= 12 {
 					break
 				}
