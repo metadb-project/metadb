@@ -48,7 +48,7 @@ func launchPollLoop(cat *catalog.Catalog, svr *server, spr *sproc) (reterr error
 	defer func() {
 		if r := recover(); r != nil {
 			reterr = fmt.Errorf("%v", r)
-			log.Fatal("%s", reterr)
+			log.Error("%s", reterr)
 		}
 	}()
 	reterr = outerPollLoop(cat, svr, spr)
