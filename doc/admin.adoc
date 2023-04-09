@@ -97,13 +97,15 @@ following structure:
 [main]
 host = _host name of the PostgreSQL server_
 port = _port number of the PostgreSQL server_
-database = _database name, typically "metadb"_
+database = _database name_
 superuser = _database superuser such as "postgres"_
 superuser_password = _password of superuser_
 systemuser = _database user that is the owner of the database_
 systemuser_password = _password of systemuser_
 sslmode = _should be set to "require" or stronger option_
 ----
+
+The database name should be `metadb` or should begin with `metadb_`.
 
 This file should be edited to add database connection parameters, for example:
 

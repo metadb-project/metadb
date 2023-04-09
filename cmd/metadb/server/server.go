@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"regexp"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -122,6 +123,10 @@ func runServer(svr *server) error {
 	svr.db, err = util.ReadConfigDatabase(svr.opt.Datadir)
 	if err != nil {
 		return fmt.Errorf("reading configuration file: %v", err)
+	}
+
+	if svr.db.DBName != "metadb" && !strings.HasPrefix(svr.db.DBName, "metadb_") {
+		log.Warning("database has nonstandard name %q", svr.db.DBName)
 	}
 
 	svr.dp, err = pgxpool.New(context.TODO(), svr.db.ConnString(svr.db.User, svr.db.Password))
