@@ -427,9 +427,9 @@ The user `lisa` who created this function can share it with other users in a
 similar way as described in the "Workspaces" section above.
 
 ----
-GRANT USAGE ON SCHEMA lisa TO rosalind;
+GRANT USAGE ON SCHEMA lisa TO celia, rosalind;
 
-GRANT EXECUTE ON FUNCTION lisa.count_loans TO rosalind;
+GRANT EXECUTE ON FUNCTION lisa.count_loans TO celia, rosalind;
 ----
 
 Note that the `GRANT USAGE ON SCHEMA` command does not have to be run again if
