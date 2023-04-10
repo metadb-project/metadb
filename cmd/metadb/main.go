@@ -285,7 +285,7 @@ func run() error {
 var helpStart = "Start server\n"
 var helpStop = "Shutdown server\n"
 var helpInit = "Initialize new Metadb instance\n"
-var helpUpgrade = "Upgrade a Metadb instance to the current version\n"
+var helpUpgrade = "Upgrade Metadb instance to current version\n"
 var helpReset = "Reset database for new snapshot\n"
 var helpClean = "Remove data from previous reset\n"
 var helpVersion = "Print metadb version\n"
@@ -570,10 +570,11 @@ func dirFlag(cmd *cobra.Command, datadir *string) string {
 
 func memoryLimitFlag(cmd *cobra.Command, memoryLimit *float64) string {
 	if cmd != nil {
-		cmd.Flags().Float64Var(memoryLimit, "memlimit", 16.0, "")
+		cmd.Flags().Float64Var(memoryLimit, "memlimit", 1.0, "")
 	}
 	return "" +
-		"      --memlimit <m>          - Approximate limit on memory usage in GiB\n"
+		"      --memlimit <m>          - Approximate limit on memory usage in GiB\n" +
+		"                                (default: 1.0)\n"
 }
 
 func setupLog(logfile, csvlogfile string, debug bool, trace bool) (*os.File, *os.File, error) {

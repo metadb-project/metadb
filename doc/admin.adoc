@@ -6,7 +6,7 @@
 
 * Metadb software:
 ** CPU: 2 cores
-** Memory: 2 GB
+** Memory: 1 GB
 ** Storage: 500 GB SSD
 * PostgreSQL database:
 ** CPU: 4 cores
