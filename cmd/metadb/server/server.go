@@ -125,10 +125,6 @@ func runServer(svr *server) error {
 		return fmt.Errorf("reading configuration file: %v", err)
 	}
 
-	if svr.db.DBName != "metadb" && !strings.HasPrefix(svr.db.DBName, "metadb_") {
-		log.Warning("database has nonstandard name %q", svr.db.DBName)
-	}
-
 	svr.dp, err = pgxpool.New(context.TODO(), svr.db.ConnString(svr.db.User, svr.db.Password))
 	if err != nil {
 		return fmt.Errorf("creating database connection pool: %v", err)
@@ -145,9 +141,11 @@ func runServer(svr *server) error {
 	defer log.SetDatabase(nil)
 
 	log.Info("starting Metadb %s", util.MetadbVersion)
-	// if svr.opt.RewriteJSON {
-	// 	log.Info("enabled JSON rewriting")
-	// }
+
+	if svr.db.DBName != "metadb" && !strings.HasPrefix(svr.db.DBName, "metadb_") {
+		log.Info("database has nonstandard name %q", svr.db.DBName)
+	}
+
 	setMemoryLimit(svr.opt.MemoryLimit)
 
 	if svr.opt.NoTLS {
