@@ -27,9 +27,6 @@ that begin with two underscores:
 * `__current` is a Boolean value that indicates whether the row
   is current.
 
-* `\__source` identifies the data source.  The value of `__source` is
-  the same for all rows that have been read from the same data source.
-
 * `\__origin` is an optional identifier used to group related data
   from one or more data sources.  For example, Metadb can combine data
   from similar source tables into a single table in the analytic
@@ -132,14 +129,13 @@ To take another example:
 
 [source]
 ----
-SELECT __id, __start, __source, __origin, id, groupname, description FROM library.patrongroup;
+SELECT __id, __start, __origin, id, groupname, description FROM library.patrongroup;
 ----
 
-[%header,cols=">1m,4m,2m,2m,>1m,2m,4m"]
+[%header,cols=">1m,4m,2m,>1m,2m,4m"]
 |===
 ^|`*__id*`
 ^|`*__start*`
-^|`*__source*`
 ^|`*__origin*`
 ^|`*id*`
 ^|`*groupname*`
@@ -147,7 +143,6 @@ SELECT __id, __start, __source, __origin, id, groupname, description FROM librar
 
 |8
 |2022-04-18 19:27:18-00
-|library
 |west
 |15
 |undergrad
@@ -155,7 +150,6 @@ SELECT __id, __start, __source, __origin, id, groupname, description FROM librar
 
 |4
 |2022-04-17 17:42:25-00
-|library
 |east
 |10
 |graduate
@@ -163,7 +157,6 @@ SELECT __id, __start, __source, __origin, id, groupname, description FROM librar
 
 |5
 |2022-04-17 17:52:53-00
-|library
 |east
 |9
 |faculty
@@ -171,7 +164,6 @@ SELECT __id, __start, __source, __origin, id, groupname, description FROM librar
 
 |6
 |2022-04-17 17:52:53-00
-|library
 |east
 |12
 |staff
