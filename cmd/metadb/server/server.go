@@ -330,7 +330,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, 
 		for {
 			tries++
 			url := "https://github.com/openlibraryenvironment/reshare-analytics.git"
-			tag := "v0.2.0-beta7"
+			tag := "20230426170621"
 			path := "sql/derived_tables"
 			schema := "reshare_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {
