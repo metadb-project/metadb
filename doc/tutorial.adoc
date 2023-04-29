@@ -372,7 +372,7 @@ The user `rosalind` can then access the table:
 SELECT * FROM celia.westgroup LIMIT 20;
 ----
 
-=== Parameterized reports
+=== Creating reports
 
 An effective way to create a report is to package it as a database function.  A
 database function can define a query and associated parameters.  Users can then
