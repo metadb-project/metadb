@@ -158,6 +158,7 @@ This table summarizes the type adjustments that are performed:
 |Returns the status and elapsed running time of current query processes
 |===
 
+[discrete]
 ===== Examples
 
 Show log messages from the past hour, and from the past 24 hours:
@@ -307,6 +308,7 @@ ALTER DATA SOURCE `*_source_name_*`
     OPTIONS ( [ ADD | SET | DROP ] *_option_* ['*_value_*'] [, ... ] )
 ----
 
+[discrete]
 ===== Description
 
 ALTER DATA SOURCE changes connection settings for a data source.
@@ -318,6 +320,7 @@ ALTER DATA SOURCE currently requires restarting the server before it
 will take effect.
 ****
 
+[discrete]
 ===== Parameters
 
 [frame=none,grid=none,cols="1,2"]
@@ -329,10 +332,12 @@ will take effect.
 |Connection settings and other configuration options for the data source.
 |===
 
+[discrete]
 ===== Options
 
 See CREATE DATA SOURCE
 
+[discrete]
 ===== Examples
 
 Change the consumer group:
@@ -352,6 +357,7 @@ AUTHORIZE SELECT
     TO `*_role_specification_*`
 ----
 
+[discrete]
 ===== Description
 
 The AUTHORIZE command grants access to tables.  It differs from GRANT in that
@@ -365,6 +371,7 @@ AUTHORIZE currently requires restarting the server before it will take
 effect.
 ****
 
+[discrete]
 ===== Parameters
 
 [frame=none,grid=none,cols="1,2"]
@@ -376,6 +383,7 @@ effect.
 |An existing role to be granted the authorization.
 |===
 
+[discrete]
 ===== Examples
 
 ----
@@ -384,6 +392,7 @@ AUTHORIZE SELECT
     TO beatrice;
 ----
 
+[discrete]
 ==== CREATE DATA ORIGIN
 
 Define a new data origin
@@ -393,6 +402,7 @@ Define a new data origin
 CREATE DATA ORIGIN `*_origin_name_*`
 ----
 
+[discrete]
 ===== Description
 
 CREATE DATA ORIGIN defines a new origin.
@@ -404,6 +414,7 @@ CREATE DATA ORIGIN currently requires restarting the server before it will take
 effect.
 ****
 
+[discrete]
 ===== Parameters
 
 [frame=none,grid=none,cols="1,2"]
@@ -412,6 +423,7 @@ effect.
 |A unique name for the data origin to be created.
 |===
 
+[discrete]
 ===== Examples
 
 Create a new origin `test_origin`:
@@ -431,10 +443,12 @@ CREATE DATA SOURCE `*_source_name_*` TYPE *_source_type_*
     OPTIONS ( *_option_* '*_value_*' [, ... ] )
 ----
 
+[discrete]
 ===== Description
 
 CREATE DATA SOURCE defines connection settings for an external data source.
 
+[discrete]
 ===== Parameters
 
 [frame=none,grid=none,cols="1,2"]
@@ -449,6 +463,7 @@ CREATE DATA SOURCE defines connection settings for an external data source.
 |Connection settings and other configuration options for the data source.
 |===
 
+[discrete]
 ===== Options for data source type "kafka"
 
 [frame=none,grid=none,cols="1,3"]
@@ -482,6 +497,7 @@ CREATE DATA SOURCE defines connection settings for an external data source.
 |Name of pre-defined configuration.
 |===
 
+[discrete]
 ===== Examples
 
 Create `sensor` as a `kafka` data source:
@@ -511,10 +527,12 @@ Remove a data source configuration
 DROP DATA SOURCE `*_source_name_*`
 ----
 
+[discrete]
 ===== Description
 
 DROP DATA SOURCE removes a data source configuration.
 
+[discrete]
 ===== Parameters
 
 [frame=none,grid=none,cols="1,2"]
@@ -523,6 +541,7 @@ DROP DATA SOURCE removes a data source configuration.
 |The name of an existing data source.
 |===
 
+[discrete]
 ===== Examples
 
 Drop a data source `sensor`:
@@ -540,11 +559,13 @@ Show the value of a system variable
 LIST `*_name_*`
 ----
 
+[discrete]
 ===== Description
 
 LIST shows the current setting of various system configurations and other
 variables.
 
+[discrete]
 ===== Parameters
 
 [frame=none,grid=none,cols="1,3,8"]
@@ -570,6 +591,7 @@ variables.
 |Current status of system components.
 |===
 
+[discrete]
 ===== Examples
 
 ----
