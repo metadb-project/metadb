@@ -62,6 +62,426 @@ APIs which are roughly equivalent.  This is located at
 in `-storage`, but some modules use a different convention; for instance, the
 storage module for users is `mod-users`.  (All module names begin with `mod-`.)
 
+==== Migrating from LDP
+
+This section contains notes on migrating queries from LDP to Metadb.
+
+===== Table names
+
+Table names have changed and now are derived from FOLIO internal table names:
+
+[%header,cols="8l,9l"]
+|===
+|LDP table
+|Metadb table
+
+|acquisitions_memberships
+|folio_orders.acquisitions_unit_membership
+
+|acquisitions_units
+|folio_orders.acquisitions_unit
+
+|audit_circulation_logs
+|folio_audit.circulation_logs
+
+|circulation_cancellation_reasons
+|folio_circulation.cancellation_reason
+
+|circulation_check_ins
+|folio_circulation.check_in
+
+|circulation_loan_history
+|folio_circulation.audit_loan
+
+|circulation_loan_policies
+|folio_circulation.loan_policy
+
+|circulation_loans
+|folio_circulation.loan
+
+|circulation_patron_action_sessions
+|circulation_patron_action_sessions
+
+|circulation_patron_notice_policies
+|folio_circulation.patron_notice_policy
+
+|circulation_request_policies
+|folio_circulation.request_policy
+
+|circulation_request_preference
+|folio_circulation.user_request_preference
+
+|circulation_scheduled_notices
+|folio_circulation.scheduled_notice
+
+|circulation_staff_slips
+|folio_circulation.staff_slips
+
+|configuration_entries
+|folio_configuration.config_data
+
+|course_copyrightstatuses
+|folio_courses.coursereserves_copyrightstates
+
+|course_courselistings
+|folio_courses.coursereserves_courselistings
+
+|course_courses
+|folio_courses.coursereserves_courses
+
+|course_coursetypes
+|folio_courses.coursereserves_coursetypes
+
+|course_departments
+|folio_courses.coursereserves_departments
+
+|course_processingstatuses
+|folio_courses.coursereserves_processingstates
+
+|course_reserves
+|folio_courses.coursereserves_reserves
+
+|course_terms
+|folio_courses.coursereserves_terms
+
+|email_email
+|folio_email.email_statistics
+
+|feesfines_accounts
+|folio_feesfines.accounts
+
+|feesfines_comments
+|folio_feesfines.comments
+
+|feesfines_feefineactions
+|folio_feesfines.feefineactions
+
+|feesfines_feefines
+|folio_feesfines.feefines
+
+|feesfines_lost_item_fees_policies
+|folio_feesfines.lost_item_fee_policy
+
+|feesfines_overdue_fines_policies
+|folio_feesfines.overdue_fine_policy
+
+|feesfines_owners
+|folio_feesfines.owners
+
+|feesfines_payments
+|folio_feesfines.payments
+
+|feesfines_refunds
+|folio_feesfines.refunds
+
+|feesfines_waives
+|folio_feesfines.waives
+
+|finance_budgets
+|folio_finance.budget
+
+|finance_fiscal_years
+|folio_finance.fiscal_year
+
+|finance_fund_types
+|folio_finance.fund_type
+
+|finance_funds
+|folio_finance.fund
+
+|finance_group_fund_fiscal_years
+|folio_finance.group_fund_fiscal_year
+
+|finance_groups
+|folio_finance.groups
+
+|finance_ledgers
+|folio_finance.ledger
+
+|finance_transactions
+|folio_finance.transaction
+
+|inventory_alternative_title_types
+|folio_inventory.alternative_title_type
+
+|inventory_call_number_types
+|folio_inventory.call_number_type
+
+|inventory_campuses
+|folio_inventory.loccampus
+
+|inventory_classification_types
+|folio_inventory.classification_type
+
+|inventory_contributor_name_types
+|folio_inventory.contributor_name_type
+
+|inventory_contributor_types
+|folio_inventory.contributor_type
+
+|inventory_electronic_access_relationships
+|folio_inventory.electronic_access_relationship
+
+|inventory_holdings
+|folio_inventory.holdings_record
+
+|inventory_holdings_note_types
+|folio_inventory.holdings_note_type
+
+|inventory_holdings_sources
+|folio_inventory.holdings_records_source
+
+|inventory_holdings_types
+|folio_inventory.holdings_type
+
+|inventory_identifier_types
+|folio_inventory.identifier_type
+
+|inventory_ill_policies
+|folio_inventory.ill_policy
+
+|inventory_instance_formats
+|folio_inventory.instance_format
+
+|inventory_instance_note_types
+|folio_inventory.instance_note_type
+
+|inventory_instance_relationship_types
+|folio_inventory.instance_relationship_type
+
+|inventory_instance_relationships
+|folio_inventory.instance_relationship
+
+|inventory_instance_statuses
+|folio_inventory.instance_status
+
+|inventory_instance_types
+|folio_inventory.instance_type
+
+|inventory_instances
+|folio_inventory.instance
+
+|inventory_institutions
+|folio_inventory.locinstitution
+
+|inventory_item_damaged_statuses
+|folio_inventory.item_damaged_status
+
+|inventory_item_note_types
+|folio_inventory.item_note_type
+
+|inventory_items
+|folio_inventory.item
+
+|inventory_libraries
+|folio_inventory.loclibrary
+
+|inventory_loan_types
+|folio_inventory.loan_type
+
+|inventory_locations
+|folio_inventory.location
+
+|inventory_material_types
+|folio_inventory.material_type
+
+|inventory_modes_of_issuance
+|folio_inventory.mode_of_issuance
+
+|inventory_nature_of_content_terms
+|folio_inventory.nature_of_content_term
+
+|inventory_service_points
+|folio_inventory.service_point
+
+|inventory_service_points_users
+|folio_inventory.service_point_user
+
+|inventory_statistical_code_types
+|folio_inventory.statistical_code_type
+
+|inventory_statistical_codes
+|folio_inventory.statistical_code
+
+|invoice_invoices
+|folio_invoice.invoices
+
+|invoice_lines
+|folio_invoice.invoice_lines
+
+|invoice_voucher_lines
+|folio_invoice.voucher_lines
+
+|invoice_vouchers
+|folio_invoice.vouchers
+
+|organization_categories
+|folio_organizations.categories
+
+|organization_contacts
+|folio_organizations.contacts
+
+|organization_interfaces
+|folio_organizations.interfaces
+
+|organization_organizations
+|folio_organizations.organizations
+
+|po_alerts
+|folio_orders.alert
+
+|po_lines
+|folio_orders.po_line
+
+|po_order_templates
+|folio_orders.order_templates
+
+|po_pieces
+|folio_orders.pieces
+
+|po_purchase_orders
+|folio_orders.purchase_order
+
+|po_reporting_codes
+|folio_orders.reporting_code
+
+|srs_error
+|folio_source_record.error_records_lb
+
+|srs_marc
+|folio_source_record.marc_records_lb
+
+|srs_records
+|folio_source_record.records_lb
+
+|user_addresstypes
+|folio_users.addresstype
+
+|user_groups
+|folio_users.groups
+
+|user_proxiesfor
+|folio_users.proxyfor
+
+|user_users
+|folio_users.users
+|===
+
+===== Column names
+
+The `data` column in LDP contains JSON objects.  In Metadb this column appears
+as `jsonb` or in some cases `content`, matching the FOLIO internal column
+names.
+
+===== Data types
+
+In Metadb, UUIDs generally have the `uuid` data type.  If a UUID has the `text`
+data type preserved from the source data, it should be cast using `::uuid` in
+queries.
+
+Columns with the `json` data type in LDP have been changed to use the `jsonb`
+data type in Metadb.
+
+===== JSON queries
+
+Querying JSON is very similar with Metadb as compared to LDP.  For clarity we
+give a few examples below.
+
+[discrete]
+====== JSON source data
+
+To select JSON data extracted from a FOLIO source, LDP supports:
+
+----
+SELECT data FROM user_groups;
+----
+
+In Metadb, this can be written as:
+
+----
+SELECT jsonb FROM folio_users.groups;
+----
+
+Or with easier to read formatting:
+
+----
+SELECT jsonb_pretty(jsonb) FROM folio_users.groups;
+----
+
+[discrete]
+====== JSON fields: non-array data
+
+For non-array JSON fields, extracting the data directly from JSON in LDP
+usually takes the form:
+
+----
+SELECT json_extract_path_text(data, 'group') FROM user_groups;
+----
+
+The equivalent for Metadb is either:
+
+----
+SELECT jsonb_extract_path_text(jsonb, 'group') FROM folio_users.groups;
+----
+
+Or:
+
+----
+SELECT jsonb->>'group' FROM folio_users.groups;
+----
+
+[discrete]
+====== JSON fields: array data
+
+To extract JSON arrays, the syntax for Metadb is similar to LDP.  A lateral
+join can be used with the function `jsonb_array_elements()` to convert the
+elements of a JSON array to a set of rows, one row per array element.
+
+For example, if the array elements are simple `text` strings:
+
+----
+CREATE TABLE instance_format_ids AS
+SELECT id AS instance_id,
+       instance_format_ids.jsonb #>> '{}' AS instance_format_id,
+       instance_format_ids.ordinality
+FROM folio_inventory.instance
+    CROSS JOIN LATERAL jsonb_array_elements(jsonb_extract_path(jsonb, 'instanceFormatIds')) WITH ORDINALITY
+        AS instance_format_ids (jsonb);
+----
+
+If the array elements are JSON objects:
+
+----
+CREATE TABLE holdings_notes AS
+SELECT id AS holdings_id,
+       (jsonb_extract_path_text(notes.jsonb, 'holdingsNoteTypeId'))::uuid AS holdings_note_type_id,
+       jsonb_extract_path_text(notes.jsonb, 'note') AS note,
+       (jsonb_extract_path_text(notes.jsonb, 'staffOnly'))::boolean AS staff_only,
+       notes.ordinality
+FROM folio_inventory.holdings_record
+    CROSS JOIN LATERAL jsonb_array_elements(jsonb_extract_path(jsonb, 'notes')) WITH ORDINALITY
+        AS notes (jsonb);
+----
+
+[discrete]
+====== JSON fields as columns
+
+LDP transforms simple, first-level JSON fields into columns, which can be
+queried as:
+
+----
+SELECT expiration_offset_in_days FROM user_groups;
+----
+
+The Metadb equivalent of this query is:
+
+----
+SELECT expiration_offset_in_days FROM folio_users.groups__t;
+----
+
+Support for transforming subfields and arrays is planned in Metadb.
+
+
 === ReShare
 
 Before defining a ReShare data source, create a data origin for each consortial
