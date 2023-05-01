@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
