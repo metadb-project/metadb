@@ -3,7 +3,7 @@ module github.com/metadb-project/metadb
 go 1.19
 
 require (
-	github.com/confluentinc/confluent-kafka-go/v2 v2.1.0
+	github.com/confluentinc/confluent-kafka-go v1.9.2
 	github.com/fatih/color v1.13.0
 	github.com/go-git/go-git/v5 v5.5.1
 	github.com/jackc/pgx/v5 v5.1.1
@@ -41,6 +41,7 @@ require (
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.5 // indirect
 	github.com/pjbgf/sha1cd v0.2.3 // indirect
+	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/skeema/knownhosts v1.1.0 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
@@ -48,6 +49,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.14.0 // indirect
+	github.com/stretchr/testify v1.8.2 // indirect
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
