@@ -396,7 +396,7 @@ is that data will appear to be missing until they are re-streamed.
 Until a failed stream is re-streamed by following the process above, the
 analytic database may continue to be unsynchronized with the source.
 
-=== Configuring database users
+=== Creating database users
 
 To create a new database user account:
 
@@ -406,12 +406,16 @@ CREATE USER weg PASSWORD 'LZn2DCajcNHpGR3ZXWHD';
 ----
 
 In addition to creating the user, this also creates a schema with the same name
-as the user which can be used as a workspace.
+as the user.  The schema is intended as a workspace for the user.
 
-We recommend user names of 3 to 8 characters in length.
+.Recommendations:
+* Each user account should be for an individual user and not shared by more
+  than one person.
+* Prefer user names of 3 to 8 characters in length.
 
-To give the user access to all tables generated from a data source (including
-tables not yet created):
+By default the user does not have access to data tables.  To give the user
+access to all tables generated from a data source (including tables not yet
+created):
 
 [source]
 ----
