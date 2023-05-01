@@ -337,7 +337,7 @@ In addition to these table types, some partition tables have names that begin
 with `zzz___`.  It is recommended that these tables not be used directly in
 queries, and access to them is generally disabled.
 
-=== Workspaces
+=== User workspaces
 
 In general, users do not have privileges to modify or create tables in the
 database.  However, Metadb creates a schema for each user where the user does
@@ -372,6 +372,38 @@ The user `rosalind` can then access the table:
 SELECT * FROM celia.westgroup LIMIT 20;
 ----
 
+=== Working with data types
+
+This section offers a few brief recommendations for working with common data
+types.
+
+[discrete]
+==== Text and varchar
+
+The `text` data type is recommended for strings of characters.
+
+The `varchar(_n_)` type with length _n_ can be used for older database clients
+that require the length to be specified.
+
+[discrete]
+==== Monetary data
+
+For monetary amounts, `numeric(19, 4)` is usually a good choice.  For exchange
+rates, `numeric(19, 14)` may be used.
+
+[discrete]
+==== Querying on a range of dates
+
+There are various ways of querying within a range of dates, but the least
+error-prone is to use inequalities of the form `_start_ \<= _t_ < _end_`, for
+example:
+
+----
+SELECT *
+    FROM folio_circulation.loan__t
+    WHERE '2023-01-01' <= loan_date AND loan_date < '2024-01-01';
+----
+
 === Creating reports
 
 An effective way to create a report is to package it as a database function.  A
@@ -385,7 +417,7 @@ library for each circulated item within a range of dates.
 SELECT item_id,
        count(*) AS loan_count
     FROM folio_circulation.loan__t
-    WHERE loan_date >= '2023-01-01' AND loan_date < '2024-01-01'
+    WHERE '2023-01-01' <= loan_date AND loan_date < '2024-01-01'
     GROUP BY item_id;
 ----
 
@@ -400,7 +432,7 @@ $$
 SELECT item_id,
        count(*) AS loan_count
     FROM folio_circulation.loan__t
-    WHERE loan_date >= start_date AND loan_date < end_date
+    WHERE start_date <= loan_date AND loan_date < end_date
     GROUP BY item_id
 $$
 LANGUAGE SQL;
@@ -416,7 +448,7 @@ SELECT * FROM lisa.count_loans('2022-01-01', '2023-01-01');
 
 [.aqua-background]#Metadb v1.0.6#
 The user `lisa` who created this function can share it with other users in a
-similar way as described in the "Workspaces" section above.
+similar way as described in the "User workspaces" section above.
 
 ----
 GRANT USAGE ON SCHEMA lisa TO celia, rosalind;
@@ -473,7 +505,7 @@ Metadb reports errors and other information in a logging table called
 ----
 SELECT *
     FROM metadb.log
-    WHERE log_time >= '2023-01-01' AND log_time < '2023-02-01'
+    WHERE '2023-01-01' <= log_time AND log_time < '2023-02-01'
     ORDER BY log_time;
 ----
 

@@ -481,7 +481,6 @@ SELECT expiration_offset_in_days FROM folio_users.groups__t;
 
 Support for transforming subfields and arrays is planned in Metadb.
 
-
 === ReShare
 
 Before defining a ReShare data source, create a data origin for each consortial
