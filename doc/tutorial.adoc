@@ -355,7 +355,7 @@ CREATE TABLE celia.westgroup AS
 SELECT * FROM celia.westgroup LIMIT 20;
 ----
 
-Others users typically do not have privileges to access the table by default.
+Other users typically do not have privileges to access the table by default.
 
 [.aqua-background]#Metadb v1.0.6#
 To grant the user `rosalind` read-only access to the schema and table:
@@ -366,11 +366,7 @@ GRANT USAGE ON SCHEMA celia TO rosalind;
 GRANT SELECT ON celia.westgroup TO rosalind;
 ----
 
-The user `rosalind` can then access the table:
-
-----
-SELECT * FROM celia.westgroup LIMIT 20;
-----
+The user `rosalind` can then access the table.
 
 === Working with data types
 
@@ -426,7 +422,7 @@ dates directly within the query, we will define them as parameters:
 `start_date` and `end_date`.
 
 ----
-CREATE FUNCTION lisa.count_loans(start_date date, end_date date)
+CREATE OR REPLACE FUNCTION lisa.count_loans(start_date date, end_date date)
     RETURNS TABLE(item_id uuid, loan_count integer) AS
 $$
 SELECT item_id,
