@@ -311,7 +311,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, 
 		for {
 			tries++
 			url := "https://github.com/folio-org/folio-analytics.git"
-			tag := "20230313005208"
+			tag := "v1.6.0"
 			path := "sql_metadb/derived_tables"
 			schema := "folio_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {
