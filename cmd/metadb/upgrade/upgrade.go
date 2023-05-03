@@ -221,21 +221,6 @@ func upgradeDatabases(datadir string) (bool, error) {
 }
 */
 
-func resetMaintenanceTime(db *dbx.DB) error {
-	// Open database
-	dc, err := db.Connect()
-	if err != nil {
-		return err
-	}
-	defer dbx.Close(dc)
-
-	q := "UPDATE metadb.maintenance SET next_maintenance_time = next_maintenance_time - interval '1 day'"
-	if _, err = dc.Exec(context.TODO(), q); err != nil {
-		return err
-	}
-	return nil
-}
-
 func upgradeDatabase(datadir string) (bool, error) {
 	confFileName := util.ConfigFileName(datadir)
 	confExists, err := util.FileExists(confFileName)
@@ -333,7 +318,6 @@ func upgradeDatabase(datadir string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	_ = resetMaintenanceTime(db)
 	return true, nil
 }
 
