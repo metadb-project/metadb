@@ -15,6 +15,26 @@ type PostgresDB struct {
 // Ensure that the type implements the DB interface.
 var _ DB = (*PostgresDB)(nil)
 
+func setDatabaseParameters(db *sql.DB) error {
+	q := "SET idle_in_transaction_session_timeout=0"
+	if _, err := db.Exec(q); err != nil {
+		return err
+	}
+	q = "SET idle_session_timeout=0"
+	if _, err := db.Exec(q); err != nil {
+		return err
+	}
+	q = "SET statement_timeout=0"
+	if _, err := db.Exec(q); err != nil {
+		return err
+	}
+	q = "SET timezone='UTC'"
+	if _, err := db.Exec(q); err != nil {
+		return err
+	}
+	return nil
+}
+
 func OpenPostgres(dsn *DSN) (*PostgresDB, error) {
 	s := "host=" + dsn.Host + " port=" + dsn.Port + " user=" + dsn.User + " password=" + dsn.Password + " dbname=" + dsn.DBName + " sslmode=" + dsn.SSLMode
 	db, err := sql.Open("postgres", s)
@@ -23,6 +43,10 @@ func OpenPostgres(dsn *DSN) (*PostgresDB, error) {
 		return nil, err
 	}
 	_, err = db.ExecContext(context.TODO(), "SET timezone='UTC'")
+	if err != nil {
+		return nil, err
+	}
+	err = setDatabaseParameters(db)
 	if err != nil {
 		return nil, err
 	}

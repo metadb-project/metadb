@@ -125,7 +125,7 @@ func runServer(svr *server) error {
 		return fmt.Errorf("reading configuration file: %v", err)
 	}
 
-	svr.dp, err = pgxpool.New(context.TODO(), svr.db.ConnString(svr.db.User, svr.db.Password))
+	svr.dp, err = dbx.NewPool(context.TODO(), svr.db.ConnString(svr.db.User, svr.db.Password))
 	if err != nil {
 		return fmt.Errorf("creating database connection pool: %v", err)
 	}
