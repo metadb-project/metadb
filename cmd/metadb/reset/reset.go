@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
@@ -32,7 +31,7 @@ func Reset(opt *option.Reset) error {
 	if err != nil {
 		return err
 	}
-	dp, err := pgxpool.New(context.TODO(), db.ConnString(db.User, db.Password))
+	dp, err := dbx.NewPool(context.TODO(), db.ConnString(db.User, db.Password))
 	if err != nil {
 		return fmt.Errorf("creating database connection pool: %v", err)
 	}

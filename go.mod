@@ -8,7 +8,7 @@ require (
 	github.com/go-git/go-git/v5 v5.5.1
 	github.com/jackc/pgx/v5 v5.1.1
 	github.com/lib/pq v1.10.4
-	github.com/library-data-platform/ldpmarc v1.6.1-0.20230212153420-0b3c486ecabe
+	github.com/library-data-platform/ldpmarc v1.6.1-0.20230503015306-99c3faac6fba
 	github.com/mattn/go-isatty v0.0.16
 	github.com/mattn/go-sqlite3 v1.14.14
 	github.com/shopspring/decimal v1.3.1

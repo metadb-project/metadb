@@ -91,10 +91,34 @@ func (d *DB) ConnectSuper() (*pgx.Conn, error) {
 	return d.connect(d.SuperUser, d.SuperPassword)
 }
 
+func setDatabaseParameters(ctx context.Context, dc *pgx.Conn) error {
+	q := "SET idle_in_transaction_session_timeout=0"
+	if _, err := dc.Exec(ctx, q); err != nil {
+		return err
+	}
+	q = "SET idle_session_timeout=0"
+	if _, err := dc.Exec(ctx, q); err != nil {
+		return err
+	}
+	q = "SET statement_timeout=0"
+	if _, err := dc.Exec(ctx, q); err != nil {
+		return err
+	}
+	q = "SET timezone='UTC'"
+	if _, err := dc.Exec(ctx, q); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (d *DB) connect(user, password string) (*pgx.Conn, error) {
 	dc, err := pgx.Connect(context.TODO(), d.ConnString(user, password))
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %s: %v", user, err)
+	}
+	err = setDatabaseParameters(context.TODO(), dc)
+	if err != nil {
+		return nil, err
 	}
 	return dc, nil
 }
@@ -136,6 +160,19 @@ func Analyze(dc *pgx.Conn, table Table) error {
 		return fmt.Errorf("analyzing: %s: %v", table, err)
 	}
 	return nil
+}
+
+func NewPool(ctx context.Context, connString string) (*pgxpool.Pool, error) {
+	config, err := pgxpool.ParseConfig(connString)
+	if err != nil {
+		return nil, err
+	}
+	config.AfterConnect = setDatabaseParameters
+	dp, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	return dp, nil
 }
 
 /*
