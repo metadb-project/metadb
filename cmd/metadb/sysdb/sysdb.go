@@ -38,6 +38,7 @@ type SourceConnector struct {
 	Group            string
 	SchemaPassFilter []string
 	SchemaStopFilter []string
+	TableStopFilter  []string
 	TrimSchemaPrefix string
 	AddSchemaPrefix  string
 	Module           string

@@ -393,6 +393,7 @@ var updbList = []updbFunc{
 	updb11,
 	updb12,
 	updb13,
+	updb14,
 }
 
 /*
@@ -1096,6 +1097,45 @@ func updb13(opt *dbopt) error {
 
 	// Write new version number
 	err = metadata.WriteDatabaseVersion(tx, 13)
+	if err != nil {
+		return err
+	}
+	err = tx.Commit(context.TODO())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb14(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	// Begin transaction
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+
+	q := "ALTER TABLE metadb.source ADD COLUMN tablestopfilter text"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+
+	// add resync mode (Add column "resync" to metadb.init and set to false)
+	// ok if already in resync?
+	q = "ALTER TABLE metadb.init ADD COLUMN resync boolean NOT NULL DEFAULT false"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+
+	// Write new version number
+	err = metadata.WriteDatabaseVersion(tx, 14)
 	if err != nil {
 		return err
 	}

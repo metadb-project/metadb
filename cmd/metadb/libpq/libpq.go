@@ -457,12 +457,13 @@ func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Con
 	}
 
 	q = "INSERT INTO metadb.source" +
-		"(name,brokers,security,topics,consumergroup,schemapassfilter,schemastopfilter,trimschemaprefix,addschemaprefix,module,enable)" +
-		"VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)"
+		"(name,brokers,security,topics,consumergroup,schemapassfilter,schemastopfilter,tablestopfilter,trimschemaprefix,addschemaprefix,module,enable)" +
+		"VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)"
 	_, err = dc.Exec(context.TODO(), q,
 		name, src.Brokers, src.Security, strings.Join(src.Topics, ","), src.Group,
-		strings.Join(src.SchemaPassFilter, ","), strings.Join(src.SchemaStopFilter, ","), src.TrimSchemaPrefix,
-		src.AddSchemaPrefix, src.Module, src.Enable)
+		strings.Join(src.SchemaPassFilter, ","), strings.Join(src.SchemaStopFilter, ","),
+		strings.Join(src.TableStopFilter, ","), src.TrimSchemaPrefix, src.AddSchemaPrefix, src.Module,
+		src.Enable)
 	if err != nil {
 		return fmt.Errorf("writing source configuration: %v", err)
 	}
@@ -617,6 +618,7 @@ func createSourceOptions(options []ast.Option) (*sysdb.SourceConnector, error) {
 		Topics:           []string{},
 		SchemaPassFilter: []string{},
 		SchemaStopFilter: []string{},
+		TableStopFilter:  []string{},
 	}
 	for _, opt := range options {
 		switch opt.Name {
@@ -632,6 +634,8 @@ func createSourceOptions(options []ast.Option) (*sysdb.SourceConnector, error) {
 			s.SchemaPassFilter = strings.Split(opt.Val, ",")
 		case "schemastopfilter":
 			s.SchemaStopFilter = strings.Split(opt.Val, ",")
+		case "tablestopfilter":
+			s.TableStopFilter = strings.Split(opt.Val, ",")
 		case "trimschemaprefix":
 			s.TrimSchemaPrefix = opt.Val
 		case "addschemaprefix":

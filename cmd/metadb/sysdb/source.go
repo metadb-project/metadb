@@ -21,7 +21,8 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 	rows, err = dbc.Query(context.TODO(), ""+
 		"SELECT name,enable,coalesce(brokers,''),coalesce(security,''),coalesce(topics,''),"+
 		"coalesce(consumergroup,''),coalesce(schemapassfilter,''),coalesce(schemastopfilter,''),"+
-		"coalesce(trimschemaprefix,''),coalesce(addschemaprefix,''),coalesce(module,'') FROM metadb.source")
+		"coalesce(tablestopfilter,''),coalesce(trimschemaprefix,''),coalesce(addschemaprefix,''),"+
+		"coalesce(module,'') FROM metadb.source")
 	if err != nil {
 		return nil, err
 	}
@@ -34,11 +35,13 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 		var consumergroup string
 		var schemapassfilter string
 		var schemastopfilter string
+		var tablestopfilter string
 		var trimschemaprefix string
 		var addschemaprefix string
 		var module string
 		if err := rows.Scan(&name, &enable, &brokers, &security, &topics, &consumergroup, &schemapassfilter,
-			&schemastopfilter, &trimschemaprefix, &addschemaprefix, &module); err != nil {
+			&schemastopfilter, &tablestopfilter, &trimschemaprefix, &addschemaprefix,
+			&module); err != nil {
 			return nil, err
 		}
 		if security == "" {
@@ -53,6 +56,7 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 			Group:            consumergroup,
 			SchemaPassFilter: util.SplitList(schemapassfilter),
 			SchemaStopFilter: util.SplitList(schemastopfilter),
+			TableStopFilter:  util.SplitList(tablestopfilter),
 			TrimSchemaPrefix: trimschemaprefix,
 			AddSchemaPrefix:  addschemaprefix,
 			Module:           module,
