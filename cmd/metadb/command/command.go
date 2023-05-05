@@ -624,14 +624,6 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 	// convert ts_ms to string
 	i, f := math.Modf(*ce.Value.Payload.Source.TsMs / 1000)
 	c.SourceTimestamp = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000000") + "Z"
-	if ce.Value.Payload.Source.Table != nil {
-		table := *ce.Value.Payload.Source.Table
-		if len(tableStopFilter) > 0 && util.MatchRegexps(tableStopFilter, table) {
-			log.Trace("filter: reject: %s", table)
-			return nil, nil
-		}
-		c.TableName = table
-	}
 	if ce.Value.Payload.Source.Schema != nil {
 		schema := *ce.Value.Payload.Source.Schema
 		if len(schemaPassFilter) > 0 && !util.MatchRegexps(schemaPassFilter, schema) {
@@ -658,6 +650,15 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 		c.Origin = origin
 		schema = addSchemaPrefix + schema
 		c.SchemaName = schema
+	}
+	if ce.Value.Payload.Source.Table != nil {
+		table := *ce.Value.Payload.Source.Table
+		schemaTable := c.SchemaName + "." + table
+		if len(tableStopFilter) > 0 && util.MatchRegexps(tableStopFilter, schemaTable) {
+			log.Trace("filter: reject: %s", table)
+			return nil, nil
+		}
+		c.TableName = table
 	}
 	if c.Op == TruncateOp {
 		return c, nil
