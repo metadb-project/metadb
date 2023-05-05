@@ -53,6 +53,7 @@ type sproc struct {
 	db               []sqlx.DB
 	schemaPassFilter []*regexp.Regexp
 	schemaStopFilter []*regexp.Regexp
+	tableStopFilter  []*regexp.Regexp
 	source           *sysdb.SourceConnector
 	databases        []*sysdb.DatabaseConnector
 	sourceLog        *log.SourceLog

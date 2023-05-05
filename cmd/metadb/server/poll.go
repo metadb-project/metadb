@@ -174,6 +174,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 	if sourceFileScanner == nil {
 		spr.schemaPassFilter = util.CompileRegexps(spr.source.SchemaPassFilter)
 		spr.schemaStopFilter = util.CompileRegexps(spr.source.SchemaStopFilter)
+		spr.tableStopFilter = util.CompileRegexps(spr.source.TableStopFilter)
 		var brokers = spr.source.Brokers
 		var topics = spr.source.Topics
 		var group = spr.source.Group
@@ -216,7 +217,8 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 
 		// Parse
 		eventReadCount, err := parseChangeEvents(pkerr, consumer, cl, spr.schemaPassFilter, spr.schemaStopFilter,
-			spr.source.TrimSchemaPrefix, spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog)
+			spr.tableStopFilter, spr.source.TrimSchemaPrefix, spr.source.AddSchemaPrefix, sourceFileScanner,
+			spr.sourceLog)
 		if err != nil {
 			return fmt.Errorf("parser: %v", err)
 		}
@@ -264,8 +266,9 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 	}
 }
 
-func parseChangeEvents(pkerr map[string]struct{}, consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter, schemaStopFilter []*regexp.Regexp,
-	trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
+func parseChangeEvents(pkerr map[string]struct{}, consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter,
+	schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string,
+	sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
 	var err error
 	var eventReadCount int
 	var x int
@@ -294,7 +297,8 @@ func parseChangeEvents(pkerr map[string]struct{}, consumer *kafka.Consumer, cl *
 			break
 		}
 		eventReadCount++
-		c, err := command.NewCommand(pkerr, ce, schemaPassFilter, schemaStopFilter, trimSchemaPrefix, addSchemaPrefix)
+		c, err := command.NewCommand(pkerr, ce, schemaPassFilter, schemaStopFilter, tableStopFilter,
+			trimSchemaPrefix, addSchemaPrefix)
 		if err != nil {
 			log.Debug("%v", *ce)
 			return 0, fmt.Errorf("parsing command: %v", err)

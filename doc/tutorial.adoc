@@ -422,7 +422,7 @@ dates directly within the query, we will define them as parameters:
 `start_date` and `end_date`.
 
 ----
-CREATE OR REPLACE FUNCTION lisa.count_loans(start_date date, end_date date)
+CREATE FUNCTION lisa.count_loans(start_date date, end_date date)
     RETURNS TABLE(item_id uuid, loan_count integer) AS
 $$
 SELECT item_id,

@@ -579,7 +579,8 @@ func structScale(data any) (int32, string, error) {
 // var FolioTenant string
 var ReshareTenants []string
 
-func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, schemaStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string) (*Command, error) {
+func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, schemaStopFilter,
+	tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string) (*Command, error) {
 	// Note: this function returns nil, nil in some cases.
 	if ce == nil {
 		return nil, fmt.Errorf("missing change event")
@@ -623,17 +624,25 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 	// convert ts_ms to string
 	i, f := math.Modf(*ce.Value.Payload.Source.TsMs / 1000)
 	c.SourceTimestamp = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000000") + "Z"
-	if ce.Value.Payload.Source.Schema != nil {
-		if len(schemaPassFilter) > 0 && !util.MatchRegexps(schemaPassFilter, *ce.Value.Payload.Source.Schema) {
-			log.Trace("filter: reject: %s", *ce.Value.Payload.Source.Schema)
+	if ce.Value.Payload.Source.Table != nil {
+		table := *ce.Value.Payload.Source.Table
+		if len(tableStopFilter) > 0 && util.MatchRegexps(tableStopFilter, table) {
+			log.Trace("filter: reject: %s", table)
 			return nil, nil
 		}
-		if len(schemaStopFilter) > 0 && util.MatchRegexps(schemaStopFilter, *ce.Value.Payload.Source.Schema) {
-			log.Trace("filter: reject: %s", *ce.Value.Payload.Source.Schema)
+		c.TableName = table
+	}
+	if ce.Value.Payload.Source.Schema != nil {
+		schema := *ce.Value.Payload.Source.Schema
+		if len(schemaPassFilter) > 0 && !util.MatchRegexps(schemaPassFilter, schema) {
+			log.Trace("filter: reject: %s", schema)
+			return nil, nil
+		}
+		if len(schemaStopFilter) > 0 && util.MatchRegexps(schemaStopFilter, schema) {
+			log.Trace("filter: reject: %s", schema)
 			return nil, nil
 		}
 		// Rewrite schema name
-		var schema string = *ce.Value.Payload.Source.Schema
 		if trimSchemaPrefix != "" {
 			schema = strings.TrimPrefix(schema, trimSchemaPrefix)
 		}
@@ -649,10 +658,7 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 		c.Origin = origin
 		schema = addSchemaPrefix + schema
 		c.SchemaName = schema
-	} else {
-		c.SchemaName = ""
 	}
-	c.TableName = *ce.Value.Payload.Source.Table
 	if c.Op == TruncateOp {
 		return c, nil
 	}
