@@ -270,8 +270,9 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		if err != nil {
 			return err
 		}
-		if resync && cat.HoursSinceLastSnapshotRecord() > 6 && spr.source.Status.Get() == status.ActiveStatus {
-			log.Info("snapshot may have completed (no recent snapshot records received)")
+		if resync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 6 {
+			log.Info("resync snapshot complete (deadline exceeded)")
+			log.Info("consider running \"metadb clean\"")
 			cat.ResetLastSnapshotRecord() // Reset timer.
 		}
 	}

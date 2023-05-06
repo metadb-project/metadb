@@ -50,6 +50,9 @@ func Reset(opt *option.Reset) error {
 			return fmt.Errorf("disabling source connectors: %s", err)
 		}
 	*/
+	if err := catalog.SetResyncMode(dp, true); err != nil {
+		return err
+	}
 	// Get list of tables
 	cat, err := catalog.Initialize(db, dp)
 	if err != nil {
@@ -75,9 +78,6 @@ func Reset(opt *option.Reset) error {
 		if _, err := dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
-	}
-	if err := catalog.SetResyncMode(dp, true); err != nil {
-		return err
 	}
 	eout.Info("completed reset")
 	return nil
