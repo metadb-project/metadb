@@ -76,6 +76,9 @@ func Reset(opt *option.Reset) error {
 			return err
 		}
 	}
+	if err := catalog.SetResyncMode(dp, true); err != nil {
+		return err
+	}
 	eout.Info("completed reset")
 	return nil
 }
