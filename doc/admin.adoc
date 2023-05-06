@@ -384,14 +384,14 @@ metadb clean -D data --source sensor
 +
 The timing of when "metadb clean" should be run is up to the admninistrator,
 but *it must be run to complete the resynchronization process*.  In most cases
-it will be better for users if "metadb clean" is run too late (delaying removal
-of deleted records) rather than too early (removing records before they have
-been restreamed).
+it will be more convenient for users if "metadb clean" is run too late
+(delaying removal of deleted records) rather than too early (removing records
+before they have been restreamed).
 +
 [.aqua-background]#Metadb v1.0.10#
-Metadb will try to detect when the snapshot has completed and then will write
-to the log a message such as, "snapshot may have completed."  This means it is
-probably a good time to run "metadb clean".
+Metadb detects when snapshot data are no longer being received, and then writes
+to the log a message such as "resync snapshot complete (deadline exceeded)."
+This generally means it is a good time to run "metadb clean".
 
 5. Start the server.
 +
