@@ -147,6 +147,14 @@ func runServer(svr *server) error {
 		log.Info("database has nonstandard name %q", svr.db.DBName)
 	}
 
+	resync, err := catalog.IsResyncMode(svr.dp)
+	if err != nil {
+		return err
+	}
+	if resync {
+		log.Info("resync mode")
+	}
+
 	setMemoryLimit(svr.opt.MemoryLimit)
 
 	if svr.opt.NoTLS {

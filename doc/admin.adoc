@@ -382,14 +382,16 @@ metadb reset -D data --source sensor
 metadb clean -D data --source sensor
 ----
 +
-Note that the metadb server currently does not give an indication that it has
-finished re-streaming.  (Having the server report that initial streaming or
-re-streaming has finished is a planned feature.)
+The timing of when "metadb clean" should be run is up to the admninistrator,
+but *it must be run to complete the resynchronization process*.  In most cases
+it will be better for users if "metadb clean" is run too late (delaying removal
+of deleted records) rather than too early (removing records before they have
+been restreamed).
 +
-The precise timing of when "metadb clean" should be run is up to the
-admninistrator, but *it must be run to remove redundant data and to complete
-the resynchronization process*.  The only disadvantage of running it too early
-is that data will appear to be missing until they are re-streamed.
+[.aqua-background]#Metadb v1.0.10#
+Metadb will try to detect when the snapshot has completed and then will write
+to the log a message such as, "snapshot may have completed."  This means it is
+probably a good time to run "metadb clean".
 
 5. Start the server.
 +

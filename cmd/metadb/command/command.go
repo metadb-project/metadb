@@ -580,10 +580,11 @@ func structScale(data any) (int32, string, error) {
 var ReshareTenants []string
 
 func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, schemaStopFilter,
-	tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string) (*Command, error) {
+	tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string) (*Command, bool, error) {
+	snapshot := false
 	// Note: this function returns nil, nil in some cases.
 	if ce == nil {
-		return nil, fmt.Errorf("missing change event")
+		return nil, false, fmt.Errorf("missing change event")
 	}
 	var err error
 	var c = new(Command)
@@ -596,10 +597,10 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 			key = ce.Key.Payload
 		}
 		log.Trace("possible tombstone event: missing value payload in change event: schema=%q, key=%v", name, key)
-		return nil, nil
+		return nil, false, nil
 	}
 	if ce.Value.Payload.Op == nil {
-		return nil, fmt.Errorf("missing value payload op")
+		return nil, false, fmt.Errorf("missing value payload op")
 	}
 	switch *ce.Value.Payload.Op {
 	case "c":
@@ -613,13 +614,13 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 	case "t":
 		c.Op = TruncateOp
 	default:
-		return nil, fmt.Errorf("unknown op value in change event: %q", *ce.Value.Payload.Op)
+		return nil, false, fmt.Errorf("unknown op value in change event: %q", *ce.Value.Payload.Op)
 	}
 	if ce.Value.Payload.Source == nil {
-		return nil, fmt.Errorf("missing value payload source: %v", ce.Value.Payload)
+		return nil, false, fmt.Errorf("missing value payload source: %v", ce.Value.Payload)
 	}
 	if ce.Value.Payload.Source.TsMs == nil {
-		return nil, fmt.Errorf("missing value payload source timestamp: %v", ce.Value.Payload.Source)
+		return nil, false, fmt.Errorf("missing value payload source timestamp: %v", ce.Value.Payload.Source)
 	}
 	// convert ts_ms to string
 	i, f := math.Modf(*ce.Value.Payload.Source.TsMs / 1000)
@@ -628,11 +629,11 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 		schema := *ce.Value.Payload.Source.Schema
 		if len(schemaPassFilter) > 0 && !util.MatchRegexps(schemaPassFilter, schema) {
 			log.Trace("filter: reject: %s", schema)
-			return nil, nil
+			return nil, false, nil
 		}
 		if len(schemaStopFilter) > 0 && util.MatchRegexps(schemaStopFilter, schema) {
 			log.Trace("filter: reject: %s", schema)
-			return nil, nil
+			return nil, false, nil
 		}
 		// Rewrite schema name
 		if trimSchemaPrefix != "" {
@@ -656,46 +657,49 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 		schemaTable := c.SchemaName + "." + table
 		if len(tableStopFilter) > 0 && util.MatchRegexps(tableStopFilter, schemaTable) {
 			log.Trace("filter: reject: %s", table)
-			return nil, nil
+			return nil, false, nil
 		}
 		c.TableName = table
 	}
+	if *ce.Value.Payload.Source.Snapshot == "true" {
+		snapshot = true
+	}
 	if c.Op == TruncateOp {
-		return c, nil
+		return c, snapshot, nil
 	}
 	if c.Op == DeleteOp {
 		switch {
 		case ce.Key == nil:
-			return nil, fmt.Errorf("delete: missing event key: %v", ce.Key)
+			return nil, false, fmt.Errorf("delete: missing event key: %v", ce.Key)
 		case ce.Key.Schema == nil:
-			return nil, fmt.Errorf("delete: missing event key schema: %v", ce.Key)
+			return nil, false, fmt.Errorf("delete: missing event key schema: %v", ce.Key)
 		case ce.Key.Schema.Fields == nil:
-			return nil, fmt.Errorf("delete: missing event key schema fields: %v", ce.Key)
+			return nil, false, fmt.Errorf("delete: missing event key schema fields: %v", ce.Key)
 		case ce.Key.Payload == nil:
-			return nil, fmt.Errorf("delete: missing event key payload: %v", ce.Key)
+			return nil, false, fmt.Errorf("delete: missing event key payload: %v", ce.Key)
 		}
 		fields := ce.Key.Schema.Fields
 		payload := ce.Key.Payload
 		for i, m := range fields {
 			attr, ok := m["field"].(string)
 			if !ok {
-				return nil, fmt.Errorf("delete: unexpected type: key schema field: %v", m["field"])
+				return nil, false, fmt.Errorf("delete: unexpected type: key schema field: %v", m["field"])
 			}
 			var semtype string
 			if m["name"] != nil {
 				semtype, ok = m["name"].(string)
 				if !ok {
-					return nil, fmt.Errorf("delete: unexpected type: key schema name: %v", m["name"])
+					return nil, false, fmt.Errorf("delete: unexpected type: key schema name: %v", m["name"])
 				}
 			}
 			dt, ok := m["type"].(string)
 			if !ok {
-				return nil, fmt.Errorf("delete: unexpected type: key schema type: %v", m["type"])
+				return nil, false, fmt.Errorf("delete: unexpected type: key schema type: %v", m["type"])
 			}
 			var dtype DataType
 			dtype, err = convertDataType(dt, semtype)
 			if err != nil {
-				return nil, fmt.Errorf("delete: unknown key schema type: %v", m["type"])
+				return nil, false, fmt.Errorf("delete: unknown key schema type: %v", m["type"])
 			}
 			// var scale int32
 			// if dtype == NumericType {
@@ -715,12 +719,12 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 			var edata *string
 			edata, err = DataToSQLData(data, dtype, semtype)
 			if err != nil {
-				return nil, fmt.Errorf("delete: unknown type: %v", err)
+				return nil, false, fmt.Errorf("delete: unknown type: %v", err)
 			}
 			var typesize int64
 			typesize, err = convertTypeSize(edata, dt, dtype)
 			if err != nil {
-				return nil, fmt.Errorf("delete: unknown type size: %v", data)
+				return nil, false, fmt.Errorf("delete: unknown type size: %v", data)
 			}
 			c.Column = append(c.Column, CommandColumn{
 				Name:       attr,
@@ -731,15 +735,15 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 				PrimaryKey: i + 1,
 			})
 		}
-		return c, nil
+		return c, snapshot, nil
 	}
 	if c.Column, err = extractColumns(pkerr, ce); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if c.Column == nil {
-		return nil, nil
+		return nil, false, nil
 	}
-	return c, nil
+	return c, snapshot, nil
 }
 
 func extractOrigin(prefixes []string, schema string) (string, string) {

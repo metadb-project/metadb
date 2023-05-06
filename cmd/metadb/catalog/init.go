@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,12 +19,13 @@ import (
 var catalogSchema = "metadb"
 
 type Catalog struct {
-	mu        sync.Mutex
-	tableDir  map[dbx.Table]tableEntry
-	partYears map[string]map[int]struct{}
-	users     map[string]*util.RegexList
-	columns   map[sqlx.Column]ColumnType
-	dp        *pgxpool.Pool
+	mu                 sync.Mutex
+	tableDir           map[dbx.Table]tableEntry
+	partYears          map[string]map[int]struct{}
+	users              map[string]*util.RegexList
+	columns            map[sqlx.Column]ColumnType
+	lastSnapshotRecord time.Time
+	dp                 *pgxpool.Pool
 }
 
 func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
@@ -59,6 +61,7 @@ func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
 	if err := c.initSchema(); err != nil {
 		return nil, err
 	}
+	c.initSnapshot()
 
 	return c, nil
 }

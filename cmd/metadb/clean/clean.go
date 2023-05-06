@@ -77,6 +77,9 @@ func Clean(opt *option.Clean) error {
 			return err
 		}
 	}
+	if err := catalog.SetResyncMode(dp, false); err != nil {
+		return err
+	}
 	eout.Info("completed clean")
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
@@ -216,9 +217,9 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		var cl = &command.CommandList{}
 
 		// Parse
-		eventReadCount, err := parseChangeEvents(pkerr, consumer, cl, spr.schemaPassFilter, spr.schemaStopFilter,
-			spr.tableStopFilter, spr.source.TrimSchemaPrefix, spr.source.AddSchemaPrefix, sourceFileScanner,
-			spr.sourceLog)
+		eventReadCount, err := parseChangeEvents(cat, pkerr, consumer, cl, spr.schemaPassFilter,
+			spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
+			spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog)
 		if err != nil {
 			return fmt.Errorf("parser: %v", err)
 		}
@@ -263,13 +264,24 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		if eventReadCount > 0 {
 			log.Debug("checkpoint: events=%d, commands=%d", eventReadCount, len(cl.Cmd))
 		}
+
+		// Check if resync snapshot may have completed.
+		resync, err := catalog.IsResyncMode(dc)
+		if err != nil {
+			return err
+		}
+		if resync && cat.HoursSinceLastSnapshotRecord() > 6 && spr.source.Status.Get() == status.ActiveStatus {
+			log.Info("snapshot may have completed (no recent snapshot records received)")
+			cat.ResetLastSnapshotRecord() // Reset timer.
+		}
 	}
 }
 
-func parseChangeEvents(pkerr map[string]struct{}, consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter,
-	schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string,
-	sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
+func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer *kafka.Consumer,
+	cl *command.CommandList, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix,
+	addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
 	var err error
+	snapshot := false
 	var eventReadCount int
 	var x int
 	for x = 0; x < 10000; x++ {
@@ -297,7 +309,7 @@ func parseChangeEvents(pkerr map[string]struct{}, consumer *kafka.Consumer, cl *
 			break
 		}
 		eventReadCount++
-		c, err := command.NewCommand(pkerr, ce, schemaPassFilter, schemaStopFilter, tableStopFilter,
+		c, snap, err := command.NewCommand(pkerr, ce, schemaPassFilter, schemaStopFilter, tableStopFilter,
 			trimSchemaPrefix, addSchemaPrefix)
 		if err != nil {
 			log.Debug("%v", *ce)
@@ -306,7 +318,13 @@ func parseChangeEvents(pkerr map[string]struct{}, consumer *kafka.Consumer, cl *
 		if c == nil {
 			continue
 		}
+		if snap {
+			snapshot = true
+		}
 		cl.Cmd = append(cl.Cmd, *c)
+	}
+	if snapshot {
+		cat.ResetLastSnapshotRecord()
 	}
 	return eventReadCount, nil
 }
