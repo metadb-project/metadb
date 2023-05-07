@@ -400,6 +400,7 @@ analytic database may continue to be unsynchronized with the source.
 
 === Creating database users
 
+[.aqua-background]#Metadb v1.0.10#
 To create a new database user account:
 
 [source]
