@@ -220,7 +220,6 @@ server:
 psql -h localhost -p 8440
 ----
 
-[.aqua-background]#Metadb v1.0.5#
 Then for example to show the software version:
 
 ----
@@ -349,6 +348,7 @@ Note that during the resynchronization process, the analytics database
 continues to be available to users.  However, streaming updates will be slower
 than usual, and there temporarily may be missing records (until they are
 re-streamed) or "extra" records (recently deleted in the source database).
+Also, periodic transforms and external SQL are paused during resynchronization.
 
 1. Update the `topics` and `consumergroup` configuration settings for the new
    data stream.

@@ -45,6 +45,14 @@ func Clean(opt *option.Clean) error {
 	if !exists {
 		return fmt.Errorf("data source %q does not exist", opt.Source)
 	}
+	// Continue only if we are in resync mode.
+	resync, err := catalog.IsResyncMode(dp)
+	if err != nil {
+		return err
+	}
+	if !resync {
+		return fmt.Errorf("\"clean\" is only permitted after \"reset\"")
+	}
 	// Get list of tables
 	cat, err := catalog.Initialize(db, dp)
 	if err != nil {
@@ -58,26 +66,33 @@ func Clean(opt *option.Clean) error {
 		eout.Info("cleaning: %s", t.String())
 		mainTable := t.MainSQL()
 		q := "VACUUM ANALYZE " + mainTable
-		if _, err := dp.Exec(context.TODO(), q); err != nil {
+		if _, err = dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
 		q = "UPDATE " + mainTable + " SET __cf=TRUE,__end='" + now + "',__current=FALSE " +
 			"WHERE NOT __cf AND __current AND __source='" + opt.Source + "'"
-		if _, err := dp.Exec(context.TODO(), q); err != nil {
+		if _, err = dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
 		// Any non-current historical data can be set to __cf=TRUE.
 		q = "UPDATE " + mainTable + " SET __cf=TRUE WHERE NOT __cf AND __source='" + opt.Source +
 			"'"
-		if _, err := dp.Exec(context.TODO(), q); err != nil {
+		if _, err = dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
 		q = "VACUUM ANALYZE " + mainTable
-		if _, err := dp.Exec(context.TODO(), q); err != nil {
+		if _, err = dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
 	}
-	if err := catalog.SetResyncMode(dp, false); err != nil {
+	if err = catalog.SetResyncMode(dp, false); err != nil {
+		return err
+	}
+	// Reset marctab for full update and schedule maintenance.
+	q := "UPDATE marctab.metadata SET version = 0"
+	_, _ = dp.Exec(context.TODO(), q)
+	q = "UPDATE metadb.maintenance SET next_maintenance_time = next_maintenance_time - interval '1 day'"
+	if _, err = dp.Exec(context.TODO(), q); err != nil {
 		return err
 	}
 	eout.Info("completed clean")

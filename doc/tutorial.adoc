@@ -475,7 +475,6 @@ section.
 [discrete]
 ==== Metadb version
 
-[.aqua-background]#Metadb v1.0.5#
 To show the current Metadb version:
 
 ----
@@ -505,7 +504,6 @@ SELECT *
     ORDER BY log_time;
 ----
 
-[.aqua-background]#Metadb v1.0.5#
 The `mdblog()` function is provided for convenience and returns ordered log
 messages, from the past 24 hours by default (or optionally from a specified
 interval):
