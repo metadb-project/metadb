@@ -546,6 +546,7 @@ a workspace for the user.
 |Sets the user's password.  (Required)
 
 |`comment`
+[.aqua-background]#Metadb v1.0.10#
 |Stores a comment about the user, e.g. the user's real name.
 |===
 
