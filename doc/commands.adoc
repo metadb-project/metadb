@@ -509,10 +509,55 @@ CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
 
 ==== CREATE USER
 
-CREATE USER is mostly equivalent to the PostgreSQL CREATE USER statement.
-However it also creates a schema having the same name as the user, if the
-schema does not exist, and grants the user privileges on the schema.  The
-schema is intended as a workspace for the user.
+Define a new database user
+
+[source,subs="verbatim,quotes"]
+----
+CREATE USER `*_user_name_*` [ WITH ] *_option_* '*_value_*' [, ... ]
+----
+
+[discrete]
+===== Description
+
+CREATE USER defines a new database user that will be managed by Metadb.  It
+also creates a schema having the same name as the user, if the schema does not
+exist, and grants the user privileges on the schema.  The schema is intended as
+a workspace for the user.
+
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_user_name_*`
+|The name of the new user.
+
+|`[ WITH ] ( *_option_* '*_value_*' [, ... ] )`
+|Configuration options for the new user.
+|===
+
+[discrete]
+===== Options
+
+[frame=none,grid=none,cols="1,3"]
+|===
+|`password`
+|Sets the user's password.  (Required)
+
+|`comment`
+|Stores a comment about the user, e.g. the user's real name.
+|===
+
+[discrete]
+===== Examples
+
+Create a user `wegg`:
+
+----
+CREATE USER wegg WITH PASSWORD 'LZn2DCajcNHpGR3ZXWHD', COMMENT 'Silas Wegg';
+----
+
 
 ==== DROP DATA SOURCE
 

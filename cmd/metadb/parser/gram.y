@@ -27,7 +27,7 @@ import (
 
 %token SELECT
 %token CREATE ALTER DATA SOURCE ORIGIN OPTIONS USER
-%token AUTHORIZE ON ALL TABLES IN TO MAPPING LIST
+%token AUTHORIZE ON ALL TABLES IN TO WITH MAPPING LIST
 %token TYPE
 %token TRUE FALSE
 %token <str> VERSION
@@ -130,10 +130,13 @@ create_data_origin_stmt:
 		}
 
 create_user_stmt:
-	CREATE USER name
+	CREATE USER name WITH option_list ';'
 		{
-			yylex.(*lexer).pass = true
-			$$ = &ast.CreateUserStmt{UserName: $3}
+			$$ = &ast.CreateUserStmt{UserName: $3, Options: $5}
+		}
+	| CREATE USER name option_list ';'
+		{
+			$$ = &ast.CreateUserStmt{UserName: $3, Options: $4}
 		}
 	| CREATE USER MAPPING
 		{
