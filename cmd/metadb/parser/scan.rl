@@ -65,6 +65,7 @@ func (lex *lexer) Lex(out *yySymType) int {
 			'in'i => { tok = IN; fbreak; };
 			'to'i => { tok = TO; fbreak; };
 			'user'i => { tok = USER; fbreak; };
+			'with'i => { tok = WITH; fbreak; };
 			'mapping'i => { tok = MAPPING; fbreak; };
 			'list'i => { tok = LIST; fbreak; };
 			'version'i => { out.str = "version"; tok = VERSION; fbreak; };

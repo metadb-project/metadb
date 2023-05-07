@@ -2,10 +2,7 @@ package libpq
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"net"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -16,11 +13,11 @@ import (
 )
 
 func proxyQuery(conn net.Conn, query string, args []any, node ast.Node, db *dbx.DB, dc *pgx.Conn) error {
-	switch n := node.(type) {
+	switch node.(type) {
 	case *ast.SelectStmt:
 		return proxySelect(conn, query, args, dc)
-	case *ast.CreateUserStmt:
-		return createUser(conn, query, n, db)
+		//case *ast.CreateUserStmt:
+		//	return createUser(conn, query, n, db)
 	}
 
 	return write(conn, encode(nil, []pgproto3.Message{
@@ -37,57 +34,6 @@ func proxyQuery(conn net.Conn, query string, args []any, node ast.Node, db *dbx.
 	//	&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	//})
 	//return write(conn, b)
-}
-
-func createUser(conn net.Conn, query string, node *ast.CreateUserStmt, db *dbx.DB) error {
-	dcsuper, err := db.ConnectSuper()
-	if err != nil {
-		return err
-	}
-	defer dbx.Close(dcsuper)
-
-	exists, err := userExists(dcsuper, node.UserName)
-	if err != nil {
-		return fmt.Errorf("selecting role: %v", err)
-	}
-	if exists {
-		_ = write(conn, encode(nil, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
-			Message: fmt.Sprintf("role %q already exists, skipping", node.UserName)},
-		}))
-	} else {
-		_, err = dcsuper.Exec(context.TODO(), query)
-		if err != nil {
-			return errors.New(strings.TrimLeft(strings.TrimPrefix(err.Error(), "ERROR:"), " "))
-		}
-	}
-
-	dc, err := db.Connect()
-	if err != nil {
-		return err
-	}
-	defer dbx.Close(dc)
-
-	q := "CREATE SCHEMA IF NOT EXISTS " + node.UserName
-	_, err = dc.Exec(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("creating schema %s: %s", node.UserName, err)
-	}
-	q = "GRANT CREATE ON SCHEMA " + node.UserName + " TO " + node.UserName
-	_, err = dc.Exec(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("granting create privilege on schema %q to role %q: %s", node.UserName, node.UserName, err)
-	}
-	q = "GRANT USAGE ON SCHEMA " + node.UserName + " TO " + node.UserName + " WITH GRANT OPTION"
-	_, err = dc.Exec(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("granting usage privilege on schema %q to role %q: %s", node.UserName, node.UserName, err)
-	}
-
-	b := encode(nil, []pgproto3.Message{
-		&pgproto3.CommandComplete{CommandTag: []byte("CREATE ROLE")},
-		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	})
-	return write(conn, b)
 }
 
 func proxySelect(conn net.Conn, query string, args []any, dbconn *pgx.Conn) error {

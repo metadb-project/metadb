@@ -404,7 +404,7 @@ To create a new database user account:
 
 [source]
 ----
-CREATE USER weg PASSWORD 'LZn2DCajcNHpGR3ZXWHD';
+CREATE USER wegg WITH PASSWORD 'LZn2DCajcNHpGR3ZXWHD', COMMENT 'Silas Wegg';
 ----
 
 In addition to creating the user, this also creates a schema with the same name
@@ -421,7 +421,7 @@ created):
 
 [source]
 ----
-AUTHORIZE SELECT ON ALL TABLES IN DATA SOURCE sensor TO weg;
+AUTHORIZE SELECT ON ALL TABLES IN DATA SOURCE sensor TO wegg;
 ----
 
 .Note

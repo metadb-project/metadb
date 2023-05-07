@@ -258,6 +258,8 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 		err = createDataSource(conn, n, dbconn)
 	case *ast.AlterDataSourceStmt:
 		err = alterDataSource(conn, n, dbconn)
+	case *ast.CreateUserStmt:
+		err = createUser(conn, n, db, dbconn)
 	case *ast.DropDataSourceStmt:
 		err = dropDataSource(conn, n, dbconn)
 	case *ast.AuthorizeStmt:
@@ -621,7 +623,7 @@ func createSourceOptions(options []ast.Option) (*sysdb.SourceConnector, error) {
 		TableStopFilter:  []string{},
 	}
 	for _, opt := range options {
-		switch opt.Name {
+		switch strings.ToLower(opt.Name) {
 		case "brokers":
 			s.Brokers = opt.Val
 		case "security":
@@ -658,12 +660,104 @@ func createSourceOptions(options []ast.Option) (*sysdb.SourceConnector, error) {
 func checkOptionDuplicates(options []ast.Option) error {
 	m := make(map[string]bool)
 	for _, opt := range options {
-		if m[opt.Name] {
+		name := strings.ToLower(opt.Name)
+		if m[name] {
 			return fmt.Errorf("option %q provided more than once", opt.Name)
 		}
-		m[opt.Name] = true
+		m[name] = true
 	}
 	return nil
+}
+
+func createUser(conn net.Conn /*query string,*/, node *ast.CreateUserStmt, db *dbx.DB, dc *pgx.Conn) error {
+	if node.Options == nil {
+		// return to client
+	}
+	opt, err := createUserOptions(node.Options)
+	if err != nil {
+		return err
+	}
+	if opt.Password == "" {
+		return fmt.Errorf("option \"password\" is required")
+	}
+
+	dcsuper, err := db.ConnectSuper()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dcsuper)
+
+	exists, err := userExists(dcsuper, node.UserName)
+	if err != nil {
+		return fmt.Errorf("selecting role: %v", err)
+	}
+	if exists {
+		_ = write(conn, encode(nil, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
+			Message: fmt.Sprintf("role %q already exists, skipping", node.UserName)},
+		}))
+	} else {
+		q := "CREATE USER " + node.UserName + " PASSWORD '" + opt.Password + "'"
+		if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+
+	}
+
+	// Add comment on role.
+	if opt.Comment != "" {
+		q := "COMMENT ON ROLE " + node.UserName + " IS '" + opt.Comment + "'"
+		if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+			return fmt.Errorf("adding comment on role %s: %s", node.UserName, err)
+		}
+	}
+
+	q := "CREATE SCHEMA IF NOT EXISTS " + node.UserName
+	if _, err = dc.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("creating schema %s: %s", node.UserName, err)
+	}
+	q = "GRANT CREATE ON SCHEMA " + node.UserName + " TO " + node.UserName
+	if _, err = dc.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("granting create privilege on schema %q to role %q: %s", node.UserName, node.UserName, err)
+	}
+	q = "GRANT USAGE ON SCHEMA " + node.UserName + " TO " + node.UserName + " WITH GRANT OPTION"
+	if _, err = dc.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("granting usage privilege on schema %q to role %q: %s", node.UserName, node.UserName, err)
+	}
+
+	b := encode(nil, []pgproto3.Message{
+		&pgproto3.CommandComplete{CommandTag: []byte("CREATE ROLE")},
+		&pgproto3.ReadyForQuery{TxStatus: 'I'},
+	})
+	return write(conn, b)
+}
+
+func createUserOptions(options []ast.Option) (*userOptions, error) {
+	err := checkOptionDuplicates(options)
+	if err != nil {
+		return nil, err
+	}
+	o := &userOptions{
+		// Set default values
+	}
+	for _, opt := range options {
+		switch strings.ToLower(opt.Name) {
+		case "password":
+			o.Password = opt.Val
+		case "comment":
+			o.Comment = opt.Val
+		default:
+			return nil, &dberr.Error{
+				Err:  fmt.Errorf("invalid option %q", opt.Name),
+				Hint: "Valid options in this context are: password, comment",
+			}
+		}
+	}
+	return o, nil
+}
+
+type userOptions struct {
+	Password string
+	Comment  string
 }
 
 func authorize(conn net.Conn, node *ast.AuthorizeStmt, dc *pgx.Conn) error {

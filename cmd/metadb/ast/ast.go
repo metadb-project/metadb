@@ -62,6 +62,7 @@ func (*AuthorizeStmt) stmtNode() {}
 
 type CreateUserStmt struct {
 	UserName string
+	Options  []Option
 }
 
 func (*CreateUserStmt) node()     {}
