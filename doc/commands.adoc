@@ -134,7 +134,7 @@ This table summarizes the type adjustments that are performed:
 |Return type
 |Description
 
-|`mdblog(interval)` [.aqua-background]#Metadb v1.0.5#
+|`mdblog(interval)`
 |table (
     log_time timestamptz(3),
     error_severity text,
@@ -143,7 +143,7 @@ This table summarizes the type adjustments that are performed:
 |Returns recent log messages during the specified interval, or during
  the past 24 hours if no interval is given
 
-|`mdbversion()` [.aqua-background]#Metadb v1.0.5#
+|`mdbversion()`
 |text
 |Returns the Metadb version
 
@@ -170,7 +170,6 @@ SELECT * FROM mdblog(interval '1 hour');
 SELECT * FROM mdblog();
 ----
 
-[.aqua-background]#Metadb v1.0.5#
 Show the current Metadb version:
 
 ----
@@ -223,7 +222,6 @@ SELECT mdbversion();
 
 === External SQL directives
 
-[.aqua-background]#Metadb v1.0.5#
 Metadb allows scheduling external SQL files to run on a regular basis.
 
 Each SQL statement should be separated from others by an empty line, and any
@@ -249,7 +247,6 @@ SELECT . . . ;
 
 ==== --metadb:require
 
-[.aqua-background]#Metadb v1.0.5#
 The `--metadb:require` directive asserts a dependency on a specific table and
 column in the database.  Metadb will ensure that the table and column exist
 before it continues executing the SQL file.  The required table can be a main
@@ -275,7 +272,6 @@ or known to be missing in some instances.
 
 ==== --metadb:table
 
-[.aqua-background]#Metadb v1.0.5#
 The `--metadb:table` directive declares that the SQL file updates a specific
 table.  This allows Metadb to report on the status of the table.  The directive
 takes the form:

@@ -147,14 +147,6 @@ func runServer(svr *server) error {
 		log.Info("database has nonstandard name %q", svr.db.DBName)
 	}
 
-	resync, err := catalog.IsResyncMode(svr.dp)
-	if err != nil {
-		return err
-	}
-	if resync {
-		log.Info("resync mode")
-	}
-
 	setMemoryLimit(svr.opt.MemoryLimit)
 
 	if svr.opt.NoTLS {
@@ -278,30 +270,34 @@ func isReshareModulePresent(db *dbx.DB) (bool, error) {
 }
 
 func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, folio, reshare bool) {
+	dc, err := db.Connect()
+	if err != nil {
+		log.Error("%v", err)
+	}
+	defer dbx.Close(dc)
 	for {
 		time.Sleep(5 * time.Minute)
-		if folio {
+		resync, err := catalog.IsResyncMode(dc)
+		if err != nil {
+			log.Error("unable to read resync mode: %v", err)
+		}
+		if folio && !resync {
 			if err := marctab.RunMarctab(db, datadir, cat); err != nil {
 				log.Error("marc__t: %v", err)
 			}
 		}
-		if err := checkTimeDailyMaintenance(datadir, db, cat, folio, reshare); err != nil {
+		if err := checkTimeDailyMaintenance(datadir, db, dc, cat, folio, reshare, resync); err != nil {
 			log.Error("%v", err)
 		}
 		time.Sleep(55 * time.Minute)
 	}
 }
 
-func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, folio, reshare bool) error {
-	dc, err := db.Connect()
-	if err != nil {
-		return err
-	}
-	defer dbx.Close(dc)
-
+func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *catalog.Catalog, folio, reshare bool,
+	resync bool) error {
 	var overdue bool
 	q := "SELECT CURRENT_TIMESTAMP > next_maintenance_time FROM metadb.maintenance"
-	err = dc.QueryRow(context.TODO(), q).Scan(&overdue)
+	err := dc.QueryRow(context.TODO(), q).Scan(&overdue)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		fallthrough
@@ -315,7 +311,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, 
 
 	log.Debug("starting maintenance")
 
-	if folio {
+	if folio && !resync {
 		tries := 0
 		for {
 			tries++
@@ -334,7 +330,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, 
 			break
 		}
 	}
-	if reshare {
+	if reshare && !resync {
 		tries := 0
 		for {
 			tries++

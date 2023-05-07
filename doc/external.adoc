@@ -35,7 +35,6 @@ are suggested:
 
 ==== MARC transformation
 
-[.aqua-background]#Metadb v1.0.5#
 Metadb transforms MARC records from the tables `marc_records_lb` and
 `records_lb` in schema `folio_source_record` to a tabular form which is stored
 in a new table, `folio_source_record.marc__t`.  This transformation is updated
