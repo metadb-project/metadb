@@ -547,9 +547,8 @@ a workspace for the user.
 
 |`comment`
 [.aqua-background]#Metadb v1.0.10#
-|Stores a comment about the user, e.g. the user's real
-name.  The comment can be viewed in psql using
-the `\du+` command, or in other user interfaces.
+|Stores a comment about the user, e.g. the user's real name.  The comment can be
+viewed in psql using the `\du+` command, or in other user interfaces.
 |===
 
 [discrete]

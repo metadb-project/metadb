@@ -52,11 +52,11 @@ SELECT updated
 FOLIO derived tables are automatically updated once per day, usually at about
 00:00:00 UTC by default.
 
-==== Documentation
+==== Data model
 
-FOLIO does not provide documentation for its internal data, which Metadb tables
-are based on, but it does have some data documentation for its "storage module"
-APIs which are roughly equivalent.  This is located at
+FOLIO does not provide documentation for its internal data model, which Metadb
+tables are based on, but it does have some data documentation for its "storage
+module" APIs which are roughly equivalent.  This is located at
 `https://dev.folio.org/reference/api/`.  The name of most storage modules ends
 in `-storage`, but some modules use a different convention; for instance, the
 storage module for users is `mod-users`.  (All module names begin with `mod-`.)
