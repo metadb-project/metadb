@@ -654,7 +654,7 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 	}
 	if ce.Value.Payload.Source.Table != nil {
 		table := *ce.Value.Payload.Source.Table
-		schemaTable := c.SchemaName + "." + table
+		schemaTable := *ce.Value.Payload.Source.Schema + "." + table
 		if len(tableStopFilter) > 0 && util.MatchRegexps(tableStopFilter, schemaTable) {
 			log.Trace("filter: reject: %s", table)
 			return nil, false, nil
