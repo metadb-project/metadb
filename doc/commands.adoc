@@ -480,8 +480,10 @@ CREATE DATA SOURCE defines connection settings for an external data source.
 |Regular expressions matching schema names to accept (comma-separated list).
 
 |`schemastopfilter`
-|Regular expressions matching schema names to ignore (comma-separated list),
- evaluated after `schemapassfilter`.
+|Regular expressions matching schema names to ignore (comma-separated list).
+
+|`tablestopfilter`
+|Regular expressions matching table names to ignore (comma-separated list).
 
 |`trimschemaprefix`
 |Prefix to remove from schema names.
