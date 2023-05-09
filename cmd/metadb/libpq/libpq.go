@@ -539,6 +539,8 @@ func alterSourceOptions(dc *pgx.Conn, node *ast.AlterDataSourceStmt) error {
 			fallthrough
 		case "schemastopfilter":
 			fallthrough
+		case "tablestopfilter":
+			fallthrough
 		case "trimschemaprefix":
 			fallthrough
 		case "addschemaprefix":
@@ -549,7 +551,7 @@ func alterSourceOptions(dc *pgx.Conn, node *ast.AlterDataSourceStmt) error {
 			return &dberr.Error{
 				Err: fmt.Errorf("invalid option %q", opt.Name),
 				Hint: "Valid options in this context are: " +
-					"brokers, security, topics, consumergroup, schemapassfilter, schemastopfilter, trimschemaprefix, addschemaprefix, module",
+					"brokers, security, topics, consumergroup, schemapassfilter, schemastopfilter, tablestopfilter, trimschemaprefix, addschemaprefix, module",
 			}
 		}
 		isnull, err := isSourceOptionNull(dc, node.DataSourceName, opt.Name)
@@ -650,7 +652,7 @@ func createSourceOptions(options []ast.Option) (*sysdb.SourceConnector, error) {
 			return nil, &dberr.Error{
 				Err: fmt.Errorf("invalid option %q", opt.Name),
 				Hint: "Valid options in this context are: " +
-					"brokers, security, topics, consumergroup, schemapassfilter, schemastopfilter, trimschemaprefix, addschemaprefix, module",
+					"brokers, security, topics, consumergroup, schemapassfilter, schemastopfilter, tablestopfilter, trimschemaprefix, addschemaprefix, module",
 			}
 		}
 	}
