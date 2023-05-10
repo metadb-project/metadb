@@ -1,13 +1,13 @@
 package catalog
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"golang.org/x/net/context"
 )
 
 func (c *Catalog) initSnapshot() {
