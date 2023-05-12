@@ -173,9 +173,18 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 	// Kafka source
 	var consumer *kafka.Consumer
 	if sourceFileScanner == nil {
-		spr.schemaPassFilter = util.CompileRegexps(spr.source.SchemaPassFilter)
-		spr.schemaStopFilter = util.CompileRegexps(spr.source.SchemaStopFilter)
-		spr.tableStopFilter = util.CompileRegexps(spr.source.TableStopFilter)
+		spr.schemaPassFilter, err = util.CompileRegexps(spr.source.SchemaPassFilter)
+		if err != nil {
+			return err
+		}
+		spr.schemaStopFilter, err = util.CompileRegexps(spr.source.SchemaStopFilter)
+		if err != nil {
+			return err
+		}
+		spr.tableStopFilter, err = util.CompileRegexps(spr.source.TableStopFilter)
+		if err != nil {
+			return err
+		}
 		var brokers = spr.source.Brokers
 		var topics = spr.source.Topics
 		var group = spr.source.Group

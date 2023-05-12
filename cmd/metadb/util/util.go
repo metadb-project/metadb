@@ -78,14 +78,16 @@ func MatchRegexps(res []*regexp.Regexp, s string) bool {
 	return false
 }
 
-func CompileRegexps(strs []string) []*regexp.Regexp {
+func CompileRegexps(strs []string) ([]*regexp.Regexp, error) {
 	var res []*regexp.Regexp
-	var str string
-	for _, str = range strs {
-		var re *regexp.Regexp = regexp.MustCompile(str)
+	for _, s := range strs {
+		re, err := regexp.Compile("^" + s + "$")
+		if err != nil {
+			return nil, fmt.Errorf("compiling regular expression %s: %v", s, err)
+		}
 		res = append(res, re)
 	}
-	return res
+	return res, nil
 }
 
 func KafkaMessageString(m *kafka.Message) string {
