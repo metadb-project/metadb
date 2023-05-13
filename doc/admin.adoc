@@ -233,7 +233,7 @@ A data source is defined using the `CREATE DATA SOURCE` statement, for example:
 ----
 CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
     brokers 'kafka:29092',
-    topics '^metadb_sensor_1.*',
+    topics '^metadb_sensor_1\.',
     consumergroup 'metadb_sensor_1_1',
     addschemaprefix 'sensor_',
     schemastopfilter 'admin'
@@ -356,7 +356,7 @@ Also, periodic transforms and external SQL are paused during resynchronization.
 [source]
 ----
 ALTER DATA SOURCE sensor OPTIONS
-    (SET topics '^metadb_sensor_2.*', SET consumergroup 'metadb_sensor_2_1');
+    (SET topics '^metadb_sensor_2\.', SET consumergroup 'metadb_sensor_2_1');
 ----
 +
 *Do not restart the Metadb server but continue directly to Step 2.*
