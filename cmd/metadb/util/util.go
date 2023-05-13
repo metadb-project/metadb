@@ -81,7 +81,7 @@ func MatchRegexps(res []*regexp.Regexp, s string) bool {
 func CompileRegexps(strs []string) ([]*regexp.Regexp, error) {
 	var res []*regexp.Regexp
 	for _, s := range strs {
-		re, err := regexp.Compile("^" + s + "$")
+		re, err := regexp.Compile(s)
 		if err != nil {
 			return nil, fmt.Errorf("compiling regular expression %s: %v", s, err)
 		}
