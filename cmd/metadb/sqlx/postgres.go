@@ -21,9 +21,7 @@ func setDatabaseParameters(db *sql.DB) error {
 		return err
 	}
 	q = "SET idle_session_timeout=0"
-	if _, err := db.Exec(q); err != nil {
-		return err
-	}
+	_, _ = db.Exec(q) // Temporarily allow for PostgreSQL versions < 14
 	q = "SET statement_timeout=0"
 	if _, err := db.Exec(q); err != nil {
 		return err
