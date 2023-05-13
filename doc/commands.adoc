@@ -506,7 +506,7 @@ CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
     topics '^metadb_sensor_1\.',
     consumergroup 'metadb_sensor_1_1',
     addschemaprefix 'sensor_',
-    tablestopfilter 'testing\.air_temp,testing\.air_temp_avg'
+    tablestopfilter '^testing\.air_temp$,^testing\.air_temp_avg$'
 );
 ----
 
