@@ -7,6 +7,7 @@ runalltest='false'
 verbose='false'
 quiet='false'
 experiment='false'
+tagsdynamic='false'
 
 usage() {
     echo ''
@@ -22,11 +23,12 @@ usage() {
     echo '    go install github.com/gordonklaus/ineffassign@latest'
     echo '    go install github.com/remyoudompheng/go-misc/deadcode@latest'
     echo '-v  Enable verbose output'
+    echo '-D  Enable "-tags dynamic" compiler option'
     # echo '-q  Enable quiet output'
     # echo '-X  Include experimental code'
 }
 
-while getopts 'cfhJtvqX' flag; do
+while getopts 'cfhJtvqXD' flag; do
     case "${flag}" in
         t) runalltest='true' ;;
         c) ;;
@@ -37,6 +39,7 @@ while getopts 'cfhJtvqX' flag; do
         v) verbose='true' ;;
         q) quiet='true' ;;
         X) experiment='true' ;;
+        D) tagsdynamic='true' ;;
         *) usage
             exit 1 ;;
     esac
@@ -88,9 +91,14 @@ version=`git describe --tags --always`
 # Check which operating system is running.
 case "$(uname -s)" in
     Linux*)     tags='' ;;
-    Darwin*)    tags='-tags dynamic' ;;
+    # Darwin*)    tags='-tags dynamic' ;;
+    Darwin*)    tags='' ;;
     *)          tags='' ;;
 esac
+
+if $tagsdynamic; then
+    tags='-tags dynamic'
+fi
 
 mkdir -p $bindir
 
