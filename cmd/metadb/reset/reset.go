@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
+	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
@@ -53,6 +55,9 @@ func Reset(opt *option.Reset) error {
 	if err = catalog.SetResyncMode(dp, true); err != nil {
 		return err
 	}
+	log.Init(ioutil.Discard, false, false)
+	log.SetDatabase(dp)
+	log.Info("resync started")
 	// Get list of tables
 	cat, err := catalog.Initialize(db, dp)
 	if err != nil {
