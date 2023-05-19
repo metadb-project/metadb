@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
+	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
@@ -88,6 +90,9 @@ func Clean(opt *option.Clean) error {
 	if err = catalog.SetResyncMode(dp, false); err != nil {
 		return err
 	}
+	log.Init(ioutil.Discard, false, false)
+	log.SetDatabase(dp)
+	log.Info("resync complete")
 	// Reset marctab for full update and schedule maintenance.
 	q := "UPDATE marctab.metadata SET version = 0"
 	_, _ = dp.Exec(context.TODO(), q)
