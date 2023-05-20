@@ -280,7 +280,8 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 			return err
 		}
 		if resync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 6 {
-			log.Info("resync snapshot complete (deadline exceeded); consider running \"metadb clean\"")
+			log.Info("source %q snapshot complete (deadline exceeded); consider running \"metadb clean\"",
+				spr.source.Name)
 			cat.ResetLastSnapshotRecord() // Reset timer.
 		}
 	}

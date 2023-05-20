@@ -357,7 +357,6 @@ SELECT * FROM celia.westgroup LIMIT 20;
 
 Other users typically do not have privileges to access the table by default.
 
-[.aqua-background]#Metadb v1.0.6#
 To grant the user `rosalind` read-only access to the schema and table:
 
 ----
@@ -442,7 +441,6 @@ SELECT * FROM lisa.count_loans('2023-01-01', '2024-01-01');
 SELECT * FROM lisa.count_loans('2022-01-01', '2023-01-01');
 ----
 
-[.aqua-background]#Metadb v1.0.6#
 The user `lisa` who created this function can share it with other users in a
 similar way as described in the "User workspaces" section above.
 

@@ -76,7 +76,7 @@ func Start(opt *option.Server) error {
 	}
 
 	var svr = &server{opt: opt}
-	if err = runServer(svr); err != nil {
+	if err = loggingServer(svr); err != nil {
 		return err
 	}
 	process.RemovePIDFile(svr.opt.Datadir)
@@ -118,7 +118,7 @@ func isServerRunning(datadir string) (bool, int, error) {
 	return true, pid, nil
 }
 
-func runServer(svr *server) error {
+func loggingServer(svr *server) error {
 	// Read database URL from config file.
 	var err error
 	svr.db, err = util.ReadConfigDatabase(svr.opt.Datadir)
@@ -142,17 +142,26 @@ func runServer(svr *server) error {
 	defer log.SetDatabase(nil)
 
 	log.Info("starting Metadb %s", util.MetadbVersion)
+	if err := runServer(svr, cat); err != nil {
+		log.Fatal("%s", err)
+		return err
+	}
+	return nil
+}
 
+func runServer(svr *server, cat *catalog.Catalog) error {
 	if svr.db.DBName != "metadb" && !strings.HasPrefix(svr.db.DBName, "metadb_") {
 		log.Info("database has nonstandard name %q", svr.db.DBName)
 	}
-
 	setMemoryLimit(svr.opt.MemoryLimit)
-
 	if svr.opt.NoTLS {
 		log.Warning("TLS disabled for all client connections")
 	}
-	return launchServer(svr, cat)
+	if err := launchServer(svr, cat); err != nil {
+		return err
+	}
+	//log.Info("server is shut down")
+	return nil
 }
 
 func setMemoryLimit(limit float64) {
@@ -170,7 +179,7 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 	go func() {
 		<-sigc
 		log.Debug("received shutdown request")
-		log.Debug("shutting down")
+		log.Info("shutting down")
 		process.SetStop()
 	}()
 	// TODO also need to catch signals and call RemovePIDFile
