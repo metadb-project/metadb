@@ -131,12 +131,8 @@ func run() error {
 			serverOpt.RewriteJSON = rewriteJSON == "1"
 			serverOpt.Listen = "127.0.0.1"
 			if err = server.Start(&serverOpt); err != nil {
-				return logFatal(err, logf, csvlogf)
+				return fatal(err, logf, csvlogf)
 			}
-			if err != nil {
-				log.Error("%s", err)
-			}
-			log.Info("server is shut down")
 			return nil
 		},
 	}
@@ -648,8 +644,7 @@ func validateServerOptions(opt *option.Server) error {
 	return nil
 }
 
-func logFatal(err error, logf, csvlogf *os.File) error {
-	log.Fatal("%s", err)
+func fatal(err error, logf, csvlogf *os.File) error {
 	if logf != nil {
 		_ = logf.Close()
 	}

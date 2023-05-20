@@ -390,7 +390,7 @@ before they have been restreamed).
 +
 [.aqua-background]#Metadb v1.0.10#
 Metadb detects when snapshot data are no longer being received, and then writes
-to the log a message such as "resync snapshot complete (deadline exceeded)."
+to the log a message such as "source snapshot complete (deadline exceeded)"
 This generally means it is a good time to run "metadb clean".
 
 5. Start the server.
