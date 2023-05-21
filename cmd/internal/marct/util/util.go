@@ -154,9 +154,7 @@ func setDatabaseParameters(ctx context.Context, dc *pgx.Conn) error {
 		return err
 	}
 	q = "SET idle_session_timeout=0"
-	if _, err := dc.Exec(ctx, q); err != nil {
-		return err
-	}
+	_, _ = dc.Exec(ctx, q) // Temporarily allow for PostgreSQL versions < 14
 	q = "SET statement_timeout=0"
 	if _, err := dc.Exec(ctx, q); err != nil {
 		return err
