@@ -367,9 +367,9 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *cat
 		return fmt.Errorf("error updating maintenance time: %v", err)
 	}
 
-	if err = vacuumAll(db, cat, folio); err != nil {
-		return err
-	}
+	// if err = vacuumAll(db, cat, folio); err != nil {
+	// 	return err
+	// }
 
 	log.Debug("completed maintenance")
 	return nil

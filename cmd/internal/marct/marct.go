@@ -194,8 +194,8 @@ func fullUpdate(opts *TransformOptions, connString string, printerr PrintErr) er
 		ConnString: connString,
 	}
 	// Vacuum in case previous run was not completed.
-	_ = util.Vacuum(context.TODO(), dbc, opts.Loc.tablefinal())
-	_ = inc.VacuumCksum(context.TODO(), dbc)
+	// _ = util.Vacuum(context.TODO(), dbc, opts.Loc.tablefinal())
+	// _ = inc.VacuumCksum(context.TODO(), dbc)
 	if opts.CSVFileName != "" {
 		if csvFile, err = os.Create(opts.CSVFileName); err != nil {
 			return err
@@ -240,16 +240,18 @@ func fullUpdate(opts *TransformOptions, connString string, printerr PrintErr) er
 			if opts.Verbose >= 1 {
 				printerr(" %s checksum", util.ElapsedTime(startCksum))
 			}
-			startVacuum := time.Now()
-			if err = util.Vacuum(context.TODO(), dbc, opts.Loc.tablefinal()); err != nil {
-				return err
-			}
-			if err = inc.VacuumCksum(context.TODO(), dbc); err != nil {
-				return err
-			}
-			if opts.Verbose >= 1 {
-				printerr(" %s vacuum", util.ElapsedTime(startVacuum))
-			}
+			/*
+				startVacuum := time.Now()
+				if err = util.Vacuum(context.TODO(), dbc, opts.Loc.tablefinal()); err != nil {
+					return err
+				}
+				if err = inc.VacuumCksum(context.TODO(), dbc); err != nil {
+					return err
+				}
+				if opts.Verbose >= 1 {
+					printerr(" %s vacuum", util.ElapsedTime(startVacuum))
+				}
+			*/
 		}
 		if opts.Verbose >= 1 {
 			printerr("%s full update", util.ElapsedTime(startUpdate))
