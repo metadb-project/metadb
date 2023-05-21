@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/internal/marct/marc"
 	"github.com/metadb-project/metadb/cmd/internal/marct/util"
-	"github.com/metadb-project/metadb/cmd/internal/marct/uuid"
+	"github.com/metadb-project/metadb/cmd/internal/uuid"
 )
 
 const schemaVersion int64 = 14

@@ -4,8 +4,9 @@ package marc
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
-	"github.com/metadb-project/metadb/cmd/internal/marct/uuid"
+	"github.com/metadb-project/metadb/cmd/internal/uuid"
 )
 
 // Marc is a single "row" of data extracted from part of a MARC record.
@@ -115,7 +116,7 @@ func Transform(marcjson *string, state string) ([]Marc, string, error) {
 		return nil, "", fmt.Errorf("parsing: %v", err)
 	}
 	// If the MARC record is not current, return nothing.
-	if !isCurrent(state, instanceID) {
+	if instanceID == "" {
 		return []Marc{}, uuid.NilUUID, nil
 	}
 	return mrecs, instanceID, nil
@@ -199,12 +200,11 @@ func getInstanceID(mrecs []Marc) (string, error) {
 				return "", fmt.Errorf("multiple values for 999 ff $i")
 			}
 			found = true
-			instanceID = r.Content
+			instanceID = strings.TrimSpace(r.Content)
 		}
 	}
+	if instanceID != "" && !uuid.IsUUID(instanceID) {
+		return "", fmt.Errorf("non-UUID value in 999 ff $i")
+	}
 	return instanceID, nil
-}
-
-func isCurrent(state string, instanceID string) bool {
-	return state == "ACTUAL" && instanceID != ""
 }

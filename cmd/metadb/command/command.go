@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/metadb-project/metadb/cmd/internal/uuid"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
@@ -952,13 +953,12 @@ func PrimaryKeyColumns(columns []CommandColumn) []CommandColumn {
 	return pkey
 }
 
-var uuidRegexp = regexp.MustCompile(`^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$`)
 var timestamptzRegexp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|(\+\d+(\:\d+)?))?$`)
 var timestampRegexp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$`)
 
 func InferTypeFromString(data string) (DataType, int64) {
 	// Test for UUID
-	if IsUUID(data) {
+	if uuid.IsUUID(data) {
 		return UUIDType, 0
 	}
 	// Test for timestamp with time zone
@@ -975,8 +975,4 @@ func InferTypeFromString(data string) (DataType, int64) {
 		n = 1
 	}
 	return VarcharType, int64(n)
-}
-
-func IsUUID(str string) bool {
-	return uuidRegexp.MatchString(str)
 }

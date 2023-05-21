@@ -11,7 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/metadb-project/metadb/cmd/internal/marct/util"
-	"github.com/metadb-project/metadb/cmd/internal/marct/uuid"
+	"github.com/metadb-project/metadb/cmd/internal/uuid"
 )
 
 type Record struct {

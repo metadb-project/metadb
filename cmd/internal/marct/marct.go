@@ -353,14 +353,16 @@ func processAll(opts *TransformOptions, dbc *util.DBC, store *local.Store, print
 	var msg *string
 	var writeCount int64
 	var q = "SELECT r.id, r.matched_id, r.external_hrid instance_hrid, r.state, m." + opts.Loc.SrsMarcAttr +
-		"::text FROM " + opts.Loc.SrsRecords + " r JOIN " + opts.Loc.SrsMarc + " m ON r.id = m.id"
+		"::text FROM " + opts.Loc.SrsRecords + " r JOIN " + opts.Loc.SrsMarc + " m ON r.id = m.id" +
+		" WHERE r.state = 'ACTUAL'"
+	state := "ACTUAL"
 	var rows pgx.Rows
 	if rows, err = dbc.Conn.Query(context.TODO(), q); err != nil {
 		return 0, fmt.Errorf("selecting marc records: %v", err)
 	}
 	for rows.Next() {
-		var id, matchedID, instanceHRID, state, data *string
-		if err = rows.Scan(&id, &matchedID, &instanceHRID, &state, &data); err != nil {
+		var id, matchedID, instanceHRID, data *string
+		if err = rows.Scan(&id, &matchedID, &instanceHRID, &data); err != nil {
 			return 0, fmt.Errorf("scanning records: %v", err)
 		}
 		var record local.Record
@@ -368,7 +370,7 @@ func processAll(opts *TransformOptions, dbc *util.DBC, store *local.Store, print
 		var mrecs []marc.Marc
 		var skip bool
 		id, matchedID, instanceHRID, instanceID, mrecs, skip = util.Transform(id, matchedID, instanceHRID,
-			state, data, printerr, opts.Verbose)
+			&state, data, printerr, opts.Verbose)
 		if skip {
 			continue
 		}

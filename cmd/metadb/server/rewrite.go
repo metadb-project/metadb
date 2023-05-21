@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 
+	"github.com/metadb-project/metadb/cmd/internal/uuid"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/jsonx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
@@ -25,7 +26,7 @@ func rewriteCommand(cl *command.CommandList, c *command.Command, rewriteJSON boo
 	for i := range c.Column {
 		col := c.Column[i]
 		if col.DType == command.VarcharType {
-			if col.Data != nil && command.IsUUID(fmt.Sprintf("%v", col.Data)) {
+			if col.Data != nil && uuid.IsUUID(fmt.Sprintf("%v", col.Data)) {
 				col.DType = command.UUIDType
 				col.DTypeSize = 0
 				c.Column[i] = col
