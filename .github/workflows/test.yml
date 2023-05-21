@@ -23,8 +23,11 @@ jobs:
     #   run: PATH=/usr/local/mdb/go/bin:$PATH go install github.com/remyoudompheng/go-misc/deadcode@latest
     - name: install ragel
       run: sudo apt install ragel
-    - name: build
+    - name: build metadb
       run: PATH=$HOME/go/bin:/usr/local/mdb/go/bin:$PATH ./build.sh
     - name: run metadb
       run: ./bin/metadb help
-
+    - name: build marct
+      run: go build -o bin ./cmd/marct
+    - name: run marct
+      run: ./bin/marct -h
