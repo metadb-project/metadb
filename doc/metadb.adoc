@@ -15,4 +15,6 @@ include::commands.adoc[]
 
 include::admin.adoc[]
 
+// include::transform.adoc[]
+
 include::external.adoc[]

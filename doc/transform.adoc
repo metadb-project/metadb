@@ -1,0 +1,9 @@
+== Transforms
+
+=== MARC transform
+
+The MARC transform converts JSON-encoded MARC 21 records to a tabular format
+that is easier to query via SQL.
+
+At present this transform only supports FOLIO MARC data.  For more information,
+see: External projects > FOLIO > MARC transform.

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/library-data-platform/ldpmarc/marc"
+	"github.com/metadb-project/metadb/cmd/internal/marct"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
@@ -23,7 +23,7 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 	defer dbx.Close(dcsuper)
 
 	users := []string{}
-	opt := &marc.TransformOptions{
+	opt := &marct.TransformOptions{
 		FullUpdate:   false,
 		Datadir:      datadir,
 		Users:        users,
@@ -39,7 +39,7 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 			log.Warning("marc__t: %s\n", fmt.Sprintf(format, v...))
 		},
 	}
-	if err = marc.Run(opt); err != nil {
+	if err = marct.Run(opt); err != nil {
 		return fmt.Errorf("%v", err)
 	}
 	if err = cat.TableUpdatedNow(dbx.Table{S: "folio_source_record", T: "marc__t"}); err != nil {

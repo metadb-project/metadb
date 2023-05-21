@@ -5,9 +5,10 @@
 ==== Hardware requirements
 
 * Metadb software:
+** Architecture: x86-64 (AMD64)
 ** CPU: 2 cores
 ** Memory: 1 GB
-** Storage: 500 GB SSD
+** Local storage: 500 GB SSD
 * PostgreSQL database:
 ** CPU: 4 cores
 ** Memory: 32 GB
@@ -15,7 +16,6 @@
 
 ==== Software requirements
 
-* Architecture: x86-64 (AMD64)
 * Operating system: Debian 11 or later
 * https://www.postgresql.org/[PostgreSQL] 15 or later
 ** PostgreSQL 15.2 or later is recommended
@@ -48,7 +48,7 @@ the build workspace for Go, e.g.:
 
 [source,bash]
 ----
-$ export GOPATH=$HOME/go
+export GOPATH=$HOME/go
 ----
 
 Then install goyacc:
@@ -64,7 +64,7 @@ Then to build the server:
 
 [source,bash]
 ----
-$ ./build.sh
+./build.sh
 ----
 
 The `build.sh` script creates a `bin/` subdirectory and builds the `metadb`
@@ -72,7 +72,7 @@ executable there:
 
 [source,bash]
 ----
-$ ./bin/metadb help
+./bin/metadb help
 ----
 
 It is suggested that a `metadb` user be created and the server run by that
@@ -388,7 +388,6 @@ it will be more convenient for users if "metadb clean" is run too late
 (delaying removal of deleted records) rather than too early (removing records
 before they have been restreamed).
 +
-[.aqua-background]#Metadb v1.0.10#
 Metadb detects when snapshot data are no longer being received, and then writes
 to the log a message such as "source snapshot complete (deadline exceeded)"
 This generally means it is a good time to run "metadb clean".
@@ -400,7 +399,6 @@ analytic database may continue to be unsynchronized with the source.
 
 === Creating database users
 
-[.aqua-background]#Metadb v1.0.10#
 To create a new database user account:
 
 [source]

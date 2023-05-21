@@ -2,44 +2,17 @@
 
 === FOLIO
 
-==== Configuration
-
-When creating a FOLIO data source, use the `module 'folio'` option, and set
-`trimschemaprefix` to remove the tenant from schema names and `addschemaprefix`
-to add a `folio_` prefix to the schema names.  For example:
-
-----
-CREATE DATA SOURCE folio TYPE kafka OPTIONS (
-    module 'folio',
-    trimschemaprefix 'tenantname_',
-    addschemaprefix 'folio_',
-    brokers 'kafka:29092',
-    topics '^metadb_folio_1\.',
-    consumergroup 'metadb_folio_1_1',
-    schemastopfilter 'admin'
-);
-----
-
-It is recommended to use a separate Kafka cluster, rather than the FOLIO Kafka
-instance, until one has experience with administration of Kafka.
-
-In the Debezium PostgreSQL connector configuration, the following exclusions
-are suggested:
-
-----
-"schema.exclude.list": "public,.*_mod_login,.*_mod_pubsub,.*pubsub_config,supertenant_mod_.*,.*_mod_kb_ebsco_java,.*_mod_data_export_spring"
-----
-----
-"table.exclude.list": ".*__system,.*_mod_agreements.alternate_resource_name,.*_mod_service_interaction.dashboard_access,.*_mod_agreements.availability_constraint,.*_mod_agreements\\.package_description_url,.*_mod_agreements\\.content_type,.*_mod_agreements\\.entitlement_tag,.*_mod_agreements\\.erm_resource_tag,.*_mod_agreements\\.string_template,.*_mod_agreements\\.string_template_scopes,.*_mod_agreements\\.templated_url,.*_mod_oai_pmh\\.instances,.*_mod_remote_storage\\.original_locations,.*_mod_remote_storage\\.item_notes,.*app_setting,.*alternate_name,.*databasechangelog,.*databasechangeloglock,.*directory_entry_tag,.*license_document_attachment,.*license_supp_doc,.*license_tag,.*log_entry_additional_info,.*subscription_agreement_supp_doc,.*subscription_agreement_document_attachment,.*subscription_agreement_ext_lic_doc,.*subscription_agreement_tag,.*tenant_changelog,.*tenant_changelog_lock,.*marc_indexers.*,.*rmb_internal.*,.*rmb_job.*,.*_mod_agreements\\.match_key,.*system_changelog"
-----
-
-==== MARC transformation
+==== MARC transform
 
 Metadb transforms MARC records from the tables `marc_records_lb` and
 `records_lb` in schema `folio_source_record` to a tabular form which is stored
-in a new table, `folio_source_record.marc__t`.  This transformation is updated
-usually every few hours.  The time of the most recent update can be retrieved
-via SQL:
+in a new table, `folio_source_record.marc__t`.  Only records considered to be
+current are transformed, where current is defined as having `state` =
+`'ACTUAL'` and an identifier present in `999ff$i`.
+
+This transform updates the table `folio_source_record.marc__t` usually every
+few hours or so.  The time of the most recent update can be retrieved from the
+table `metadb.table_update`:
 
 ----
 SELECT updated
@@ -63,7 +36,7 @@ storage module for users is `mod-users`.  (All module names begin with `mod-`.)
 
 ==== Migrating from LDP
 
-This section contains notes on migrating queries from LDP to Metadb.
+This section contains notes related to migrating from LDP to Metadb.
 
 ===== Table names
 
@@ -480,7 +453,115 @@ SELECT expiration_offset_in_days FROM folio_users.groups__t;
 
 Support for transforming subfields and arrays is planned in Metadb.
 
+===== MARC transform for LDP
+
+[.aqua-background]#Metadb v1.1#
+The MARC transform in Metadb can also be used with LDP (and LDLite).  A
+command-line tool called `marct` is provided which is a drop-in replacement for
+`ldpmarc`.
+
+The system requirements are a subset of those recommended for Metadb:
+
+* Local storage: 500 GB
+* Database storage: 500 GB
+* Operating system: Linux
+* https://www.postgresql.org/[PostgreSQL] 13 or later
+* https://golang.org/[Go] 1.20 or later
+
+To build `marct`:
+
+----
+mkdir -p bin && go build -o bin ./cmd/marct
+----
+
+This creates a `bin/` subdirectory and builds the `marct` executable there:
+
+----
+./bin/marct -h
+----
+
+In LDP, MARC data are read from the tables `public.srs_marc` and
+`public.srs_records`, and the transformed output is written to the table
+`public.srs_marctab`.
+
+Typical usage is:
+
+----
+./bin/marct -D <datadir> -u <ldp_user>
+----
+
+where `datadir` is a LDP data directory containing `ldpconf.json`, and
+`ldp1_user` is a LDP user to be granted `SELECT` privileges on the output
+table.
+
+For example:
+
+----
+./bin/marct -D data -u ldp
+----
+
+Note that `marct` only grants privileges for a single user.  If individual user
+accounts are configured for LDP, a shell script can be used to grant privileges
+to the users, for example:
+
+----
+users=/path/to/list/of/users.txt
+for u in $( cat $users ); do
+    psql -c "GRANT SELECT ON public.srs_marctab TO $u ;"
+done
+----
+
+The first time `marct` runs, it will perform a "full update" of all of the MARC
+records.  In subsequent runs, it will attempt to use "incremental update" to
+update only records that have changed since the previous run, which can
+dramatically reduce the running time if the number of changes is small.
+
+However, if very many records have changed, it is possible that incremental
+update may take longer than full update.  If it appears that an incremental
+update will never finish, it should be canceled, and a full update should be
+run once before resuming incremental updates.  This can be done by using the
+`-f` command-line option, which disables incremental update and requires
+`marct` to do a full update.
+
+==== Configuring Metadb for FOLIO
+
+When creating a FOLIO data source, use the `module 'folio'` option, and set
+`trimschemaprefix` to remove the tenant from schema names and `addschemaprefix`
+to add a `folio_` prefix to the schema names.  For example:
+
+----
+CREATE DATA SOURCE folio TYPE kafka OPTIONS (
+    module 'folio',
+    trimschemaprefix 'tenantname_',
+    addschemaprefix 'folio_',
+    brokers 'kafka:29092',
+    topics '^metadb_folio_1\.',
+    consumergroup 'metadb_folio_1_1',
+    schemastopfilter 'admin'
+);
+----
+
+It is recommended to use a separate Kafka cluster, rather than the FOLIO Kafka
+instance, until one has experience with administration of Kafka.
+
+In the Debezium PostgreSQL connector configuration, the following exclusions
+are suggested:
+
+----
+"schema.exclude.list": "public,.*_mod_login,.*_mod_pubsub,.*pubsub_config,supertenant_mod_.*,.*_mod_kb_ebsco_java,.*_mod_data_export_spring"
+----
+----
+"table.exclude.list": ".*__system,.*_mod_agreements.alternate_resource_name,.*_mod_service_interaction.dashboard_access,.*_mod_agreements.availability_constraint,.*_mod_agreements\\.package_description_url,.*_mod_agreements\\.content_type,.*_mod_agreements\\.entitlement_tag,.*_mod_agreements\\.erm_resource_tag,.*_mod_agreements\\.string_template,.*_mod_agreements\\.string_template_scopes,.*_mod_agreements\\.templated_url,.*_mod_oai_pmh\\.instances,.*_mod_remote_storage\\.original_locations,.*_mod_remote_storage\\.item_notes,.*app_setting,.*alternate_name,.*databasechangelog,.*databasechangeloglock,.*directory_entry_tag,.*license_document_attachment,.*license_supp_doc,.*license_tag,.*log_entry_additional_info,.*subscription_agreement_supp_doc,.*subscription_agreement_document_attachment,.*subscription_agreement_ext_lic_doc,.*subscription_agreement_tag,.*tenant_changelog,.*tenant_changelog_lock,.*marc_indexers.*,.*rmb_internal.*,.*rmb_job.*,.*_mod_agreements\\.match_key,.*system_changelog"
+----
+
 === ReShare
+
+==== Derived tables
+
+ReShare derived tables are automatically updated once per day, usually at about
+00:00:00 UTC by default.
+
+==== Configuring Metadb for ReShare
 
 Before defining a ReShare data source, create a data origin for each consortial
 tenant.  For example:
@@ -522,10 +603,5 @@ ORIGIN` (and the server restarted) before the tenant is added to ReShare.
 
 In the Debezium PostgreSQL connector configuration, it is suggested that
 credentials (`.+mod_login`), the public schema, the Okapi supertenant
-(`supertenant_mod_.+`), and mod-pubsub data (`pubsub_config,.+_mod_pubsub`) be
-excluded using the `schema.exclude.list` setting.
-
-==== Derived tables
-
-ReShare derived tables are automatically updated once per day, usually at about
-00:00:00 UTC by default.
+(`supertenant_mod_.+`), and mod-pubsub data (`pubsub_config,.+_mod_pubsub`)
+be excluded using the `schema.exclude.list` setting.

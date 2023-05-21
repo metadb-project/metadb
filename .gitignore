@@ -4,10 +4,10 @@ cmd/metadb/parser/y.output
 bin
 *~
 
-admin.html
-commands.html
-external.html
-metadb.html
-streamproc.html
-tutorial.html
-
+doc/admin.html
+doc/commands.html
+doc/external.html
+doc/metadb.html
+doc/streamproc.html
+doc/transform.html
+doc/tutorial.html
