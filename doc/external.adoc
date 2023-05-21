@@ -8,7 +8,7 @@ Metadb transforms MARC records from the tables `marc_records_lb` and
 `records_lb` in schema `folio_source_record` to a tabular form which is stored
 in a new table, `folio_source_record.marc__t`.  Only records considered to be
 current are transformed, where current is defined as having `state` =
-`'ACTUAL'` and an identifier present in `999ff$i`.
+`'ACTUAL'` and an identifier present in `999 ff $i`.
 
 This transform updates the table `folio_source_record.marc__t` usually every
 few hours or so.  The time of the most recent update can be retrieved from the

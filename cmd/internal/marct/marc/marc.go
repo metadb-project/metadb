@@ -109,7 +109,7 @@ func Transform(marcjson *string, state string) ([]Marc, string, error) {
 
 		}
 	}
-	// Extract the instance identifier from 999$i (f f).
+	// Extract the instance identifier from 999 ff $i.
 	instanceID, err := getInstanceID(mrecs)
 	if err != nil {
 		return nil, "", fmt.Errorf("parsing: %v", err)
@@ -196,7 +196,7 @@ func getInstanceID(mrecs []Marc) (string, error) {
 		// Filter should match inc.CreateCksum
 		if r.Field == "999" && r.SF == "i" && r.Ind1 == "f" && r.Ind2 == "f" && r.Content != "" {
 			if found {
-				return "", fmt.Errorf("multiple values for 999$i (f f)")
+				return "", fmt.Errorf("multiple values for 999 ff $i")
 			}
 			found = true
 			instanceID = r.Content
