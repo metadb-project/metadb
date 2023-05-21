@@ -352,7 +352,7 @@ func processAll(opts *TransformOptions, dbc *util.DBC, store *local.Store, print
 	var err error
 	var msg *string
 	var writeCount int64
-	var q = "SELECT r.id, r.matched_id, r.external_hrid instance_hrid, r.state, m." + opts.Loc.SrsMarcAttr +
+	var q = "SELECT r.id, r.matched_id, r.external_hrid instance_hrid, m." + opts.Loc.SrsMarcAttr +
 		"::text FROM " + opts.Loc.SrsRecords + " r JOIN " + opts.Loc.SrsMarc + " m ON r.id = m.id" +
 		" WHERE r.state = 'ACTUAL'"
 	state := "ACTUAL"
