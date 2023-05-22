@@ -22,12 +22,16 @@ type Marc struct {
 
 // Transform converts marcjson, a MARC record in JSON format, into a table.
 // Only a MARC record considered to be current is transformed, where current is
-// defined as having state = "ACTUAL" and some content present in 999$i which
-// is presumed to be the FOLIO instance identifer.  Transform returns the
+// defined as having state == "ACTUAL" and some content present in 999 ff $i
+// which is presumed to be the FOLIO instance identifer.  Transform returns the
 // resultant table as a slice of Marc structs and the instance identifer as a
 // string.  If the MARC record is not current, Transform returns an empty slice
 // and the instance identifier as "".
 func Transform(marcjson *string, state string) ([]Marc, string, error) {
+	// No need to do any parsing if state is not ACTUAL, since that means it is not current.
+	if state != "ACTUAL" {
+		return []Marc{}, uuid.NilUUID, nil
+	}
 	// mrecs is the slice of Marc structs that will contain the transformed
 	// rows.
 	mrecs := make([]Marc, 0)
@@ -115,7 +119,7 @@ func Transform(marcjson *string, state string) ([]Marc, string, error) {
 	if err != nil {
 		return nil, "", fmt.Errorf("parsing: %v", err)
 	}
-	// If the MARC record is not current, return nothing.
+	// If there is no instance identifier, the record is not current.
 	if instanceID == "" {
 		return []Marc{}, uuid.NilUUID, nil
 	}

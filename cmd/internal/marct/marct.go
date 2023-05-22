@@ -257,8 +257,6 @@ func fullUpdate(opts *TransformOptions, connString string, printerr PrintErr) er
 			printerr("%s full update", util.ElapsedTime(startUpdate))
 			printerr("%d output rows", writeCount)
 			printerr("new table is ready to use: " + opts.Loc.tablefinal())
-		} else {
-
 		}
 	}
 	return nil
