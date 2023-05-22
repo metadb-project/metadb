@@ -5,6 +5,8 @@
 // Text is styled using "pre-wrap" and wrapped at column 79.
 
 = Metadb Documentation
+:sectnums:
+:sectnumlevels: 4
 :toc: left
 :toclevels: 5
 :toc-title: Contents
