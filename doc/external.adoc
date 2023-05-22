@@ -455,7 +455,7 @@ Support for transforming subfields and arrays is planned in Metadb.
 
 ===== MARC transform for LDP
 
-[.aqua-background]#Metadb v1.1#
+[.aqua-background]#Metadb 1.1#
 The MARC transform in Metadb can also be used with LDP (and LDLite).  A
 command-line tool called `marct` is provided which is a drop-in replacement for
 `ldpmarc`.
@@ -474,7 +474,7 @@ To build `marct`:
 mkdir -p bin && go build -o bin ./cmd/marct
 ----
 
-This creates a `bin/` subdirectory and builds the `marct` executable there:
+which creates a `bin/` subdirectory and builds the `marct` executable there:
 
 ----
 ./bin/marct -h
