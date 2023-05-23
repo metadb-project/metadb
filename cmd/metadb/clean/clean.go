@@ -65,11 +65,11 @@ func Clean(opt *option.Clean) error {
 	for _, t := range tables {
 		eout.Info("cleaning: %s", t.String())
 		mainTable := t.MainSQL()
-		q := "VACUUM ANALYZE " + mainTable
-		if _, err = dp.Exec(context.TODO(), q); err != nil {
-			return err
-		}
-		q = "UPDATE " + mainTable + " SET __cf=TRUE,__end='" + now + "',__current=FALSE " +
+		//q := "VACUUM ANALYZE " + mainTable
+		//if _, err = dp.Exec(context.TODO(), q); err != nil {
+		//	return err
+		//}
+		q := "UPDATE " + mainTable + " SET __cf=TRUE,__end='" + now + "',__current=FALSE " +
 			"WHERE NOT __cf AND __current AND __source='" + opt.Source + "'"
 		if _, err = dp.Exec(context.TODO(), q); err != nil {
 			return err
@@ -80,10 +80,10 @@ func Clean(opt *option.Clean) error {
 		if _, err = dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
-		q = "VACUUM ANALYZE " + mainTable
-		if _, err = dp.Exec(context.TODO(), q); err != nil {
-			return err
-		}
+		//q = "VACUUM ANALYZE " + mainTable
+		//if _, err = dp.Exec(context.TODO(), q); err != nil {
+		//	return err
+		//}
 	}
 	if err = catalog.SetResyncMode(dp, false); err != nil {
 		return err

@@ -68,19 +68,19 @@ func Reset(opt *option.Reset) error {
 	for _, t := range tables {
 		eout.Info("resetting: %s", t.String())
 		mainTable := t.MainSQL()
-		q := "VACUUM ANALYZE " + mainTable
-		if _, err := dp.Exec(context.TODO(), q); err != nil {
-			return err
-		}
-		q = "UPDATE " + mainTable + " SET __cf=FALSE WHERE __cf AND __current AND " +
+		//q := "VACUUM ANALYZE " + mainTable
+		//if _, err := dp.Exec(context.TODO(), q); err != nil {
+		//	return err
+		//}
+		q := "UPDATE " + mainTable + " SET __cf=FALSE WHERE __cf AND __current AND " +
 			"__source='" + opt.Source + "'"
 		if _, err := dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
-		q = "VACUUM ANALYZE " + mainTable
-		if _, err := dp.Exec(context.TODO(), q); err != nil {
-			return err
-		}
+		//q = "VACUUM ANALYZE " + mainTable
+		//if _, err := dp.Exec(context.TODO(), q); err != nil {
+		//	return err
+		//}
 	}
 	eout.Info("completed reset")
 	return nil
