@@ -14,6 +14,7 @@ type deltaColumnSchema struct {
 	newType     command.DataType
 	oldTypeSize int64
 	newTypeSize int64
+	newData     any
 }
 
 type deltaSchema struct {
@@ -63,6 +64,7 @@ func tableSchemaFromCommand(c *command.Command) *sysdb.TableSchema {
 		cs.DType = col.DType
 		cs.DTypeSize = col.DTypeSize
 		cs.PrimaryKey = col.PrimaryKey
+		cs.Data = col.Data
 		ts.Column = append(ts.Column, cs)
 	}
 	return ts
@@ -86,6 +88,7 @@ func findDeltaColumnSchema(column1 *sysdb.ColumnSchema, column2 *sysdb.ColumnSch
 			name:        column2.Name,
 			newType:     column2.DType,
 			newTypeSize: column2.DTypeSize,
+			newData:     column2.Data,
 		})
 		return
 	}

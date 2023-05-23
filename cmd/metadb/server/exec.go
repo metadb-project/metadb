@@ -104,6 +104,12 @@ func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSch
 			col.newType = command.VarcharType
 			col.newTypeSize = typeSize
 		}
+
+		// Don't change a UUID type with a null value, because UUID may have been inferred from data.
+		if col.oldType == command.UUIDType && col.newType == command.VarcharType && col.newData == nil {
+			continue
+		}
+
 		// If both the old and new types are varchar, most databases
 		// can alter the column in place.
 		if col.oldType == command.VarcharType && col.newType == command.VarcharType {
@@ -260,7 +266,7 @@ func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandLis
 		// Extra check of varchar sizes to ensure size was adjusted and
 		// avoid silent data loss due to optimization errors
 		for _, col := range c.Column {
-			if col.DType == command.VarcharType {
+			if col.DType == command.VarcharType && col.Data != nil {
 				schemaCol := cat.Column(sqlx.NewColumn(c.SchemaName, c.TableName, col.Name))
 				if schemaCol != nil && col.DTypeSize > schemaCol.CharMaxLen {
 					// TODO Factor fatal error exit into function

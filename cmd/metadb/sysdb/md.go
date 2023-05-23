@@ -13,4 +13,5 @@ type ColumnSchema struct {
 	DType      command.DataType
 	DTypeSize  int64
 	PrimaryKey int
+	Data       any
 }
