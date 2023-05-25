@@ -445,12 +445,7 @@ func index(opts *TransformOptions, dbc *util.DBC, printerr PrintErr) error {
 	startIndex := time.Now()
 	var err error
 	// Index columns
-	var cols = []string{
-		"srs_id",
-		"matched_id",
-		"instance_hrid",
-		"instance_id",
-		"sf"}
+	var cols = []string{"srs_id"}
 	if opts.TrigramIndex {
 		cols = append(cols, "content")
 	}

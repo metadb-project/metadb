@@ -394,6 +394,7 @@ var updbList = []updbFunc{
 	updb12,
 	updb13,
 	updb14,
+	updb15,
 }
 
 /*
@@ -1136,6 +1137,84 @@ func updb14(opt *dbopt) error {
 
 	// Write new version number
 	err = metadata.WriteDatabaseVersion(tx, 14)
+	if err != nil {
+		return err
+	}
+	err = tx.Commit(context.TODO())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb15(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	// Read list of tracked tables.
+	q := "SELECT schemaname, tablename FROM metadb.track ORDER BY schemaname, tablename"
+	rows, err := dc.Query(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("selecting table list: %v", err)
+	}
+	tables := make([]dbx.Table, 0)
+	for rows.Next() {
+		var schema, table string
+		err = rows.Scan(&schema, &table)
+		if err != nil {
+			rows.Close()
+			return fmt.Errorf("reading table list: %v", err)
+		}
+		tables = append(tables, dbx.Table{S: schema, T: table})
+	}
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("reading table list: %v", err)
+	}
+	rows.Close()
+
+	for _, table := range tables {
+		q = "SELECT indexname FROM pg_indexes WHERE schemaname=$1 and tablename=$2"
+		rows, err = dc.Query(context.TODO(), q, table.S, table.T+"__")
+		if err != nil {
+			return fmt.Errorf("selecting index list: %v", err)
+		}
+		indexes := make([]string, 0)
+		for rows.Next() {
+			var index string
+			err = rows.Scan(&index)
+			if err != nil {
+				rows.Close()
+				return fmt.Errorf("reading index list: %v", err)
+			}
+			indexes = append(indexes, table.S+"."+index)
+		}
+		if err = rows.Err(); err != nil {
+			rows.Close()
+			return fmt.Errorf("reading index list: %v", err)
+		}
+		rows.Close()
+		for _, schemaIndex := range indexes {
+			q := "DROP INDEX " + schemaIndex
+			if _, err = dc.Exec(context.TODO(), q); err != nil {
+				return err
+			}
+
+		}
+	}
+
+	// Begin transaction
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+	// Write new version number
+	err = metadata.WriteDatabaseVersion(tx, 15)
 	if err != nil {
 		return err
 	}

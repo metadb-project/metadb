@@ -13,7 +13,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/internal/uuid"
 )
 
-const schemaVersion int64 = 14
+const schemaVersion int64 = 15
 const cksumTable = "marctab.cksum"
 const metadataTableS = "marctab"
 const metadataTableT = "metadata"

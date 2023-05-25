@@ -325,7 +325,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *cat
 		for {
 			tries++
 			url := "https://github.com/folio-org/folio-analytics.git"
-			tag := "20230521231434"
+			tag := "20230525025259"
 			path := "sql_metadb/derived_tables"
 			schema := "folio_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {
@@ -344,7 +344,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *cat
 		for {
 			tries++
 			url := "https://github.com/openlibraryenvironment/reshare-analytics.git"
-			tag := "20230521232455"
+			tag := "20230525025851"
 			path := "sql/derived_tables"
 			schema := "reshare_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {

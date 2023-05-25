@@ -294,7 +294,7 @@ func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer
 	snapshot := false
 	var eventReadCount int
 	var x int
-	for x = 0; x < 10000; x++ {
+	for x = 0; x < 1000; x++ {
 		var ce *change.Event
 		if sourceFileScanner != nil {
 			if ce, err = readChangeEventFromFile(sourceFileScanner, sourceLog); err != nil {

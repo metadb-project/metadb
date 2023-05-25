@@ -7,9 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
 type ColumnType struct {
@@ -137,16 +135,6 @@ func (c *Catalog) AddColumn(table dbx.Table, columnName string, newType command.
 	_, err := c.dp.Exec(context.TODO(), "ALTER TABLE "+table.MainSQL()+" ADD COLUMN \""+columnName+"\" "+dataTypeSQL)
 	if err != nil {
 		return fmt.Errorf("adding column %q in table %q: alter table: %v", columnName, table, err)
-	}
-	// Add index on new column.
-	if newType != command.JSONType && newTypeSize <= util.MaximumTypeSizeIndex {
-		_, err = c.dp.Exec(context.TODO(), ""+
-			"CREATE INDEX ON "+table.MainSQL()+" (\""+columnName+"\")")
-		if err != nil {
-			return fmt.Errorf("adding column %q in table %q: creating index: %v", columnName, table, err)
-		}
-	} else {
-		log.Trace("disabling index: value too large")
 	}
 	// Update schema.
 	updateColumn(c, &sqlx.Column{Schema: table.S, Table: table.T, Column: columnName}, dataType, charMaxLen)

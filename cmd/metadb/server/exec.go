@@ -21,11 +21,14 @@ func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, 
 		}
 		// exec schema changes
 		if err := execCommandSchema(cat, &cc.Cmd[0], db); err != nil {
-			return fmt.Errorf("command list: %v", err)
+			return fmt.Errorf("exec command schema: %v", err)
+		}
+		if err := execCommandAddIndexes(cat, cc); err != nil {
+			return fmt.Errorf("exec command indexes: %v", err)
 		}
 		err := execCommandListData(cat, db, cc, source)
 		if err != nil {
-			return fmt.Errorf("command list: %v", err)
+			return fmt.Errorf("exec command data: %v", err)
 		}
 		// log confirmation
 		for _, c := range cc.Cmd {
@@ -250,6 +253,19 @@ func selectMaxStringLength(db sqlx.DB, table *sqlx.Table, column string) (int64,
 			column, table, err)
 	}
 	return maxlen, nil
+}
+
+func execCommandAddIndexes(cat *catalog.Catalog, cmds command.CommandList) error {
+	for _, cmd := range cmds.Cmd {
+		for _, col := range cmd.Column {
+			if col.PrimaryKey != 0 {
+				if err := cat.AddIndexIfNotExists(cmd.SchemaName, cmd.TableName, col.Name); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandList, source string) error {

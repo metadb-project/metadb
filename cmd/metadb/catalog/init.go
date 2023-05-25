@@ -24,6 +24,7 @@ type Catalog struct {
 	partYears          map[string]map[int]struct{}
 	users              map[string]*util.RegexList
 	columns            map[sqlx.Column]ColumnType
+	indexes            map[dbx.Column]struct{}
 	lastSnapshotRecord time.Time
 	dp                 *pgxpool.Pool
 }
@@ -59,6 +60,9 @@ func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
 		return nil, err
 	}
 	if err := c.initSchema(); err != nil {
+		return nil, err
+	}
+	if err := c.initIndexes(); err != nil {
 		return nil, err
 	}
 	c.initSnapshot()
