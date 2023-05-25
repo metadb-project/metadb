@@ -104,7 +104,6 @@ func (c *Catalog) AddIndexIfNotExists(schema, table, column string) error {
 	}
 	// Create index.
 	q := "CREATE INDEX ON " + schema + "." + table + "__ (" + column + ")"
-	fmt.Println(q)
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating index: %v", err)
 	}
