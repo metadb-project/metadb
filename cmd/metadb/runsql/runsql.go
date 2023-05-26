@@ -100,6 +100,11 @@ func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, sche
 		return err
 	}
 	list := sqlSeparator.Split(string(data), -1)
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
 	for _, l := range list {
 		q := strings.TrimSpace(l)
 		if q == "" {
@@ -108,13 +113,14 @@ func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, sche
 		if err = checkForDirectives(cat, url, tag, fullpath, q, &table); err != nil {
 			return err
 		}
-		if _, err = dc.Exec(context.TODO(), q); err != nil {
+		if _, err = tx.Exec(context.TODO(), q); err != nil {
 			if table != "" {
 				_ = cat.TableUpdatedNow(dbx.Table{S: schema, T: table})
 			}
 			return fmt.Errorf("%s", strings.TrimPrefix(err.Error(), "ERROR: "))
 		}
 	}
+	err = tx.Commit(context.TODO())
 	if table != "" {
 		if err = cat.TableUpdatedNow(dbx.Table{S: schema, T: table}); err != nil {
 			return fmt.Errorf("writing table updated time: %v", err)
