@@ -27,6 +27,7 @@ type Catalog struct {
 	indexes            map[dbx.Column]struct{}
 	lastSnapshotRecord time.Time
 	dp                 *pgxpool.Pool
+	lz4                bool
 }
 
 func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
@@ -66,8 +67,16 @@ func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
 		return nil, err
 	}
 	c.initSnapshot()
+	c.lz4 = isLZ4Available(c.dp)
 
 	return c, nil
+}
+
+func isLZ4Available(dq dbx.Queryable) bool {
+	var c string
+	q := "SHOW default_toast_compression"
+	err := dq.QueryRow(context.TODO(), q).Scan(&c)
+	return err == nil
 }
 
 func checkDatabaseCompatible(dp *pgxpool.Pool) error {

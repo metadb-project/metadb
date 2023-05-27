@@ -126,14 +126,16 @@ func (c *Catalog) Column(column *sqlx.Column) *ColumnType {
 	return nil
 }
 
-// TODO Use txn for ALTER TABLE and CREATE INDEX to ensure database and cache are updated atomically.
 func (c *Catalog) AddColumn(table dbx.Table, columnName string, newType command.DataType, newTypeSize int64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// Alter table schema in database.
 	dataTypeSQL, dataType, charMaxLen := command.DataTypeToSQL(newType, newTypeSize)
-	_, err := c.dp.Exec(context.TODO(), "ALTER TABLE "+table.MainSQL()+" ADD COLUMN \""+columnName+"\" "+dataTypeSQL)
-	if err != nil {
+	q := "ALTER TABLE " + table.MainSQL() + " ADD COLUMN \"" + columnName + "\" " + dataTypeSQL
+	if c.lz4 && (newType == command.VarcharType || newType == command.JSONType) {
+		q = q + " COMPRESSION lz4"
+	}
+	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("adding column %q in table %q: alter table: %v", columnName, table, err)
 	}
 	// Update schema.
