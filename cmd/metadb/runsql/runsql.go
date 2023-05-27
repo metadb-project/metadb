@@ -143,7 +143,11 @@ func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input s
 			if len(s) < 2 {
 				return fmt.Errorf("syntax error in directive %q", line)
 			}
-			*table = strings.TrimSpace(s[1])
+			t := strings.TrimSpace(s[1])
+			if !simpleTable.MatchString(t) || strings.HasPrefix(t, "__") {
+				return fmt.Errorf("invalid table name in directive %q", line)
+			}
+			*table = t
 		case strings.HasPrefix(line, "--metadb:require "):
 			s := spaceSeparator.Split(line, -1)
 			if len(s) < 3 {
@@ -203,3 +207,4 @@ func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input s
 }
 
 var spaceSeparator = regexp.MustCompile("\\s+")
+var simpleTable = regexp.MustCompile("^[A-Za-z_][0-9A-Za-z_]*$")
