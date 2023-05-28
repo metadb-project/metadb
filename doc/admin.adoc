@@ -32,7 +32,6 @@
 * `checkpoint_timeout`: `3600`
 * `cpu_tuple_cost`: `0.03`
 * `default_statistics_target`: `1000`
-* `default_toast_compression`: `lz4`
 * `effective_io_concurrency`: `200`
 * `idle_in_transaction_session_timeout`: `3600000`
 * `idle_session_timeout`: `604800000`
