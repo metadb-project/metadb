@@ -18,7 +18,7 @@
 
 * Operating system: Debian 11 or later
 * https://www.postgresql.org/[PostgreSQL] 15 or later
-** PostgreSQL 15.2 or later is recommended
+** PostgreSQL 15.3 or later is recommended
 ** AWS RDS PostgreSQL optionally may be used (with servers in the same
    zone/subnet); Aurora is not supported
 * Required to build from source:
