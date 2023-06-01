@@ -177,3 +177,8 @@ func ConnectDB(ctx context.Context, connString string) (*pgx.Conn, error) {
 	}
 	return dc, nil
 }
+
+type FieldSF struct {
+	Field string
+	SF    string
+}

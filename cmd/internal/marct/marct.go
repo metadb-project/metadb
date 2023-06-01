@@ -12,25 +12,27 @@ import (
 	"github.com/metadb-project/metadb/cmd/internal/marct/inc"
 	"github.com/metadb-project/metadb/cmd/internal/marct/local"
 	"github.com/metadb-project/metadb/cmd/internal/marct/marc"
+	"github.com/metadb-project/metadb/cmd/internal/marct/options"
 	"github.com/metadb-project/metadb/cmd/internal/marct/util"
 	"github.com/spf13/viper"
 	"gopkg.in/ini.v1"
 )
 
-type TransformOptions struct {
-	FullUpdate   bool
-	Datadir      string
-	Users        []string
-	TrigramIndex bool
-	NoIndexes    bool
-	Verbose      int // 0=quiet, 1=summary, 2=detail
-	CSVFileName  string
-	SRSRecords   string
-	SRSMarc      string
-	SRSMarcAttr  string
-	Metadb       bool
-	PrintErr     PrintErr
-	Loc          Locations
+type MARCTransform struct {
+	FullUpdate bool
+	Datadir    string
+	Users      []string
+	//TrigramIndex bool
+	//NoIndexes    bool
+	Verbose int // 0=quiet, 1=summary, 2=detail
+	//CSVFileName  string
+	SRSRecords  string
+	SRSMarc     string
+	SRSMarcAttr string
+	Metadb      bool
+	// Move into options package:
+	PrintErr PrintErr
+	Loc      Locations
 }
 
 type PrintErr func(string, ...interface{})
@@ -51,50 +53,28 @@ var allFields = util.GetAllFieldNames()
 
 var csvFile *os.File
 
-/*
-func main() {
-	flag.Parse()
-	if len(flag.Args()) > 0 {
-		printerr("invalid argument: %s", flag.Arg(0))
-		os.Exit(2)
+func (t *MARCTransform) Transform() error {
+	t.Loc = setupLocations(t)
+	opts := &options.Options{
+		TempPartitionSchema:  tableoutSchema,
+		TempTablePrefix:      "_",
+		PartitionTableBase:   "mt",
+		FinalPartitionSchema: tableoutSchema,
 	}
-	if *helpFlag || *datadirFlag == "" {
-		_, _ = fmt.Fprintf(os.Stderr, "Usage of %s:\n", program)
-		flag.PrintDefaults()
-		if *helpFlag {
-			return
-		} else {
-			os.Exit(2)
-		}
-	}
-	if *incUpdateFlag {
-		printerr("-i option no longer supported")
-		os.Exit(1)
-	}
-	if *noTrigramIndexFlag {
-		printerr("-T option no longer supported")
-		os.Exit(1)
-	}
-	loc := setupLocations()
-	if err := run(loc); err != nil {
-		printerr("%s", err)
-		os.Exit(1)
-	}
+	return marcTransform(opts, t)
 }
-*/
 
-func Run(opts *TransformOptions) error {
-	opts.Loc = setupLocations(opts)
+func marcTransform(opts *options.Options, marct *MARCTransform) error {
 	// Read database configuration
 	var host, port, user, password, dbname, sslmode string
 	var err error
-	if opts.Metadb {
-		host, port, user, password, dbname, sslmode, err = readConfigMetadb(opts)
+	if marct.Metadb {
+		host, port, user, password, dbname, sslmode, err = readConfigMetadb(marct)
 		if err != nil {
 			return err
 		}
 	} else {
-		host, port, user, password, dbname, sslmode, err = readConfigLDP1(opts)
+		host, port, user, password, dbname, sslmode, err = readConfigLDP1(marct)
 		if err != nil {
 			return err
 		}
@@ -115,22 +95,22 @@ func Run(opts *TransformOptions) error {
 	}
 	var retry bool
 	for {
-		if !retry && incUpdateAvail && !opts.FullUpdate && opts.CSVFileName == "" {
-			if opts.Verbose >= 1 {
-				opts.PrintErr("starting incremental update")
+		if !retry && incUpdateAvail && !marct.FullUpdate {
+			if marct.Verbose >= 1 {
+				marct.PrintErr("starting incremental update")
 			}
-			err = inc.IncrementalUpdate(connString, opts.Loc.SrsRecords, opts.Loc.SrsMarc, opts.Loc.SrsMarcAttr,
-				opts.Loc.tablefinal(), opts.PrintErr, opts.Verbose)
+			err = inc.IncrementalUpdate(opts, connString, marct.Loc.SrsRecords, marct.Loc.SrsMarc, marct.Loc.SrsMarcAttr,
+				marct.Loc.tablefinal(), marct.PrintErr, marct.Verbose)
 			if err != nil {
-				opts.PrintErr("restarting with full update due to early termination: %v", err)
+				marct.PrintErr("restarting with full update due to early termination: %v", err)
 				retry = true
 			}
 		} else {
 			retry = false
-			if opts.Verbose >= 1 {
-				opts.PrintErr("starting full update")
+			if marct.Verbose >= 1 {
+				marct.PrintErr("starting full update")
 			}
-			if err = fullUpdate(opts, connString, opts.PrintErr); err != nil {
+			if err = fullUpdate(opts, marct, connString, marct.PrintErr); err != nil {
 				_, _ = conn.Exec(context.TODO(), "DROP TABLE IF EXISTS "+tableout)
 				return err
 			}
@@ -142,7 +122,7 @@ func Run(opts *TransformOptions) error {
 	return nil
 }
 
-func setupLocations(opts *TransformOptions) Locations {
+func setupLocations(opts *MARCTransform) Locations {
 	loc := Locations{
 		SrsRecords:       "folio_source_record.records_lb",
 		SrsMarc:          "folio_source_record.marc_records_lb",
@@ -181,7 +161,7 @@ func setupSchema(dc *pgx.Conn) error {
 	return nil
 }
 
-func fullUpdate(opts *TransformOptions, connString string, printerr PrintErr) error {
+func fullUpdate(opts *options.Options, marct *MARCTransform, connString string, printerr PrintErr) error {
 	var err error
 	startUpdate := time.Now()
 	conn, err := util.ConnectDB(context.TODO(), connString)
@@ -193,109 +173,90 @@ func fullUpdate(opts *TransformOptions, connString string, printerr PrintErr) er
 		Conn:       conn,
 		ConnString: connString,
 	}
-	// Vacuum in case previous run was not completed.
-	// _ = util.Vacuum(context.TODO(), dbc, opts.Loc.tablefinal())
-	// _ = inc.VacuumCksum(context.TODO(), dbc)
-	if opts.CSVFileName != "" {
-		if csvFile, err = os.Create(opts.CSVFileName); err != nil {
-			return err
-		}
-		defer func(csvFile *os.File) {
-			_ = csvFile.Close()
-		}(csvFile)
-		if opts.Verbose >= 1 {
-			printerr("output will be written to file: %s", opts.CSVFileName)
-		}
-	}
+	// tableTemps maps the names of temporary partition tables to their final table names.
+	tableTemps := make(map[string]string)
 	// Process MARC data
-	inputCount, writeCount, err := process(opts, dbc, printerr)
+	inputCount, writeCount, err := process(opts, marct, dbc, printerr, tableTemps)
 	if err != nil {
 		return err
 	}
-	if opts.CSVFileName == "" {
-		// Index columns
-		if !opts.NoIndexes {
-			if err = index(opts, dbc, printerr); err != nil {
-				return err
-			}
-		}
-		// Replace table
-		if err = replace(opts, dbc); err != nil {
+	// Index columns
+	if err = index(marct, dbc, printerr); err != nil {
+		return err
+	}
+	// Install tables
+	if err = install(marct, dbc, tableTemps, printerr); err != nil {
+		return err
+	}
+	// Grant permission to LDP user
+	for _, u := range marct.Users {
+		if err = grant(marct, dbc, u); err != nil {
 			return err
 		}
-		// Grant permission to LDP user
-		for _, u := range opts.Users {
-			if err = grant(opts, dbc, u); err != nil {
+	}
+	_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS dbsystem.ldpmarc_cksum;")
+	_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS dbsystem.ldpmarc_metadata;")
+	if inputCount > 0 {
+		startCksum := time.Now()
+		if err = inc.CreateCksum(dbc, marct.Loc.SrsRecords, marct.Loc.SrsMarc, marct.Loc.tablefinal(),
+			marct.Loc.SrsMarcAttr); err != nil {
+			return err
+		}
+		if marct.Verbose >= 1 {
+			printerr(" %s checksum", util.ElapsedTime(startCksum))
+		}
+		/*
+			startVacuum := time.Now()
+			if err = util.Vacuum(context.TODO(), dbc, marct.Loc.tablefinal()); err != nil {
 				return err
 			}
-		}
-		_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS dbsystem.ldpmarc_cksum;")
-		_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS dbsystem.ldpmarc_metadata;")
-		if inputCount > 0 {
-			startCksum := time.Now()
-			if err = inc.CreateCksum(dbc, opts.Loc.SrsRecords, opts.Loc.SrsMarc, opts.Loc.tablefinal(),
-				opts.Loc.SrsMarcAttr); err != nil {
+			if err = inc.VacuumCksum(context.TODO(), dbc); err != nil {
 				return err
 			}
-			if opts.Verbose >= 1 {
-				printerr(" %s checksum", util.ElapsedTime(startCksum))
+			if marct.Verbose >= 1 {
+				printerr(" %s vacuum", util.ElapsedTime(startVacuum))
 			}
-			/*
-				startVacuum := time.Now()
-				if err = util.Vacuum(context.TODO(), dbc, opts.Loc.tablefinal()); err != nil {
-					return err
-				}
-				if err = inc.VacuumCksum(context.TODO(), dbc); err != nil {
-					return err
-				}
-				if opts.Verbose >= 1 {
-					printerr(" %s vacuum", util.ElapsedTime(startVacuum))
-				}
-			*/
-		}
-		if opts.Verbose >= 1 {
-			printerr("%s full update", util.ElapsedTime(startUpdate))
-			printerr("%d output rows", writeCount)
-			printerr("new table is ready to use: " + opts.Loc.tablefinal())
-		}
+		*/
+	}
+	if marct.Verbose >= 1 {
+		printerr("%s full update", util.ElapsedTime(startUpdate))
+		printerr("%d output rows", writeCount)
+		printerr("new table is ready to use: " + marct.Loc.tablefinal())
 	}
 	return nil
 }
 
-func process(opts *TransformOptions, dbc *util.DBC, printerr PrintErr) (int64, int64, error) {
+func process(opts *options.Options, marct *MARCTransform, dbc *util.DBC, printerr PrintErr, tableTemps map[string]string) (int64, int64, error) {
 	var err error
 	var store *local.Store
-	if store, err = local.NewStore(opts.Datadir); err != nil {
+	if store, err = local.NewStore(marct.Datadir); err != nil {
 		return 0, 0, err
 	}
 	defer store.Close()
-	if err = setupTables(opts, dbc); err != nil {
+	if err = setupTables(dbc, tableTemps); err != nil {
 		return 0, 0, err
 	}
 
 	var inputCount, writeCount int64
-	if inputCount, err = selectCount(dbc, opts.Loc.SrsRecords); err != nil {
+	if inputCount, err = selectCount(dbc, marct.Loc.SrsRecords); err != nil {
 		return 0, 0, err
 	}
-	if opts.Verbose >= 1 {
+	if marct.Verbose >= 1 {
 		printerr("%d input rows", inputCount)
 	}
 	// main processing
 	if inputCount > 0 {
-		if writeCount, err = processAll(opts, dbc, store, printerr); err != nil {
+		if writeCount, err = processAll(opts, marct, dbc, store, printerr, tableTemps); err != nil {
 			return 0, 0, err
 		}
 	}
 	return inputCount, writeCount, nil
 }
 
-func setupTables(opts *TransformOptions, dbc *util.DBC) error {
+func setupTables(dbc *util.DBC, tableTemps map[string]string) error {
 	var err error
 	var q string
 	_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS "+tableout)
-	if opts.TrigramIndex && !util.IsTrgmAvailable(dbc) {
-		return fmt.Errorf("unable to access pg_trgm module extension")
-	}
 	var lz4 string
 	if util.IsLZ4Available(dbc) {
 		lz4 = " COMPRESSION lz4"
@@ -325,10 +286,12 @@ func setupTables(opts *TransformOptions, dbc *util.DBC) error {
 		_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS ldpmarc.srs_marctab_"+field)
 		_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS "+tableout+field)
 		q = "CREATE TABLE " + tableout + field +
-			" PARTITION OF " + tableout + " FOR VALUES IN ('" + field + "')"
+			" PARTITION OF " + tableout + " FOR VALUES IN ('" + field + "')" +
+			" PARTITION BY LIST (sf)"
 		if _, err = dbc.Conn.Exec(context.TODO(), q); err != nil {
-			return fmt.Errorf("creating partition: %s", err)
+			return fmt.Errorf("creating field partition: %s", err)
 		}
+		tableTemps[tableoutTable+field] = "mt" + field
 	}
 	_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS ldpmarc.cksum")
 	_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS ldpmarc.metadata")
@@ -346,14 +309,18 @@ func selectCount(dbc *util.DBC, tablein string) (int64, error) {
 	return count, nil
 }
 
-func processAll(opts *TransformOptions, dbc *util.DBC, store *local.Store, printerr PrintErr) (int64, error) {
+func processAll(opts *options.Options, marct *MARCTransform, dbc *util.DBC, store *local.Store, printerr PrintErr,
+	tableTemps map[string]string) (int64, error) {
+
 	startTime := time.Now()
 
 	var err error
 	var msg *string
 	var writeCount int64
-	var q = "SELECT r.id, r.matched_id, r.external_hrid instance_hrid, m." + opts.Loc.SrsMarcAttr +
-		"::text FROM " + opts.Loc.SrsRecords + " r JOIN " + opts.Loc.SrsMarc + " m ON r.id = m.id" +
+	sfmap := make(map[util.FieldSF]struct{})
+
+	var q = "SELECT r.id, r.matched_id, r.external_hrid instance_hrid, m." + marct.Loc.SrsMarcAttr +
+		"::text FROM " + marct.Loc.SrsRecords + " r JOIN " + marct.Loc.SrsMarc + " m ON r.id = m.id" +
 		" WHERE r.state = 'ACTUAL'"
 	state := "ACTUAL"
 	var rows pgx.Rows
@@ -370,37 +337,37 @@ func processAll(opts *TransformOptions, dbc *util.DBC, store *local.Store, print
 		var mrecs []marc.Marc
 		var skip bool
 		id, matchedID, instanceHRID, instanceID, mrecs, skip = util.Transform(id, matchedID, instanceHRID,
-			&state, data, printerr, opts.Verbose)
+			&state, data, printerr, marct.Verbose)
 		if skip {
 			continue
 		}
 		var m marc.Marc
 		for _, m = range mrecs {
-			if opts.CSVFileName == "" {
-				record.SRSID = *id
-				record.Line = m.Line
-				record.MatchedID = *matchedID
-				record.InstanceHRID = *instanceHRID
-				record.InstanceID = instanceID
-				record.Field = m.Field
-				record.Ind1 = m.Ind1
-				record.Ind2 = m.Ind2
-				record.Ord = m.Ord
-				record.SF = m.SF
-				record.Content = m.Content
-				msg, err = store.Write(&record)
-				if err != nil {
-					return 0, fmt.Errorf("writing record: %v: %v", err, record)
-				}
-				if msg != nil {
-					printerr("skipping line in record: %s: %s", *id, *msg)
-					continue
-				}
-				writeCount++
-			} else {
-				_, _ = fmt.Fprintf(csvFile, "%q,%d,%q,%q,%q,%q,%q,%q,%d,%q,%q\n", *id, m.Line, *matchedID, *instanceHRID, instanceID, m.Field, m.Ind1, m.Ind2, m.Ord, m.SF, m.Content)
-				writeCount++
+			record.SRSID = *id
+			record.Line = m.Line
+			record.MatchedID = *matchedID
+			record.InstanceHRID = *instanceHRID
+			record.InstanceID = instanceID
+			record.Field = m.Field
+			record.Ind1 = m.Ind1
+			record.Ind2 = m.Ind2
+			record.Ord = m.Ord
+			record.SF = m.SF
+			record.Content = m.Content
+			msg, err = store.Write(&record)
+			if err != nil {
+				return 0, fmt.Errorf("writing record: %v: %v", err, record)
 			}
+			if msg != nil {
+				printerr("skipping line in record: %s: %s", *id, *msg)
+				continue
+			}
+			fieldSF := util.FieldSF{Field: m.Field, SF: m.SF}
+			_, ok := sfmap[fieldSF]
+			if !ok {
+				sfmap[fieldSF] = struct{}{}
+			}
+			writeCount++
 		}
 	}
 	if rows.Err() != nil {
@@ -412,7 +379,11 @@ func processAll(opts *TransformOptions, dbc *util.DBC, store *local.Store, print
 		return 0, err
 	}
 
-	if opts.Verbose >= 1 {
+	if err = createSFPartitions(opts, dbc, sfmap, tableTemps); err != nil {
+		return 0, err
+	}
+
+	if marct.Verbose >= 1 {
 		printerr(" %s transform", util.ElapsedTime(startTime))
 	}
 
@@ -434,21 +405,34 @@ func processAll(opts *TransformOptions, dbc *util.DBC, store *local.Store, print
 		src.Close()
 	}
 
-	if opts.Verbose >= 1 {
+	if marct.Verbose >= 1 {
 		printerr(" %s load", util.ElapsedTime(startTime))
 	}
 
 	return writeCount, nil
 }
 
-func index(opts *TransformOptions, dbc *util.DBC, printerr PrintErr) error {
+func createSFPartitions(opts *options.Options, dbc *util.DBC, sfmap map[util.FieldSF]struct{},
+	tableTemps map[string]string) error {
+	for f := range sfmap {
+		t := opts.SFPartitionTable(f.Field, f.SF)
+		q := "CREATE TABLE " + opts.TempPartitionSchema + "." + opts.TempTablePrefix + t +
+			" PARTITION OF " +
+			opts.TempPartitionSchema + "." + opts.TempTablePrefix + opts.PartitionTableBase + f.Field +
+			" FOR VALUES IN ('" + f.SF + "')"
+		if _, err := dbc.Conn.Exec(context.TODO(), q); err != nil {
+			return fmt.Errorf("creating sf partition: %s", err)
+		}
+		tableTemps[opts.TempTablePrefix+t] = t
+	}
+	return nil
+}
+
+func index(opts *MARCTransform, dbc *util.DBC, printerr PrintErr) error {
 	startIndex := time.Now()
 	var err error
 	// Index columns
 	var cols = []string{"srs_id"}
-	if opts.TrigramIndex {
-		cols = append(cols, "content")
-	}
 	if err = indexColumns(opts, dbc, cols, printerr); err != nil {
 		return err
 	}
@@ -458,75 +442,67 @@ func index(opts *TransformOptions, dbc *util.DBC, printerr PrintErr) error {
 	return nil
 }
 
-func indexColumns(opts *TransformOptions, dbc *util.DBC, cols []string, printerr PrintErr) error {
+func indexColumns(opts *MARCTransform, dbc *util.DBC, cols []string, printerr PrintErr) error {
 	for _, c := range cols {
 		if opts.Verbose >= 2 {
 			printerr("creating index: %s", c)
 		}
-		if c == "content" {
-			var q = "CREATE INDEX ON " + tableout + " USING GIN (" + c + " gin_trgm_ops)"
-			if _, err := dbc.Conn.Exec(context.TODO(), q); err != nil {
-				return fmt.Errorf("creating index with pg_trgm extension: %s: %s", c, err)
-			}
-		} else {
-			var q = "CREATE INDEX ON " + tableout + " (" + c + ")"
-			if _, err := dbc.Conn.Exec(context.TODO(), q); err != nil {
-				return fmt.Errorf("creating index: %s: %s", c, err)
-			}
+		var q = "CREATE INDEX ON " + tableout + " (" + c + ")"
+		if _, err := dbc.Conn.Exec(context.TODO(), q); err != nil {
+			return fmt.Errorf("creating index: %s: %s", c, err)
 		}
 	}
 	return nil
 }
 
-func replace(opts *TransformOptions, dbc *util.DBC) error {
-	// Clean up old tables
-	q := "DROP TABLE IF EXISTS folio_source_record.marctab"
-	_, err := dbc.Conn.Exec(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("dropping table: %s", err)
-	}
-	q = "DROP TABLE IF EXISTS public.srs_marctab"
-	_, err = dbc.Conn.Exec(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("dropping table: %s", err)
-	}
+func install(opts *MARCTransform, dbc *util.DBC, tableTemps map[string]string, printerr PrintErr) error {
+	start := time.Now()
 
-	q = "DROP TABLE IF EXISTS " + tableoutSchema + "." + opts.Loc.TablefinalTable
-	_, err = dbc.Conn.Exec(context.TODO(), q)
+	// Clean up obsolete table.
+	_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS folio_source_record.marctab")
+
+	tx, err := util.BeginTx(context.TODO(), dbc.Conn)
 	if err != nil {
+		return err
+	}
+	defer tx.Rollback(context.TODO())
+
+	q := "DROP TABLE IF EXISTS " + tableoutSchema + "." + opts.Loc.TablefinalTable
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("dropping table: %s", err)
 	}
 	q = "ALTER TABLE " + tableout + " RENAME TO " + opts.Loc.TablefinalTable
-	_, err = dbc.Conn.Exec(context.TODO(), q)
-	if err != nil {
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("renaming table: %s", err)
 	}
 	q = "DROP TABLE IF EXISTS " + opts.Loc.tablefinal()
-	_, err = dbc.Conn.Exec(context.TODO(), q)
-	if err != nil {
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("dropping table: %s", err)
 	}
 	q = "ALTER TABLE " + tableoutSchema + "." + opts.Loc.TablefinalTable + " SET SCHEMA " + opts.Loc.TablefinalSchema
-	_, err = dbc.Conn.Exec(context.TODO(), q)
-	if err != nil {
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("moving table: %s", err)
 	}
-	for _, field := range allFields {
-		q = "DROP TABLE IF EXISTS " + tableoutSchema + "." + opts.Loc.TablefinalTable + field
-		_, err = dbc.Conn.Exec(context.TODO(), q)
-		if err != nil {
+	for oldT, newT := range tableTemps {
+		q = "DROP TABLE IF EXISTS " + tableoutSchema + "." + newT
+		if _, err = tx.Exec(context.TODO(), q); err != nil {
 			return fmt.Errorf("dropping table: %s", err)
 		}
-		q = "ALTER TABLE " + tableout + field + " RENAME TO mt" + field
-		_, err = dbc.Conn.Exec(context.TODO(), q)
-		if err != nil {
+		q = "ALTER TABLE " + tableoutSchema + "." + oldT + " RENAME TO " + newT
+		if _, err = tx.Exec(context.TODO(), q); err != nil {
 			return fmt.Errorf("renaming table: %s", err)
 		}
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
+		return err
+	}
+	if opts.Verbose >= 1 {
+		printerr(" %s install", util.ElapsedTime(start))
 	}
 	return nil
 }
 
-func grant(opts *TransformOptions, dbc *util.DBC, user string) error {
+func grant(opts *MARCTransform, dbc *util.DBC, user string) error {
 	var err error
 	// Grant permission to LDP user
 	var q = "GRANT USAGE ON SCHEMA " + opts.Loc.TablefinalSchema + " TO " + user
@@ -540,48 +516,11 @@ func grant(opts *TransformOptions, dbc *util.DBC, user string) error {
 	return nil
 }
 
-/*
-func setupLocations() *locations {
-	loc := &locations{
-		SrsRecords:       "folio_source_record.records_lb",
-		SrsMarc:          "folio_source_record.marc_records_lb",
-		SrsMarcAttr:      "content",
-		TablefinalSchema: "folio_source_record",
-		TablefinalTable:  "marctab",
-	}
-	if !*metadbFlag { // LDP1
-		loc.SrsRecords = "public.srs_records"
-		loc.SrsMarc = "public.srs_marc"
-		loc.SrsMarcAttr = "data"
-		loc.TablefinalSchema = "public"
-		loc.TablefinalTable = "srs_marctab"
-	}
-	if *srsRecordsFlag != "" {
-		loc.SrsRecords = *srsRecordsFlag
-	}
-	if *srsMarcFlag != "" {
-		loc.SrsMarc = *srsMarcFlag
-	}
-	if *srsMarcAttrFlag != "" {
-		loc.SrsMarcAttr = *srsMarcAttrFlag
-	}
-	return loc
-}
-
-type locations struct {
-	SrsRecords       string
-	SrsMarc          string
-	SrsMarcAttr      string
-	TablefinalSchema string
-	TablefinalTable  string
-}
-*/
-
 func (l Locations) tablefinal() string {
 	return l.TablefinalSchema + "." + l.TablefinalTable
 }
 
-func readConfigMetadb(opts *TransformOptions) (string, string, string, string, string, string, error) {
+func readConfigMetadb(opts *MARCTransform) (string, string, string, string, string, string, error) {
 	var mdbconf = filepath.Join(opts.Datadir, "metadb.conf")
 	cfg, err := ini.Load(mdbconf)
 	if err != nil {
@@ -597,7 +536,7 @@ func readConfigMetadb(opts *TransformOptions) (string, string, string, string, s
 	return host, port, user, password, dbname, sslmode, nil
 }
 
-func readConfigLDP1(opts *TransformOptions) (string, string, string, string, string, string, error) {
+func readConfigLDP1(opts *MARCTransform) (string, string, string, string, string, string, error) {
 	var ldpconf = filepath.Join(opts.Datadir, "ldpconf.json")
 	viper.SetConfigFile(ldpconf)
 	viper.SetConfigType("json")
@@ -618,7 +557,3 @@ func readConfigLDP1(opts *TransformOptions) (string, string, string, string, str
 	var sslmode = viper.GetString(ldp + ".database_sslmode")
 	return host, port, user, password, dbname, sslmode, nil
 }
-
-//func printerr(format string, v ...any) {
-//	_, _ = fmt.Fprintf(os.Stderr, "%s: %s\n", "LDPMARC", fmt.Sprintf(format, v...))
-//}

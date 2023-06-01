@@ -9,11 +9,12 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/internal/marct/marc"
+	"github.com/metadb-project/metadb/cmd/internal/marct/options"
 	"github.com/metadb-project/metadb/cmd/internal/marct/util"
 	"github.com/metadb-project/metadb/cmd/internal/uuid"
 )
 
-const schemaVersion int64 = 15
+const schemaVersion int64 = 16
 const cksumTable = "marctab.cksum"
 const metadataTableS = "marctab"
 const metadataTableT = "metadata"
@@ -99,7 +100,7 @@ func VacuumCksum(ctx context.Context, dbc *util.DBC) error {
 	return nil
 }
 
-func IncrementalUpdate(connString string, srsRecords, srsMarc, srsMarcAttr, tablefinal string,
+func IncrementalUpdate(opts *options.Options, connString string, srsRecords, srsMarc, srsMarcAttr, tablefinal string,
 	printerr func(string, ...any), verbose int) error {
 
 	var err error
@@ -119,7 +120,8 @@ func IncrementalUpdate(connString string, srsRecords, srsMarc, srsMarcAttr, tabl
 	// _ = util.Vacuum(ctx, dbc, tablefinal)
 	// _ = VacuumCksum(ctx, dbc)
 	// add new data
-	if err = updateNew(ctx, dbc, srsRecords, srsMarc, srsMarcAttr, tablefinal, printerr, verbose); err != nil {
+	if err = updateNew(ctx, opts, dbc, srsRecords, srsMarc, srsMarcAttr, tablefinal, printerr,
+		verbose); err != nil {
 		return fmt.Errorf("new: %s", err)
 	}
 	// remove deleted data
@@ -127,7 +129,7 @@ func IncrementalUpdate(connString string, srsRecords, srsMarc, srsMarcAttr, tabl
 		return fmt.Errorf("delete: %s", err)
 	}
 	// replace modified data
-	if err = updateChange(ctx, dbc, srsRecords, srsMarc, srsMarcAttr, tablefinal, printerr, verbose); err != nil {
+	if err = updateChange(ctx, opts, dbc, srsRecords, srsMarc, srsMarcAttr, tablefinal, printerr, verbose); err != nil {
 		return fmt.Errorf("change: %s", err)
 	}
 	// vacuum
@@ -149,8 +151,8 @@ func IncrementalUpdate(connString string, srsRecords, srsMarc, srsMarcAttr, tabl
 	return nil
 }
 
-func updateNew(ctx context.Context, dbc *util.DBC, srsRecords, srsMarc, srsMarcAttr, tablefinal string, printerr func(string, ...any),
-	verbose int) error {
+func updateNew(ctx context.Context, opts *options.Options, dbc *util.DBC, srsRecords, srsMarc, srsMarcAttr,
+	tablefinal string, printerr func(string, ...any), verbose int) error {
 	startNew := time.Now()
 	var err error
 	// find new data
@@ -160,12 +162,12 @@ func updateNew(ctx context.Context, dbc *util.DBC, srsRecords, srsMarc, srsMarcA
 	if _, err = dbc.Conn.Exec(ctx, q); err != nil {
 		return fmt.Errorf("creating addition table: %s", err)
 	}
+	//if err = util.VacuumAnalyze(ctx, dbc, "marctab.inc_add"); err != nil {
+	//	return fmt.Errorf("vacuum analyze: %s", err)
+	//}
 	q = "ALTER TABLE marctab.inc_add ADD CONSTRAINT marctab_add_pkey PRIMARY KEY (id);"
 	if _, err = dbc.Conn.Exec(ctx, q); err != nil {
 		return fmt.Errorf("creating primary key on addition table: %s", err)
-	}
-	if err = util.VacuumAnalyze(ctx, dbc, "marctab.inc_add"); err != nil {
-		return fmt.Errorf("vacuum analyze: %s", err)
 	}
 	var connw *pgx.Conn
 	if connw, err = util.ConnectDB(ctx, dbc.ConnString); err != nil {
@@ -178,6 +180,7 @@ func updateNew(ctx context.Context, dbc *util.DBC, srsRecords, srsMarc, srsMarcA
 	}
 	defer tx.Rollback(ctx)
 	// transform
+	sfmap := make(map[util.FieldSF]struct{})
 	q = filterQuery(srsRecords, srsMarc, srsMarcAttr, "marctab.inc_add")
 	var rows pgx.Rows
 	if rows, err = dbc.Conn.Query(ctx, q); err != nil {
@@ -204,10 +207,24 @@ func updateNew(ctx context.Context, dbc *util.DBC, srsRecords, srsMarc, srsMarcA
 		}
 		var m marc.Marc
 		for _, m = range mrecs {
+			// Create partition.
+			fieldSF := util.FieldSF{Field: m.Field, SF: m.SF}
+			_, ok := sfmap[fieldSF]
+			if !ok {
+				t := opts.SFPartitionTable(fieldSF.Field, fieldSF.SF)
+				q = "CREATE TABLE IF NOT EXISTS " + opts.FinalPartitionSchema + "." + t +
+					" PARTITION OF " + opts.FinalPartitionSchema + "." +
+					opts.PartitionTableBase + fieldSF.Field +
+					" FOR VALUES IN ('" + fieldSF.SF + "')"
+				if _, err = tx.Exec(ctx, q); err != nil {
+					return fmt.Errorf("adding partition: %v", err)
+				}
+				sfmap[fieldSF] = struct{}{}
+			}
+			// Insert row.
 			q = "INSERT INTO " + tablefinal + " VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)"
-			_, err = tx.Exec(ctx, q, id, m.Line, matchedID, instanceHRID, instanceID, m.Field, m.Ind1,
-				m.Ind2, m.Ord, m.SF, m.Content)
-			if err != nil {
+			if _, err = tx.Exec(ctx, q, id, m.Line, matchedID, instanceHRID, instanceID, m.Field, m.Ind1,
+				m.Ind2, m.Ord, m.SF, m.Content); err != nil {
 				return fmt.Errorf("adding record: %v", err)
 			}
 		}
@@ -245,12 +262,12 @@ func updateDelete(ctx context.Context, dbc *util.DBC, srsRecords, tablefinal str
 	if _, err = dbc.Conn.Exec(ctx, q); err != nil {
 		return fmt.Errorf("creating deletion table: %s", err)
 	}
+	//if err = util.VacuumAnalyze(ctx, dbc, "marctab.inc_delete"); err != nil {
+	//	return fmt.Errorf("vacuum analyze: %s", err)
+	//}
 	q = "ALTER TABLE marctab.inc_delete ADD CONSTRAINT marctab_delete_pkey PRIMARY KEY (id);"
 	if _, err = dbc.Conn.Exec(ctx, q); err != nil {
 		return fmt.Errorf("creating primary key on deletion table: %s", err)
-	}
-	if err = util.VacuumAnalyze(ctx, dbc, "marctab.inc_delete"); err != nil {
-		return fmt.Errorf("vacuum analyze: %s", err)
 	}
 	if verbose >= 2 {
 		// show changes
@@ -306,7 +323,7 @@ func updateDelete(ctx context.Context, dbc *util.DBC, srsRecords, tablefinal str
 	return nil
 }
 
-func updateChange(ctx context.Context, dbc *util.DBC, srsRecords, srsMarc, srsMarcAttr, tablefinal string, printerr func(string, ...any), verbose int) error {
+func updateChange(ctx context.Context, opts *options.Options, dbc *util.DBC, srsRecords, srsMarc, srsMarcAttr, tablefinal string, printerr func(string, ...any), verbose int) error {
 	startChange := time.Now()
 	var err error
 	// find changed data
@@ -315,12 +332,12 @@ func updateChange(ctx context.Context, dbc *util.DBC, srsRecords, srsMarc, srsMa
 	if _, err = dbc.Conn.Exec(ctx, q); err != nil {
 		return fmt.Errorf("creating change table: %s", err)
 	}
+	//if err = util.VacuumAnalyze(ctx, dbc, "marctab.inc_change"); err != nil {
+	//	return fmt.Errorf("vacuum analyze: %s", err)
+	//}
 	q = "ALTER TABLE marctab.inc_change ADD CONSTRAINT marctab_change_pkey PRIMARY KEY (id);"
 	if _, err = dbc.Conn.Exec(ctx, q); err != nil {
 		return fmt.Errorf("creating primary key on change table: %s", err)
-	}
-	if err = util.VacuumAnalyze(ctx, dbc, "marctab.inc_change"); err != nil {
-		return fmt.Errorf("vacuum analyze: %s", err)
 	}
 	// connR is used for queries concurrent with reading rows.
 	var connR *pgx.Conn
@@ -340,6 +357,7 @@ func updateChange(ctx context.Context, dbc *util.DBC, srsRecords, srsMarc, srsMa
 	}
 	defer tx.Rollback(ctx)
 	// transform
+	sfmap := make(map[util.FieldSF]struct{})
 	q = filterQuery(srsRecords, srsMarc, srsMarcAttr, "marctab.inc_change")
 	var rows pgx.Rows
 	if rows, err = dbc.Conn.Query(ctx, q); err != nil {
@@ -387,6 +405,21 @@ func updateChange(ctx context.Context, dbc *util.DBC, srsRecords, srsMarc, srsMa
 		}
 		var m marc.Marc
 		for _, m = range mrecs {
+			// Create partition.
+			fieldSF := util.FieldSF{Field: m.Field, SF: m.SF}
+			_, ok := sfmap[fieldSF]
+			if !ok {
+				t := opts.SFPartitionTable(fieldSF.Field, fieldSF.SF)
+				q = "CREATE TABLE IF NOT EXISTS " + opts.FinalPartitionSchema + "." + t +
+					" PARTITION OF " + opts.FinalPartitionSchema + "." +
+					opts.PartitionTableBase + fieldSF.Field +
+					" FOR VALUES IN ('" + fieldSF.SF + "')"
+				if _, err = tx.Exec(ctx, q); err != nil {
+					return fmt.Errorf("adding partition: %v", err)
+				}
+				sfmap[fieldSF] = struct{}{}
+			}
+			// Insert row.
 			q = "INSERT INTO " + tablefinal + " VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)"
 			_, err = tx.Exec(ctx, q, id, m.Line, matchedID, instanceHRID, instanceID, m.Field, m.Ind1,
 				m.Ind2, m.Ord, m.SF, m.Content)

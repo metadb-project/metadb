@@ -13,10 +13,12 @@ var incUpdateFlag = flag.Bool("i", false, "[option no longer supported]")
 var datadirFlag = flag.String("D", "", "Data directory")
 var ldpUserFlag = flag.String("u", "", "User to be granted select privileges")
 var noTrigramIndexFlag = flag.Bool("T", false, "[option no longer supported]")
-var trigramIndexFlag = flag.Bool("t", false, "Create trigram index on content column")
-var noIndexesFlag = flag.Bool("I", false, "Disable creation of all indexes")
+
+// var trigramIndexFlag = flag.Bool("t", false, "Create trigram index on content column")
+// var noIndexesFlag = flag.Bool("I", false, "Disable creation of all indexes")
 var verboseFlag = flag.Bool("v", false, "Enable verbose output")
-var csvFilenameFlag = flag.String("c", "", "Write output to CSV file instead of a database")
+
+// var csvFilenameFlag = flag.String("c", "", "Write output to CSV file instead of a database")
 var srsRecordsFlag = flag.String("r", "", "Name of table containing MARC records to read")
 var srsMarcFlag = flag.String("m", "", "Name of table containing MARC (JSON) data to read")
 var srsMarcAttrFlag = flag.String("j", "", "Name of column containing MARC JSON data")
@@ -56,21 +58,21 @@ func main() {
 	if *verboseFlag {
 		verbose = 2
 	}
-	opt := &marct.TransformOptions{
-		FullUpdate:   *fullUpdateFlag,
-		Datadir:      *datadirFlag,
-		Users:        users,
-		TrigramIndex: *trigramIndexFlag,
-		NoIndexes:    *noIndexesFlag,
-		Verbose:      verbose,
-		CSVFileName:  *csvFilenameFlag,
-		SRSRecords:   *srsRecordsFlag,
-		SRSMarc:      *srsMarcFlag,
-		SRSMarcAttr:  *srsMarcAttrFlag,
-		Metadb:       *metadbFlag,
-		PrintErr:     printerr,
+	t := &marct.MARCTransform{
+		FullUpdate: *fullUpdateFlag,
+		Datadir:    *datadirFlag,
+		Users:      users,
+		//TrigramIndex: *trigramIndexFlag,
+		//NoIndexes:    *noIndexesFlag,
+		Verbose: verbose,
+		//CSVFileName:  *csvFilenameFlag,
+		SRSRecords:  *srsRecordsFlag,
+		SRSMarc:     *srsMarcFlag,
+		SRSMarcAttr: *srsMarcAttrFlag,
+		Metadb:      *metadbFlag,
+		PrintErr:    printerr,
 	}
-	if err := marct.Run(opt); err != nil {
+	if err := t.Transform(); err != nil {
 		printerr("%s", err)
 		os.Exit(1)
 	}
