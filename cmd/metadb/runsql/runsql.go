@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -105,6 +106,7 @@ func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, sche
 		return err
 	}
 	defer dbx.Rollback(tx)
+	start := time.Now()
 	for _, l := range list {
 		q := strings.TrimSpace(l)
 		if q == "" {
@@ -114,15 +116,15 @@ func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, sche
 			return err
 		}
 		if _, err = tx.Exec(context.TODO(), q); err != nil {
-			if table != "" {
-				_ = cat.TableUpdatedNow(dbx.Table{S: schema, T: table})
-			}
 			return fmt.Errorf("%s", strings.TrimPrefix(err.Error(), "ERROR: "))
 		}
 	}
-	err = tx.Commit(context.TODO())
+	elapsed := time.Since(start)
+	if err = tx.Commit(context.TODO()); err != nil {
+		return err
+	}
 	if table != "" {
-		if err = cat.TableUpdatedNow(dbx.Table{S: schema, T: table}); err != nil {
+		if err = cat.TableUpdatedNow(dbx.Table{S: schema, T: table}, elapsed); err != nil {
 			return fmt.Errorf("writing table updated time: %v", err)
 		}
 	}

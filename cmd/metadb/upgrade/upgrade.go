@@ -395,6 +395,7 @@ var updbList = []updbFunc{
 	updb13,
 	updb14,
 	updb15,
+	updb16,
 }
 
 /*
@@ -1215,6 +1216,37 @@ func updb15(opt *dbopt) error {
 	defer dbx.Rollback(tx)
 	// Write new version number
 	err = metadata.WriteDatabaseVersion(tx, 15)
+	if err != nil {
+		return err
+	}
+	err = tx.Commit(context.TODO())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb16(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	// Begin transaction
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+	// Add realtime column.
+	q := "ALTER TABLE metadb.table_update ADD COLUMN realtime real"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	// Write new version number
+	err = metadata.WriteDatabaseVersion(tx, 16)
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@ package marctab
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/metadb-project/metadb/cmd/internal/marct"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
@@ -22,6 +23,7 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 	}
 	defer dbx.Close(dcsuper)
 
+	start := time.Now()
 	users := []string{}
 	t := &marct.MARCTransform{
 		FullUpdate: false,
@@ -42,7 +44,8 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 	if err = t.Transform(); err != nil {
 		return fmt.Errorf("%v", err)
 	}
-	if err = cat.TableUpdatedNow(dbx.Table{S: "folio_source_record", T: "marc__t"}); err != nil {
+	elapsed := time.Since(start)
+	if err = cat.TableUpdatedNow(dbx.Table{S: "folio_source_record", T: "marc__t"}, elapsed); err != nil {
 		return fmt.Errorf("writing table updated time: %v", err)
 	}
 	_ = cat.RemoveTableUpdated(dbx.Table{S: "folio_source_record", T: "marctab"})

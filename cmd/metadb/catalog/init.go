@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"sync"
 	"time"
@@ -285,12 +286,13 @@ func createTableTrack(tx pgx.Tx) error {
 	return nil
 }
 
-func (c *Catalog) TableUpdatedNow(table dbx.Table) error {
+func (c *Catalog) TableUpdatedNow(table dbx.Table, elapsedTime time.Duration) error {
+	realtime := float32(math.Round(elapsedTime.Seconds()*10000) / 10000)
 	u := catalogSchema + ".table_update"
-	q := "INSERT INTO " + u + "(schemaname,tablename,updated)" +
-		"VALUES($1,$2,now())" +
-		"ON CONFLICT (schemaname,tablename) DO UPDATE SET updated=now()"
-	if _, err := c.dp.Exec(context.TODO(), q, table.S, table.T); err != nil {
+	q := "INSERT INTO " + u + "(schemaname,tablename,updated,realtime)" +
+		"VALUES($1,$2,now(),$3)" +
+		"ON CONFLICT (schemaname,tablename) DO UPDATE SET updated=now(),realtime=$4"
+	if _, err := c.dp.Exec(context.TODO(), q, table.S, table.T, realtime, realtime); err != nil {
 		return fmt.Errorf("updating table %s in %s: %v", table, u, err)
 	}
 	return nil
