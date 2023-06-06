@@ -20,6 +20,9 @@ SELECT updated
     WHERE schemaname = 'folio_source_record' AND tablename = 'marc__t';
 ----
 
+The MARC transform stores partition tables in the schema `marctab`.  Users can
+ignore this schema, as all data are accessible via `folio_source_record.marc__t`.
+
 ==== Derived tables
 
 FOLIO derived tables are automatically updated once per day, usually at about
