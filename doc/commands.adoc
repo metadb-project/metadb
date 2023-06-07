@@ -201,23 +201,27 @@ SELECT mdbversion();
 
 ==== metadb.table_update
 
-[%header,cols="1l,1l,3"]
+[%header,cols="1,1l,3"]
 |===
 |Column name
 |Column type
 |Description
 
-|schemaname
+|`schemaname`
 |text
 |Schema name of the updated table
 
-|tablename
+|`tablename`
 |text
 |Table name of the updated table
 
-|updated
+|`updated`
 |timestamptz
-|Timestamp when the table was last updated
+|Timestamp when the table was last updated successfully
+
+|`realtime` [.aqua-background]#Metadb 1.1#
+|real
+|Elapsed real time (in seconds) of the completed update process
 |===
 
 === External SQL directives
