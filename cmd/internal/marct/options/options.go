@@ -1,5 +1,7 @@
 package options
 
+import "strconv"
+
 type Options struct {
 	TempPartitionSchema  string
 	TempTablePrefix      string
@@ -8,14 +10,22 @@ type Options struct {
 }
 
 func (o Options) SFPartitionTable(field, sf string) string {
-	var sf0, sf1 string
-	// If sf is uppercase, convert to lowercase and double it, so that we can send
-	// the database a lowercase table name.
-	if len(sf) != 0 && 'A' <= sf[0] && sf[0] <= 'Z' {
-		sf0 = string(sf[0] ^ 0x20) // Convert to lowercase.
-		sf1 = sf0
-	} else {
-		sf0 = sf
+	return o.PartitionTableBase + field + "_" + sfToIdentifierString(sf)
+}
+
+// sfToIdentifierString converts a valid sf to a string that is valid to use as the middle or end of a database
+// identifier.
+func sfToIdentifierString(sf string) string {
+	if sf == "" {
+		return ""
 	}
-	return o.PartitionTableBase + field + "_" + sf0 + sf1
+	r := sf[0]
+	if ('a' <= r && r <= 'z') || ('0' <= r && r <= '9') {
+		return sf
+	}
+	if 'A' <= r && r <= 'Z' {
+		w := string(r ^ 0x20) // Convert to lowercase.
+		return w + w
+	}
+	return "0x" + strconv.FormatInt(int64(r), 16)
 }
