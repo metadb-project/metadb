@@ -215,7 +215,7 @@ func updateNew(ctx context.Context, opts *options.Options, dbc *util.DBC, srsRec
 				q = "CREATE TABLE IF NOT EXISTS " + opts.FinalPartitionSchema + "." + t +
 					" PARTITION OF " + opts.FinalPartitionSchema + "." +
 					opts.PartitionTableBase + fieldSF.Field +
-					" FOR VALUES IN ('" + fieldSF.SF + "')"
+					" FOR VALUES IN ('" + util.EscapeSFString(fieldSF.SF) + "')"
 				if _, err = tx.Exec(ctx, q); err != nil {
 					return fmt.Errorf("adding partition: %v", err)
 				}
@@ -413,7 +413,7 @@ func updateChange(ctx context.Context, opts *options.Options, dbc *util.DBC, srs
 				q = "CREATE TABLE IF NOT EXISTS " + opts.FinalPartitionSchema + "." + t +
 					" PARTITION OF " + opts.FinalPartitionSchema + "." +
 					opts.PartitionTableBase + fieldSF.Field +
-					" FOR VALUES IN ('" + fieldSF.SF + "')"
+					" FOR VALUES IN ('" + util.EscapeSFString(fieldSF.SF) + "')"
 				if _, err = tx.Exec(ctx, q); err != nil {
 					return fmt.Errorf("adding partition: %v", err)
 				}

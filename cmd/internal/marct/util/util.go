@@ -178,6 +178,13 @@ func ConnectDB(ctx context.Context, connString string) (*pgx.Conn, error) {
 	return dc, nil
 }
 
+func EscapeSFString(sf string) string {
+	if sf == "'" {
+		return "''"
+	}
+	return sf
+}
+
 type FieldSF struct {
 	Field string
 	SF    string

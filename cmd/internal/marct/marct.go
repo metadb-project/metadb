@@ -419,7 +419,7 @@ func createSFPartitions(opts *options.Options, dbc *util.DBC, sfmap map[util.Fie
 		q := "CREATE TABLE " + opts.TempPartitionSchema + "." + opts.TempTablePrefix + t +
 			" PARTITION OF " +
 			opts.TempPartitionSchema + "." + opts.TempTablePrefix + opts.PartitionTableBase + f.Field +
-			" FOR VALUES IN ('" + f.SF + "')"
+			" FOR VALUES IN ('" + util.EscapeSFString(f.SF) + "')"
 		if _, err := dbc.Conn.Exec(context.TODO(), q); err != nil {
 			return fmt.Errorf("creating sf partition: %s", err)
 		}
