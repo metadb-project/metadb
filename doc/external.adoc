@@ -393,16 +393,10 @@ usually takes the form:
 SELECT json_extract_path_text(data, 'group') FROM user_groups;
 ----
 
-The equivalent for Metadb is either:
+The equivalent for Metadb is:
 
 ----
 SELECT jsonb_extract_path_text(jsonb, 'group') FROM folio_users.groups;
-----
-
-Or:
-
-----
-SELECT jsonb->>'group' FROM folio_users.groups;
 ----
 
 [discrete]
