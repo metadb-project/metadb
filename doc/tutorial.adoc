@@ -248,8 +248,8 @@ The JSON fields can be selected using SQL:
 SELECT __id,
        __start,
        id,
-       jsondata->>'groupname' AS groupname,
-       jsondata->>'description' AS description
+       jsondata #>> '{groupname}' AS groupname,
+       jsondata #>> '{description}' AS description
     FROM library.patrongroup;
 ----
 
