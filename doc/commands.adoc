@@ -164,7 +164,7 @@ This table summarizes the type adjustments that are performed:
 Show log messages from the past hour, and from the past 24 hours:
 
 ----
-SELECT * FROM mdblog(interval '1 hour');
+SELECT * FROM mdblog('1 hour');
 ----
 ----
 SELECT * FROM mdblog();
