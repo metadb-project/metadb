@@ -11,12 +11,12 @@
 :toclevels: 5
 :toc-title: Contents
 
-include::tutorial.adoc[]
+include::userguide.adoc[]
 
-include::commands.adoc[]
+include::reference.adoc[]
 
-include::admin.adoc[]
+include::serveradmin.adoc[]
 
 // include::transform.adoc[]
 
-include::external.adoc[]
+include::externalproj.adoc[]
