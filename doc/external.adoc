@@ -457,12 +457,12 @@ The MARC transform in Metadb can also be used with LDP (and LDLite).  A
 command-line tool called `marct` is provided which is a drop-in replacement for
 `ldpmarc`.
 
-The system requirements are a subset of those recommended for Metadb:
+The system requirements are a subset of those for Metadb:
 
 * Local storage: 500 GB
 * Database storage: 500 GB
 * Operating system: Linux
-* https://www.postgresql.org/[PostgreSQL] 13 or later
+* https://www.postgresql.org/[PostgreSQL] 15 or later
 * https://golang.org/[Go] 1.20 or later
 
 To build `marct`:
