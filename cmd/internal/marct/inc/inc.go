@@ -156,7 +156,9 @@ func updateNew(ctx context.Context, opts *options.Options, dbc *util.DBC, srsRec
 	startNew := time.Now()
 	var err error
 	// find new data
-	_, _ = dbc.Conn.Exec(ctx, "DROP TABLE IF EXISTS marctab.inc_add")
+	if _, err = dbc.Conn.Exec(ctx, "DROP TABLE IF EXISTS marctab.inc_add"); err != nil {
+		return fmt.Errorf("dropping table \"marctab.inc_add\": %v", err)
+	}
 	var q = "CREATE UNLOGGED TABLE marctab.inc_add AS SELECT r.id::uuid FROM " + srsRecords + " r LEFT JOIN " +
 		cksumTable + " c ON r.id::uuid = c.id WHERE c.id IS NULL;"
 	if _, err = dbc.Conn.Exec(ctx, q); err != nil {
@@ -256,7 +258,9 @@ func updateDelete(ctx context.Context, dbc *util.DBC, srsRecords, tablefinal str
 	startDelete := time.Now()
 	var err error
 	// find deleted data
-	_, _ = dbc.Conn.Exec(ctx, "DROP TABLE IF EXISTS marctab.inc_delete")
+	if _, err = dbc.Conn.Exec(ctx, "DROP TABLE IF EXISTS marctab.inc_delete"); err != nil {
+		return fmt.Errorf("dropping table \"marctab.inc_delete\": %v", err)
+	}
 	q := "CREATE UNLOGGED TABLE marctab.inc_delete AS SELECT c.id FROM " + srsRecords + " r RIGHT JOIN " +
 		cksumTable + " c ON r.id::uuid = c.id WHERE r.id IS NULL;"
 	if _, err = dbc.Conn.Exec(ctx, q); err != nil {
@@ -327,7 +331,9 @@ func updateChange(ctx context.Context, opts *options.Options, dbc *util.DBC, srs
 	startChange := time.Now()
 	var err error
 	// find changed data
-	_, _ = dbc.Conn.Exec(ctx, "DROP TABLE IF EXISTS marctab.inc_change")
+	if _, err = dbc.Conn.Exec(ctx, "DROP TABLE IF EXISTS marctab.inc_change"); err != nil {
+		return fmt.Errorf("dropping table \"marctab.inc_change\": %v", err)
+	}
 	var q = "CREATE UNLOGGED TABLE marctab.inc_change AS SELECT r.id::uuid FROM " + srsRecords + " r JOIN " + cksumTable + " c ON r.id::uuid = c.id JOIN " + srsMarc + " m ON r.id = m.id WHERE " + util.MD5(srsMarcAttr) + " <> c.cksum;"
 	if _, err = dbc.Conn.Exec(ctx, q); err != nil {
 		return fmt.Errorf("creating change table: %s", err)

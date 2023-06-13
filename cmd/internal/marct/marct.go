@@ -111,7 +111,9 @@ func marcTransform(opts *options.Options, marct *MARCTransform) error {
 				marct.PrintErr("starting full update")
 			}
 			if err = fullUpdate(opts, marct, connString, marct.PrintErr); err != nil {
-				_, _ = conn.Exec(context.TODO(), "DROP TABLE IF EXISTS "+tableout)
+				if _, err = conn.Exec(context.TODO(), "DROP TABLE IF EXISTS "+tableout); err != nil {
+					return fmt.Errorf("dropping table %q: %v", tableout, err)
+				}
 				return err
 			}
 		}
@@ -194,8 +196,12 @@ func fullUpdate(opts *options.Options, marct *MARCTransform, connString string, 
 			return err
 		}
 	}
-	_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS dbsystem.ldpmarc_cksum;")
-	_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS dbsystem.ldpmarc_metadata;")
+	if _, err = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS dbsystem.ldpmarc_cksum"); err != nil {
+		return fmt.Errorf("dropping table \"dbsystem.ldpmarc_cksum\": %v", err)
+	}
+	if _, err = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS dbsystem.ldpmarc_metadata"); err != nil {
+		return fmt.Errorf("dropping table \"dbsystem.ldpmarc_metadata\": %v", err)
+	}
 	if inputCount > 0 {
 		startCksum := time.Now()
 		if err = inc.CreateCksum(dbc, marct.Loc.SrsRecords, marct.Loc.SrsMarc, marct.Loc.tablefinal(),
@@ -256,7 +262,9 @@ func process(opts *options.Options, marct *MARCTransform, dbc *util.DBC, printer
 func setupTables(dbc *util.DBC, tableTemps map[string]string) error {
 	var err error
 	var q string
-	_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS "+tableout)
+	if _, err = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS "+tableout); err != nil {
+		return fmt.Errorf("dropping table %q: %v", tableout, err)
+	}
 	var lz4 string
 	if util.IsLZ4Available(dbc) {
 		lz4 = " COMPRESSION lz4"
@@ -283,8 +291,12 @@ func setupTables(dbc *util.DBC, tableTemps map[string]string) error {
 		return fmt.Errorf("adding comment on table: %s", err)
 	}
 	for _, field := range allFields {
-		_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS ldpmarc.srs_marctab_"+field)
-		_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS "+tableout+field)
+		if _, err = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS ldpmarc.srs_marctab_"+field); err != nil {
+			return fmt.Errorf("dropping table \"ldpmarc.srs_marctab_%s\": %v", field, err)
+		}
+		if _, err = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS "+tableout+field); err != nil {
+			return fmt.Errorf("dropping table %q: %v", tableout+field, err)
+		}
 		q = "CREATE TABLE " + tableout + field +
 			" PARTITION OF " + tableout + " FOR VALUES IN ('" + field + "')" +
 			" PARTITION BY LIST (sf)"
@@ -293,9 +305,15 @@ func setupTables(dbc *util.DBC, tableTemps map[string]string) error {
 		}
 		tableTemps[tableoutTable+field] = "mt" + field
 	}
-	_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS ldpmarc.cksum")
-	_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS ldpmarc.metadata")
-	_, _ = dbc.Conn.Exec(context.TODO(), "DROP SCHEMA IF EXISTS ldpmarc")
+	if _, err = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS ldpmarc.cksum"); err != nil {
+		return fmt.Errorf("dropping table \"ldpmarc.cksum\": %v", err)
+	}
+	if _, err = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS ldpmarc.metadata"); err != nil {
+		return fmt.Errorf("dropping table \"ldpmarc.metadata\": %v", err)
+	}
+	if _, err = dbc.Conn.Exec(context.TODO(), "DROP SCHEMA IF EXISTS ldpmarc"); err != nil {
+		return fmt.Errorf("dropping schema \"ldpmarc\": %v", err)
+	}
 	return nil
 }
 
@@ -459,7 +477,9 @@ func install(opts *MARCTransform, dbc *util.DBC, tableTemps map[string]string, p
 	start := time.Now()
 
 	// Clean up obsolete table.
-	_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS folio_source_record.marctab")
+	if _, err := dbc.Conn.Exec(context.TODO(), "DROP TABLE IF EXISTS folio_source_record.marctab"); err != nil {
+		return fmt.Errorf("dropping table \"folio_source_record.marctab\": %v", err)
+	}
 
 	tx, err := util.BeginTx(context.TODO(), dbc.Conn)
 	if err != nil {
