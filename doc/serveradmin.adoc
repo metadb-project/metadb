@@ -217,6 +217,8 @@ server:
 psql -h localhost -p 8440
 ----
 
+Connections are accepted only from `localhost`.
+
 Then for example to show the software version:
 
 ----
