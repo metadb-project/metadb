@@ -210,20 +210,20 @@ systemctl start metadb
 
 === Connecting to the server
 
-The PostgreSQL terminal client, `psql`, can be used to connect to the Metadb
-server:
+The PostgreSQL terminal-based client, `psql`, is used to connect to a Metadb
+server that runs on the same host and listens on a specified port:
 
 ----
-psql -h localhost -p 8440 -d metadb -X
+psql -d metadb -h localhost -X -p <port>
 ----
 
-Connections are accepted only from localhost.
-
-Then for example to show the software version:
+For example:
 
 ----
-SELECT mdbversion();
+psql -d metadb -h localhost -X -p 8440
 ----
+
+See *Reference > Statements* for commands that can be issued via `psql`.
 
 === Configuring a Kafka data source
 
