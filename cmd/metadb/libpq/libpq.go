@@ -67,8 +67,14 @@ func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, sources *[]*sys
 	// TODO Close
 
 	if err = startup(conn, backend); err != nil {
-		// TODO handle error
-		log.Info("%v", err)
+		errw := write(conn, encode(nil, []pgproto3.Message{
+			&pgproto3.ErrorResponse{Message: err.Error()},
+			&pgproto3.ReadyForQuery{TxStatus: 'I'},
+		}))
+		log.Info("connection from address %q: %v", conn.RemoteAddr(), err)
+		if errw != nil {
+			log.Info("%v", errw)
+		}
 		return
 	}
 	for {
@@ -123,14 +129,6 @@ func startup(conn net.Conn, backend *pgproto3.Backend) error {
 		}
 		return nil
 	case *pgproto3.StartupMessage:
-		//fmt.Printf("%#v\n", m)
-		// &pgproto3.StartupMessage{
-		//ProtocolVersion:0x30000,
-		//Parameters:map[string]string{"application_name":"psql",
-		//    "client_encoding":"UTF8",
-		//    "database":"nrn",
-		//    "user":"nrn"}
-		//   }
 		if err = handleStartup(conn, m); err != nil {
 			return err
 		}
@@ -299,9 +297,21 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 }
 
 func handleStartup(conn net.Conn, msg *pgproto3.StartupMessage) error {
+	if msg.ProtocolVersion != 0x30000 {
+		return fmt.Errorf("unknown protocol version \"%#x\"", msg.ProtocolVersion)
+	}
+	if msg.Parameters["application_name"] != "psql" {
+		return fmt.Errorf("unsupported application %q", msg.Parameters["application_name"])
+	}
+	if msg.Parameters["client_encoding"] != "UTF8" {
+		return fmt.Errorf("unsupported client encoding %q", msg.Parameters["client_encoding"])
+	}
+	if msg.Parameters["database"] != "metadb" {
+		return fmt.Errorf("unsupported database name %q (use \"-d metadb\")", msg.Parameters["database"])
+	}
 	return write(conn, encode(nil, []pgproto3.Message{
 		&pgproto3.AuthenticationOk{},
-		&pgproto3.ParameterStatus{Name: "server_version", Value: "14.3.0"},
+		&pgproto3.ParameterStatus{Name: "server_version", Value: "15.3.0"},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	}))
 }
