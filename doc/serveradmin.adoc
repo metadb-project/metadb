@@ -214,7 +214,7 @@ The PostgreSQL terminal client, `psql`, can be used to connect to the Metadb
 server:
 
 ----
-psql -h localhost -p 8440
+psql -h localhost -p 8440 -X
 ----
 
 Connections are accepted only from `localhost`.
