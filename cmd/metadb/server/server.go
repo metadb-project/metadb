@@ -151,7 +151,7 @@ func loggingServer(svr *server) error {
 
 func runServer(svr *server, cat *catalog.Catalog) error {
 	if svr.db.DBName != "metadb" && !strings.HasPrefix(svr.db.DBName, "metadb_") {
-		log.Info("database has nonstandard name %q", svr.db.DBName)
+		log.Warning("database has nonstandard name %q", svr.db.DBName)
 	}
 	setMemoryLimit(svr.opt.MemoryLimit)
 	if svr.opt.NoTLS {
