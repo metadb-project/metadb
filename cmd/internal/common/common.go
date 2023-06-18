@@ -1,3 +1,3 @@
 package common
 
-var DefaultPort = "8440"
+var DefaultPort = "8550"

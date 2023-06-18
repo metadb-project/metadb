@@ -169,7 +169,7 @@ needed, for example:
 nohup metadb start -D data -l metadb.log --memlimit 2 &
 ----
 
-The server listens on port 8440 by default, but this can be set using the
+The server listens on port 8550 by default, but this can be set using the
 `--port` option.  The `--debug` option enables verbose logging.
 
 To stop the server:
@@ -221,7 +221,7 @@ psql -d metadb -h localhost -X -p <port>
 For example:
 
 ----
-psql -d metadb -h localhost -X -p 8440
+psql -d metadb -h localhost -X -p 8550
 ----
 
 See *Reference > Statements* for commands that can be issued via `psql`.
