@@ -111,8 +111,8 @@ func marcTransform(opts *options.Options, marct *MARCTransform) error {
 				marct.PrintErr("starting full update")
 			}
 			if err = fullUpdate(opts, marct, connString, marct.PrintErr); err != nil {
-				if _, err = conn.Exec(context.TODO(), "DROP TABLE IF EXISTS "+tableout); err != nil {
-					return fmt.Errorf("dropping table %q: %v", tableout, err)
+				if _, errd := conn.Exec(context.TODO(), "DROP TABLE IF EXISTS "+tableout); errd != nil {
+					return fmt.Errorf("dropping table %q: %v", tableout, errd)
 				}
 				return err
 			}
