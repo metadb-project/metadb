@@ -138,13 +138,6 @@ func (c *Catalog) AddColumn(table dbx.Table, columnName string, newType command.
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("adding column %q in table %q: alter table: %v", columnName, table, err)
 	}
-	// Create index if type is uuid.
-	if newType == command.UUIDType {
-		q = "CREATE INDEX ON " + table.MainSQL() + " (\"" + columnName + "\")"
-		if _, err := c.dp.Exec(context.TODO(), q); err != nil {
-			return fmt.Errorf("creating index on column %q in table %q: create index: %v", columnName, table, err)
-		}
-	}
 	// Update schema.
 	updateColumn(c, &sqlx.Column{Schema: table.S, Table: table.T, Column: columnName}, dataType, charMaxLen)
 	return nil
