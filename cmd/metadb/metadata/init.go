@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -118,10 +118,10 @@ import (
 //	return nil
 //}
 
-func WriteDatabaseVersion(tx pgx.Tx, version int64) error {
+func WriteDatabaseVersion(dq dbx.Queryable, version int64) error {
 	mver := util.MetadbVersionString()
 	dbver := strconv.FormatInt(version, 10)
-	_, err := tx.Exec(context.TODO(), "UPDATE metadb.init SET version='"+mver+"',dbversion="+dbver)
+	_, err := dq.Exec(context.TODO(), "UPDATE metadb.init SET version='"+mver+"',dbversion="+dbver)
 	if err != nil {
 		return fmt.Errorf("updating dbversion in table metadb.init: %s", err)
 	}
