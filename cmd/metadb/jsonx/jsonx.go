@@ -11,12 +11,6 @@ import (
 )
 
 func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.CommandColumn) error {
-	// folio module filter
-	if cmd.SchemaName == "folio_source_record" &&
-		(cmd.TableName == "marc_records_lb" || cmd.TableName == "edifact_records_lb") {
-		return nil
-	}
-
 	if column.Data == nil {
 		return nil
 	}
