@@ -96,6 +96,10 @@ SELECT table_schema, table_name, column_name
 func (c *Catalog) AddIndexIfNotExists(schema, table, column string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return addIndexIfNotExists(c, schema, table, column)
+}
+
+func addIndexIfNotExists(c *Catalog, schema, table, column string) error {
 	// Return if index already exists.
 	stc := dbx.Column{S: schema, T: table, C: column}
 	_, ok := c.indexes[stc]
@@ -103,7 +107,7 @@ func (c *Catalog) AddIndexIfNotExists(schema, table, column string) error {
 		return nil
 	}
 	// Create index.
-	q := "CREATE INDEX ON " + schema + "." + table + "__ (" + column + ")"
+	q := "CREATE INDEX ON \"" + schema + "\".\"" + table + "__\" (\"" + column + "\")"
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating index: %v", err)
 	}
