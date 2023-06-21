@@ -39,7 +39,8 @@ func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, 
 }
 
 func execCommandSchema(cat *catalog.Catalog, cmd *command.Command, db sqlx.DB) error {
-	if cmd.Op == command.DeleteOp {
+
+	if cmd.Op == command.DeleteOp || cmd.Op == command.TruncateOp {
 		return nil
 	}
 	var err error
@@ -257,6 +258,12 @@ func selectMaxStringLength(db sqlx.DB, table *sqlx.Table, column string) (int64,
 
 func execCommandAddIndexes(cat *catalog.Catalog, cmds command.CommandList) error {
 	for _, cmd := range cmds.Cmd {
+		// The table associated with delete/truncate operations may not exist, and any
+		// needed indexes would have been created anyway with a merge operation.
+		if cmd.Op == command.DeleteOp || cmd.Op == command.TruncateOp {
+			continue
+		}
+		// Create indexes on primary key columns.
 		for _, col := range cmd.Column {
 			if col.PrimaryKey != 0 {
 				if err := cat.AddIndexIfNotExists(cmd.SchemaName, cmd.TableName, col.Name); err != nil {
@@ -527,7 +534,11 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 }
 
 func execDeleteData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
+	// Get the transformed tables so that we can propagate the delete operation.
 	tables := cat.DescendantTables(dbx.Table{S: c.SchemaName, T: c.TableName})
+	// Note that if the table does not exist, "tables" will be an empty slice and the
+	// loop below will not do anything.
+
 	// Find matching current record and mark as not current.
 	// TODO Use pgx.Batch
 	for _, t := range tables {
@@ -545,7 +556,11 @@ func execDeleteData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sql
 }
 
 func execTruncateData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
+	// Get the transformed tables so that we can propagate the truncate operation.
 	tables := cat.DescendantTables(dbx.Table{S: c.SchemaName, T: c.TableName})
+	// Note that if the table does not exist, "tables" will be an empty slice and the
+	// loop below will not do anything.
+
 	// Mark as not current.
 	// TODO Use pgx.Batch
 	for _, t := range tables {
