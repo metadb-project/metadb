@@ -104,6 +104,7 @@ func findDeltaColumnSchema(column1 *sysdb.ColumnSchema, column2 *sysdb.ColumnSch
 		newType:     column2.DType,
 		oldTypeSize: column1.DTypeSize,
 		newTypeSize: column2.DTypeSize,
+		newData:     column2.Data,
 	})
 	return
 
