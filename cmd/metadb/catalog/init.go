@@ -265,7 +265,8 @@ func createTableUpdate(tx pgx.Tx) error {
 		"schemaname text, " +
 		"tablename text, " +
 		"PRIMARY KEY (schemaname, tablename), " +
-		"updated timestamptz)"
+		"updated timestamptz, " +
+		"realtime real)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".table_update: %v", err)
 	}
