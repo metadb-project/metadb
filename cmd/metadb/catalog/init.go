@@ -70,6 +70,9 @@ func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
 	c.initSnapshot()
 	c.lz4 = isLZ4Available(c.dp)
 
+	// Add realtime column.
+	_, _ = c.dp.Exec(context.TODO(), "ALTER TABLE metadb.table_update ADD COLUMN realtime real")
+
 	return c, nil
 }
 
