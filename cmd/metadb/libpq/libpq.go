@@ -303,9 +303,6 @@ func handleStartup(conn net.Conn, msg *pgproto3.StartupMessage) error {
 	if msg.Parameters["application_name"] != "psql" {
 		return fmt.Errorf("unsupported application %q", msg.Parameters["application_name"])
 	}
-	if msg.Parameters["client_encoding"] != "UTF8" {
-		return fmt.Errorf("unsupported client encoding %q", msg.Parameters["client_encoding"])
-	}
 	if msg.Parameters["database"] != "metadb" {
 		return fmt.Errorf("unsupported database name %q (use \"-d metadb\")", msg.Parameters["database"])
 	}
