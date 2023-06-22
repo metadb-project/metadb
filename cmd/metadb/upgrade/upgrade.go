@@ -22,11 +22,19 @@ func Upgrade(opt *option.Upgrade) error {
 	if opt.Datadir == "" {
 		return fmt.Errorf("data directory not specified")
 	}
+	// Require that the datadir exists.
+	exists, err := util.FileExists(opt.Datadir)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("data directory not found: %s", opt.Datadir)
+	}
 	// Ask for confirmation
 	if !opt.Force {
 		_, _ = fmt.Fprintf(os.Stderr, "Upgrade instance %q to Metadb %s? ", opt.Datadir, util.MetadbVersion)
 		var confirm string
-		_, err := fmt.Scanln(&confirm)
+		_, err = fmt.Scanln(&confirm)
 		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
 			return nil
 		}
@@ -44,7 +52,6 @@ func Upgrade(opt *option.Upgrade) error {
 	*/
 	// Upgrade databases.
 	var upgraded bool
-	var err error
 	upgraded, err = upgradeDatabase(opt.Datadir)
 	if err != nil {
 		return err
