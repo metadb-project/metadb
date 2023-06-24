@@ -404,6 +404,7 @@ var updbList = []updbFunc{
 	updb15,
 	updb16,
 	updb17,
+	updb18,
 }
 
 /*
@@ -1364,7 +1365,7 @@ SELECT table_schema, table_name, column_name
 		t := dbx.Table{S: c.S, T: c.T}
 		_, ok := processed[t]
 		if !ok {
-			eout.Info("upgrading: table %s", t)
+			eout.Info("upgrading: table %q", t)
 			processed[t] = struct{}{}
 		}
 		q = "CREATE INDEX ON \"" + c.S + "\".\"" + c.T + "\" (\"" + c.C + "\")"
@@ -1386,6 +1387,116 @@ SELECT table_schema, table_name, column_name
 
 	// Write new version number.
 	err = metadata.WriteDatabaseVersion(dc, 17)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb18(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	// Find __id columns without an index.
+	q := `WITH
+attr AS (
+    SELECT ns.nspname, t.relname, a.attnum, a.attname, y.typname, FALSE AS has_index
+        FROM metadb.track AS m
+            JOIN pg_class AS t ON m.tablename||'__' = t.relname
+            JOIN pg_namespace AS ns ON m.schemaname = ns.nspname AND t.relnamespace = ns.oid
+            JOIN pg_attribute AS a ON t.oid = a.attrelid
+            JOIN pg_type AS y ON a.atttypid = y.oid
+        WHERE t.relkind IN ('r', 'p') AND a.attnum > 0
+),
+ind AS (
+    SELECT d.nspname, d.relname, d.indname, d.attname, d.amname
+        FROM ( SELECT ns.nspname,
+                      t.relname,
+                      i.relname AS indname,
+                      a.attname,
+                      ( SELECT c.rownum
+                            FROM ( SELECT k, row_number() OVER () AS rownum
+                                       FROM unnest(x.indkey) WITH ORDINALITY AS a (k)
+                                 ) AS c
+                            WHERE k = attnum
+                      ),
+                      am.amname
+                   FROM metadb.track AS m
+                       JOIN pg_class AS t ON m.tablename||'__' = t.relname
+                       JOIN pg_namespace AS ns ON m.schemaname = ns.nspname AND t.relnamespace = ns.oid
+                       JOIN pg_index AS x ON t.oid = x.indrelid
+                       JOIN pg_class AS i ON x.indexrelid = i.oid
+                       JOIN pg_attribute AS a
+                           ON t.oid = a.attrelid AND a.attnum = ANY (x.indkey)
+                       JOIN pg_opclass AS oc ON x.indclass[0] = oc.oid
+                       JOIN pg_am AS am ON oc.opcmethod = am.oid
+                   WHERE t.relkind IN ('r', 'p')
+                   ORDER BY nspname, relname, indname, rownum
+             ) AS d
+),
+part AS (
+    SELECT nspname,
+           relname,
+           indname,
+           first_value(attname) OVER (PARTITION BY nspname, relname, indname) AS attname,
+           amname
+        FROM ind
+),
+distpart AS (
+    SELECT DISTINCT nspname,
+                    relname,
+                    attname,
+                    TRUE AS has_index,
+                    amname
+        FROM part
+),
+joined AS (
+    SELECT a.nspname::varchar AS table_schema,
+           a.relname::varchar AS table_name,
+           a.attname::varchar AS column_name,
+           a.attnum AS ordinal_position,
+           a.typname AS data_type,
+           a.has_index OR coalesce(dp.has_index, FALSE) AS has_index,
+           coalesce(dp.amname, '')::varchar AS index_type
+        FROM attr AS a
+            LEFT JOIN distpart AS dp ON a.nspname = dp.nspname AND a.relname = dp.relname AND a.attname = dp.attname
+)
+SELECT table_schema, table_name
+    FROM joined
+    WHERE data_type = 'int8' AND NOT has_index AND column_name = '__id'
+    ORDER BY table_schema, table_name, column_name`
+	rows, err := dc.Query(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("selecting indexes: %v", err)
+	}
+	defer rows.Close()
+	indexes := make([]dbx.Table, 0)
+	for rows.Next() {
+		var schema, table string
+		if err = rows.Scan(&schema, &table); err != nil {
+			return fmt.Errorf("reading indexes: %v", err)
+		}
+		indexes = append(indexes, dbx.Table{S: schema, T: table})
+	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("reading indexes: %v", err)
+	}
+
+	// Create an index on each __id column that does not already have an index.
+	for _, t := range indexes {
+		eout.Info("upgrading: table %q", t)
+		q = "CREATE INDEX ON \"" + t.S + "\".\"" + t.T + "\" (__id)"
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+	}
+
+	// Write new version number.
+	err = metadata.WriteDatabaseVersion(dc, 18)
 	if err != nil {
 		return err
 	}

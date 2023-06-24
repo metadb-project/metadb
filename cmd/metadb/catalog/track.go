@@ -211,5 +211,10 @@ func createMainTableIfNotExists(c *Catalog, table dbx.Table) error {
 			return fmt.Errorf("granting select privilege on %q to %q: %v", table, u, err)
 		}
 	}
+	q = "CREATE INDEX ON " + table.MainSQL() + " (__id)"
+	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("creating index on table %q column \"__id\": %v", table.Main(), err)
+	}
+
 	return nil
 }
