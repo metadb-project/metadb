@@ -73,7 +73,6 @@ func createCurrentTableIfNotExists(table *sqlx.T, db sqlx.DB, users *cache.Users
 		"    __id bigint "+db.AutoIncrementSQL()+" PRIMARY KEY,"+
 		"    __cf boolean NOT NULL DEFAULT TRUE,"+
 		"    __start timestamp with time zone NOT NULL,"+
-		"    __source varchar(63) NOT NULL,"+
 		"    __origin varchar(63) NOT NULL DEFAULT ''"+
 		")")
 	if err != nil {
@@ -81,10 +80,6 @@ func createCurrentTableIfNotExists(table *sqlx.T, db sqlx.DB, users *cache.Users
 	}
 	// Add indexes on new columns.
 	_, err = db.Exec(nil, "CREATE INDEX ON "+db.TableSQL(table)+" (__start)")
-	if err != nil {
-		return err
-	}
-	_, err = db.Exec(nil, "CREATE INDEX ON "+db.TableSQL(table)+" (__source)")
 	if err != nil {
 		return err
 	}
@@ -110,7 +105,6 @@ func createCurrentTableIfNotExists(table *sqlx.T, db sqlx.DB, users *cache.Users
 //		"__start timestamp with time zone NOT NULL, " +
 //		"__end timestamp with time zone NOT NULL, " +
 //		"__current boolean NOT NULL, " +
-//		"__source varchar(63) NOT NULL, " +
 //		"__origin varchar(63) NOT NULL DEFAULT ''" +
 //		") PARTITION BY LIST (__current)"
 //	if _, err := db.Exec(nil, q); err != nil {

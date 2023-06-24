@@ -58,7 +58,7 @@ func Clean(opt *option.Clean) error {
 	if err != nil {
 		return err
 	}
-	tables := cat.AllTables()
+	tables := cat.AllTables(opt.Source)
 	sort.Slice(tables, func(i, j int) bool {
 		return tables[i].String() < tables[j].String()
 	})
@@ -70,13 +70,12 @@ func Clean(opt *option.Clean) error {
 		//	return err
 		//}
 		q := "UPDATE " + mainTable + " SET __cf=TRUE,__end='" + now + "',__current=FALSE " +
-			"WHERE NOT __cf AND __current AND __source='" + opt.Source + "'"
+			"WHERE NOT __cf AND __current"
 		if _, err = dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
 		// Any non-current historical data can be set to __cf=TRUE.
-		q = "UPDATE " + mainTable + " SET __cf=TRUE WHERE NOT __cf AND __source='" + opt.Source +
-			"'"
+		q = "UPDATE " + mainTable + " SET __cf=TRUE WHERE NOT __cf"
 		if _, err = dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}

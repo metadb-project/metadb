@@ -833,6 +833,10 @@ func userExists(dc *pgx.Conn, username string) (bool, error) {
 }
 
 func createDataOrigin(conn net.Conn, node *ast.CreateDataOriginStmt, dc *pgx.Conn) error {
+	if len(node.OriginName) > 63 {
+		return fmt.Errorf("data origin name %q too long", node.OriginName)
+	}
+
 	exists, err := originExists(dc, node.OriginName)
 	if err != nil {
 		return fmt.Errorf("selecting data origin: %v", err)

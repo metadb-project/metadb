@@ -405,158 +405,8 @@ var updbList = []updbFunc{
 	updb16,
 	updb17,
 	updb18,
+	updb19,
 }
-
-/*
-func updb5(opt *dbopt) error {
-	track, err := cache.NewTrack(opt.DB)
-	if err != nil {
-		return err
-	}
-	schema, err := cache.NewSchema(opt.DB, track)
-	if err != nil {
-		return err
-	}
-	for _, t := range track.All() {
-		eout.Info("upgrading: version %d: %s", opt.DBVersion, t.String())
-		err = updb5Table(opt, schema, &t)
-		if err != nil {
-			return err
-		}
-	}
-	err = metadata.WriteDatabaseVersion(opt.DB, nil, 5)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func updb5Table(opt *dbopt, schema *cache.S, table *sqlx.T) error {
-	alterColumns := make([]string, 0)
-	tableSchema := schema.TableSchema(table)
-	for colname, coltype := range tableSchema {
-		if coltype.DataType == "character varying" && coltype.CharMaxLen >= 36 {
-			uuid, err := updb5UUID(opt.DB, table, colname)
-			if err != nil {
-				return err
-			}
-			uuidh, err := updb5UUID(opt.DB, opt.DB.HistoryTable(table), colname)
-			if err != nil {
-				return err
-			}
-			if uuid && uuidh {
-				alterColumns = append(alterColumns, "ALTER COLUMN "+colname+" TYPE uuid USING "+colname+"::uuid")
-			}
-		}
-		if coltype.DataType == "json" {
-			alterColumns = append(alterColumns, "ALTER COLUMN "+colname+" TYPE jsonb")
-		}
-	}
-	if len(alterColumns) != 0 {
-		join := strings.Join(alterColumns, ",")
-		q := "ALTER TABLE " + opt.DB.TableSQL(table) + " " + join
-		_, err := opt.DB.Exec(nil, q)
-		if err != nil {
-			return err
-		}
-		q = "ALTER TABLE " + opt.DB.HistoryTableSQL(table) + " " + join
-		_, err = opt.DB.Exec(nil, q)
-		if err != nil {
-			return err
-		}
-		_ = opt.DB.VacuumAnalyzeTable(table)
-		_ = opt.DB.VacuumAnalyzeTable(opt.DB.HistoryTable(table))
-	}
-	return nil
-}
-
-func updb5UUID(db sqlx.DB, table *sqlx.T, colname string) (bool, error) {
-	var count int64
-	q := "SELECT count(*) FROM " + db.TableSQL(table) + " WHERE " + colname + " NOT LIKE '________-_________-____-____________'"
-	err := db.QueryRow(nil, q).Scan(&count)
-	switch {
-	case err == sql.ErrNoRows:
-		return false, fmt.Errorf("internal error: no rows returned by query %s", q)
-	case err != nil:
-		return false, fmt.Errorf("error querying table %s: %v", table.String(), err)
-	default:
-		return count == 0, nil
-	}
-}
-
-func updb6(opt *dbopt) error {
-	track, err := cache.NewTrack(opt.DB)
-	if err != nil {
-		return err
-	}
-	schema, err := cache.NewSchema(opt.DB, track)
-	if err != nil {
-		return err
-	}
-	for _, t := range track.All() {
-		eout.Info("upgrading: version %d: %s", opt.DBVersion, t.String())
-		err = updb6Table(opt, schema, &t)
-		if err != nil {
-			return err
-		}
-		err = updb6Table(opt, schema, opt.DB.HistoryTable(&t))
-		if err != nil {
-			return err
-		}
-	}
-	err = metadata.WriteDatabaseVersion(opt.DB, nil, 6)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func updb6Table(opt *dbopt, schema *cache.S, table *sqlx.T) error {
-	q := "ALTER TABLE " + opt.DB.TableSQL(table) + " ADD COLUMN __source varchar(63);"
-	_, _ = opt.DB.Exec(nil, q)
-	q = "UPDATE " + opt.DB.TableSQL(table) + " SET __source='';"
-	_, err := opt.DB.Exec(nil, q)
-	if err != nil {
-		return err
-	}
-	q = "ALTER TABLE " + opt.DB.TableSQL(table) + " ALTER COLUMN __source SET NOT NULL;"
-	_, err = opt.DB.Exec(nil, q)
-	if err != nil {
-		return err
-	}
-	_ = opt.DB.VacuumAnalyzeTable(table)
-	return nil
-}
-
-func updb7(opt *dbopt) error {
-	tx, err := opt.DB.BeginTx()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	_, err = opt.DB.Exec(nil, "ALTER TABLE metadb.track ADD COLUMN transformed boolean;")
-	if err != nil {
-		return err
-	}
-	_, err = opt.DB.Exec(nil, "UPDATE metadb.track SET transformed = (tablename LIKE '%\\_\\_t');")
-	if err != nil {
-		return err
-	}
-	_, err = opt.DB.Exec(nil, "ALTER TABLE metadb.track ALTER COLUMN transformed SET NOT NULL;")
-	if err != nil {
-		return err
-	}
-	err = metadata.WriteDatabaseVersion(opt.DB, tx, 7)
-	if err != nil {
-		return err
-	}
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-*/
 
 func updb8(opt *dbopt) error {
 	// Open database
@@ -1498,6 +1348,71 @@ SELECT table_schema, table_name
 	// Write new version number.
 	err = metadata.WriteDatabaseVersion(dc, 18)
 	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb19(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	// Read table names.
+	q := `SELECT schemaname, tablename FROM metadb.track ORDER BY schemaname, tablename`
+	rows, err := dc.Query(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("selecting table names: %v", err)
+	}
+	defer rows.Close()
+	tables := make([]dbx.Table, 0)
+	for rows.Next() {
+		var schema, table string
+		if err = rows.Scan(&schema, &table); err != nil {
+			return fmt.Errorf("reading table names: %v", err)
+		}
+		tables = append(tables, dbx.Table{S: schema, T: table})
+	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("reading indexes: %v", err)
+	}
+
+	// Drop column "__source" from each table.
+	for _, t := range tables {
+		eout.Info("upgrading: table %q", t)
+		q = "ALTER TABLE \"" + t.S + "\".\"" + t.T + "__\" DROP COLUMN IF EXISTS __source"
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+	}
+
+	// Begin transaction
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+	// Add column "source" in table catalog.
+	q = "ALTER TABLE metadb.track ADD COLUMN source varchar(63)"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "UPDATE metadb.track SET source = (SELECT name FROM metadb.source LIMIT 1)"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "ALTER TABLE metadb.track ALTER COLUMN source SET NOT NULL"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	// Write new version number.
+	if err = metadata.WriteDatabaseVersion(tx, 19); err != nil {
+		return err
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
 		return err
 	}
 	return nil

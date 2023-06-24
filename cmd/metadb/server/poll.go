@@ -151,7 +151,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 	go func(dsnsuper sqlx.DSN, trackedTables []dbx.Table) {
 		defer waitUserPerms.Done()
 		sysdb.GoUpdateUserPerms(dc, dcsuper, trackedTables)
-	}(dsnsuper, cat.AllTables())
+	}(dsnsuper, cat.AllTables(spr.source.Name))
 	// Cache users
 	/*	users, err := cache.NewUsers(db)
 		if err != nil {
@@ -248,7 +248,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cat, cl, spr.db[0], spr.source.Name); err != nil {
+		if err = execCommandList(cat, cl, spr.db[0]); err != nil {
 			return fmt.Errorf("executor: %s", err)
 		}
 

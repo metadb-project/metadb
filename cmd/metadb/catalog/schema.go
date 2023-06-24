@@ -43,7 +43,7 @@ func getColumnSchemas(dp *pgxpool.Pool) ([]*sqlx.ColumnSchema, error) {
 		"FROM information_schema.columns "+
 		"WHERE lower(table_schema) NOT IN ('information_schema', 'pg_catalog')"+
 		" AND right(table_name, 2) = '__'"+
-		" AND lower(column_name) NOT IN ('__id', '__cf', '__start', '__end', '__current', '__source', '__origin');")
+		" AND lower(column_name) NOT IN ('__id', '__cf', '__start', '__end', '__current', '__origin');")
 	if err != nil {
 		return nil, fmt.Errorf("querying database schema: %s", err)
 	}

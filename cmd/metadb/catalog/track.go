@@ -13,19 +13,20 @@ type tableEntry struct {
 	transformed bool
 	parentTable dbx.Table
 	children    map[dbx.Table]struct{}
+	source      string
 }
 
 func (c *Catalog) initTableDir() error {
-	q := "SELECT schemaname, tablename, transformed, parentschema, parenttable FROM metadb.track"
+	q := "SELECT schemaname, tablename, transformed, parentschema, parenttable, source FROM metadb.track"
 	rows, err := c.dp.Query(context.TODO(), q)
 	if err != nil {
 		return fmt.Errorf("selecting table list: %v", err)
 	}
 	tableDir := make(map[dbx.Table]tableEntry)
 	for rows.Next() {
-		var schemaname, tablename, parentschema, parenttable string
+		var schemaname, tablename, parentschema, parenttable, source string
 		var transformed bool
-		err = rows.Scan(&schemaname, &tablename, &transformed, &parentschema, &parenttable)
+		err = rows.Scan(&schemaname, &tablename, &transformed, &parentschema, &parenttable, &source)
 		if err != nil {
 			rows.Close()
 			return fmt.Errorf("reading table list: %v", err)
@@ -34,6 +35,7 @@ func (c *Catalog) initTableDir() error {
 			transformed: transformed,
 			parentTable: dbx.Table{S: parentschema, T: parenttable},
 			children:    make(map[dbx.Table]struct{}),
+			source:      source,
 		}
 		tableDir[dbx.Table{S: schemaname, T: tablename}] = t
 	}
@@ -117,11 +119,14 @@ func (c *Catalog) updateCacheTableEntry(table dbx.Table, transformed bool, paren
 	}
 }
 
-func (c *Catalog) AllTables() []dbx.Table {
+func (c *Catalog) AllTables(source string) []dbx.Table {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	all := make([]dbx.Table, 0)
-	for t := range c.tableDir {
+	for t, e := range c.tableDir {
+		if e.source != source {
+			continue
+		}
 		all = append(all, t)
 	}
 	return all
@@ -185,7 +190,6 @@ func createMainTableIfNotExists(c *Catalog, table dbx.Table) error {
 		"__start timestamp with time zone NOT NULL, " +
 		"__end timestamp with time zone NOT NULL, " +
 		"__current boolean NOT NULL, " +
-		"__source varchar(63) NOT NULL, " +
 		"__origin varchar(63) NOT NULL DEFAULT ''" +
 		") PARTITION BY LIST (__current)"
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {

@@ -61,7 +61,7 @@ func Reset(opt *option.Reset) error {
 	if err != nil {
 		return err
 	}
-	tables := cat.AllTables()
+	tables := cat.AllTables(opt.Source)
 	sort.Slice(tables, func(i, j int) bool {
 		return tables[i].String() < tables[j].String()
 	})
@@ -72,8 +72,7 @@ func Reset(opt *option.Reset) error {
 		//if _, err := dp.Exec(context.TODO(), q); err != nil {
 		//	return err
 		//}
-		q := "UPDATE " + mainTable + " SET __cf=FALSE WHERE __cf AND __current AND " +
-			"__source='" + opt.Source + "'"
+		q := "UPDATE " + mainTable + " SET __cf=FALSE WHERE __cf AND __current"
 		if _, err := dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}

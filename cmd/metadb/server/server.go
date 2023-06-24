@@ -375,6 +375,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *cat
 	return nil
 }
 
+/*
 func vacuumAll(db dbx.DB, cat *catalog.Catalog, folio bool) error {
 	dcsuper, err := db.ConnectSuper()
 	if err != nil {
@@ -403,6 +404,7 @@ func vacuumAll(db dbx.DB, cat *catalog.Catalog, folio bool) error {
 	}
 	return nil
 }
+*/
 
 func goCreateFunctions(db dbx.DB) {
 	dc, err := db.Connect()

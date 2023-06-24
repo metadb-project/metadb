@@ -13,7 +13,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, source string) error {
+func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB) error {
 	var clt []command.CommandList = partitionTxn(cat, cl)
 	for _, cc := range clt {
 		if len(cc.Cmd) == 0 {
@@ -26,7 +26,7 @@ func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, 
 		if err := execCommandAddIndexes(cat, cc); err != nil {
 			return fmt.Errorf("exec command indexes: %v", err)
 		}
-		err := execCommandListData(cat, db, cc, source)
+		err := execCommandListData(cat, db, cc)
 		if err != nil {
 			return fmt.Errorf("exec command data: %v", err)
 		}
@@ -275,7 +275,7 @@ func execCommandAddIndexes(cat *catalog.Catalog, cmds command.CommandList) error
 	return nil
 }
 
-func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandList, source string) error {
+func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandList) error {
 	// Begin txn
 	tx, err := db.BeginTx()
 	if err != nil {
@@ -299,7 +299,7 @@ func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandLis
 			}
 		}
 		// Execute data part of command
-		if err = execCommandData(cat, &c, tx, db, source); err != nil {
+		if err = execCommandData(cat, &c, tx, db); err != nil {
 			return fmt.Errorf("data: %v", err)
 		}
 	}
@@ -365,18 +365,18 @@ func requiresSchemaChanges(cat *catalog.Catalog, c, o *command.Command) bool {
 	return false
 }
 
-func execCommandData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
+func execCommandData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 	switch c.Op {
 	case command.MergeOp:
-		if err := execMergeData(c, tx, db, source); err != nil {
+		if err := execMergeData(c, tx, db); err != nil {
 			return fmt.Errorf("merge: %v", err)
 		}
 	case command.DeleteOp:
-		if err := execDeleteData(cat, c, tx, db, source); err != nil {
+		if err := execDeleteData(cat, c, tx, db); err != nil {
 			return fmt.Errorf("delete: %v", err)
 		}
 	case command.TruncateOp:
-		if err := execTruncateData(cat, c, tx, db, source); err != nil {
+		if err := execTruncateData(cat, c, tx, db); err != nil {
 			return fmt.Errorf("truncate: %v", err)
 		}
 	default:
@@ -385,17 +385,17 @@ func execCommandData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sq
 	return nil
 }
 
-func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
+func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
 	// Check if current record is identical.
-	ident, cf, err := isCurrentIdentical(c, tx, db, &t, source)
+	ident, cf, err := isCurrentIdentical(c, tx, db, &t)
 	if err != nil {
 		return fmt.Errorf("matcher: %v", err)
 	}
 	if ident {
 		if cf == "false" {
 			// log.Trace("matcher cf")
-			return updateRowCF(c, tx, db, &t, source)
+			return updateRowCF(c, tx, db, &t)
 		}
 		// log.Trace("matcher ok")
 		return nil
@@ -404,21 +404,21 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) er
 	// History table:
 	// Select matching current record in history table and mark as not current.
 	var uphist strings.Builder
-	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
+	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
 	if err = wherePKDataEqual(db, &uphist, c.Column); err != nil {
 		return fmt.Errorf("primary key columns equal: %v", err)
 	}
 	exec = append(exec, uphist.String())
 	// insert new record
 	var inshist strings.Builder
-	inshist.WriteString("INSERT INTO " + db.HistoryTableSQL(&t) + "(__start,__end,__current,__source")
+	inshist.WriteString("INSERT INTO " + db.HistoryTableSQL(&t) + "(__start,__end,__current")
 	if c.Origin != "" {
 		inshist.WriteString(",__origin")
 	}
 	for _, c := range c.Column {
 		inshist.WriteString("," + db.IdentiferSQL(c.Name))
 	}
-	inshist.WriteString(")VALUES('" + c.SourceTimestamp + "','9999-12-31 00:00:00Z',TRUE,'" + source + "'")
+	inshist.WriteString(")VALUES('" + c.SourceTimestamp + "','9999-12-31 00:00:00Z',TRUE")
 	if c.Origin != "" {
 		inshist.WriteString(",'" + c.Origin + "'")
 	}
@@ -436,10 +436,10 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB, source string) er
 	return nil
 }
 
-func updateRowCF(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, source string) error {
+func updateRowCF(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table) error {
 	// Select matching current record in history table.
 	var uphist strings.Builder
-	uphist.WriteString("UPDATE " + db.HistoryTableSQL(t) + " SET __cf=TRUE WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
+	uphist.WriteString("UPDATE " + db.HistoryTableSQL(t) + " SET __cf=TRUE WHERE __current AND __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(db, &uphist, c.Column); err != nil {
 		return fmt.Errorf("primary key columns equal: %v", err)
 	}
@@ -449,9 +449,9 @@ func updateRowCF(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, sour
 	return nil
 }
 
-func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table, source string) (bool, string, error) {
+func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table) (bool, string, error) {
 	var b strings.Builder
-	b.WriteString("SELECT * FROM " + db.TableSQL(t) + " WHERE __source='" + source + "' AND __origin='" + c.Origin + "'")
+	b.WriteString("SELECT * FROM " + db.TableSQL(t) + " WHERE __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(db, &b, c.Column); err != nil {
 		return false, "", fmt.Errorf("primary key columns equal: %v", err)
 	}
@@ -489,7 +489,6 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 				case "__start":
 				case "__end":
 				case "__current":
-				case "__source":
 				case "__origin":
 				default:
 					v := new(string)
@@ -533,7 +532,7 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 	return true, cf, nil
 }
 
-func execDeleteData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
+func execDeleteData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 	// Get the transformed tables so that we can propagate the delete operation.
 	tables := cat.DescendantTables(dbx.Table{S: c.SchemaName, T: c.TableName})
 	// Note that if the table does not exist, "tables" will be an empty slice and the
@@ -543,7 +542,7 @@ func execDeleteData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sql
 	// TODO Use pgx.Batch
 	for _, t := range tables {
 		var b strings.Builder
-		b.WriteString("UPDATE " + t.MainSQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
+		b.WriteString("UPDATE " + t.MainSQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
 		if err := wherePKDataEqual(db, &b, c.Column); err != nil {
 			return err
 		}
@@ -555,7 +554,7 @@ func execDeleteData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sql
 	return nil
 }
 
-func execTruncateData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB, source string) error {
+func execTruncateData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 	// Get the transformed tables so that we can propagate the truncate operation.
 	tables := cat.DescendantTables(dbx.Table{S: c.SchemaName, T: c.TableName})
 	// Note that if the table does not exist, "tables" will be an empty slice and the
@@ -565,7 +564,7 @@ func execTruncateData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db s
 	// TODO Use pgx.Batch
 	for _, t := range tables {
 		var b strings.Builder
-		b.WriteString("UPDATE " + t.MainSQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __source='" + source + "' AND __origin='" + c.Origin + "'")
+		b.WriteString("UPDATE " + t.MainSQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
 		// Run SQL.
 		if _, err := db.Exec(tx, b.String()); err != nil {
 			return err

@@ -280,7 +280,8 @@ func createTableTrack(tx pgx.Tx) error {
 		"PRIMARY KEY (schemaname, tablename), " +
 		"transformed boolean NOT NULL, " +
 		"parentschema varchar(63) NOT NULL, " +
-		"parenttable varchar(63) NOT NULL)"
+		"parenttable varchar(63) NOT NULL), " +
+		"source varchar(63) NOT NULL"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".track: %v", err)
 	}
