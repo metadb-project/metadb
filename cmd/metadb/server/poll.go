@@ -248,7 +248,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cat, cl, spr.db[0]); err != nil {
+		if err = execCommandList(cat, cl, spr.db[0], spr.svr.dp); err != nil {
 			return fmt.Errorf("executor: %s", err)
 		}
 

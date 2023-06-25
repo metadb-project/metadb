@@ -189,12 +189,13 @@ type Command struct {
 }
 
 type CommandColumn struct {
-	Name       string
-	DType      DataType
-	DTypeSize  int64
-	Data       interface{}
-	SQLData    *string
-	PrimaryKey int
+	Name        string
+	DType       DataType
+	DTypeSize   int64
+	Data        interface{}
+	SQLData     *string
+	PrimaryKey  int
+	Unavailable bool
 }
 
 func (c CommandColumn) String() string {
@@ -403,20 +404,20 @@ func extractColumns(pkerr map[string]struct{}, ce *change.Event) ([]CommandColum
 			return nil, fmt.Errorf("value: $.schema.fields: \"type\": %s", err)
 		}
 		col.Data = fieldData[field]
+		if col.DType == TextType && col.Data != nil {
+			// Large values (typically above 8 kB) in PostgreSQL that have been stored using
+			// the "TOAST" method are not included in an UPDATE change event where those
+			// values were not modified.
+			if col.Data.(string) == "__debezium_unavailable_value" {
+				col.Data = nil
+				col.Unavailable = true
+			}
+		}
 		if col.DType == NumericType && col.Data != nil {
 			if col.Data, err = decodeNumericBytes(m, col.Data, semtype); err != nil {
 				return nil, fmt.Errorf("decoding numeric bytes: %v", err)
 			}
 		}
-		// var data interface{}
-		// if col.DType == JSONType && col.Data != nil {
-		// 	data, err = indentJSON(col.Data.(string))
-		// 	if err != nil {
-		// 		data = col.Data
-		// 	}
-		// } else {
-		// 	data = col.Data
-		// }
 		if col.SQLData, err = DataToSQLData(col.Data, col.DType, semtype); err != nil {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type: %v", field, err)
 		}

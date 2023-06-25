@@ -1,10 +1,13 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
@@ -12,7 +15,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB) error {
+func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, dp *pgxpool.Pool) error {
 	var clt []command.CommandList = partitionTxn(cat, cl)
 	for _, cc := range clt {
 		if len(cc.Cmd) == 0 {
@@ -25,8 +28,7 @@ func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB) 
 		if err := execCommandAddIndexes(cat, cc); err != nil {
 			return fmt.Errorf("exec command indexes: %v", err)
 		}
-		err := execCommandListData(cat, db, cc)
-		if err != nil {
+		if err := execCommandListData(cat, db, dp, cc); err != nil {
 			return fmt.Errorf("exec command data: %v", err)
 		}
 		// log confirmation
@@ -244,7 +246,7 @@ func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSch
 	return nil
 }
 
-func selectMaxStringLength(db sqlx.DB, table *sqlx.Table, column string) (int64, error) {
+/*func selectMaxStringLength(db sqlx.DB, table *sqlx.Table, column string) (int64, error) {
 	var maxlen int64
 	tx, err := db.BeginTx()
 	if err != nil {
@@ -259,6 +261,7 @@ func selectMaxStringLength(db sqlx.DB, table *sqlx.Table, column string) (int64,
 	}
 	return maxlen, nil
 }
+*/
 
 func execCommandAddIndexes(cat *catalog.Catalog, cmds command.CommandList) error {
 	for _, cmd := range cmds.Cmd {
@@ -279,15 +282,12 @@ func execCommandAddIndexes(cat *catalog.Catalog, cmds command.CommandList) error
 	return nil
 }
 
-func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandList) error {
-	// Begin txn
-	tx, err := db.BeginTx()
+func execCommandListData(cat *catalog.Catalog, db sqlx.DB, dp *pgxpool.Pool, cc command.CommandList) error {
+	tx, err := dp.Begin(context.TODO())
 	if err != nil {
-		return fmt.Errorf("data: begin transaction: %s", err)
+		return err
 	}
-	defer func(tx *sql.Tx) {
-		_ = tx.Rollback()
-	}(tx)
+	defer dbx.Rollback(tx)
 	// Exec data
 	for _, c := range cc.Cmd {
 		// Execute data part of command
@@ -297,8 +297,8 @@ func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandLis
 	}
 	// Commit txn
 	log.Trace("commit txn")
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("data: commit: %s", err)
+	if err = tx.Commit(context.TODO()); err != nil {
+		return fmt.Errorf("committing changes: %v", err)
 	}
 	return nil
 }
@@ -349,7 +349,7 @@ func requiresSchemaChanges(cat *catalog.Catalog, c, o *command.Command) bool {
 	return false
 }
 
-func execCommandData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB) error {
+func execCommandData(cat *catalog.Catalog, c *command.Command, tx pgx.Tx, db sqlx.DB) error {
 	switch c.Op {
 	case command.MergeOp:
 		if err := execMergeData(c, tx, db); err != nil {
@@ -369,22 +369,160 @@ func execCommandData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sq
 	return nil
 }
 
-func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
-	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
-	// Check if current record is identical.
-	ident, cf, err := isCurrentIdentical(c, tx, db, &t)
+// execMergeData executes a merge command in the database.
+func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
+	table := dbx.Table{S: cmd.SchemaName, T: cmd.TableName}
+	// Check if the current record (if any) is identical to the new one.  If so, we
+	// can avoid making any changes in the database.
+	ident, cf, err := isCurrentIdentical(cmd, tx, &table, db)
 	if err != nil {
 		return fmt.Errorf("matcher: %v", err)
 	}
 	if ident {
-		if cf == "false" {
+		////////////////////////////////////////////////////////////////////////////////
+		// Temporary: read __cf value which, if false, currently still requires updating
+		// the row.
+		if cf == false {
+			// log.Trace("matcher cf")
+			return updateRowCF(cmd, tx, db, &table)
+		}
+		////////////////////////////////////////////////////////////////////////////////
+		// log.Trace("matcher ok")
+		return nil
+	}
+	// If any columns are "unavailable," extract the previous values from the current record.
+	unavail := make([]string, 0)
+	for _, c := range cmd.Column {
+		if c.Unavailable {
+			unavail = append(unavail, c.Name)
+		}
+	}
+	if len(unavail) != 0 {
+		var b strings.Builder
+		b.WriteString("SELECT ")
+		for i, n := range unavail {
+			if i != 0 {
+				b.WriteByte(',')
+			}
+			b.WriteByte('"')
+			b.WriteString(n)
+			b.WriteString("\"::text")
+		}
+		b.WriteString(" FROM \"")
+		b.WriteString(table.S)
+		b.WriteString("\".\"")
+		b.WriteString(table.T)
+		b.WriteString("\" WHERE __origin='")
+		b.WriteString(cmd.Origin)
+		b.WriteString("'")
+		if err = wherePKDataEqual(db, &b, cmd.Column); err != nil {
+			return fmt.Errorf("primary key columns equal: %v", err)
+		}
+		b.WriteString(" LIMIT 1")
+		var rows pgx.Rows
+		rows, err = tx.Query(context.TODO(), b.String())
+		if err != nil {
+			return fmt.Errorf("querying for unavailable data: %v", err)
+		}
+		defer rows.Close()
+		lenColumns := len(unavail)
+		dest := make([]any, lenColumns)
+		values := make([]any, lenColumns)
+		for i := range dest {
+			dest[i] = &(values[i])
+		}
+		found := false
+		if rows.Next() {
+			found = true
+			if err = rows.Scan(dest...); err != nil {
+				return fmt.Errorf("scanning row values: %v", err)
+			}
+		}
+		if err = rows.Err(); err != nil {
+			return fmt.Errorf("reading matching current row: %v", err)
+		}
+		if !found {
+			log.Warning("no current value for unavailable data in table %q", table)
+		} else {
+			for i, c := range cmd.Column {
+				if c.Unavailable {
+					for j := 0; j < lenColumns; j++ {
+						if c.Name == unavail[j] {
+							cmd.Column[i].SQLData = values[j].(*string)
+							log.Info("found current value for unavailable data: ", cmd.Column[i])
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+	// Set the current row, if any, to __current=FALSE.
+	var b strings.Builder
+	b.WriteString("UPDATE \"")
+	b.WriteString(table.S)
+	b.WriteString("\".\"")
+	b.WriteString(table.T)
+	b.WriteString("__\" SET __cf='t',__end='")
+	b.WriteString(cmd.SourceTimestamp)
+	b.WriteString("',__current='f'")
+	b.WriteString(" WHERE __current AND __origin='")
+	b.WriteString(cmd.Origin)
+	b.WriteByte('\'')
+	if err = wherePKDataEqual(db, &b, cmd.Column); err != nil {
+		return fmt.Errorf("primary key columns equal: %v", err)
+	}
+	if _, err := tx.Exec(context.TODO(), b.String()); err != nil {
+		return fmt.Errorf("updating current row: %v", err)
+	}
+	// Insert the new row.
+	b.Reset()
+	b.WriteString("INSERT INTO \"")
+	b.WriteString(table.S)
+	b.WriteString("\".\"")
+	b.WriteString(table.T)
+	b.WriteString("__\"(__start,__end,__current")
+	if cmd.Origin != "" {
+		b.WriteString(",__origin")
+	}
+	for _, c := range cmd.Column {
+		b.WriteString(",\"")
+		b.WriteString(c.Name)
+		b.WriteByte('"')
+	}
+	b.WriteString(")VALUES('")
+	b.WriteString(cmd.SourceTimestamp)
+	b.WriteString("','9999-12-31 00:00:00Z','t'")
+	if cmd.Origin != "" {
+		b.WriteString(",'")
+		b.WriteString(cmd.Origin)
+		b.WriteByte('\'')
+	}
+	for _, c := range cmd.Column {
+		b.WriteString("," + encodeSQLData(c.SQLData, c.DType, db))
+	}
+	b.WriteByte(')')
+	if _, err := tx.Exec(context.TODO(), b.String()); err != nil {
+		return fmt.Errorf("inserting new row: %v", err)
+	}
+	return nil
+}
+
+/*func oldExecMergeData(c *command.Command, tx pgx.Tx, db sqlx.DB) error {
+	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
+	// Check if current record is identical.
+	ident, cf, err := isCurrentIdentical(c, tx, &t)
+	if err != nil {
+		return fmt.Errorf("matcher: %v", err)
+	}
+	if ident {
+		if cf == false {
 			// log.Trace("matcher cf")
 			return updateRowCF(c, tx, db, &t)
 		}
 		// log.Trace("matcher ok")
 		return nil
 	}
-	exec := make([]string, 0)
 	// History table:
 	// Select matching current record in history table and mark as not current.
 	var uphist strings.Builder
@@ -392,10 +530,12 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 	if err = wherePKDataEqual(db, &uphist, c.Column); err != nil {
 		return fmt.Errorf("primary key columns equal: %v", err)
 	}
-	exec = append(exec, uphist.String())
+	if _, err := tx.Exec(context.TODO(), uphist.String()); err != nil {
+		return fmt.Errorf("updating current row: %v", err)
+	}
 	// insert new record
 	var inshist strings.Builder
-	inshist.WriteString("INSERT INTO " + db.HistoryTableSQL(&t) + "(__start,__end,__current")
+	inshist.WriteString("INSERT INTO " + db.TableSQL(&t) + "(__start,__end,__current")
 	if c.Origin != "" {
 		inshist.WriteString(",__origin")
 	}
@@ -410,30 +550,113 @@ func execMergeData(c *command.Command, tx *sql.Tx, db sqlx.DB) error {
 		inshist.WriteString("," + encodeSQLData(c.SQLData, c.DType, db))
 	}
 	inshist.WriteString(")")
-	exec = append(exec, inshist.String())
-	// Run SQL.
-	err = db.ExecMultiple(tx, exec)
-	if err != nil {
-		log.Debug("%v", exec)
-		return err
+	if _, err := tx.Exec(context.TODO(), inshist.String()); err != nil {
+		return fmt.Errorf("inserting new row: %v", err)
 	}
 	return nil
 }
+*/
 
-func updateRowCF(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table) error {
+func updateRowCF(c *command.Command, tx pgx.Tx, db sqlx.DB, table *dbx.Table) error {
 	// Select matching current record in history table.
 	var uphist strings.Builder
-	uphist.WriteString("UPDATE " + db.HistoryTableSQL(t) + " SET __cf=TRUE WHERE __current AND __origin='" + c.Origin + "'")
+	uphist.WriteString("UPDATE \"" + table.S + "\".\"" + table.T + "\" SET __cf=TRUE WHERE __origin='" + c.Origin +
+		"'")
 	if err := wherePKDataEqual(db, &uphist, c.Column); err != nil {
 		return fmt.Errorf("primary key columns equal: %v", err)
 	}
-	if _, err := db.Exec(tx, uphist.String()); err != nil {
+	if _, err := tx.Exec(context.TODO(), uphist.String()); err != nil {
 		return fmt.Errorf("setting cf flag: %v", err)
 	}
 	return nil
 }
 
-func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table) (bool, string, error) {
+// isCurrentIdentical looks for an identical row in the current table.
+func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sqlx.DB) (bool, bool, error) {
+	// Match on all columns, except "unavailable" columns (which indicates a column
+	// did not change and we can assume it matches).
+	var b strings.Builder
+	b.WriteString("SELECT * FROM \"")
+	b.WriteString(table.S)
+	b.WriteString("\".\"")
+	b.WriteString(table.T)
+	b.WriteString("\" WHERE __origin='")
+	b.WriteString(cmd.Origin)
+	b.WriteByte('\'')
+	for _, c := range cmd.Column {
+		if c.Unavailable {
+			continue
+		}
+		b.WriteString(" AND \"")
+		b.WriteString(c.Name)
+		if c.Data == nil {
+			b.WriteString("\" IS NULL")
+		} else {
+			b.WriteString("\"=")
+			b.WriteString(encodeSQLData(c.SQLData, c.DType, db))
+		}
+	}
+	b.WriteString(" LIMIT 1")
+	rows, err := tx.Query(context.TODO(), b.String())
+	if err != nil {
+		return false, false, fmt.Errorf("querying for matching current row: %v", err)
+	}
+	defer rows.Close()
+	columnNames := make([]string, 0)
+	for _, f := range rows.FieldDescriptions() {
+		columnNames = append(columnNames, f.Name)
+	}
+	lenColumns := len(columnNames)
+	found := false
+	dest := make([]any, lenColumns)
+	values := make([]any, lenColumns)
+	for i := range dest {
+		dest[i] = &(values[i])
+	}
+	if rows.Next() {
+		found = true
+		if err = rows.Scan(dest...); err != nil {
+			return false, false, fmt.Errorf("scanning row values: %v", err)
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return false, false, fmt.Errorf("reading matching current row: %v", err)
+	}
+	if !found {
+		return false, false, nil
+	}
+	// If any extra column values are not NULL, there is no match.
+	var cf bool
+	for i := 0; i < lenColumns; i++ {
+		//////////////////////////////////////////////////////////////////////////////////////
+		// Temporary: read __cf value which, if false, currently still requires updating
+		// the row.
+		if columnNames[i] == "__cf" {
+			var ok bool
+			cf, ok = values[i].(bool)
+			if !ok {
+				return false, false, fmt.Errorf("error reading __cf as boolean value")
+			}
+		}
+		//////////////////////////////////////////////////////////////////////////////////////
+		found := false
+		for _, c := range cmd.Column {
+			if columnNames[i] == c.Name {
+				found = true
+				break
+			}
+		}
+		if !found { // This is an extra column.
+			if values[i] != nil {
+				return false, false, nil
+			}
+		}
+	}
+	// Otherwise we have found a match.
+	return true, cf, nil
+}
+
+func oldIsCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table) (bool, string, error) {
 	var b strings.Builder
 	b.WriteString("SELECT * FROM " + db.TableSQL(t) + " WHERE __origin='" + c.Origin + "'")
 	if err := wherePKDataEqual(db, &b, c.Column); err != nil {
@@ -516,7 +739,7 @@ func isCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Tabl
 	return true, cf, nil
 }
 
-func execDeleteData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB) error {
+func execDeleteData(cat *catalog.Catalog, c *command.Command, tx pgx.Tx, db sqlx.DB) error {
 	// Get the transformed tables so that we can propagate the delete operation.
 	tables := cat.DescendantTables(dbx.Table{S: c.SchemaName, T: c.TableName})
 	// Note that if the table does not exist, "tables" will be an empty slice and the
@@ -531,14 +754,14 @@ func execDeleteData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sql
 			return err
 		}
 		// Run SQL.
-		if _, err := db.Exec(tx, b.String()); err != nil {
+		if _, err := tx.Exec(context.TODO(), b.String()); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func execTruncateData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db sqlx.DB) error {
+func execTruncateData(cat *catalog.Catalog, c *command.Command, tx pgx.Tx, db sqlx.DB) error {
 	// Get the transformed tables so that we can propagate the truncate operation.
 	tables := cat.DescendantTables(dbx.Table{S: c.SchemaName, T: c.TableName})
 	// Note that if the table does not exist, "tables" will be an empty slice and the
@@ -550,7 +773,7 @@ func execTruncateData(cat *catalog.Catalog, c *command.Command, tx *sql.Tx, db s
 		var b strings.Builder
 		b.WriteString("UPDATE " + t.MainSQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
 		// Run SQL.
-		if _, err := db.Exec(tx, b.String()); err != nil {
+		if _, err := tx.Exec(context.TODO(), b.String()); err != nil {
 			return err
 		}
 	}
