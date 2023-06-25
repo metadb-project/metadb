@@ -114,6 +114,10 @@ func Trace(format string, args ...interface{}) {
 	printf(nil, false, "TRACE", format, args...)
 }
 
+func IsLevelTrace() bool {
+	return std.logTrace
+}
+
 /*func P(format string, args ...interface{}) {
 	if DisableColor {
 		//std.log.Printf("PRINT: "+format, args...)

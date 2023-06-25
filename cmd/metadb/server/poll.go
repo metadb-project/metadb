@@ -469,7 +469,7 @@ func readChangeEvent(consumer *kafka.Consumer, sourceLog *log.SourceLog) (*chang
 	}
 }
 
-func logDebugCommand(c *command.Command) {
+func logTraceCommand(c *command.Command) {
 	var schemaTable string
 	if c.SchemaName == "" {
 		schemaTable = c.TableName

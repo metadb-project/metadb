@@ -30,8 +30,10 @@ func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB) 
 			return fmt.Errorf("exec command data: %v", err)
 		}
 		// log confirmation
-		for _, c := range cc.Cmd {
-			logDebugCommand(&c)
+		if log.IsLevelTrace() {
+			for _, c := range cc.Cmd {
+				logTraceCommand(&c)
+			}
 		}
 	}
 	return nil
