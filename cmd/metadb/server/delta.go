@@ -107,26 +107,6 @@ func findDeltaColumnSchema(column1 *sysdb.ColumnSchema, column2 *sysdb.ColumnSch
 		newData:     column2.Data,
 	})
 	return
-
-	///////////////////////////////////////////////////////////////////////////////
-
-	// If the types are the same and they are varchar, both PostgreSQL and
-	// Redshift can alter the column in place
-	// if column1.Type == column2.Type && column1.Type == VarcharType {
-	// 	if err = dbAlterColumnType(tschema, tableName,
-	// 	column1.Name, column2.Type, column2.TypeSize, svr); err != nil {
-	// 		return err
-	// 	}
-	// }
-
-	// Increase data type size
-
-	// TODO Rename column and create new column as above
-
-	// fmt.Println("Type change not yet implemented:")
-	// os.Exit(-1)
-
-	// return nil
 }
 
 func findDeltaSchema(cat *catalog.Catalog, c *command.Command) (*deltaSchema, error) {

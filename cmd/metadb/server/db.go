@@ -7,10 +7,8 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
 func addTable(cmd *command.Command, db sqlx.DB, cat *catalog.Catalog) error {
@@ -132,6 +130,7 @@ func createCurrentTableIfNotExists(table *sqlx.T, db sqlx.DB, users *cache.Users
 //	return nil
 //}
 
+/*
 func alterColumnVarcharSize(cat *catalog.Catalog, table *sqlx.Table, column string, datatype command.DataType, typesize int64, db sqlx.DB) error {
 	var err error
 	// Remove index if type size too large.
@@ -154,6 +153,7 @@ func alterColumnVarcharSize(cat *catalog.Catalog, table *sqlx.Table, column stri
 	cat.UpdateColumn(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: column}, dataType, charMaxLen)
 	return nil
 }
+*/
 
 /*
 func alterColumnIntegerSize(table *sqlx.T, column string, typesize int64, db sqlx.DB, schema *cache.S) error {
@@ -174,7 +174,7 @@ func alterColumnIntegerSize(table *sqlx.T, column string, typesize int64, db sql
 
 /*
 func alterColumnToVarchar(table *sqlx.T, column string, typesize int64, db sqlx.DB, schema *cache.S) error {
-	dtypesql, dataType, charMaxLen := command.DataTypeToSQL(command.VarcharType, typesize)
+	dtypesql, dataType, charMaxLen := command.DataTypeToSQL(command.TextType, typesize)
 	_, err := db.Exec(nil, "ALTER TABLE "+db.TableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+dtypesql+
 		" USING \""+column+"\"::varchar")
 	if err != nil {
@@ -194,7 +194,7 @@ func alterColumnToVarchar(table *sqlx.T, column string, typesize int64, db sqlx.
 // Change column type to a specified new type, optionally casting data to the new type
 func alterColumnType(cat *catalog.Catalog, db sqlx.DB, schema string, table string, column string, datatype command.DataType, typesize int64, cast bool) error {
 	schemaTable := sqlx.NewTable(schema, table)
-	sqltype, datatypeStr, charMaxLen := command.DataTypeToSQL(datatype, typesize)
+	sqltype := command.DataTypeToSQL(datatype, typesize)
 	var caststr string
 	if cast {
 		caststr = " USING \"" + column + "\"::" + sqltype
@@ -205,7 +205,7 @@ func alterColumnType(cat *catalog.Catalog, db sqlx.DB, schema string, table stri
 			column, table, sqltype, err)
 	}
 	// Update schema.
-	cat.UpdateColumn(&sqlx.Column{Schema: schema, Table: table, Column: column}, datatypeStr, charMaxLen)
+	cat.UpdateColumn(&sqlx.Column{Schema: schema, Table: table, Column: column}, sqltype)
 	return nil
 }
 
@@ -269,11 +269,11 @@ func newNumberedColumnName(table *sqlx.T, column string, schema *cache.S) (strin
 */
 
 func selectTableSchema(cat *catalog.Catalog, table *sqlx.Table) (*sysdb.TableSchema, error) {
-	var m map[string]catalog.ColumnType = cat.TableSchema(table)
-	var ts = new(sysdb.TableSchema)
+	m := cat.TableSchema(table)
+	ts := new(sysdb.TableSchema)
 	for k, v := range m {
 		name := k
-		dtype, dtypesize := command.MakeDataType(v.DataType, v.CharMaxLen)
+		dtype, dtypesize := command.MakeDataType(v)
 		cs := sysdb.ColumnSchema{Name: name, DType: dtype, DTypeSize: dtypesize}
 		ts.Column = append(ts.Column, cs)
 	}

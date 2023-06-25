@@ -10,13 +10,15 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
+/*
 type ColumnType struct {
 	DataType   string
 	CharMaxLen int64
 }
+*/
 
 func (c *Catalog) initSchema() error {
-	columns := make(map[sqlx.Column]ColumnType)
+	columns := make(map[sqlx.Column]string)
 	// Read column schemas from database.
 	columnSchemas, err := getColumnSchemas(c.dp)
 	if err != nil {
@@ -30,7 +32,7 @@ func (c *Catalog) initSchema() error {
 		//	continue
 		//}
 		c := sqlx.Column{Schema: col.Schema, Table: col.Table, Column: col.Column}
-		columns[c] = ColumnType{DataType: col.DataType, CharMaxLen: *col.CharMaxLen}
+		columns[c] = col.DataType
 	}
 	c.columns = columns
 	return nil
@@ -76,14 +78,14 @@ func getColumnSchemas(dp *pgxpool.Pool) ([]*sqlx.ColumnSchema, error) {
 	return cs, nil
 }
 
-func (c *Catalog) UpdateColumn(column *sqlx.Column, dataType string, charMaxLen int64) {
+func (c *Catalog) UpdateColumn(column *sqlx.Column, dataType string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	updateColumn(c, column, dataType, charMaxLen)
+	updateColumn(c, column, dataType)
 }
 
-func updateColumn(cat *Catalog, column *sqlx.Column, dataType string, charMaxLen int64) {
-	cat.columns[*column] = ColumnType{DataType: dataType, CharMaxLen: charMaxLen}
+func updateColumn(cat *Catalog, column *sqlx.Column, dataType string) {
+	cat.columns[*column] = dataType
 }
 
 func (c *Catalog) DeleteColumn(column *sqlx.Column) {
@@ -104,10 +106,10 @@ func (c *Catalog) TableColumns(table *sqlx.Table) []string {
 	return columns
 }
 
-func (c *Catalog) TableSchema(table *sqlx.Table) map[string]ColumnType {
+func (c *Catalog) TableSchema(table *sqlx.Table) map[string]string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	ts := make(map[string]ColumnType)
+	ts := make(map[string]string)
 	for k, v := range c.columns {
 		if k.Schema == table.Schema && k.Table == table.Table {
 			ts[k.Column] = v
@@ -116,7 +118,7 @@ func (c *Catalog) TableSchema(table *sqlx.Table) map[string]ColumnType {
 	return ts
 }
 
-func (c *Catalog) Column(column *sqlx.Column) *ColumnType {
+func (c *Catalog) Column(column *sqlx.Column) *string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	cs, ok := c.columns[*column]
@@ -130,9 +132,9 @@ func (c *Catalog) AddColumn(table dbx.Table, columnName string, newType command.
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// Alter table schema in database.
-	dataTypeSQL, dataType, charMaxLen := command.DataTypeToSQL(newType, newTypeSize)
+	dataTypeSQL := command.DataTypeToSQL(newType, newTypeSize)
 	q := "ALTER TABLE " + table.MainSQL() + " ADD COLUMN \"" + columnName + "\" " + dataTypeSQL
-	if c.lz4 && (newType == command.VarcharType || newType == command.JSONType) {
+	if c.lz4 && (newType == command.TextType || newType == command.JSONType) {
 		q = q + " COMPRESSION lz4"
 	}
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
@@ -145,6 +147,6 @@ func (c *Catalog) AddColumn(table dbx.Table, columnName string, newType command.
 		}
 	}
 	// Update schema.
-	updateColumn(c, &sqlx.Column{Schema: table.S, Table: table.T, Column: columnName}, dataType, charMaxLen)
+	updateColumn(c, &sqlx.Column{Schema: table.S, Table: table.T, Column: columnName}, dataTypeSQL)
 	return nil
 }

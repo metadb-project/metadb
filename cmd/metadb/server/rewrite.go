@@ -25,7 +25,7 @@ func rewriteCommand(cl *command.CommandList, c *command.Command, rewriteJSON boo
 	// probably become optional.
 	for i := range c.Column {
 		col := c.Column[i]
-		if col.DType == command.VarcharType {
+		if col.DType == command.TextType {
 			if col.Data != nil && uuid.IsUUID(fmt.Sprintf("%v", col.Data)) {
 				col.DType = command.UUIDType
 				col.DTypeSize = 0

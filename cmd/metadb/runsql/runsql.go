@@ -194,10 +194,10 @@ func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input s
 			}
 			// Add column
 			t := strings.ToLower(requireColumnType)
-			if t == "text" || strings.HasPrefix(t, "varchar(") {
-				t = "varchar"
+			if t == "text" || strings.HasPrefix(t, "varchar") {
+				t = "text"
 			}
-			dtype, dtypesize := command.MakeDataType(t, 1)
+			dtype, dtypesize := command.MakeDataType(t)
 			if err := cat.AddColumn(requireTable, requireColumn, dtype, dtypesize); err != nil {
 				return fmt.Errorf("creating new column: %s.%s: %v", requireTable, requireColumn, err)
 			}

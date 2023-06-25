@@ -3,7 +3,6 @@ package server
 import (
 	"database/sql"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
@@ -68,7 +67,7 @@ func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSch
 	for _, col := range delta.column {
 		// Is this a new column (as opposed to a modification)?
 		if col.newColumn {
-			dtypesql, _, _ := command.DataTypeToSQL(col.newType, col.newTypeSize)
+			dtypesql := command.DataTypeToSQL(col.newType, col.newTypeSize)
 			log.Trace("table %s.%s: new column: %s %s", tschema, tableName, col.name, dtypesql)
 			t := dbx.Table{S: tschema, T: tableName}
 			if err := cat.AddColumn(t, col.name, col.newType, col.newTypeSize); err != nil {
@@ -82,7 +81,7 @@ func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSch
 		// runaway type changes (and the resulting runaway column
 		// renaming).  Later we can give the user a way to change the
 		// type of a specific column.
-		if col.oldType == command.VarcharType && col.newType != command.VarcharType {
+		if col.oldType == command.TextType && col.newType != command.TextType {
 			// Adjust the new data type in the command.
 			var typeSize int64 = -1
 			for j, c := range cmd.Column {
@@ -92,7 +91,7 @@ func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSch
 					} else {
 						typeSize = int64(len(*(cmd.Column[j].SQLData)))
 					}
-					cmd.Column[j].DType = command.VarcharType
+					cmd.Column[j].DType = command.TextType
 					cmd.Column[j].DTypeSize = typeSize
 					break
 				}
@@ -105,25 +104,26 @@ func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSch
 			}
 			// Change the delta column type as well so that column
 			// size can be adjusted below if needed.
-			col.newType = command.VarcharType
+			col.newType = command.TextType
 			col.newTypeSize = typeSize
 		}
 
 		// Don't change a UUID type with a null value, because UUID may have been inferred from data.
-		if col.oldType == command.UUIDType && col.newType == command.VarcharType && col.newData == nil {
+		if col.oldType == command.UUIDType && col.newType == command.TextType && col.newData == nil {
 			continue
 		}
 
 		// If both the old and new types are varchar, most databases
 		// can alter the column in place.
-		if col.oldType == command.VarcharType && col.newType == command.VarcharType {
-			dtypesql, _, _ := command.DataTypeToSQL(col.newType, col.newTypeSize)
-			log.Trace("table %s.%s: alter column: %s %s", tschema, tableName, col.name, dtypesql)
-			if err := alterColumnVarcharSize(cat, sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db); err != nil {
-				return fmt.Errorf("delta schema: %v", err)
-			}
-			continue
-		}
+		/*		if col.oldType == command.TextType && col.newType == command.TextType {
+					dtypesql, _, _ := command.DataTypeToSQL(col.newType, col.newTypeSize)
+					log.Trace("table %s.%s: alter column: %s %s", tschema, tableName, col.name, dtypesql)
+					if err := alterColumnVarcharSize(cat, sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db); err != nil {
+						return fmt.Errorf("delta schema: %v", err)
+					}
+					continue
+				}
+		*/
 		// If both the old and new types are IntegerType, change the
 		// column type to handle the larger size.
 		if col.oldType == command.IntegerType && col.newType == command.IntegerType {
@@ -181,45 +181,47 @@ func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSch
 			continue
 		}
 
-		// If not a compatible change, adjust new type to varchar in
-		// all cases.  To do this we need to determine what the varchar
-		// length limit should be, by looking at existing data and the
-		// new datum.
+		// If not a compatible change, adjust new type to varchar in all cases.
 
-		// Get maximum string length of existing data.
-		maxlen, err := selectMaxStringLength(db, sqlx.NewTable(tschema, tableName), col.name)
-		if err != nil {
-			return fmt.Errorf("delta schema: %v", err)
-		}
+		/*
+			// To do this we need to determine what the varchar length limit should be, by
+			// looking at existing data and the new datum.
 
-		// Get string length of new datum.
-		var typeSize int64 = -1
-		for j, c := range cmd.Column {
-			if c.Name == col.name {
-				if cmd.Column[j].SQLData == nil {
-					typeSize = 0
-				} else {
-					typeSize = int64(len(*(cmd.Column[j].SQLData)))
-				}
-				cmd.Column[j].DType = command.VarcharType
-				cmd.Column[j].DTypeSize = typeSize
-				break
+			// Get maximum string length of existing data.
+			maxlen, err := selectMaxStringLength(db, sqlx.NewTable(tschema, tableName), col.name)
+			if err != nil {
+				return fmt.Errorf("delta schema: %v", err)
 			}
-		}
-		if typeSize == -1 {
-			return fmt.Errorf("delta schema: internal error: column %q in table %q not found in command: ",
-				col.name, tschema+"."+tableName)
-		}
 
-		if typeSize > maxlen {
-			maxlen = typeSize
-		}
-		if maxlen < 1 {
-			maxlen = 1
-		}
+			// Get string length of new datum.
+			var typeSize int64 = -1
+			for j, c := range cmd.Column {
+				if c.Name == col.name {
+					if cmd.Column[j].SQLData == nil {
+						typeSize = 0
+					} else {
+						typeSize = int64(len(*(cmd.Column[j].SQLData)))
+					}
+					cmd.Column[j].DType = command.TextType
+					cmd.Column[j].DTypeSize = typeSize
+					break
+				}
+			}
+			if typeSize == -1 {
+				return fmt.Errorf("delta schema: internal error: column %q in table %q not found in command: ",
+					col.name, tschema+"."+tableName)
+			}
+
+			if typeSize > maxlen {
+				maxlen = typeSize
+			}
+			if maxlen < 1 {
+				maxlen = 1
+			}
+		*/
 
 		// err = alterColumnToVarchar(sqlx.NewTable(tschema, tableName), col.name, maxlen, db, schema)
-		err = alterColumnType(cat, db, tschema, tableName, col.name, command.VarcharType, maxlen, false)
+		err := alterColumnType(cat, db, tschema, tableName, col.name, command.TextType, 0, false)
 		if err != nil {
 			return fmt.Errorf("delta schema: %v", err)
 		}
@@ -286,18 +288,6 @@ func execCommandListData(cat *catalog.Catalog, db sqlx.DB, cc command.CommandLis
 	}(tx)
 	// Exec data
 	for _, c := range cc.Cmd {
-		// Extra check of varchar sizes to ensure size was adjusted and
-		// avoid silent data loss due to optimization errors
-		for _, col := range c.Column {
-			if col.DType == command.VarcharType && col.Data != nil {
-				schemaCol := cat.Column(sqlx.NewColumn(c.SchemaName, c.TableName, col.Name))
-				if schemaCol != nil && col.DTypeSize > schemaCol.CharMaxLen {
-					// TODO Factor fatal error exit into function
-					log.Fatal("internal error: schema varchar size not adjusted: %d > %d", col.DTypeSize, schemaCol.CharMaxLen)
-					os.Exit(-1)
-				}
-			}
-		}
 		// Execute data part of command
 		if err = execCommandData(cat, &c, tx, db); err != nil {
 			return fmt.Errorf("data: %v", err)
@@ -343,23 +333,15 @@ func requiresSchemaChanges(cat *catalog.Catalog, c, o *command.Command) bool {
 		return true
 	}
 	for i, col := range c.Column {
-		cc := sqlx.Column{Schema: c.SchemaName, Table: c.TableName, Column: col.Name}
-		if col.Name != o.Column[i].Name || col.DType != o.Column[i].DType || col.PrimaryKey != o.Column[i].PrimaryKey {
+		switch {
+		case col.Name != o.Column[i].Name:
 			return true
-		}
-		if col.DType == command.VarcharType {
-			// Special case for varchar
-			schemaCol := cat.Column(&cc)
-			if schemaCol == nil {
-				return true
-			}
-			if col.DTypeSize > schemaCol.CharMaxLen {
-				return true
-			}
-		} else {
-			if col.DTypeSize != o.Column[i].DTypeSize {
-				return true
-			}
+		case col.DType != o.Column[i].DType:
+			return true
+		case col.DTypeSize != o.Column[i].DTypeSize:
+			return true
+		case col.PrimaryKey != o.Column[i].PrimaryKey:
+			return true
 		}
 	}
 	return false
@@ -597,7 +579,7 @@ func encodeSQLData(sqldata *string, datatype command.DataType, db sqlx.DB) strin
 		return "NULL"
 	}
 	switch datatype {
-	case command.VarcharType, command.JSONType:
+	case command.TextType, command.JSONType:
 		return db.EncodeString(*sqldata)
 	case command.DateType, command.TimeType, command.TimetzType, command.TimestampType, command.TimestamptzType, command.UUIDType:
 		return "'" + *sqldata + "'"

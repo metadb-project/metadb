@@ -55,7 +55,7 @@ const (
 	TimestamptzType
 	TimetzType
 	UUIDType
-	VarcharType
+	TextType
 )
 
 func (d DataType) String() string {
@@ -82,18 +82,18 @@ func (d DataType) String() string {
 		return "TimetzType"
 	case UUIDType:
 		return "UUIDType"
-	case VarcharType:
-		return "VarcharType"
+	case TextType:
+		return "TextType"
 	default:
 		log.Error("data type to string: unknown data type: %d", d)
 		return "(unknown type)"
 	}
 }
 
-func MakeDataType(dataType string, charMaxLen int64) (DataType, int64) {
+func MakeDataType(dataType string) (DataType, int64) {
 	switch strings.ToLower(dataType) {
-	case "character varying", "varchar", "text":
-		return VarcharType, charMaxLen
+	case "text", "varchar", "character varying":
+		return TextType, 0
 	case "smallint":
 		return IntegerType, 2
 	case "integer":
@@ -128,54 +128,51 @@ func MakeDataType(dataType string, charMaxLen int64) (DataType, int64) {
 	}
 }
 
-// DataTypeToSQL convert a data type and type size to a database type, with and
-// without a character maximum length (charMaxLen).  It returns three values:
-// the SQL type including charMaxLen, the SQL type name without charMaxLen, and
-// charMaxLen.
-func DataTypeToSQL(dtype DataType, typeSize int64) (string, string, int64) {
+// DataTypeToSQL convert a data type and type size to a database type.
+func DataTypeToSQL(dtype DataType, typeSize int64) string {
 	switch dtype {
-	case VarcharType:
-		return fmt.Sprintf("character varying(%d)", typeSize), "character varying", typeSize
+	case TextType:
+		return "text"
 	case IntegerType:
 		switch typeSize {
 		case 2:
-			return "smallint", "smallint", 0
+			return "smallint"
 		case 4:
-			return "integer", "integer", 0
+			return "integer"
 		case 8:
-			return "bigint", "bigint", 0
+			return "bigint"
 		default:
-			return "(unknown)", "(unknown)", 0
+			return "(unknown)"
 		}
 	case FloatType:
 		switch typeSize {
 		case 4:
-			return "real", "real", 0
+			return "real"
 		case 8:
-			return "double precision", "double precision", 0
+			return "double precision"
 		default:
-			return "(unknown)", "(unknown)", 0
+			return "(unknown)"
 		}
 	case NumericType:
-		return "numeric", "numeric", 0
+		return "numeric"
 	case BooleanType:
-		return "boolean", "boolean", 0
+		return "boolean"
 	case DateType:
-		return "date", "date", 0
+		return "date"
 	case TimeType:
-		return "time without time zone", "time without time zone", 0
+		return "time without time zone"
 	case TimetzType:
-		return "time with time zone", "time with time zone", 0
+		return "time with time zone"
 	case TimestampType:
-		return "timestamp without time zone", "timestamp without time zone", 0
+		return "timestamp without time zone"
 	case TimestamptzType:
-		return "timestamp with time zone", "timestamp with time zone", 0
+		return "timestamp with time zone"
 	case UUIDType:
-		return "uuid", "uuid", 0
+		return "uuid"
 	case JSONType:
-		return "jsonb", "jsonb", 0
+		return "jsonb"
 	default:
-		return "(unknown)", "(unknown)", 0
+		return "(unknown)"
 	}
 }
 
@@ -238,7 +235,7 @@ func convertTypeSize(data *string, coltype string, datatype DataType) (int64, er
 		default:
 			return 0, fmt.Errorf("internal error: unexpected integer type %q", coltype)
 		}
-	case VarcharType:
+	case TextType:
 		if data == nil {
 			return 1, nil
 		}
@@ -799,7 +796,7 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 		if strings.HasSuffix(semtype, ".time.ZonedTimestamp") {
 			return TimestamptzType, nil
 		}
-		return VarcharType, nil
+		return TextType, nil
 	case "bytes":
 		// if strings.HasSuffix(semtype, ".data.Bits") {
 		// 	return , nil
@@ -891,7 +888,7 @@ func DataToSQLData(data any, datatype DataType, semtype string) (*string, error)
 			s := fixupSQLTime(t)
 			return &s, nil
 		}
-	case VarcharType, NumericType, UUIDType, JSONType, TimetzType, TimestamptzType:
+	case TextType, NumericType, UUIDType, JSONType, TimetzType, TimestamptzType:
 		s, ok := data.(string)
 		if !ok {
 			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
@@ -969,10 +966,10 @@ func InferTypeFromString(data string) (DataType, int64) {
 	if timestampRegexp.MatchString(data) {
 		return TimestampType, 0
 	}
-	// Otherwise default to varchar
+	// Otherwise default to text
 	n := len(data)
 	if n < 1 {
 		n = 1
 	}
-	return VarcharType, int64(n)
+	return TextType, int64(n)
 }

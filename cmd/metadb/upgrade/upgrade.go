@@ -406,6 +406,7 @@ var updbList = []updbFunc{
 	updb17,
 	updb18,
 	updb19,
+	updb20,
 }
 
 func updb8(opt *dbopt) error {
@@ -1413,6 +1414,63 @@ func updb19(opt *dbopt) error {
 		return err
 	}
 	if err = tx.Commit(context.TODO()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb20(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	// Find varchar columns.
+	q := `SELECT ns.nspname, t.relname, a.attname
+    FROM metadb.track AS m
+        JOIN pg_class AS t ON m.tablename||'__' = t.relname
+        JOIN pg_namespace AS ns ON m.schemaname = ns.nspname AND t.relnamespace = ns.oid
+        JOIN pg_attribute AS a ON t.oid = a.attrelid
+        JOIN pg_type AS y ON a.atttypid = y.oid
+    WHERE t.relkind IN ('r', 'p') AND a.attnum > 0 AND y.typname = 'varchar' AND left(attname, 2) <> '__'
+    ORDER BY ns.nspname, t.relname, a.attnum`
+	rows, err := dc.Query(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("selecting varchar columns: %v", err)
+	}
+	defer rows.Close()
+	columns := make([]dbx.Column, 0)
+	for rows.Next() {
+		var schema, table, column string
+		if err = rows.Scan(&schema, &table, &column); err != nil {
+			return fmt.Errorf("reading varchar columns: %v", err)
+		}
+		columns = append(columns, dbx.Column{S: schema, T: table, C: column})
+	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("reading varchar columns: %v", err)
+	}
+
+	// Create an index on each uuid column that does not already have an index.
+	processed := make(map[dbx.Table]struct{})
+	for _, c := range columns {
+		t := dbx.Table{S: c.S, T: c.T}
+		_, ok := processed[t]
+		if !ok {
+			eout.Info("upgrading: table %q", t)
+			processed[t] = struct{}{}
+		}
+		q = "ALTER TABLE \"" + c.S + "\".\"" + c.T + "\" ALTER COLUMN \"" + c.C + "\" TYPE text"
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+	}
+
+	// Write new version number.
+	err = metadata.WriteDatabaseVersion(dc, 20)
+	if err != nil {
 		return err
 	}
 	return nil

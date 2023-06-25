@@ -98,7 +98,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 			//        return err
 			//}
 		case string:
-			sqldata, err := command.DataToSQLData(v, command.VarcharType, "")
+			sqldata, err := command.DataToSQLData(v, command.TextType, "")
 			if err != nil {
 				return err
 			}
@@ -161,11 +161,11 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 			})
 			cols = append(cols, command.CommandColumn{
 				Name:         aname,
-				DType:        command.VarcharType,
+				DType:        command.TextType,
 				DTypeSize:    int64(len(v)),
 				SemanticType: "",
 				Data:         v,
-				EncodedData:  command.SQLEncodeData(v, command.VarcharType, ""),
+				EncodedData:  command.SQLEncodeData(v, command.TextType, ""),
 				PrimaryKey:   0,
 			})
 			ncmd := command.Command{

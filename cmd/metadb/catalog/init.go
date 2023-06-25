@@ -24,7 +24,7 @@ type Catalog struct {
 	tableDir           map[dbx.Table]tableEntry
 	partYears          map[string]map[int]struct{}
 	users              map[string]*util.RegexList
-	columns            map[sqlx.Column]ColumnType
+	columns            map[sqlx.Column]string
 	indexes            map[dbx.Column]struct{}
 	lastSnapshotRecord time.Time
 	dp                 *pgxpool.Pool
