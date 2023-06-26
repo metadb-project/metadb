@@ -634,6 +634,7 @@ func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sq
 	if err = rows.Err(); err != nil {
 		return false, false, fmt.Errorf("reading matching current row: %v", err)
 	}
+	rows.Close()
 	if !found {
 		return false, false, nil
 	}
