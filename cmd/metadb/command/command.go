@@ -288,7 +288,7 @@ func extractPrimaryKey(pkerr map[string]struct{}, ce *change.Event) (map[string]
 		}
 		_, ok = pkerr[topic]
 		if !ok {
-			log.Error("primary key not defined: %s", topic)
+			log.Warning("primary key not defined: %s", topic)
 			pkerr[topic] = struct{}{}
 		}
 		return nil, nil
