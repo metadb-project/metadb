@@ -404,7 +404,7 @@ func extractColumns(pkerr map[string]struct{}, ce *change.Event) ([]CommandColum
 			return nil, fmt.Errorf("value: $.schema.fields: \"type\": %s", err)
 		}
 		col.Data = fieldData[field]
-		if col.DType == TextType && col.Data != nil {
+		if (col.DType == TextType || col.DType == JSONType) && col.Data != nil {
 			// Large values (typically above 8 kB) in PostgreSQL that have been stored using
 			// the "TOAST" method are not included in an UPDATE change event where those
 			// values were not modified.
