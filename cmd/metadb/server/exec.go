@@ -441,6 +441,7 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 		if err = rows.Err(); err != nil {
 			return fmt.Errorf("reading matching current row: %v", err)
 		}
+		rows.Close()
 		if !found {
 			log.Warning("no current value for unavailable data in table %q", table)
 		} else {
@@ -448,6 +449,10 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 				if c.Unavailable {
 					for j := 0; j < lenColumns; j++ {
 						if c.Name == unavail[j] {
+							if values[j] == nil {
+								return fmt.Errorf("nil value in replacing" +
+									" unavailable data")
+							}
 							s, ok := values[j].(string)
 							if !ok {
 								return fmt.Errorf("type assertion failed in" +
@@ -478,8 +483,9 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 	if err = wherePKDataEqual(db, &b, cmd.Column); err != nil {
 		return fmt.Errorf("primary key columns equal: %v", err)
 	}
-	batch := &pgx.Batch{}
-	batch.Queue(b.String())
+	if _, err := tx.Exec(context.TODO(), b.String()); err != nil {
+		return fmt.Errorf("updating current row: %v", err)
+	}
 	// Insert the new row.
 	b.Reset()
 	b.WriteString("INSERT INTO \"")
@@ -504,12 +510,12 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 		b.WriteByte('\'')
 	}
 	for _, c := range cmd.Column {
-		b.WriteString("," + encodeSQLData(c.SQLData, c.DType, db))
+		b.WriteString(",")
+		b.WriteString(encodeSQLData(c.SQLData, c.DType, db))
 	}
 	b.WriteByte(')')
-	batch.Queue(b.String())
-	if err = tx.SendBatch(context.TODO(), batch).Close(); err != nil {
-		return fmt.Errorf("update and insert: %v", err)
+	if _, err := tx.Exec(context.TODO(), b.String()); err != nil {
+		return fmt.Errorf("inserting new row: %v", err)
 	}
 	return nil
 }
