@@ -459,8 +459,8 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 									" replacing unavailable data")
 							}
 							cmd.Column[i].SQLData = &s
-							log.Trace("found current value for unavailable data: %v",
-								cmd.Column[i])
+							log.Trace("found current value for unavailable data"+
+								" in table %q, column %q", table, cmd.Column[i].Name)
 							break
 						}
 					}
