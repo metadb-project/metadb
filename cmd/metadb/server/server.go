@@ -220,15 +220,20 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 
 	go goPollLoop(cat, svr)
 
-	folio, err := isFolioModulePresent(svr.db)
-	if err != nil {
-		return fmt.Errorf("checking for folio module: %v", err)
-	}
-	reshare, err := isReshareModulePresent(svr.db)
-	if err != nil {
-		return fmt.Errorf("checking for reshare module: %v", err)
-	}
-	go goMaintenance(svr.opt.Datadir, *(svr.db), cat, folio, reshare)
+	/*	folio, err := isFolioModulePresent(svr.db)
+		if err != nil {
+			return fmt.Errorf("checking for folio module: %v", err)
+		}
+		reshare, err := isReshareModulePresent(svr.db)
+		if err != nil {
+			return fmt.Errorf("checking for reshare module: %v", err)
+		}
+		source, err := util.GetOneSource(svr.dp)
+		if err != nil {
+			log.Info("reading source: %v", err)
+		}
+		go goMaintenance(svr.opt.Datadir, *(svr.db), cat, source, folio, reshare)
+	*/
 
 	for {
 		if process.Stop() {
@@ -278,7 +283,7 @@ func isReshareModulePresent(db *dbx.DB) (bool, error) {
 	}
 }
 
-func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, folio, reshare bool) {
+func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, source string, folio, reshare bool) {
 	dc, err := db.Connect()
 	if err != nil {
 		log.Error("%v", err)
@@ -295,15 +300,14 @@ func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, folio, resha
 				log.Error("marc__t: %v", err)
 			}
 		}
-		if err := checkTimeDailyMaintenance(datadir, db, dc, cat, folio, reshare, resync); err != nil {
+		if err := checkTimeDailyMaintenance(datadir, db, dc, cat, source, folio, reshare, resync); err != nil {
 			log.Error("%v", err)
 		}
 		time.Sleep(55 * time.Minute)
 	}
 }
 
-func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *catalog.Catalog, folio, reshare bool,
-	resync bool) error {
+func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *catalog.Catalog, source string, folio, reshare bool, resync bool) error {
 	var overdue bool
 	q := "SELECT CURRENT_TIMESTAMP > next_maintenance_time FROM metadb.maintenance"
 	err := dc.QueryRow(context.TODO(), q).Scan(&overdue)
@@ -328,7 +332,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *cat
 			tag := "20230625024847"
 			path := "sql_metadb/derived_tables"
 			schema := "folio_derived"
-			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {
+			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema, source); err != nil {
 				log.Warning("runsql: %v: repository=%s tag=%s path=%s", err, url, tag, path)
 				if tries >= 12 {
 					break
@@ -347,7 +351,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *cat
 			tag := "20230525025851"
 			path := "sql/derived_tables"
 			schema := "reshare_derived"
-			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema); err != nil {
+			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema, source); err != nil {
 				log.Warning("runsql: %v: repository=%s tag=%s path=%s", err, url, tag, path)
 				if tries >= 12 {
 					break

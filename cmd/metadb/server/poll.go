@@ -34,6 +34,17 @@ func goPollLoop(cat *catalog.Catalog, svr *server) {
 		log.Fatal("%s", err)
 		os.Exit(1)
 	}
+
+	folio, err := isFolioModulePresent(svr.db)
+	if err != nil {
+		log.Error("checking for folio module: %v", err)
+	}
+	reshare, err := isReshareModulePresent(svr.db)
+	if err != nil {
+		log.Error("checking for reshare module: %v", err)
+	}
+	go goMaintenance(svr.opt.Datadir, *(svr.db), cat, spr.source.Name, folio, reshare)
+
 	for {
 		err := launchPollLoop(cat, svr, spr)
 		if err == nil {
@@ -248,7 +259,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cat, cl, spr.db[0], spr.svr.dp); err != nil {
+		if err = execCommandList(cat, cl, spr.db[0], spr.svr.dp, spr.source.Name); err != nil {
 			return fmt.Errorf("executor: %s", err)
 		}
 

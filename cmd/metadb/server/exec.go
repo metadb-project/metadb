@@ -15,14 +15,14 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, dp *pgxpool.Pool) error {
+func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, dp *pgxpool.Pool, source string) error {
 	var clt []command.CommandList = partitionTxn(cat, cl)
 	for _, cc := range clt {
 		if len(cc.Cmd) == 0 {
 			continue
 		}
 		// exec schema changes
-		if err := execCommandSchema(cat, &cc.Cmd[0], db); err != nil {
+		if err := execCommandSchema(cat, &cc.Cmd[0], db, source); err != nil {
 			return fmt.Errorf("exec command schema: %v", err)
 		}
 		if err := execCommandAddIndexes(cat, cc); err != nil {
@@ -41,7 +41,7 @@ func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, 
 	return nil
 }
 
-func execCommandSchema(cat *catalog.Catalog, cmd *command.Command, db sqlx.DB) error {
+func execCommandSchema(cat *catalog.Catalog, cmd *command.Command, db sqlx.DB, source string) error {
 
 	if cmd.Op == command.DeleteOp || cmd.Op == command.TruncateOp {
 		return nil
@@ -51,7 +51,7 @@ func execCommandSchema(cat *catalog.Catalog, cmd *command.Command, db sqlx.DB) e
 	if delta, err = findDeltaSchema(cat, cmd); err != nil {
 		return fmt.Errorf("schema: %v", err)
 	}
-	if err = addTable(cmd, db, cat); err != nil {
+	if err = addTable(cmd, db, cat, source); err != nil {
 		return fmt.Errorf("schema: %v", err)
 	}
 	if err = addPartition(cat, cmd); err != nil {

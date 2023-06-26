@@ -72,7 +72,8 @@ func tableExists(c *Catalog, table dbx.Table) bool {
 //	return addTableEntry(c, true, table, transformed, parentTable)
 //}
 
-func addTableEntry(c *Catalog, lock bool, table dbx.Table, transformed bool, parentTable dbx.Table) error {
+func addTableEntry(c *Catalog, lock bool, table dbx.Table, transformed bool, parentTable dbx.Table, source string) error {
+
 	func(table dbx.Table, transformed bool, parentTable dbx.Table) {
 		if lock {
 			c.mu.Lock()
@@ -80,15 +81,17 @@ func addTableEntry(c *Catalog, lock bool, table dbx.Table, transformed bool, par
 		}
 		c.updateCacheTableEntry(table, transformed, parentTable)
 	}(table, transformed, parentTable)
-	if err := insertIntoTableTrack(c, table, transformed, parentTable); err != nil {
+	if err := insertIntoTableTrack(c, table, transformed, parentTable, source); err != nil {
 		return fmt.Errorf("updating catalog in database for table %q: %v", table, err)
 	}
 	return nil
 }
 
-func insertIntoTableTrack(c *Catalog, table dbx.Table, transformed bool, parentTable dbx.Table) error {
-	q := "INSERT INTO " + catalogSchema + ".track(schemaname,tablename,transformed,parentschema,parenttable)VALUES($1,$2,$3,$4,$5)"
-	if _, err := c.dp.Exec(context.TODO(), q, table.S, table.T, transformed, parentTable.S, parentTable.T); err != nil {
+func insertIntoTableTrack(c *Catalog, table dbx.Table, transformed bool, parentTable dbx.Table, source string) error {
+	q := "INSERT INTO " + catalogSchema +
+		".track(schemaname,tablename,transformed,parentschema,parenttable,source)VALUES($1,$2,$3,$4,$5,$6)"
+	_, err := c.dp.Exec(context.TODO(), q, table.S, table.T, transformed, parentTable.S, parentTable.T, source)
+	if err != nil {
 		return fmt.Errorf("inserting catalog entry for table: %q: %s", table, err)
 	}
 	return nil
@@ -151,7 +154,7 @@ func findDescendantTables(tableDir map[dbx.Table]tableEntry, table dbx.Table, de
 	}
 }
 
-func (c *Catalog) CreateNewTable(table dbx.Table, transformed bool, parentTable dbx.Table) error {
+func (c *Catalog) CreateNewTable(table dbx.Table, transformed bool, parentTable dbx.Table, source string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if tableExists(c, table) {
@@ -163,7 +166,7 @@ func (c *Catalog) CreateNewTable(table dbx.Table, transformed bool, parentTable 
 	if err := createMainTableIfNotExists(c, table); err != nil {
 		return fmt.Errorf("creating new table %q: %v", table, err)
 	}
-	if err := addTableEntry(c, false, table, transformed, parentTable); err != nil {
+	if err := addTableEntry(c, false, table, transformed, parentTable, source); err != nil {
 		return fmt.Errorf("creating new table %q: %v", table, err)
 	}
 	return nil

@@ -20,7 +20,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, schema string) error {
+func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, schema string, source string) error {
 	dc, err := db.Connect()
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, sch
 		log.Trace("running file: %d %s", i, f)
 		file := filepath.Join(workdir, f)
 		fullpath := filepath.Join(path, f)
-		if err = runFile(cat, url, tag, fullpath, dc, schema, file); err != nil {
+		if err = runFile(cat, url, tag, fullpath, dc, schema, file, source); err != nil {
 			log.Warning("runsql: %v: repository=%s tag=%s path=%s", err, url, tag, fullpath)
 		}
 		for _, u := range users {
@@ -94,7 +94,7 @@ func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, sch
 	return nil
 }
 
-func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, schema string, file string) error {
+func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, schema string, file string, source string) error {
 	var table string
 	data, err := os.ReadFile(file)
 	if err != nil {
@@ -112,7 +112,7 @@ func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, sche
 		if q == "" {
 			continue
 		}
-		if err = checkForDirectives(cat, url, tag, fullpath, q, &table); err != nil {
+		if err = checkForDirectives(cat, url, tag, fullpath, q, &table, source); err != nil {
 			return err
 		}
 		if _, err = tx.Exec(context.TODO(), q); err != nil {
@@ -133,7 +133,7 @@ func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, sche
 
 var sqlSeparator = regexp.MustCompile("\\n\\s*\\n")
 
-func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input string, table *string) error {
+func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input string, table *string, source string) error {
 	if !strings.HasPrefix(strings.TrimSpace(input), "--metadb:") {
 		return nil
 	}
@@ -189,7 +189,7 @@ func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input s
 				continue
 			}
 			// Add table
-			if err := cat.CreateNewTable(requireTable, false, dbx.Table{}); err != nil {
+			if err := cat.CreateNewTable(requireTable, false, dbx.Table{}, source); err != nil {
 				return fmt.Errorf("creating new table: %s: %v", requireTable, err)
 			}
 			// Add column
