@@ -448,7 +448,12 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 				if c.Unavailable {
 					for j := 0; j < lenColumns; j++ {
 						if c.Name == unavail[j] {
-							cmd.Column[i].SQLData = values[j].(*string)
+							s, ok := values[j].(string)
+							if !ok {
+								return fmt.Errorf("type assertion failed in" +
+									" replacing unavailable data")
+							}
+							cmd.Column[i].SQLData = &s
 							log.Trace("found current value for unavailable data: %v",
 								cmd.Column[i])
 							break
