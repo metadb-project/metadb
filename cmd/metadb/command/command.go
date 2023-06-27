@@ -239,14 +239,7 @@ func convertTypeSize(data *string, coltype string, datatype DataType) (int64, er
 			return 0, fmt.Errorf("internal error: unexpected integer type %q", coltype)
 		}
 	case TextType:
-		if data == nil {
-			return 1, nil
-		}
-		lendata := len(*data)
-		if lendata <= 1 {
-			return 1, nil
-		}
-		return int64(lendata), nil
+		return 0, nil
 	case FloatType:
 		switch coltype {
 		case "float", "float32":
