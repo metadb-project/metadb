@@ -177,13 +177,15 @@ func DataTypeToSQL(dtype DataType, typeSize int64) string {
 }
 
 type Command struct {
-	Op              Operation
-	SchemaName      string
-	TableName       string
-	Transformed     bool
-	ParentTable     sqlx.Table
-	Origin          string
-	Column          []CommandColumn
+	Op          Operation
+	SchemaName  string
+	TableName   string
+	Transformed bool
+	ParentTable sqlx.Table
+	Origin      string
+	Column      []CommandColumn
+	// ColumnMap maps the column names to the columns.
+	ColumnMap       map[string]*CommandColumn
 	ChangeEvent     *change.Event
 	SourceTimestamp string
 }
@@ -737,7 +739,17 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 	if c.Column == nil {
 		return nil, false, nil
 	}
+	// Create map of the column names to the columns.
+	c.ColumnMap = BuildColumnMap(c.Column)
 	return c, snapshot, nil
+}
+
+func BuildColumnMap(columns []CommandColumn) map[string]*CommandColumn {
+	m := make(map[string]*CommandColumn)
+	for i := range columns {
+		m[columns[i].Name] = &(columns[i])
+	}
+	return m
 }
 
 func extractOrigin(prefixes []string, schema string) (string, string) {
@@ -946,26 +958,18 @@ func PrimaryKeyColumns(columns []CommandColumn) []CommandColumn {
 	return pkey
 }
 
+func InferTypeFromString(data string) DataType {
+	switch {
+	case uuid.IsUUID(data):
+		return UUIDType
+	case timestamptzRegexp.MatchString(data):
+		return TimestamptzType
+	case timestampRegexp.MatchString(data):
+		return TimestampType
+	default:
+		return TextType
+	}
+}
+
 var timestamptzRegexp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|(\+\d+(\:\d+)?))?$`)
 var timestampRegexp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$`)
-
-func InferTypeFromString(data string) (DataType, int64) {
-	// Test for UUID
-	if uuid.IsUUID(data) {
-		return UUIDType, 0
-	}
-	// Test for timestamp with time zone
-	if timestamptzRegexp.MatchString(data) {
-		return TimestamptzType, 0
-	}
-	// Test for timestamp without time zone
-	if timestampRegexp.MatchString(data) {
-		return TimestampType, 0
-	}
-	// Otherwise default to text
-	n := len(data)
-	if n < 1 {
-		n = 1
-	}
-	return TextType, int64(n)
-}

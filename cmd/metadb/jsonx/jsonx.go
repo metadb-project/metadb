@@ -80,7 +80,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				PrimaryKey: 0,
 			})
 		case float64:
-			var s string = strconv.FormatFloat(v, 'E', -1, 64)
+			s := strconv.FormatFloat(v, 'E', -1, 64)
 			sqldata, err := command.DataToSQLData(s, command.NumericType, "")
 			if err != nil {
 				return err
@@ -102,16 +102,15 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 			if err != nil {
 				return err
 			}
-			dtype, dtypesize := command.InferTypeFromString(v)
+			dtype := command.InferTypeFromString(v)
 			cols = append(cols, command.CommandColumn{
 				Name:       n,
 				DType:      dtype,
-				DTypeSize:  dtypesize,
+				DTypeSize:  0,
 				Data:       v,
 				SQLData:    sqldata,
 				PrimaryKey: 0,
 			})
-		default:
 		}
 
 	}
@@ -123,6 +122,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 		ParentTable:     sqlx.Table{Schema: cmd.SchemaName, Table: cmd.TableName},
 		Origin:          cmd.Origin,
 		Column:          cols,
+		ColumnMap:       command.BuildColumnMap(cols),
 		ChangeEvent:     cmd.ChangeEvent,
 		SourceTimestamp: cmd.SourceTimestamp,
 	}

@@ -16,7 +16,7 @@ import (
 )
 
 func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, dp *pgxpool.Pool, source string) error {
-	var clt []command.CommandList = partitionTxn(cat, cl)
+	var clt = partitionTxn(cl)
 	for _, cc := range clt {
 		if len(cc.Cmd) == 0 {
 			continue
@@ -303,46 +303,55 @@ func execCommandListData(cat *catalog.Catalog, db sqlx.DB, dp *pgxpool.Pool, cc 
 	return nil
 }
 
-func partitionTxn(cat *catalog.Catalog, cl *command.CommandList) []command.CommandList {
-	var clt []command.CommandList
-	newcl := new(command.CommandList)
-	var c, lastc command.Command
-	for _, c = range cl.Cmd {
-		req := requiresSchemaChanges(cat, &c, &lastc)
-		if req {
-			if len(newcl.Cmd) > 0 {
-				clt = append(clt, *newcl)
-				newcl = new(command.CommandList)
-			}
+func partitionTxn(cmdlist *command.CommandList) []command.CommandList {
+	// cmdlisttxns is a partition of command lists into transactions.
+	cmdlisttxns := make([]command.CommandList, 0)
+	// newcmdlist is the command list we are currently adding commands to.
+	newcmdlist := new(command.CommandList)
+	// lastcmd stores the previous command that was examined.
+	lastcmd := command.Command{}
+	for _, cmd := range cmdlist.Cmd {
+		// If a command may require schema changes, end the current transaction and begin
+		// a new one.
+		if mayRequireSchemaChanges(&cmd, &lastcmd) && len(newcmdlist.Cmd) > 0 {
+			cmdlisttxns = append(cmdlisttxns, *newcmdlist)
+			newcmdlist = new(command.CommandList)
 		}
-		newcl.Cmd = append(newcl.Cmd, c)
-		lastc = c
+		newcmdlist.Cmd = append(newcmdlist.Cmd, cmd)
+		if cmd.Op == command.MergeOp {
+			lastcmd = cmd
+		}
 	}
-	if len(newcl.Cmd) > 0 {
-		clt = append(clt, *newcl)
+	if len(newcmdlist.Cmd) > 0 {
+		cmdlisttxns = append(cmdlisttxns, *newcmdlist)
 	}
-	return clt
+	return cmdlisttxns
 }
 
-func requiresSchemaChanges(cat *catalog.Catalog, c, o *command.Command) bool {
-	if c.Op == command.DeleteOp || c.Op == command.TruncateOp {
+func mayRequireSchemaChanges(cmd, lastcmd *command.Command) bool {
+	switch {
+	case cmd.Op != command.MergeOp:
 		return false
-	}
-	if c.Op != o.Op || c.SchemaName != o.SchemaName || c.TableName != o.TableName {
+	case cmd.SchemaName != lastcmd.SchemaName:
+		return true
+	case cmd.TableName != lastcmd.TableName:
+		return true
+	case len(cmd.Column) != len(lastcmd.Column):
 		return true
 	}
-	if len(c.Column) != len(o.Column) {
-		return true
-	}
-	for i, col := range c.Column {
+	// If the new command has a column not present in the previous command, or
+	// present but different, then schema changes may be required.
+	for _, col := range cmd.Column {
+		lastcol, ok := lastcmd.ColumnMap[col.Name]
+		if !ok {
+			return true
+		}
 		switch {
-		case col.Name != o.Column[i].Name:
+		case col.DType != lastcol.DType:
 			return true
-		case col.DType != o.Column[i].DType:
+		case col.DTypeSize != lastcol.DTypeSize:
 			return true
-		case col.DTypeSize != o.Column[i].DTypeSize:
-			return true
-		case col.PrimaryKey != o.Column[i].PrimaryKey:
+		case col.PrimaryKey != lastcol.PrimaryKey:
 			return true
 		}
 	}
