@@ -395,7 +395,7 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 				}
 				s := values[i].(string)
 				unavailColumns[i].SQLData = &s
-				log.Info("found current value for unavailable data in table %q, column %q", table, unavailColumns[i].Name)
+				log.Trace("found current value for unavailable data in table %q, column %q", table, unavailColumns[i].Name)
 				break
 			}
 		}
