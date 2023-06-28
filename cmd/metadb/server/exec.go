@@ -15,25 +15,25 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-func execCommandList(cat *catalog.Catalog, cl *command.CommandList, db sqlx.DB, dp *pgxpool.Pool, source string) error {
-	var clt = partitionTxn(cl)
-	for _, cc := range clt {
-		if len(cc.Cmd) == 0 {
+func execCommandList(cat *catalog.Catalog, cmdlist *command.CommandList, db sqlx.DB, dp *pgxpool.Pool, source string) error {
+	var cmdlisttxns = partitionTxn(cmdlist)
+	for i := range cmdlisttxns {
+		if len(cmdlisttxns[i].Cmd) == 0 {
 			continue
 		}
 		// exec schema changes
-		if err := execCommandSchema(cat, &cc.Cmd[0], db, source); err != nil {
+		if err := execCommandSchema(cat, &(cmdlisttxns[i].Cmd[0]), db, source); err != nil {
 			return fmt.Errorf("exec command schema: %v", err)
 		}
-		if err := execCommandAddIndexes(cat, cc); err != nil {
+		if err := execCommandAddIndexes(cat, &(cmdlisttxns[i])); err != nil {
 			return fmt.Errorf("exec command indexes: %v", err)
 		}
-		if err := execCommandListData(cat, db, dp, cc); err != nil {
+		if err := execCommandListData(cat, db, dp, &(cmdlisttxns[i])); err != nil {
 			return fmt.Errorf("exec command data: %v", err)
 		}
 		// log confirmation
 		if log.IsLevelTrace() {
-			for _, c := range cc.Cmd {
+			for _, c := range cmdlisttxns[i].Cmd {
 				logTraceCommand(&c)
 			}
 		}
@@ -263,17 +263,18 @@ func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSch
 }
 */
 
-func execCommandAddIndexes(cat *catalog.Catalog, cmds command.CommandList) error {
-	for _, cmd := range cmds.Cmd {
+func execCommandAddIndexes(cat *catalog.Catalog, cmdlist *command.CommandList) error {
+	commands := cmdlist.Cmd
+	for i := range commands {
 		// The table associated with delete/truncate operations may not exist, and any
 		// needed indexes would have been created anyway with a merge operation.
-		if cmd.Op == command.DeleteOp || cmd.Op == command.TruncateOp {
+		if commands[i].Op == command.DeleteOp || commands[i].Op == command.TruncateOp {
 			continue
 		}
 		// Create indexes on primary key columns.
-		for _, col := range cmd.Column {
+		for _, col := range commands[i].Column {
 			if col.PrimaryKey != 0 {
-				if err := cat.AddIndexIfNotExists(cmd.SchemaName, cmd.TableName, col.Name); err != nil {
+				if err := cat.AddIndexIfNotExists(commands[i].SchemaName, commands[i].TableName, col.Name); err != nil {
 					return err
 				}
 			}
@@ -282,16 +283,17 @@ func execCommandAddIndexes(cat *catalog.Catalog, cmds command.CommandList) error
 	return nil
 }
 
-func execCommandListData(cat *catalog.Catalog, db sqlx.DB, dp *pgxpool.Pool, cc command.CommandList) error {
+func execCommandListData(cat *catalog.Catalog, db sqlx.DB, dp *pgxpool.Pool, cmdlist *command.CommandList) error {
 	tx, err := dp.Begin(context.TODO())
 	if err != nil {
 		return err
 	}
 	defer dbx.Rollback(tx)
 	// Exec data
-	for _, c := range cc.Cmd {
+	commands := cmdlist.Cmd
+	for i := range cmdlist.Cmd {
 		// Execute data part of command
-		if err = execCommandData(cat, &c, tx, db); err != nil {
+		if err = execCommandData(cat, &(commands[i]), tx, db); err != nil {
 			return fmt.Errorf("data: %v", err)
 		}
 	}
@@ -310,16 +312,17 @@ func partitionTxn(cmdlist *command.CommandList) []command.CommandList {
 	newcmdlist := new(command.CommandList)
 	// lastcmd stores the previous command that was examined.
 	lastcmd := command.Command{}
-	for _, cmd := range cmdlist.Cmd {
+	commands := cmdlist.Cmd
+	for i := range commands {
 		// If a command may require schema changes, end the current transaction and begin
 		// a new one.
-		if mayRequireSchemaChanges(&cmd, &lastcmd) && len(newcmdlist.Cmd) > 0 {
+		if mayRequireSchemaChanges(&(commands[i]), &lastcmd) && len(newcmdlist.Cmd) > 0 {
 			cmdlisttxns = append(cmdlisttxns, *newcmdlist)
 			newcmdlist = new(command.CommandList)
 		}
-		newcmdlist.Cmd = append(newcmdlist.Cmd, cmd)
-		if cmd.Op == command.MergeOp {
-			lastcmd = cmd
+		newcmdlist.Cmd = append(newcmdlist.Cmd, commands[i])
+		if commands[i].Op == command.MergeOp {
+			lastcmd = commands[i]
 		}
 	}
 	if len(newcmdlist.Cmd) > 0 {
@@ -341,39 +344,40 @@ func mayRequireSchemaChanges(cmd, lastcmd *command.Command) bool {
 	}
 	// If the new command has a column not present in the previous command, or
 	// present but different, then schema changes may be required.
-	for _, col := range cmd.Column {
-		lastcol, ok := lastcmd.ColumnMap[col.Name]
+	columns := cmd.Column
+	for i := range columns {
+		lastcol, ok := lastcmd.ColumnMap[columns[i].Name]
 		if !ok {
 			return true
 		}
 		switch {
-		case col.DType != lastcol.DType:
+		case columns[i].DType != lastcol.DType:
 			return true
-		case col.DTypeSize != lastcol.DTypeSize:
+		case columns[i].DTypeSize != lastcol.DTypeSize:
 			return true
-		case col.PrimaryKey != lastcol.PrimaryKey:
+		case columns[i].PrimaryKey != lastcol.PrimaryKey:
 			return true
 		}
 	}
 	return false
 }
 
-func execCommandData(cat *catalog.Catalog, c *command.Command, tx pgx.Tx, db sqlx.DB) error {
-	switch c.Op {
+func execCommandData(cat *catalog.Catalog, cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
+	switch cmd.Op {
 	case command.MergeOp:
-		if err := execMergeData(c, tx, db); err != nil {
+		if err := execMergeData(cmd, tx, db); err != nil {
 			return fmt.Errorf("merge: %v", err)
 		}
 	case command.DeleteOp:
-		if err := execDeleteData(cat, c, tx, db); err != nil {
+		if err := execDeleteData(cat, cmd, tx, db); err != nil {
 			return fmt.Errorf("delete: %v", err)
 		}
 	case command.TruncateOp:
-		if err := execTruncateData(cat, c, tx, db); err != nil {
+		if err := execTruncateData(cat, cmd, tx, db); err != nil {
 			return fmt.Errorf("truncate: %v", err)
 		}
 	default:
-		return fmt.Errorf("unknown command op: %v", c.Op)
+		return fmt.Errorf("unknown command op: %v", cmd.Op)
 	}
 	return nil
 }
@@ -400,21 +404,22 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 		return nil
 	}
 	// If any columns are "unavailable," extract the previous values from the current record.
-	unavail := make([]string, 0)
-	for _, c := range cmd.Column {
-		if c.Unavailable {
-			unavail = append(unavail, c.Name)
+	unavailColumns := make([]*command.CommandColumn, 0)
+	columns := cmd.Column
+	for i := range columns {
+		if columns[i].Unavailable {
+			unavailColumns = append(unavailColumns, &(columns[i]))
 		}
 	}
-	if len(unavail) != 0 {
+	if len(unavailColumns) != 0 {
 		var b strings.Builder
 		b.WriteString("SELECT ")
-		for i, n := range unavail {
+		for i := range unavailColumns {
 			if i != 0 {
 				b.WriteByte(',')
 			}
 			b.WriteByte('"')
-			b.WriteString(n)
+			b.WriteString(unavailColumns[i].Name)
 			b.WriteString("\"::text")
 		}
 		b.WriteString(" FROM \"")
@@ -434,10 +439,10 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 			return fmt.Errorf("querying for unavailable data: %v", err)
 		}
 		defer rows.Close()
-		lenColumns := len(unavail)
+		lenColumns := len(unavailColumns)
 		dest := make([]any, lenColumns)
 		values := make([]any, lenColumns)
-		for i := range dest {
+		for i := range values {
 			dest[i] = &(values[i])
 		}
 		found := false
@@ -454,26 +459,13 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 		if !found {
 			log.Warning("no current value for unavailable data in table %q", table)
 		} else {
-			for i, c := range cmd.Column {
-				if c.Unavailable {
-					for j := 0; j < lenColumns; j++ {
-						if c.Name == unavail[j] {
-							if values[j] == nil {
-								return fmt.Errorf("nil value in replacing" +
-									" unavailable data")
-							}
-							s, ok := values[j].(string)
-							if !ok {
-								return fmt.Errorf("type assertion failed in" +
-									" replacing unavailable data")
-							}
-							cmd.Column[i].SQLData = &s
-							log.Trace("found current value for unavailable data"+
-								" in table %q, column %q", table, cmd.Column[i].Name)
-							break
-						}
-					}
+			for i := range unavailColumns {
+				if values[i] == nil {
+					return fmt.Errorf("nil value in replacing unavailable data")
 				}
+				cmd.Column[i].SQLData = dest[i].(*string)
+				log.Trace("found current value for unavailable data in table %q, column %q", table, cmd.Column[i].Name)
+				break
 			}
 		}
 	}
@@ -507,9 +499,9 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 	if cmd.Origin != "" {
 		b.WriteString(",__origin")
 	}
-	for _, c := range cmd.Column {
+	for i := range columns {
 		b.WriteString(",\"")
-		b.WriteString(c.Name)
+		b.WriteString(columns[i].Name)
 		b.WriteByte('"')
 	}
 	b.WriteString(")VALUES('")
@@ -520,9 +512,9 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 		b.WriteString(cmd.Origin)
 		b.WriteByte('\'')
 	}
-	for _, c := range cmd.Column {
+	for i := range columns {
 		b.WriteString(",")
-		b.WriteString(encodeSQLData(c.SQLData, c.DType, db))
+		b.WriteString(encodeSQLData(columns[i].SQLData, columns[i].DType, db))
 	}
 	b.WriteByte(')')
 	//if _, err := tx.Exec(context.TODO(), b.String()); err != nil {
@@ -610,17 +602,18 @@ func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sq
 	b.WriteString("\" WHERE __origin='")
 	b.WriteString(cmd.Origin)
 	b.WriteByte('\'')
-	for _, c := range cmd.Column {
-		if c.Unavailable {
+	columns := cmd.Column
+	for i := range columns {
+		if columns[i].Unavailable {
 			continue
 		}
 		b.WriteString(" AND \"")
-		b.WriteString(c.Name)
-		if c.Data == nil {
+		b.WriteString(columns[i].Name)
+		if columns[i].Data == nil {
 			b.WriteString("\" IS NULL")
 		} else {
 			b.WriteString("\"=")
-			b.WriteString(encodeSQLData(c.SQLData, c.DType, db))
+			b.WriteString(encodeSQLData(columns[i].SQLData, columns[i].DType, db))
 		}
 	}
 	b.WriteString(" LIMIT 1")
@@ -630,8 +623,9 @@ func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sq
 	}
 	defer rows.Close()
 	columnNames := make([]string, 0)
-	for _, f := range rows.FieldDescriptions() {
-		columnNames = append(columnNames, f.Name)
+	fields := rows.FieldDescriptions()
+	for i := range fields {
+		columnNames = append(columnNames, fields[i].Name)
 	}
 	lenColumns := len(columnNames)
 	found := false
@@ -655,7 +649,7 @@ func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sq
 	}
 	// If any extra column values are not NULL, there is no match.
 	var cf bool
-	for i := 0; i < lenColumns; i++ {
+	for i := range values {
 		//////////////////////////////////////////////////////////////////////////////////////
 		// Temporary: read __cf value which, if false, currently still requires updating
 		// the row.
@@ -668,8 +662,8 @@ func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sq
 		}
 		//////////////////////////////////////////////////////////////////////////////////////
 		found := false
-		for _, c := range cmd.Column {
-			if columnNames[i] == c.Name {
+		for j := range columns {
+			if columnNames[i] == columns[j].Name {
 				found = true
 				break
 			}
@@ -775,9 +769,9 @@ func execDeleteData(cat *catalog.Catalog, c *command.Command, tx pgx.Tx, db sqlx
 
 	// Find matching current record and mark as not current.
 	// TODO Use pgx.Batch
-	for _, t := range tables {
+	for i := range tables {
 		var b strings.Builder
-		b.WriteString("UPDATE " + t.MainSQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
+		b.WriteString("UPDATE " + tables[i].MainSQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
 		if err := wherePKDataEqual(db, &b, c.Column); err != nil {
 			return err
 		}
@@ -797,9 +791,9 @@ func execTruncateData(cat *catalog.Catalog, c *command.Command, tx pgx.Tx, db sq
 
 	// Mark as not current.
 	// TODO Use pgx.Batch
-	for _, t := range tables {
+	for i := range tables {
 		var b strings.Builder
-		b.WriteString("UPDATE " + t.MainSQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
+		b.WriteString("UPDATE " + tables[i].MainSQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
 		// Run SQL.
 		if _, err := tx.Exec(context.TODO(), b.String()); err != nil {
 			return err
