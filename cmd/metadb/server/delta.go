@@ -7,53 +7,20 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 )
 
-type deltaColumnSchema struct {
-	newColumn   bool
-	name        string
-	oldType     command.DataType
-	newType     command.DataType
-	oldTypeSize int64
-	newTypeSize int64
-	newData     any
-}
-
-type deltaSchema struct {
-	column []deltaColumnSchema
-}
-
-/*
-func selectTableSchema(schema string, table string, svr *server) (*tableSchema, error) {
-	var err error
-	var q = fmt.Sprintf(""+
-		"SELECT attr_name,\n"+
-		"       attr_type,\n"+
-		"       attr_type_size,\n"+
-		"       pkey\n"+
-		"    FROM dbsystem.attribute\n"+
-		"    WHERE rel_schema = '%s' and rel_name = '%s';",
-		schema, table)
-	var rows *sql.Rows
-	if rows, err = svr.db.QueryContext(context.TODO(), q); err != nil {
-		return nil, fmt.Errorf("%s:\n%s", err, q)
-	}
-	defer rows.Close()
-	var ts = new(tableSchema)
-	for rows.Next() {
-		var cs columnSchema
-		var dtype string
-		if err = rows.Scan(&cs.name, &dtype, &cs.dtypeSize, &cs.primaryKey); err != nil {
-			return nil, err
-		}
-		cs.dtype = command.MakeDataType(dtype)
-
-		ts.column = append(ts.column, cs)
-	}
-	if err = rows.Err(); err != nil {
+func findDeltaSchema(cat *catalog.Catalog, c *command.Command) (*deltaSchema, error) {
+	schema1, err := selectTableSchema(cat, &sqlx.Table{Schema: c.SchemaName, Table: c.TableName})
+	if err != nil {
 		return nil, err
 	}
-	return ts, nil
+	schema2 := tableSchemaFromCommand(c)
+	delta := new(deltaSchema)
+	for i := range schema2.Column {
+		col1 := getColumnSchema(schema1, schema2.Column[i].Name)
+		findDeltaColumnSchema(col1, &(schema2.Column[i]), delta)
+	}
+	// findDeltaPrimaryKey()
+	return delta, nil
 }
-*/
 
 func tableSchemaFromCommand(c *command.Command) *sysdb.TableSchema {
 	var ts = new(sysdb.TableSchema)
@@ -71,10 +38,9 @@ func tableSchemaFromCommand(c *command.Command) *sysdb.TableSchema {
 }
 
 func getColumnSchema(tschema *sysdb.TableSchema, columnName string) *sysdb.ColumnSchema {
-	var col sysdb.ColumnSchema
-	for _, col = range tschema.Column {
-		if col.Name == columnName {
-			return &col
+	for i := range tschema.Column {
+		if tschema.Column[i].Name == columnName {
+			return &(tschema.Column[i])
 		}
 	}
 	return nil
@@ -92,8 +58,8 @@ func findDeltaColumnSchema(column1 *sysdb.ColumnSchema, column2 *sysdb.ColumnSch
 		})
 		return
 	}
-	// If the types are the same and the existing type size is larger than
-	// the new one, the columns schema are compatible
+	// If the types are the same and the existing type size is greater than or equal
+	// to the new one, the column schemas are compatible.
 	if column1.DType == column2.DType && column1.DTypeSize >= column2.DTypeSize {
 		return
 	}
@@ -109,19 +75,16 @@ func findDeltaColumnSchema(column1 *sysdb.ColumnSchema, column2 *sysdb.ColumnSch
 	return
 }
 
-func findDeltaSchema(cat *catalog.Catalog, c *command.Command) (*deltaSchema, error) {
-	var err error
-	var schema1 *sysdb.TableSchema
-	if schema1, err = selectTableSchema(cat, &sqlx.Table{Schema: c.SchemaName, Table: c.TableName}); err != nil {
-		return nil, err
-	}
-	var schema2 *sysdb.TableSchema = tableSchemaFromCommand(c)
-	var delta = new(deltaSchema)
-	var col2 sysdb.ColumnSchema
-	for _, col2 = range schema2.Column {
-		var col1 *sysdb.ColumnSchema = getColumnSchema(schema1, col2.Name)
-		findDeltaColumnSchema(col1, &col2, delta)
-	}
-	// findDeltaPrimaryKey()
-	return delta, nil
+type deltaColumnSchema struct {
+	newColumn   bool
+	name        string
+	oldType     command.DataType
+	newType     command.DataType
+	oldTypeSize int64
+	newTypeSize int64
+	newData     any
+}
+
+type deltaSchema struct {
+	column []deltaColumnSchema
 }

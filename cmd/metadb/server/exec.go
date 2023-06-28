@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 
@@ -186,82 +185,13 @@ func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSch
 		}
 
 		// If not a compatible change, adjust new type to varchar in all cases.
-
-		/*
-			// To do this we need to determine what the varchar length limit should be, by
-			// looking at existing data and the new datum.
-
-			// Get maximum string length of existing data.
-			maxlen, err := selectMaxStringLength(db, sqlx.NewTable(tschema, tableName), col.name)
-			if err != nil {
-				return fmt.Errorf("delta schema: %v", err)
-			}
-
-			// Get string length of new datum.
-			var typeSize int64 = -1
-			for j, c := range cmd.Column {
-				if c.Name == col.name {
-					if cmd.Column[j].SQLData == nil {
-						typeSize = 0
-					} else {
-						typeSize = int64(len(*(cmd.Column[j].SQLData)))
-					}
-					cmd.Column[j].DType = command.TextType
-					cmd.Column[j].DTypeSize = typeSize
-					break
-				}
-			}
-			if typeSize == -1 {
-				return fmt.Errorf("delta schema: internal error: column %q in table %q not found in command: ",
-					col.name, tschema+"."+tableName)
-			}
-
-			if typeSize > maxlen {
-				maxlen = typeSize
-			}
-			if maxlen < 1 {
-				maxlen = 1
-			}
-		*/
-
-		// err = alterColumnToVarchar(sqlx.NewTable(tschema, tableName), col.name, maxlen, db, schema)
 		err := alterColumnType(cat, db, tschema, tableName, col.name, command.TextType, 0, false)
 		if err != nil {
 			return fmt.Errorf("delta schema: %v", err)
 		}
-
-		/* Old renaming method:
-		log.Trace("table %s.%s: rename column %s", tschema, tableName, col.name)
-		if err := renameColumnOldType(sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db, schema); err != nil {
-			return err
-		}
-		dtypesql, _, _ := command.DataTypeToSQL(col.newType, col.newTypeSize)
-		log.Trace("table %s.%s: new column %s %s", tschema, tableName, col.name, dtypesql)
-		t := &sqlx.T{S: tschema, T: tableName}
-		if err := addColumn(t, col.name, col.newType, col.newTypeSize, db, schema); err != nil {
-			return err
-		}
-		*/
 	}
 	return nil
 }
-
-/*func selectMaxStringLength(db sqlx.DB, table *sqlx.Table, column string) (int64, error) {
-	var maxlen int64
-	tx, err := db.BeginTx()
-	if err != nil {
-		return 0, fmt.Errorf("computing maximum string length of column %q in table %q: begin transaction: %v",
-			column, table, err)
-	}
-	defer tx.Rollback()
-	q := "SELECT coalesce(max(length(\"" + column + "\"::varchar)), 0) FROM " + db.HistoryTableSQL(table)
-	if err = db.QueryRow(tx, q).Scan(&maxlen); err != nil {
-		return 0, fmt.Errorf("computing maximum string length of column %q in table %q: select: %v",
-			column, table, err)
-	}
-	return maxlen, nil
-}
-*/
 
 func execCommandAddIndexes(cat *catalog.Catalog, cmdlist *command.CommandList) error {
 	commands := cmdlist.Cmd
@@ -484,9 +414,6 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 	if err = wherePKDataEqual(db, &b, cmd.Column); err != nil {
 		return fmt.Errorf("primary key columns equal: %v", err)
 	}
-	//if _, err := tx.Exec(context.TODO(), b.String()); err != nil {
-	//	return fmt.Errorf("updating current row: %v", err)
-	//}
 	batch := &pgx.Batch{}
 	batch.Queue(b.String())
 	// Insert the new row.
@@ -517,64 +444,12 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 		b.WriteString(encodeSQLData(columns[i].SQLData, columns[i].DType, db))
 	}
 	b.WriteByte(')')
-	//if _, err := tx.Exec(context.TODO(), b.String()); err != nil {
-	//	return fmt.Errorf("inserting new row: %v", err)
-	//}
 	batch.Queue(b.String())
 	if err = tx.SendBatch(context.TODO(), batch).Close(); err != nil {
 		return fmt.Errorf("update and insert: %v", err)
 	}
 	return nil
 }
-
-/*func oldExecMergeData(c *command.Command, tx pgx.Tx, db sqlx.DB) error {
-	t := sqlx.Table{Schema: c.SchemaName, Table: c.TableName}
-	// Check if current record is identical.
-	ident, cf, err := isCurrentIdentical(c, tx, &t)
-	if err != nil {
-		return fmt.Errorf("matcher: %v", err)
-	}
-	if ident {
-		if cf == false {
-			// log.Trace("matcher cf")
-			return updateRowCF(c, tx, db, &t)
-		}
-		// log.Trace("matcher ok")
-		return nil
-	}
-	// History table:
-	// Select matching current record in history table and mark as not current.
-	var uphist strings.Builder
-	uphist.WriteString("UPDATE " + db.HistoryTableSQL(&t) + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
-	if err = wherePKDataEqual(db, &uphist, c.Column); err != nil {
-		return fmt.Errorf("primary key columns equal: %v", err)
-	}
-	if _, err := tx.Exec(context.TODO(), uphist.String()); err != nil {
-		return fmt.Errorf("updating current row: %v", err)
-	}
-	// insert new record
-	var inshist strings.Builder
-	inshist.WriteString("INSERT INTO " + db.TableSQL(&t) + "(__start,__end,__current")
-	if c.Origin != "" {
-		inshist.WriteString(",__origin")
-	}
-	for _, c := range c.Column {
-		inshist.WriteString("," + db.IdentiferSQL(c.Name))
-	}
-	inshist.WriteString(")VALUES('" + c.SourceTimestamp + "','9999-12-31 00:00:00Z',TRUE")
-	if c.Origin != "" {
-		inshist.WriteString(",'" + c.Origin + "'")
-	}
-	for _, c := range c.Column {
-		inshist.WriteString("," + encodeSQLData(c.SQLData, c.DType, db))
-	}
-	inshist.WriteString(")")
-	if _, err := tx.Exec(context.TODO(), inshist.String()); err != nil {
-		return fmt.Errorf("inserting new row: %v", err)
-	}
-	return nil
-}
-*/
 
 func updateRowCF(c *command.Command, tx pgx.Tx, db sqlx.DB, table *dbx.Table) error {
 	// Select matching current record in history table.
@@ -675,89 +550,6 @@ func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sq
 		}
 	}
 	// Otherwise we have found a match.
-	return true, cf, nil
-}
-
-func oldIsCurrentIdentical(c *command.Command, tx *sql.Tx, db sqlx.DB, t *sqlx.Table) (bool, string, error) {
-	var b strings.Builder
-	b.WriteString("SELECT * FROM " + db.TableSQL(t) + " WHERE __origin='" + c.Origin + "'")
-	if err := wherePKDataEqual(db, &b, c.Column); err != nil {
-		return false, "", fmt.Errorf("primary key columns equal: %v", err)
-	}
-	b.WriteString(" LIMIT 1")
-	rows, err := db.Query(tx, b.String())
-	if err != nil {
-		return false, "", err
-	}
-	cols, err := rows.Columns()
-	if err != nil {
-		return false, "", fmt.Errorf("columns: %v", err)
-	}
-	ptrs := make([]interface{}, len(cols))
-	results := make([][]byte, len(cols))
-	for i := range results {
-		ptrs[i] = &results[i]
-	}
-	defer func(rows *sql.Rows) {
-		_ = rows.Close()
-	}(rows)
-	var cf string
-	attrs := make(map[string]*string)
-	if rows.Next() {
-		if err = rows.Scan(ptrs...); err != nil {
-			return false, "", err
-		}
-		for i, r := range results {
-			if r != nil {
-				attr := cols[i]
-				val := string(r)
-				switch attr {
-				case "__id":
-				case "__cf":
-					cf = val
-				case "__start":
-				case "__end":
-				case "__current":
-				case "__origin":
-				default:
-					v := new(string)
-					*v = val
-					attrs[attr] = v
-				}
-			}
-		}
-	} else {
-		// log.Trace("matcher: %s: row not found in database: %s", t, command.ColumnsString(c.Column))
-		return false, "", nil
-	}
-	for _, col := range c.Column {
-		var cdata, ddata *string
-		var cdatas, ddatas string
-		cdata = col.SQLData
-		if cdata != nil {
-			cdatas = *cdata
-		}
-		ddata = attrs[col.Name]
-		if ddata != nil {
-			ddatas = *ddata
-		}
-		if (cdata == nil && ddata != nil) || (cdata != nil && ddata == nil) {
-			// log.Trace("matcher: %s (%s): cdata(%v) != ddata(%v)", t, col.Name, cdata, ddata)
-			return false, cf, nil
-		}
-		if cdata != nil && ddata != nil && cdatas != ddatas {
-			// log.Trace("matcher: %s (%s): cdatas(%s) != ddatas(%s)", t, col.Name, cdatas, ddatas)
-			return false, cf, nil
-		}
-		delete(attrs, col.Name)
-	}
-	// for k, v := range attrs {
-	for _, v := range attrs {
-		if v != nil {
-			// log.Trace("matcher: %s (%s): database has extra value: %v", t, k, v)
-			return false, cf, nil
-		}
-	}
 	return true, cf, nil
 }
 
