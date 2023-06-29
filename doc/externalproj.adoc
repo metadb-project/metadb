@@ -393,7 +393,7 @@ usually takes the form:
 SELECT json_extract_path_text(data, 'group') FROM user_groups;
 ----
 
-The equivalent for Metadb is:
+The form recommended for Metadb is:
 
 ----
 SELECT jsonb_extract_path_text(jsonb, 'group') FROM folio_users.groups;
@@ -414,8 +414,8 @@ SELECT id AS instance_id,
        instance_format_ids.jsonb #>> '{}' AS instance_format_id,
        instance_format_ids.ordinality
 FROM folio_inventory.instance
-    CROSS JOIN LATERAL jsonb_array_elements(jsonb_extract_path(jsonb, 'instanceFormatIds')) WITH ORDINALITY
-        AS instance_format_ids (jsonb);
+    CROSS JOIN LATERAL jsonb_array_elements(jsonb_extract_path(jsonb, 'instanceFormatIds'))
+        WITH ORDINALITY AS instance_format_ids (jsonb);
 ----
 
 If the array elements are JSON objects:
@@ -423,102 +423,41 @@ If the array elements are JSON objects:
 ----
 CREATE TABLE holdings_notes AS
 SELECT id AS holdings_id,
-       (jsonb_extract_path_text(notes.jsonb, 'holdingsNoteTypeId'))::uuid AS holdings_note_type_id,
+       jsonb_extract_path_text(notes.jsonb, 'holdingsNoteTypeId')::uuid
+           AS holdings_note_type_id,
        jsonb_extract_path_text(notes.jsonb, 'note') AS note,
-       (jsonb_extract_path_text(notes.jsonb, 'staffOnly'))::boolean AS staff_only,
+       jsonb_extract_path_text(notes.jsonb, 'staffOnly')::boolean AS staff_only,
        notes.ordinality
 FROM folio_inventory.holdings_record
-    CROSS JOIN LATERAL jsonb_array_elements(jsonb_extract_path(jsonb, 'notes')) WITH ORDINALITY
-        AS notes (jsonb);
+    CROSS JOIN LATERAL jsonb_array_elements(jsonb_extract_path(jsonb, 'notes'))
+        WITH ORDINALITY AS notes (jsonb);
 ----
 
 [discrete]
 ====== JSON fields as columns
 
 LDP transforms simple, first-level JSON fields into columns, which can be
-queried as:
+queried as, for example:
 
 ----
-SELECT expiration_offset_in_days FROM user_groups;
+SELECT id, "desc", "group" FROM user_groups;
 ----
 
 The Metadb equivalent of this query is:
 
 ----
-SELECT expiration_offset_in_days FROM folio_users.groups__t;
+SELECT id, "desc", "group" FROM folio_users.groups__t;
+----
+
+The double quotation marks are needed here only because `desc` and `group` are
+reserved words in SQL.  Alternatively, they can be removed if the column names
+are prefixed with a table alias:
+
+----
+SELECT g.id, g.desc, g.group FROM folio_users.groups__t AS g;
 ----
 
 Support for transforming subfields and arrays is planned in Metadb.
-
-===== MARC transform for LDP
-
-[.aqua-background]#Metadb 1.1#
-The MARC transform in Metadb can also be used with LDP (and LDLite).  A
-command-line tool called `marct` is provided which is a drop-in replacement for
-`ldpmarc`.
-
-The system requirements are a subset of those for Metadb:
-
-* Local storage: 500 GB
-* Database storage: 500 GB
-* Operating system: Linux
-* https://www.postgresql.org/[PostgreSQL] 15 or later
-* https://golang.org/[Go] 1.20 or later
-
-To build `marct`:
-
-----
-mkdir -p bin && go build -o bin ./cmd/marct
-----
-
-which creates a `bin/` subdirectory and builds the `marct` executable there:
-
-----
-./bin/marct -h
-----
-
-In LDP, MARC data are read from the tables `public.srs_marc` and
-`public.srs_records`, and the transformed output is written to the table
-`public.srs_marctab`.
-
-Typical usage is:
-
-----
-./bin/marct -D <datadir> -u <ldp_user>
-----
-
-where `datadir` is a LDP data directory containing `ldpconf.json`, and
-`ldp1_user` is a LDP user to be granted `SELECT` privileges on the output
-table.
-
-For example:
-
-----
-./bin/marct -D data -u ldp
-----
-
-Note that `marct` only grants privileges for a single user.  If individual user
-accounts are configured for LDP, a shell script can be used to grant privileges
-to the users, for example:
-
-----
-users=/path/to/list/of/users.txt
-for u in $( cat $users ); do
-    psql -c "GRANT SELECT ON public.srs_marctab TO $u ;"
-done
-----
-
-The first time `marct` runs, it will perform a "full update" of all of the MARC
-records.  In subsequent runs, it will attempt to use "incremental update" to
-update only records that have changed since the previous run, which can
-dramatically reduce the running time if the number of changes is small.
-
-However, if very many records have changed, it is possible that incremental
-update may take longer than full update.  If it appears that an incremental
-update will never finish, it should be canceled, and a full update should be
-run once before resuming incremental updates.  This can be done by using the
-`-f` command-line option, which disables incremental update and requires
-`marct` to do a full update.
 
 ==== Configuring Metadb for FOLIO
 
@@ -602,3 +541,74 @@ In the Debezium PostgreSQL connector configuration, it is suggested that
 credentials (`.+mod_login`), the public schema, the Okapi supertenant
 (`supertenant_mod_.+`), and mod-pubsub data (`pubsub_config,.+_mod_pubsub`)
 be excluded using the `schema.exclude.list` setting.
+
+=== MARC transform for LDP
+
+[.aqua-background]#Metadb 1.1#
+The MARC transform in Metadb can also be used with LDP (and LDLite).  A
+command-line tool called `marct` is provided which is a drop-in replacement for
+`ldpmarc`.
+
+The system requirements are a subset of those for Metadb:
+
+* Local storage: 500 GB
+* Database storage: 500 GB
+* Operating system: Linux
+* https://www.postgresql.org/[PostgreSQL] 15 or later
+* https://golang.org/[Go] 1.20 or later
+
+To build `marct`:
+
+----
+mkdir -p bin && go build -o bin ./cmd/marct
+----
+
+which creates a `bin/` subdirectory and builds the `marct` executable there:
+
+----
+./bin/marct -h
+----
+
+In LDP, MARC data are read from the tables `public.srs_marc` and
+`public.srs_records`, and the transformed output is written to the table
+`public.srs_marctab`.
+
+Typical usage is:
+
+----
+./bin/marct -D <datadir> -u <ldp_user>
+----
+
+where `datadir` is a LDP data directory containing `ldpconf.json`, and
+`ldp1_user` is a LDP user to be granted `SELECT` privileges on the output
+table.
+
+For example:
+
+----
+./bin/marct -D data -u ldp
+----
+
+Note that `marct` only grants privileges for a single user.  If individual user
+accounts are configured for LDP, a shell script can be used to grant privileges
+to the users, for example:
+
+----
+users=/path/to/list/of/users.txt
+for u in $( cat $users ); do
+    psql -c "GRANT SELECT ON public.srs_marctab TO $u ;"
+done
+----
+
+The first time `marct` runs, it will perform a "full update" of all of the MARC
+records.  In subsequent runs, it will attempt to use "incremental update" to
+update only records that have changed since the previous run, which can
+dramatically reduce the running time if the number of changes is small.
+
+However, if very many records have changed, it is possible that incremental
+update may take longer than full update.  If it appears that an incremental
+update will never finish, it should be canceled, and a full update should be
+run once before resuming incremental updates.  This can be done by using the
+`-f` command-line option, which disables incremental update and requires
+`marct` to do a full update.
+
