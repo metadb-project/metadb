@@ -19,7 +19,7 @@ func EndSync(opt *option.EndSync) error {
 	// Validate options
 	if !opt.Force {
 		// Ask for confirmation
-		_, _ = fmt.Fprintf(os.Stderr, "Remove old data for data source %q? ", opt.Source)
+		_, _ = fmt.Fprintf(os.Stderr, "Remove unsynchronized data for data source %q? ", opt.Source)
 		var confirm string
 		_, err := fmt.Scanln(&confirm)
 		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {

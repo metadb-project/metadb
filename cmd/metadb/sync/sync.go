@@ -20,7 +20,7 @@ func Sync(opt *option.Sync) error {
 	// Validate options
 	if !opt.Force {
 		// Ask for confirmation
-		_, _ = fmt.Fprintf(os.Stderr, "Sync current data for data source %q? ", opt.Source)
+		_, _ = fmt.Fprintf(os.Stderr, "Synchronize current data for data source %q? ", opt.Source)
 		var confirm string
 		_, err := fmt.Scanln(&confirm)
 		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
@@ -50,6 +50,21 @@ func Sync(opt *option.Sync) error {
 			return fmt.Errorf("disabling source connectors: %s", err)
 		}
 	*/
+	syncMode, err := catalog.IsSyncMode(dp, opt.Source)
+	if err != nil {
+		return err
+	}
+	if syncMode {
+		fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+		fmt.Fprintf(os.Stderr, "WARNING: Synchronization in progress for data source %q.", opt.Source)
+		fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+		fmt.Fprintf(os.Stderr, "Interrupt and restart synchronization with new snapshot? ")
+		var confirm string
+		_, err := fmt.Scanln(&confirm)
+		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
+			return nil
+		}
+	}
 	if err = catalog.SetSyncMode(dp, true, opt.Source); err != nil {
 		return err
 	}
