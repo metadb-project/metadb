@@ -440,21 +440,21 @@ LDP transforms simple, first-level JSON fields into columns, which can be
 queried as, for example:
 
 ----
-SELECT id, "desc", "group" FROM user_groups;
+SELECT id, "group", "desc" FROM user_groups;
 ----
 
 The Metadb equivalent of this query is:
 
 ----
-SELECT id, "desc", "group" FROM folio_users.groups__t;
+SELECT id, "group", "desc" FROM folio_users.groups__t;
 ----
 
-The double quotation marks are needed here only because `desc` and `group` are
-reserved words in SQL.  Alternatively, they can be removed if the column names
-are prefixed with a table alias:
+Note that the double quotation marks are needed here only because `group` and
+`desc` are reserved words in SQL.  Alternatively, they can be removed if the
+column names are prefixed with a table alias:
 
 ----
-SELECT g.id, g.desc, g.group FROM folio_users.groups__t AS g;
+SELECT g.id, g.group, g.desc FROM folio_users.groups__t AS g;
 ----
 
 Support for transforming subfields and arrays is planned in Metadb.
