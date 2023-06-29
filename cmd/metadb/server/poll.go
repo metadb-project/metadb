@@ -202,7 +202,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		log.Debug("connecting to %q, topics %q", brokers, topics)
 		log.Debug("connecting to source %q", spr.source.Name)
 		var config = &kafka.ConfigMap{
-			"auto.offset.reset":    "earliest",
+			"auto.offset.sync":     "earliest",
 			"bootstrap.servers":    brokers,
 			"enable.auto.commit":   false,
 			"enable.partition.eof": true,
@@ -286,14 +286,14 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Check if resync snapshot may have completed.
-		resync, err := catalog.IsResyncMode(dc)
+		resync, err := catalog.IsSyncMode(dc, spr.source.Name)
 		if err != nil {
 			return err
 		}
 		if resync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 6 {
-			log.Info("source %q snapshot complete (deadline exceeded); consider running \"metadb clean\"",
+			log.Info("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
 				spr.source.Name)
-			cat.ResetLastSnapshotRecord() // Reset timer.
+			cat.ResetLastSnapshotRecord() // Sync timer.
 		}
 	}
 }

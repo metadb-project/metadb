@@ -1,15 +1,13 @@
-package clean
+package sync
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
@@ -17,7 +15,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func Clean(opt *option.Clean) error {
+func EndSync(opt *option.EndSync) error {
 	// Validate options
 	if !opt.Force {
 		// Ask for confirmation
@@ -46,12 +44,12 @@ func Clean(opt *option.Clean) error {
 		return fmt.Errorf("data source %q does not exist", opt.Source)
 	}
 	// Continue only if we are in resync mode.
-	resync, err := catalog.IsResyncMode(dp)
+	resync, err := catalog.IsSyncMode(dp, opt.Source)
 	if err != nil {
 		return err
 	}
 	if !resync {
-		return fmt.Errorf("\"clean\" is only permitted after \"reset\"")
+		return fmt.Errorf("\"endsync\" is only permitted after \"sync\"")
 	}
 	// Get list of tables
 	cat, err := catalog.Initialize(db, dp)
@@ -63,7 +61,7 @@ func Clean(opt *option.Clean) error {
 		return tables[i].String() < tables[j].String()
 	})
 	for _, t := range tables {
-		eout.Info("cleaning: %s", t.String())
+		eout.Info("endsync: %s", t.String())
 		mainTable := t.MainSQL()
 		//q := "VACUUM ANALYZE " + mainTable
 		//if _, err = dp.Exec(context.TODO(), q); err != nil {
@@ -84,33 +82,19 @@ func Clean(opt *option.Clean) error {
 		//	return err
 		//}
 	}
-	if err = catalog.SetResyncMode(dp, false); err != nil {
+	if err = catalog.SetSyncMode(dp, false, opt.Source); err != nil {
 		return err
 	}
-	// Reset marctab for full update and schedule maintenance.
+	// Sync marctab for full update and schedule maintenance.
 	q := "UPDATE marctab.metadata SET version = 0"
 	_, _ = dp.Exec(context.TODO(), q)
 	q = "UPDATE metadb.maintenance SET next_maintenance_time = next_maintenance_time - interval '1 day'"
 	if _, err = dp.Exec(context.TODO(), q); err != nil {
 		return err
 	}
-	eout.Info("completed clean")
+	eout.Info("completed endsync")
 	//log.Init(ioutil.Discard, false, false)
 	//log.SetDatabase(dp)
 	//log.Info("resync complete")
 	return nil
-}
-
-func sourceExists(dq dbx.Queryable, sourceName string) (bool, error) {
-	q := "SELECT 1 FROM metadb.source WHERE name=$1"
-	var i int64
-	err := dq.QueryRow(context.TODO(), q, sourceName).Scan(&i)
-	switch {
-	case errors.Is(err, pgx.ErrNoRows):
-		return false, nil
-	case err != nil:
-		return false, err
-	default:
-		return true, nil
-	}
 }

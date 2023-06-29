@@ -291,7 +291,7 @@ func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, source strin
 	defer dbx.Close(dc)
 	for {
 		time.Sleep(5 * time.Minute)
-		resync, err := catalog.IsResyncMode(dc)
+		resync, err := catalog.IsSyncMode(dc, source)
 		if err != nil {
 			log.Error("unable to read resync mode: %v", err)
 		}

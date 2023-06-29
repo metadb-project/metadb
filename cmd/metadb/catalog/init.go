@@ -190,8 +190,7 @@ func createTableAuth(tx pgx.Tx) error {
 func createTableInit(tx pgx.Tx) error {
 	q := "CREATE TABLE " + catalogSchema + ".init (" +
 		"version varchar(80) NOT NULL, " +
-		"dbversion integer NOT NULL, " +
-		"resync boolean NOT NULL DEFAULT false)"
+		"dbversion integer NOT NULL)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".track: %v", err)
 	}
@@ -253,7 +252,8 @@ func createTableSource(tx pgx.Tx) error {
 		"tablestopfilter text, " +
 		"trimschemaprefix text, " +
 		"addschemaprefix text, " +
-		"module text)"
+		"module text, " +
+		"sync boolean NOT NULL DEFAULT TRUE)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".source: %v", err)
 	}

@@ -407,6 +407,7 @@ var updbList = []updbFunc{
 	updb18,
 	updb19,
 	updb20,
+	updb21,
 }
 
 func updb8(opt *dbopt) error {
@@ -1471,6 +1472,44 @@ func updb20(opt *dbopt) error {
 	// Write new version number.
 	err = metadata.WriteDatabaseVersion(dc, 20)
 	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb21(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	// Begin transaction
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+	// Create sync column.
+	q := "ALTER TABLE metadb.source ADD COLUMN sync boolean NOT NULL DEFAULT TRUE"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "UPDATE metadb.source SET sync = (SELECT resync FROM metadb.init LIMIT 1)"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	// Remove old resync column.
+	q = "ALTER TABLE metadb.init DROP COLUMN resync"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	// Write new version number
+	if err = metadata.WriteDatabaseVersion(tx, 21); err != nil {
+		return err
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
 		return err
 	}
 	return nil

@@ -40,14 +40,14 @@ type Stop struct {
 	Datadir string
 }
 
-type Reset struct {
+type Sync struct {
 	Global
 	Datadir string
 	Source  string
 	Force   bool
 }
 
-type Clean struct {
+type EndSync struct {
 	Global
 	Datadir string
 	Source  string

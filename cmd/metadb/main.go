@@ -7,13 +7,12 @@ import (
 	"github.com/metadb-project/metadb/cmd/internal/color"
 	"github.com/metadb-project/metadb/cmd/internal/common"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
-	"github.com/metadb-project/metadb/cmd/metadb/clean"
 	"github.com/metadb-project/metadb/cmd/metadb/initsys"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
-	"github.com/metadb-project/metadb/cmd/metadb/reset"
 	"github.com/metadb-project/metadb/cmd/metadb/server"
 	"github.com/metadb-project/metadb/cmd/metadb/stop"
+	"github.com/metadb-project/metadb/cmd/metadb/sync"
 	"github.com/metadb-project/metadb/cmd/metadb/upgrade"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"github.com/spf13/cobra"
@@ -56,8 +55,8 @@ func run() error {
 	var upgradeOpt = option.Upgrade{}
 	var serverOpt = option.Server{}
 	var stopOpt = option.Stop{}
-	var resetOpt = option.Reset{}
-	var cleanOpt = option.Clean{}
+	var syncOpt = option.Sync{}
+	var endSyncOpt = option.EndSync{}
 	var logfile, csvlogfile string
 
 	var cmdInit = &cobra.Command{
@@ -171,49 +170,49 @@ func run() error {
 	_ = verboseFlag(cmdStop, &eout.EnableVerbose)
 	_ = traceFlag(cmdStop, &eout.EnableTrace)
 
-	var cmdReset = &cobra.Command{
-		Use: "reset",
+	var cmdSync = &cobra.Command{
+		Use: "sync",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 			if err = initColor(); err != nil {
 				return err
 			}
-			resetOpt.Global = globalOpt
-			if err = reset.Reset(&resetOpt); err != nil {
+			syncOpt.Global = globalOpt
+			if err = sync.Sync(&syncOpt); err != nil {
 				return err
 			}
 			return nil
 		},
 	}
-	cmdReset.SetHelpFunc(help)
-	cmdReset.Flags().StringVar(&resetOpt.Source, "source", "", "")
-	_ = cmdReset.MarkFlagRequired("source")
-	_ = dirFlag(cmdReset, &resetOpt.Datadir)
-	_ = forceFlag(cmdReset, &resetOpt.Force)
-	_ = verboseFlag(cmdReset, &eout.EnableVerbose)
-	_ = traceFlag(cmdReset, &eout.EnableTrace)
+	cmdSync.SetHelpFunc(help)
+	cmdSync.Flags().StringVar(&syncOpt.Source, "source", "", "")
+	_ = cmdSync.MarkFlagRequired("source")
+	_ = dirFlag(cmdSync, &syncOpt.Datadir)
+	_ = forceFlag(cmdSync, &syncOpt.Force)
+	_ = verboseFlag(cmdSync, &eout.EnableVerbose)
+	_ = traceFlag(cmdSync, &eout.EnableTrace)
 
-	var cmdClean = &cobra.Command{
-		Use: "clean",
+	var cmdEndSync = &cobra.Command{
+		Use: "endsync",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 			if err = initColor(); err != nil {
 				return err
 			}
-			cleanOpt.Global = globalOpt
-			if err = clean.Clean(&cleanOpt); err != nil {
+			endSyncOpt.Global = globalOpt
+			if err = sync.EndSync(&endSyncOpt); err != nil {
 				return err
 			}
 			return nil
 		},
 	}
-	cmdClean.SetHelpFunc(help)
-	cmdClean.Flags().StringVar(&cleanOpt.Source, "source", "", "")
-	_ = cmdClean.MarkFlagRequired("source")
-	_ = dirFlag(cmdClean, &cleanOpt.Datadir)
-	_ = forceFlag(cmdClean, &cleanOpt.Force)
-	_ = verboseFlag(cmdClean, &eout.EnableVerbose)
-	_ = traceFlag(cmdClean, &eout.EnableTrace)
+	cmdEndSync.SetHelpFunc(help)
+	cmdEndSync.Flags().StringVar(&endSyncOpt.Source, "source", "", "")
+	_ = cmdEndSync.MarkFlagRequired("source")
+	_ = dirFlag(cmdEndSync, &endSyncOpt.Datadir)
+	_ = forceFlag(cmdEndSync, &endSyncOpt.Force)
+	_ = verboseFlag(cmdEndSync, &eout.EnableVerbose)
+	_ = traceFlag(cmdEndSync, &eout.EnableTrace)
 
 	var cmdVersion = &cobra.Command{
 		Use: "version",
@@ -269,7 +268,7 @@ func run() error {
 	//rootCmd.PersistentFlags().StringVar(&_, "client", metadbClientPort, ""+
 	//        "client port")
 	// Add commands.
-	rootCmd.AddCommand(cmdStart, cmdStop, cmdInit, cmdUpgrade, cmdReset, cmdClean, cmdVersion, cmdCompletion)
+	rootCmd.AddCommand(cmdStart, cmdStop, cmdInit, cmdUpgrade, cmdSync, cmdEndSync, cmdVersion, cmdCompletion)
 	var err error
 	if err = rootCmd.Execute(); err != nil {
 		return err
@@ -282,8 +281,8 @@ var helpStart = "Start server\n"
 var helpStop = "Shutdown server\n"
 var helpInit = "Initialize new Metadb instance\n"
 var helpUpgrade = "Upgrade Metadb instance to current version\n"
-var helpReset = "Reset database for new snapshot\n"
-var helpClean = "Remove data from previous reset\n"
+var helpSync = "Begin synchronization with a data source\n"
+var helpEndSync = "End synchronization and remove leftover data\n"
 var helpVersion = "Print metadb version\n"
 var helpCompletion = "Generate command-line completion\n"
 
@@ -301,8 +300,8 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"  stop                        - " + helpStop +
 			"  init                        - " + helpInit +
 			"  upgrade                     - " + helpUpgrade +
-			"  reset                       - " + helpReset +
-			"  clean                       - " + helpClean +
+			"  sync                        - " + helpSync +
+			"  endsync                     - " + helpEndSync +
 			"  version                     - " + helpVersion +
 			"  completion                  - " + helpCompletion +
 			"\n" +
@@ -364,27 +363,27 @@ func help(cmd *cobra.Command, commandLine []string) {
 			verboseFlag(nil, nil) +
 			traceFlag(nil, nil) +
 			"")
-	case "reset":
+	case "sync":
 		fmt.Printf("" +
-			helpReset +
+			helpSync +
 			"\n" +
-			"Usage:  metadb reset <options>\n" +
+			"Usage:  metadb sync <options>\n" +
 			"\n" +
 			"Options:\n" +
-			"      --source <s>            - Data source to reset\n" +
+			"      --source <s>            - Data source to synchronize\n" +
 			dirFlag(nil, nil) +
 			forceFlag(nil, nil) +
 			verboseFlag(nil, nil) +
 			traceFlag(nil, nil) +
 			"")
-	case "clean":
+	case "endsync":
 		fmt.Printf("" +
-			helpClean +
+			helpEndSync +
 			"\n" +
-			"Usage:  metadb clean <options>\n" +
+			"Usage:  metadb endsync <options>\n" +
 			"\n" +
 			"Options:\n" +
-			"      --source <s>            - Data source to clean\n" +
+			"      --source <s>            - Data source to finish synchronizing\n" +
 			dirFlag(nil, nil) +
 			forceFlag(nil, nil) +
 			verboseFlag(nil, nil) +

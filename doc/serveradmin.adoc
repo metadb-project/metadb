@@ -228,17 +228,7 @@ See *Reference > Statements* for commands that can be issued via `psql`.
 
 === Configuring a Kafka data source
 
-A data source is defined using the `CREATE DATA SOURCE` statement, for example:
-
-----
-CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
-    brokers 'kafka:29092',
-    topics '^metadb_sensor_1\.',
-    consumergroup 'metadb_sensor_1_1',
-    addschemaprefix 'sensor_',
-    schemastopfilter 'admin'
-);
-----
+==== Overview
 
 Metadb currently supports reading Kafka messages in the format produced by the
 Debezium PostgreSQL connector for Kafka Connect.  Configuration of Kafka, Kafka
@@ -252,6 +242,8 @@ Data flow in this direction:
 3. Kafka
 4. Metadb
 5. The analytics database
+
+==== Creating a connector
 
 To allow capturing data changes in the source PostgreSQL database, logical
 decoding has to be enabled, in particular by setting `wal_level = logical` in
@@ -309,11 +301,13 @@ Note the `1` included in `name` and `database.server.name` in the connector
 configuration.  This is suggested as a version number, which can be incremented
 if the data stream needs to be resynchronized with a new connector.
 
-Metadb requires all streamed tables to have a primary key defined or a replica
-identity of `FULL`.  Tables that do not meet this requirement should be
-filtered out in the Debezium PostgreSQL connector configuration by setting
-`schema.exclude.list` or `table.exclude.list`.  Otherwise they will generate
-error messages in the Metadb log.
+Metadb requires all streamed tables to have a primary key defined.  Tables that
+do not meet this requirement should be filtered out in the Debezium PostgreSQL
+connector configuration by setting `schema.exclude.list` or
+`table.exclude.list`.  Otherwise they will generate error messages in the
+Metadb log.
+
+==== Monitoring replication
 
 *The replication slot disk usage must be monitored, because under certain error
 conditions it can grow too large and possibly fill up the disk.* To show the
@@ -324,11 +318,49 @@ select slot_name, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(),
     restart_lsn)) as replicationSlotLag, active from pg_replication_slots;
 ----
 
-*It is also recommended to allocate plenty of extra disk space in the source
+*It is recommended to allocate plenty of extra disk space in the source
 database.*
 
-To drop the replication slot (in the source database) after deleting a
-connector:
+==== Creating the data source
+
+In Metadb, a data source is defined using the `CREATE DATA SOURCE` statement,
+for example:
+
+----
+CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
+    brokers 'kafka:29092',
+    topics '^metadb_sensor_1\.',
+    consumergroup 'metadb_sensor_1_1',
+    addschemaprefix 'sensor_',
+    schemastopfilter 'admin'
+);
+----
+
+==== Initial synchronization
+
+[.aqua-background]#Metadb 1.2#
+When a new data source is first configured using `CREATE DATA SOURCE`, Metadb
+automatically puts the database into "sync" mode, just as if `metadb sync` had
+been run (see *Server administration > Resynchronizing a data source*).  This
+has the effect of pausing periodic transforms and external SQL.  When the
+initial snapshot has finished streaming, the message "source snapshot complete
+(deadline exceeded)" will be written to the log.  Then, to complete this first
+synchronization, stop the Metadb server, and after that run `metadb endsync`:
+
+[source,bash]
+----
+metadb stop -D data
+
+metadb endsync -D data --source sensor
+----
+
+Once "endsync" has finished running, start the Metadb server.
+
+==== Deleting a connection
+
+Sometimes a connection may have to be deleted and recreated (see *Server
+administration > Resynchronizing a data source*).  After deleting a connection,
+the replication slot in the source database can be dropped using:
 
 ----
 SELECT pg_drop_replication_slot('debezium');
@@ -339,16 +371,24 @@ DROP PUBLICATION dbz_publication;
 === Resynchronizing a data source
 
 If a Kafka data stream fails and cannot be resumed, it may be necessary to
-re-stream data to Metadb.  For example, a source database may become
-unsynchronized with the analytic database, requiring a new snapshot of the
-source database to be streamed.  Metadb can accept re-streamed data in order to
-resynchronize with the source, using the following procedure.
+re-stream a complete snapshot of the data to Metadb.  For example, a source
+database may become unsynchronized with the analytic database, requiring a new
+snapshot of the source database to be streamed.  Metadb can accept re-streamed
+data in order to synchronize with the source, using the following procedure.
 
-Note that during the resynchronization process, the analytics database
-continues to be available to users.  However, streaming updates will be slower
-than usual, and there temporarily may be missing records (until they are
+Note that during the synchronization process, the analytics database continues
+to be available to users.  However, streaming updates will be slower than
+usual, and there temporarily may be missing records (until they are
 re-streamed) or "extra" records (recently deleted in the source database).
-Also, periodic transforms and external SQL are paused during resynchronization.
+Also, periodic transforms and external SQL are paused during synchronization.
+
+.Note
+****
+[.text-center]
+The instructions below use the Metadb commands "sync" and "endsync".  In Metadb
+versions before 1.2, these commands were called "reset" and "clean",
+respectively.
+****
 
 1. Update the `topics` and `consumergroup` configuration settings for the new
    data stream.
@@ -361,36 +401,36 @@ ALTER DATA SOURCE sensor OPTIONS
 +
 *Do not restart the Metadb server but continue directly to Step 2.*
 
-2. Stop the Metadb server and (before starting it again) "reset" the analytics
-   database to mark all current data as old.  This may take some time to run.
+2. Stop the Metadb server and (before starting it again) run `metadb sync`.
+   This may take some time to run.
 +
 [source,bash]
 ----
 metadb stop -D data
 
-metadb reset -D data --source sensor
+metadb sync -D data --source sensor
 ----
 
 3. Start the Metadb server to begin streaming the data.
 
 4. Once the new data have finished (or nearly finished) re-streaming, stop the
-   Metadb server, and "clean" the analytics database to remove any old data
-   that have not been refreshed by the new data stream.
+   Metadb server, and run `metadb endsync` to remove any old data that have not
+   been refreshed by the new data stream.
 +
 [source,bash]
 ----
-metadb clean -D data --source sensor
+metadb endsync -D data --source sensor
 ----
 +
-The timing of when "metadb clean" should be run is up to the admninistrator,
-but *it must be run to complete the resynchronization process*.  In most cases
-it will be more convenient for users if "metadb clean" is run too late
-(delaying removal of deleted records) rather than too early (removing records
-before they have been restreamed).
+The timing of when "endsync" should be run is up to the admninistrator, but *it
+must be run to complete the synchronization process*.  In most cases it will be
+more convenient for users if "endsync" is run too late (delaying removal of
+deleted records) rather than too early (removing records before they have been
+restreamed).
 +
 Metadb detects when snapshot data are no longer being received, and then writes
-to the log a message such as "source snapshot complete (deadline exceeded)"
-This generally means it is a good time to run "metadb clean".
+"source snapshot complete (deadline exceeded)" to the log.  This generally
+means it is a good time to run "endsync".
 
 5. Start the server.
 +

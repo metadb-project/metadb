@@ -1,4 +1,4 @@
-package reset
+package sync
 
 import (
 	"context"
@@ -16,11 +16,11 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func Reset(opt *option.Reset) error {
+func Sync(opt *option.Sync) error {
 	// Validate options
 	if !opt.Force {
 		// Ask for confirmation
-		_, _ = fmt.Fprintf(os.Stderr, "Reset current data for data source %q? ", opt.Source)
+		_, _ = fmt.Fprintf(os.Stderr, "Sync current data for data source %q? ", opt.Source)
 		var confirm string
 		_, err := fmt.Scanln(&confirm)
 		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
@@ -43,14 +43,14 @@ func Reset(opt *option.Reset) error {
 	if !exists {
 		return fmt.Errorf("data source %q does not exist", opt.Source)
 	}
-	// Disable source connectors before beginning reset
+	// Disable source connectors before beginning sync
 	/*
 		err = sysdb.DisableSourceConnectors()
 		if err != nil {
 			return fmt.Errorf("disabling source connectors: %s", err)
 		}
 	*/
-	if err = catalog.SetResyncMode(dp, true); err != nil {
+	if err = catalog.SetSyncMode(dp, true, opt.Source); err != nil {
 		return err
 	}
 	//log.Init(ioutil.Discard, false, false)
@@ -66,7 +66,7 @@ func Reset(opt *option.Reset) error {
 		return tables[i].String() < tables[j].String()
 	})
 	for _, t := range tables {
-		eout.Info("resetting: %s", t.String())
+		eout.Info("sync: %s", t.String())
 		mainTable := t.MainSQL()
 		//q := "VACUUM ANALYZE " + mainTable
 		//if _, err := dp.Exec(context.TODO(), q); err != nil {
@@ -81,7 +81,7 @@ func Reset(opt *option.Reset) error {
 		//	return err
 		//}
 	}
-	eout.Info("completed reset")
+	eout.Info("completed sync")
 	return nil
 }
 

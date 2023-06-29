@@ -30,23 +30,24 @@ func (c *Catalog) HoursSinceLastSnapshotRecord() float64 {
 	return time.Since(c.lastSnapshotRecord).Hours()
 }
 
-func SetResyncMode(dq dbx.Queryable, resync bool) error {
-	q := "UPDATE metadb.init SET resync=$1"
-	if _, err := dq.Exec(context.TODO(), q, resync); err != nil {
+func SetSyncMode(dq dbx.Queryable, sync bool, source string) error {
+	q := "UPDATE metadb.source SET sync=$1 WHERE name=$2"
+	if _, err := dq.Exec(context.TODO(), q, sync, source); err != nil {
 		return err
 	}
 	return nil
 }
 
-func IsResyncMode(dq dbx.Queryable) (bool, error) {
-	var resync bool
-	err := dq.QueryRow(context.TODO(), "SELECT resync FROM metadb.init").Scan(&resync)
+func IsSyncMode(dq dbx.Queryable, source string) (bool, error) {
+	var sync bool
+	q := "SELECT sync FROM metadb.source WHERE name=$1"
+	err := dq.QueryRow(context.TODO(), q, source).Scan(&sync)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
-		return false, fmt.Errorf("unable to query resync mode")
+		return false, fmt.Errorf("unable to query sync mode")
 	case err != nil:
-		return false, fmt.Errorf("querying resync mode: %s", err)
+		return false, fmt.Errorf("querying sync mode: %s", err)
 	default:
-		return resync, nil
+		return sync, nil
 	}
 }
