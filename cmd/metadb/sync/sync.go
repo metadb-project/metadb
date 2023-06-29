@@ -55,12 +55,12 @@ func Sync(opt *option.Sync) error {
 		return err
 	}
 	if syncMode {
-		fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-		fmt.Fprintf(os.Stderr, "WARNING: Synchronization in progress for data source %q.", opt.Source)
-		fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+		fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
+		fmt.Fprintf(os.Stderr, "WARNING: Synchronization in progress for data source %q.\n", opt.Source)
+		fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
 		fmt.Fprintf(os.Stderr, "Interrupt and restart synchronization with new snapshot? ")
 		var confirm string
-		_, err := fmt.Scanln(&confirm)
+		_, err = fmt.Scanln(&confirm)
 		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
 			return nil
 		}
