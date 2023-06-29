@@ -223,41 +223,12 @@ func run() error {
 	}
 	cmdVersion.SetHelpFunc(help)
 
-	var cmdCompletion = &cobra.Command{
-		Use:                   "completion",
-		DisableFlagsInUseLine: true,
-		ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
-		Args:                  cobra.ExactValidArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var err error
-			switch args[0] {
-			case "bash":
-				if err = cmd.Root().GenBashCompletion(os.Stdout); err != nil {
-					return err
-				}
-			case "zsh":
-				if err = cmd.Root().GenZshCompletion(os.Stdout); err != nil {
-					return err
-				}
-			case "fish":
-				if err = cmd.Root().GenFishCompletion(os.Stdout, true); err != nil {
-					return err
-				}
-			case "powershell":
-				if err = cmd.Root().GenPowerShellCompletionWithDesc(os.Stdout); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}
-	cmdCompletion.SetHelpFunc(help)
-
 	var rootCmd = &cobra.Command{
 		Use:                "metadb",
 		SilenceErrors:      true,
 		SilenceUsage:       true,
 		DisableSuggestions: true,
+		CompletionOptions:  cobra.CompletionOptions{DisableDefaultCmd: true},
 	}
 	rootCmd.SetHelpFunc(help)
 	// Redefine help flag without -h; so we can use it for something else.
@@ -268,7 +239,7 @@ func run() error {
 	//rootCmd.PersistentFlags().StringVar(&_, "client", metadbClientPort, ""+
 	//        "client port")
 	// Add commands.
-	rootCmd.AddCommand(cmdStart, cmdStop, cmdInit, cmdUpgrade, cmdSync, cmdEndSync, cmdVersion, cmdCompletion)
+	rootCmd.AddCommand(cmdStart, cmdStop, cmdInit, cmdUpgrade, cmdSync, cmdEndSync, cmdVersion)
 	var err error
 	if err = rootCmd.Execute(); err != nil {
 		return err
@@ -284,7 +255,6 @@ var helpUpgrade = "Upgrade Metadb instance to current version\n"
 var helpSync = "Begin synchronization with a data source\n"
 var helpEndSync = "End synchronization and remove leftover data\n"
 var helpVersion = "Print metadb version\n"
-var helpCompletion = "Generate command-line completion\n"
 
 func help(cmd *cobra.Command, commandLine []string) {
 	_ = commandLine
@@ -303,7 +273,6 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"  sync                        - " + helpSync +
 			"  endsync                     - " + helpEndSync +
 			"  version                     - " + helpVersion +
-			"  completion                  - " + helpCompletion +
 			"\n" +
 			"Use \"metadb help <command>\" for more information about a command.\n")
 	case "start":
@@ -394,17 +363,6 @@ func help(cmd *cobra.Command, commandLine []string) {
 			helpVersion +
 			"\n" +
 			"Usage:  metadb version\n")
-	case "completion":
-		fmt.Printf("" +
-			helpCompletion +
-			"\n" +
-			"Usage:  metadb completion <shell>\n" +
-			"\n" +
-			"Shells:\n" +
-			"  bash\n" +
-			"  zsh\n" +
-			"  fish\n" +
-			"  powershell\n")
 	default:
 	}
 }
