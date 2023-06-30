@@ -45,8 +45,8 @@ func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
 			return nil, err
 		}
 	} else {
-		// Check that database version is compatible
-		if err = checkDatabaseCompatible(dp); err != nil {
+		// Check that database version is compatible.
+		if err = CheckDatabaseCompatible(dp); err != nil {
 			return nil, err
 		}
 	}
@@ -80,15 +80,15 @@ func isLZ4Available(dq dbx.Queryable) bool {
 	return err == nil
 }
 
-func checkDatabaseCompatible(dp *pgxpool.Pool) error {
+func CheckDatabaseCompatible(dp *pgxpool.Pool) error {
 	dbversion, err := DatabaseVersion(dp)
 	if err != nil {
 		return err
 	}
 	if dbversion != util.DatabaseVersion {
-		m := fmt.Sprintf("database incompatible with server (%d != %d)", dbversion, util.DatabaseVersion)
+		m := fmt.Sprintf("database incompatible with server: %d != %d", dbversion, util.DatabaseVersion)
 		if dbversion < util.DatabaseVersion {
-			m = m + ": upgrade using \"metadb upgrade\""
+			m += " (upgrade using \"metadb upgrade\")"
 		}
 		return fmt.Errorf("%s", m)
 	}

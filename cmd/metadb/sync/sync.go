@@ -13,6 +13,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
+	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -43,13 +44,6 @@ func Sync(opt *option.Sync) error {
 	if !exists {
 		return fmt.Errorf("data source %q does not exist", opt.Source)
 	}
-	// Disable source connectors before beginning sync
-	/*
-		err = sysdb.DisableSourceConnectors()
-		if err != nil {
-			return fmt.Errorf("disabling source connectors: %s", err)
-		}
-	*/
 	syncMode, err := catalog.IsSyncMode(dp, opt.Source)
 	if err != nil {
 		return err
@@ -65,6 +59,26 @@ func Sync(opt *option.Sync) error {
 			return nil
 		}
 	}
+
+	// Check if server is already running.
+	running, pid, err := process.IsServerRunning(opt.Datadir)
+	if err != nil {
+		return err
+	}
+	if running {
+		return fmt.Errorf("lock file %q already exists and server (PID %d) appears to be running", util.SystemPIDFileName(opt.Datadir), pid)
+	}
+	// Write lock file for new server instance.
+	if err = process.WritePIDFile(opt.Datadir); err != nil {
+		return err
+	}
+	defer process.RemovePIDFile(opt.Datadir)
+
+	// Check that database version is compatible.
+	if err = catalog.CheckDatabaseCompatible(dp); err != nil {
+		return err
+	}
+
 	if err = catalog.SetSyncMode(dp, true, opt.Source); err != nil {
 		return err
 	}

@@ -56,13 +56,3 @@ func WritePIDFile(datadir string) error {
 func RemovePIDFile(datadir string) {
 	_ = os.Remove(util.SystemPIDFileName(datadir))
 }
-
-/*func PIDFileExists(datadir string) (bool, error) {
-	var err error
-	var e bool
-	if e, err = util.FileExists(util.SystemPIDFileName(datadir)); err != nil {
-		return false, err
-	}
-	return e, nil
-}
-*/

@@ -12,6 +12,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
+	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -51,6 +52,26 @@ func EndSync(opt *option.EndSync) error {
 	if !resync {
 		return fmt.Errorf("\"endsync\" is only permitted after \"sync\"")
 	}
+
+	// Check if server is already running.
+	running, pid, err := process.IsServerRunning(opt.Datadir)
+	if err != nil {
+		return err
+	}
+	if running {
+		return fmt.Errorf("lock file %q already exists and server (PID %d) appears to be running", util.SystemPIDFileName(opt.Datadir), pid)
+	}
+	// Write lock file for new server instance.
+	if err = process.WritePIDFile(opt.Datadir); err != nil {
+		return err
+	}
+	defer process.RemovePIDFile(opt.Datadir)
+
+	// Check that database version is compatible.
+	if err = catalog.CheckDatabaseCompatible(dp); err != nil {
+		return err
+	}
+
 	// Get list of tables
 	cat, err := catalog.Initialize(db, dp)
 	if err != nil {

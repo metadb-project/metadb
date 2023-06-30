@@ -61,8 +61,8 @@ type sproc struct {
 }
 
 func Start(opt *option.Server) error {
-	// check if server is already running
-	running, pid, err := isServerRunning(opt.Datadir)
+	// Check if server is already running.
+	running, pid, err := process.IsServerRunning(opt.Datadir)
 	if err != nil {
 		return err
 	}
@@ -70,52 +70,17 @@ func Start(opt *option.Server) error {
 		log.Fatal("lock file %q already exists and server (PID %d) appears to be running", util.SystemPIDFileName(opt.Datadir), pid)
 		return fmt.Errorf("could not start server")
 	}
-	// write lock file for new server instance
+	// Write lock file for new server instance.
 	if err = process.WritePIDFile(opt.Datadir); err != nil {
 		return err
 	}
+	defer process.RemovePIDFile(opt.Datadir)
 
 	var svr = &server{opt: opt}
 	if err = loggingServer(svr); err != nil {
 		return err
 	}
-	process.RemovePIDFile(svr.opt.Datadir)
 	return nil
-}
-
-func isServerRunning(datadir string) (bool, int, error) {
-	// check for lock file
-	lockfile := util.SystemPIDFileName(datadir)
-	fexists, err := util.FileExists(lockfile)
-	if err != nil {
-		return false, 0, fmt.Errorf("reading lock file %q: %s", lockfile, err)
-	}
-	if !fexists {
-		return false, 0, nil
-	}
-	// read pid
-	pid, err := process.ReadPIDFile(datadir)
-	if err != nil {
-		return false, 0, fmt.Errorf("reading lock file %q: %s", lockfile, err)
-	}
-	// check for running process
-	p, err := os.FindProcess(pid)
-	if err != nil {
-		return false, 0, nil
-	}
-	err = p.Signal(syscall.Signal(0))
-	if err != nil {
-		errno, ok := err.(syscall.Errno)
-		if !ok {
-			return false, 0, nil
-		}
-		if errno == syscall.EPERM {
-			return true, pid, nil
-		} else {
-			return false, 0, nil
-		}
-	}
-	return true, pid, nil
 }
 
 func loggingServer(svr *server) error {
