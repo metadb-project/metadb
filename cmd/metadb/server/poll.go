@@ -202,7 +202,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		log.Debug("connecting to %q, topics %q", brokers, topics)
 		log.Debug("connecting to source %q", spr.source.Name)
 		var config = &kafka.ConfigMap{
-			"auto.offset.sync":     "earliest",
+			"auto.offset.reset":    "earliest",
 			"bootstrap.servers":    brokers,
 			"enable.auto.commit":   false,
 			"enable.partition.eof": true,
