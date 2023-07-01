@@ -221,5 +221,18 @@ func createMainTableIfNotExists(c *Catalog, table *dbx.Table) error {
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating index on table %q column \"__id\": %v", table.Main(), err)
 	}
+	// Create sync table.
+	synctsql := SyncTable(table).SQL()
+	q = "CREATE TABLE " + synctsql + " (__id bigint NOT NULL)"
+	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("creating sync table for %q: %v", table, err)
+	}
 	return nil
+}
+
+func SyncTable(table *dbx.Table) *dbx.Table {
+	return &dbx.Table{
+		S: table.S,
+		T: "zzz___" + table.T + "___sync",
+	}
 }

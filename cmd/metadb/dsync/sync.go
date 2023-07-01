@@ -49,13 +49,6 @@ func ReadSyncMode(dq dbx.Queryable, source string) (Mode, error) {
 	}
 }
 
-func SyncTable(table *dbx.Table) *dbx.Table {
-	return &dbx.Table{
-		S: table.S,
-		T: "zzz___" + table.T + "___sync",
-	}
-}
-
 func Sync(opt *option.Sync) error {
 	// Validate options
 	if !opt.Force {
@@ -132,7 +125,7 @@ func Sync(opt *option.Sync) error {
 	})
 	eout.Info("sync: preparing tables for new snapshot")
 	for _, t := range tables {
-		synct := SyncTable(&t)
+		synct := catalog.SyncTable(&t)
 		synctsql := synct.SQL()
 		q := "DROP INDEX IF EXISTS \"" + synct.S + "\".\"" + synct.T + "___id_idx\""
 		if _, err = dp.Exec(context.TODO(), q); err != nil {

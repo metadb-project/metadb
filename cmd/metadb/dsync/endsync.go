@@ -84,7 +84,7 @@ func EndSync(opt *option.EndSync) error {
 	if syncMode == Resync {
 		for _, t := range tables {
 			eout.Info("endsync: finalizing table %s", t.String())
-			synct := SyncTable(&t)
+			synct := catalog.SyncTable(&t)
 			synctsql := synct.SQL()
 			q := "CREATE INDEX \"" + synct.T + "___id_idx\" ON " + synctsql + "(__id)"
 			if _, err = dp.Exec(context.TODO(), q); err != nil {
@@ -106,7 +106,7 @@ func EndSync(opt *option.EndSync) error {
 	if syncMode == Resync {
 		eout.Info("endsync: cleaning up sync data")
 		for _, t := range tables {
-			synct := SyncTable(&t)
+			synct := catalog.SyncTable(&t)
 			synctsql := synct.SQL()
 			q := "DROP INDEX \"" + synct.S + "\".\"" + synct.T + "___id_idx\""
 			if _, err = tx.Exec(context.TODO(), q); err != nil {

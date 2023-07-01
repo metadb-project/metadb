@@ -326,7 +326,7 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB, syncMode dsync.M
 	if ident {
 		// If resync mode, write __id to sync table.
 		if syncMode == dsync.Resync {
-			q := "INSERT INTO " + dsync.SyncTable(&table).SQL() + " VALUES($1)"
+			q := "INSERT INTO " + catalog.SyncTable(&table).SQL() + " VALUES($1)"
 			if _, err = tx.Exec(context.TODO(), q, id); err != nil {
 				return err
 			}
@@ -453,7 +453,7 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB, syncMode dsync.M
 	}
 	// If resync mode, write __id to sync table.
 	if syncMode == dsync.Resync {
-		q := "INSERT INTO " + dsync.SyncTable(&table).SQL() + " VALUES($1)"
+		q := "INSERT INTO " + catalog.SyncTable(&table).SQL() + " VALUES($1)"
 		if _, err := tx.Exec(context.TODO(), q, id); err != nil {
 			return err
 		}
