@@ -51,7 +51,7 @@ func EndSync(opt *option.EndSync) error {
 	}
 	if syncMode == NoSync {
 		return fmt.Errorf("\"endsync\" can only be used in sync mode")
-	}
+	} // Allow initial sync or resync to continue.
 
 	// Check if server is already running.
 	running, pid, err := process.IsServerRunning(opt.Datadir)
@@ -81,37 +81,41 @@ func EndSync(opt *option.EndSync) error {
 	sort.Slice(tables, func(i, j int) bool {
 		return tables[i].String() < tables[j].String()
 	})
-	for _, t := range tables {
-		eout.Info("endsync: table %s", t.String())
-		synct := SyncTable(&t)
-		synctsql := synct.SQL()
-		q := "CREATE INDEX \"" + synct.T + "___id_idx\" ON " + synctsql + "(__id)"
-		if _, err = dp.Exec(context.TODO(), q); err != nil {
-			return err
-		}
-		q = "UPDATE " + t.MainSQL() + " SET __end='" + now + "',__current='f' " +
-			"WHERE __current AND" +
-			" NOT EXISTS (SELECT __id FROM " + synctsql + " s WHERE " + t.MainSQL() + ".__id=s.__id)"
-		if _, err = dp.Exec(context.TODO(), q); err != nil {
-			return err
+	if syncMode == Resync {
+		for _, t := range tables {
+			eout.Info("endsync: finalizing table %s", t.String())
+			synct := SyncTable(&t)
+			synctsql := synct.SQL()
+			q := "CREATE INDEX \"" + synct.T + "___id_idx\" ON " + synctsql + "(__id)"
+			if _, err = dp.Exec(context.TODO(), q); err != nil {
+				return err
+			}
+			q = "UPDATE " + t.MainSQL() + " SET __end='" + now + "',__current='f' " +
+				"WHERE __current AND" +
+				" NOT EXISTS (SELECT __id FROM " + synctsql + " s WHERE " + t.MainSQL() + ".__id=s.__id)"
+			if _, err = dp.Exec(context.TODO(), q); err != nil {
+				return err
+			}
 		}
 	}
-	eout.Info("endsync: cleaning up")
 	tx, err := dp.Begin(context.TODO())
 	if err != nil {
 		return err
 	}
 	defer dbx.Rollback(tx)
-	for _, t := range tables {
-		synct := SyncTable(&t)
-		synctsql := synct.SQL()
-		q := "DROP INDEX \"" + synct.S + "\".\"" + synct.T + "___id_idx\""
-		if _, err = tx.Exec(context.TODO(), q); err != nil {
-			return err
-		}
-		q = "TRUNCATE " + synctsql
-		if _, err = tx.Exec(context.TODO(), q); err != nil {
-			return err
+	if syncMode == Resync {
+		eout.Info("endsync: cleaning up sync data")
+		for _, t := range tables {
+			synct := SyncTable(&t)
+			synctsql := synct.SQL()
+			q := "DROP INDEX \"" + synct.S + "\".\"" + synct.T + "___id_idx\""
+			if _, err = tx.Exec(context.TODO(), q); err != nil {
+				return err
+			}
+			q = "TRUNCATE " + synctsql
+			if _, err = tx.Exec(context.TODO(), q); err != nil {
+				return err
+			}
 		}
 	}
 	if err = SetSyncMode(tx, NoSync, opt.Source); err != nil {
@@ -120,6 +124,7 @@ func EndSync(opt *option.EndSync) error {
 	if err = tx.Commit(context.TODO()); err != nil {
 		return fmt.Errorf("committing changes: %v", err)
 	}
+	eout.Info("endsync: completed")
 	// Sync marctab for full update and schedule maintenance.
 	q := "UPDATE marctab.metadata SET version = 0"
 	_, _ = dp.Exec(context.TODO(), q)
@@ -127,7 +132,6 @@ func EndSync(opt *option.EndSync) error {
 	if _, err = dp.Exec(context.TODO(), q); err != nil {
 		return err
 	}
-	eout.Info("completed")
 	//log.Init(ioutil.Discard, false, false)
 	//log.SetDatabase(dp)
 	//log.Info("resync complete")

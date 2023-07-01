@@ -25,6 +25,8 @@ const (
 	Resync      Mode = 2
 )
 
+var _ = InitialSync
+
 func SetSyncMode(dq dbx.Queryable, mode Mode, source string) error {
 	q := "UPDATE metadb.source SET sync=$1 WHERE name=$2"
 	if _, err := dq.Exec(context.TODO(), q, int16(mode), source); err != nil {
@@ -81,11 +83,11 @@ func Sync(opt *option.Sync) error {
 	if !exists {
 		return fmt.Errorf("data source %q does not exist", opt.Source)
 	}
-	mode, err := ReadSyncMode(dp, opt.Source)
+	syncMode, err := ReadSyncMode(dp, opt.Source)
 	if err != nil {
 		return err
 	}
-	if mode != NoSync {
+	if syncMode != NoSync {
 		fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
 		fmt.Fprintf(os.Stderr, "WARNING: Synchronization in progress for data source %q.\n", opt.Source)
 		fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
@@ -95,7 +97,7 @@ func Sync(opt *option.Sync) error {
 		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
 			return nil
 		}
-	}
+	} // The mode is resync since initial sync is only started implicitly.
 
 	// Check if server is already running.
 	running, pid, err := process.IsServerRunning(opt.Datadir)
@@ -128,7 +130,7 @@ func Sync(opt *option.Sync) error {
 	sort.Slice(tables, func(i, j int) bool {
 		return tables[i].String() < tables[j].String()
 	})
-	eout.Info("setting up sync mode")
+	eout.Info("sync: preparing tables for new snapshot")
 	for _, t := range tables {
 		synct := SyncTable(&t)
 		synctsql := synct.SQL()
@@ -144,7 +146,7 @@ func Sync(opt *option.Sync) error {
 	if err = SetSyncMode(dp, Resync, opt.Source); err != nil {
 		return err
 	}
-	eout.Info("completed")
+	eout.Info("sync: completed")
 	return nil
 }
 
