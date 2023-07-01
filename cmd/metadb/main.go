@@ -7,12 +7,12 @@ import (
 	"github.com/metadb-project/metadb/cmd/internal/color"
 	"github.com/metadb-project/metadb/cmd/internal/common"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
+	"github.com/metadb-project/metadb/cmd/metadb/dsync"
 	"github.com/metadb-project/metadb/cmd/metadb/initsys"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/server"
 	"github.com/metadb-project/metadb/cmd/metadb/stop"
-	"github.com/metadb-project/metadb/cmd/metadb/sync"
 	"github.com/metadb-project/metadb/cmd/metadb/upgrade"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"github.com/spf13/cobra"
@@ -178,7 +178,7 @@ func run() error {
 				return err
 			}
 			syncOpt.Global = globalOpt
-			if err = sync.Sync(&syncOpt); err != nil {
+			if err = dsync.Sync(&syncOpt); err != nil {
 				return err
 			}
 			return nil
@@ -200,7 +200,7 @@ func run() error {
 				return err
 			}
 			endSyncOpt.Global = globalOpt
-			if err = sync.EndSync(&endSyncOpt); err != nil {
+			if err = dsync.EndSync(&endSyncOpt); err != nil {
 				return err
 			}
 			return nil

@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
+	"github.com/metadb-project/metadb/cmd/metadb/dsync"
 	"github.com/metadb-project/metadb/cmd/metadb/libpq"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/marctab"
@@ -256,23 +257,23 @@ func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, source strin
 	defer dbx.Close(dc)
 	for {
 		time.Sleep(5 * time.Minute)
-		resync, err := catalog.IsSyncMode(dc, source)
+		syncMode, err := dsync.ReadSyncMode(dc, source)
 		if err != nil {
 			log.Error("unable to read resync mode: %v", err)
 		}
-		if folio && !resync {
+		if folio && syncMode == dsync.NoSync {
 			if err := marctab.RunMarctab(db, datadir, cat); err != nil {
 				log.Error("marc__t: %v", err)
 			}
 		}
-		if err := checkTimeDailyMaintenance(datadir, db, dc, cat, source, folio, reshare, resync); err != nil {
+		if err := checkTimeDailyMaintenance(datadir, db, dc, cat, source, folio, reshare, syncMode); err != nil {
 			log.Error("%v", err)
 		}
 		time.Sleep(55 * time.Minute)
 	}
 }
 
-func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *catalog.Catalog, source string, folio, reshare bool, resync bool) error {
+func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *catalog.Catalog, source string, folio, reshare bool, syncMode dsync.Mode) error {
 	var overdue bool
 	q := "SELECT CURRENT_TIMESTAMP > next_maintenance_time FROM metadb.maintenance"
 	err := dc.QueryRow(context.TODO(), q).Scan(&overdue)
@@ -289,7 +290,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *cat
 
 	log.Debug("starting maintenance")
 
-	if folio && !resync {
+	if folio && syncMode == dsync.NoSync {
 		tries := 0
 		for {
 			tries++
@@ -297,7 +298,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *cat
 			tag := "20230625024847"
 			path := "sql_metadb/derived_tables"
 			schema := "folio_derived"
-			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema, source); err != nil {
+			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema, source, syncMode); err != nil {
 				log.Warning("runsql: %v: repository=%s tag=%s path=%s", err, url, tag, path)
 				if tries >= 12 {
 					break
@@ -308,7 +309,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *cat
 			break
 		}
 	}
-	if reshare && !resync {
+	if reshare && syncMode == dsync.NoSync {
 		tries := 0
 		for {
 			tries++
@@ -316,7 +317,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *cat
 			tag := "20230525025851"
 			path := "sql/derived_tables"
 			schema := "reshare_derived"
-			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema, source); err != nil {
+			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema, source, syncMode); err != nil {
 				log.Warning("runsql: %v: repository=%s tag=%s path=%s", err, url, tag, path)
 				if tries >= 12 {
 					break

@@ -45,7 +45,7 @@ type SourceConnector struct {
 	Status           status.Status
 }
 
-//var sysMu sync.Mutex
+//var sysMu dsync.Mutex
 //var db *sql.DB
 
 // Deprecated

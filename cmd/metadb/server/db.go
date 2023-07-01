@@ -11,10 +11,10 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 )
 
-func addTable(cmd *command.Command, db sqlx.DB, cat *catalog.Catalog, source string) error {
+func addTable(cmd *command.Command, cat *catalog.Catalog, source string) error {
 	table := dbx.Table{S: cmd.SchemaName, T: cmd.TableName}
 	parentTable := dbx.Table{S: cmd.ParentTable.Schema, T: cmd.ParentTable.Table}
-	return cat.CreateNewTable(table, cmd.Transformed, parentTable, source)
+	return cat.CreateNewTable(&table, cmd.Transformed, &parentTable, source)
 	/*
 		// if tracked, then assume the table exists
 		if cat.TableExists(table) {

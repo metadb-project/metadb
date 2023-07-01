@@ -12,11 +12,13 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
+	"github.com/metadb-project/metadb/cmd/metadb/dsync"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
@@ -148,7 +150,8 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		if err != nil {
 			return fmt.Errorf("caching schema: %s", err)
 		}
-	*/ // Update user permissions in database
+	*/
+	// Update user permissions in database
 	var waitUserPerms sync.WaitGroup
 	waitUserPerms.Add(1)
 	dsnsuper := sqlx.DSN{
@@ -161,14 +164,26 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 	}
 	go func(dsnsuper sqlx.DSN, trackedTables []dbx.Table) {
 		defer waitUserPerms.Done()
-		sysdb.GoUpdateUserPerms(dc, dcsuper, trackedTables)
+		var dc2 *pgx.Conn
+		dc2, err = spr.svr.db.Connect()
+		if err != nil {
+			log.Error("%v", err)
+		}
+		sysdb.GoUpdateUserPerms(dc2, dcsuper, trackedTables)
 	}(dsnsuper, cat.AllTables(spr.source.Name))
 	// Cache users
 	/*	users, err := cache.NewUsers(db)
 		if err != nil {
 			return fmt.Errorf("caching users: %s", err)
 		}
-	*/ // Source file
+	*/
+	// Get sync mode.
+	syncMode, err := dsync.ReadSyncMode(dc, spr.source.Name)
+	if err != nil {
+		log.Error("unable to read sync mode: %v", err)
+	}
+
+	// Source file
 	var sourceFile *os.File
 	var sourceFileScanner *bufio.Scanner
 	if spr.svr.opt.SourceFilename != "" {
@@ -259,7 +274,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cat, cl, spr.db[0], spr.svr.dp, spr.source.Name); err != nil {
+		if err = execCommandList(cat, cl, spr.db[0], spr.svr.dp, spr.source.Name, syncMode); err != nil {
 			return fmt.Errorf("executor: %s", err)
 		}
 
@@ -286,11 +301,11 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Check if resync snapshot may have completed.
-		resync, err := catalog.IsSyncMode(dc, spr.source.Name)
+		sync, err := dsync.ReadSyncMode(dc, spr.source.Name)
 		if err != nil {
 			return err
 		}
-		if resync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 6 {
+		if sync != dsync.NoSync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 6 {
 			log.Info("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
 				spr.source.Name)
 			cat.ResetLastSnapshotRecord() // Sync timer.

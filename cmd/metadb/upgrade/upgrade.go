@@ -408,6 +408,7 @@ var updbList = []updbFunc{
 	updb19,
 	updb20,
 	updb21,
+	updb22,
 }
 
 func updb8(opt *dbopt) error {
@@ -1041,7 +1042,7 @@ func updb15(opt *dbopt) error {
 
 	for _, table := range tables {
 		q = "SELECT indexname FROM pg_indexes WHERE schemaname=$1 and tablename=$2"
-		rows, err = dc.Query(context.TODO(), q, table.S, table.T+"__")
+		rows, err = dc.Query(context.TODO(), q, table.S, table.T)
 		if err != nil {
 			return fmt.Errorf("selecting index list: %v", err)
 		}
@@ -1217,7 +1218,7 @@ SELECT table_schema, table_name, column_name
 		t := dbx.Table{S: c.S, T: c.T}
 		_, ok := processed[t]
 		if !ok {
-			eout.Info("upgrading: table %q", t)
+			eout.Info("upgrading: table %q", t.String())
 			processed[t] = struct{}{}
 		}
 		q = "CREATE INDEX ON \"" + c.S + "\".\"" + c.T + "\" (\"" + c.C + "\")"
@@ -1340,7 +1341,7 @@ SELECT table_schema, table_name
 
 	// Create an index on each __id column that does not already have an index.
 	for _, t := range indexes {
-		eout.Info("upgrading: table %q", t)
+		eout.Info("upgrading: table %q", t.String())
 		q = "CREATE INDEX ON \"" + t.S + "\".\"" + t.T + "\" (__id)"
 		if _, err = dc.Exec(context.TODO(), q); err != nil {
 			return err
@@ -1384,7 +1385,6 @@ func updb19(opt *dbopt) error {
 
 	// Drop column "__source" from each table.
 	for _, t := range tables {
-		eout.Info("upgrading: table %q", t)
 		q = "ALTER TABLE \"" + t.S + "\".\"" + t.T + "__\" DROP COLUMN IF EXISTS __source"
 		if _, err = dc.Exec(context.TODO(), q); err != nil {
 			return err
@@ -1460,7 +1460,6 @@ func updb20(opt *dbopt) error {
 		t := dbx.Table{S: c.S, T: c.T}
 		_, ok := processed[t]
 		if !ok {
-			eout.Info("upgrading: table %q", t)
 			processed[t] = struct{}{}
 		}
 		q = "ALTER TABLE \"" + c.S + "\".\"" + c.T + "\" ALTER COLUMN \"" + c.C + "\" TYPE text"
@@ -1496,7 +1495,7 @@ func updb21(opt *dbopt) error {
 	if _, err = tx.Exec(context.TODO(), q); err != nil {
 		return err
 	}
-	q = "UPDATE metadb.source SET sync = (SELECT resync FROM metadb.init LIMIT 1)"
+	q = "UPDATE metadb.source SET sync=(SELECT resync FROM metadb.init LIMIT 1)"
 	if _, err = tx.Exec(context.TODO(), q); err != nil {
 		return err
 	}
@@ -1507,6 +1506,81 @@ func updb21(opt *dbopt) error {
 	}
 	// Write new version number
 	if err = metadata.WriteDatabaseVersion(tx, 21); err != nil {
+		return err
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb22(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	// Read table names.
+	q := `SELECT schemaname, tablename FROM metadb.track ORDER BY schemaname, tablename`
+	rows, err := dc.Query(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("selecting table names: %v", err)
+	}
+	defer rows.Close()
+	tables := make([]dbx.Table, 0)
+	for rows.Next() {
+		var schema, table string
+		if err = rows.Scan(&schema, &table); err != nil {
+			return fmt.Errorf("reading table names: %v", err)
+		}
+		tables = append(tables, dbx.Table{S: schema, T: table})
+	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("reading indexes: %v", err)
+	}
+
+	for _, t := range tables {
+		// Drop column "__cf" from each table.
+		q = "ALTER TABLE \"" + t.S + "\".\"" + t.T + "__\" DROP COLUMN IF EXISTS __cf"
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+		// Drop old sync table if any.
+		synctsql := "\"" + t.S + "\".\"zzz___" + t.T + "___sync\""
+		q = "DROP TABLE IF EXISTS " + synctsql
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+		// Create sync table.
+		q = "CREATE TABLE " + synctsql + " (__id bigint NOT NULL)"
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+	}
+
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+	// Change type of dsync column.
+	q = "ALTER TABLE metadb.source DROP COLUMN IF EXISTS sync"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "ALTER TABLE metadb.source ADD COLUMN sync smallint NOT NULL DEFAULT 1"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "UPDATE metadb.source SET sync=0"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	// Write new version number.
+	err = metadata.WriteDatabaseVersion(tx, 22)
+	if err != nil {
 		return err
 	}
 	if err = tx.Commit(context.TODO()); err != nil {

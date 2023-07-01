@@ -1,4 +1,4 @@
-package sync
+package dsync
 
 import (
 	"context"
@@ -16,6 +16,43 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
+
+type Mode int
+
+const (
+	NoSync      Mode = 0
+	InitialSync Mode = 1
+	Resync      Mode = 2
+)
+
+func SetSyncMode(dq dbx.Queryable, mode Mode, source string) error {
+	q := "UPDATE metadb.source SET sync=$1 WHERE name=$2"
+	if _, err := dq.Exec(context.TODO(), q, int16(mode), source); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ReadSyncMode(dq dbx.Queryable, source string) (Mode, error) {
+	var syncMode int16
+	q := "SELECT sync FROM metadb.source WHERE name=$1"
+	err := dq.QueryRow(context.TODO(), q, source).Scan(&syncMode)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return 0, fmt.Errorf("unable to query sync mode")
+	case err != nil:
+		return 0, fmt.Errorf("querying sync mode: %s", err)
+	default:
+		return Mode(syncMode), nil
+	}
+}
+
+func SyncTable(table *dbx.Table) *dbx.Table {
+	return &dbx.Table{
+		S: table.S,
+		T: "zzz___" + table.T + "___sync",
+	}
+}
 
 func Sync(opt *option.Sync) error {
 	// Validate options
@@ -44,11 +81,11 @@ func Sync(opt *option.Sync) error {
 	if !exists {
 		return fmt.Errorf("data source %q does not exist", opt.Source)
 	}
-	syncMode, err := catalog.IsSyncMode(dp, opt.Source)
+	mode, err := ReadSyncMode(dp, opt.Source)
 	if err != nil {
 		return err
 	}
-	if syncMode {
+	if mode != NoSync {
 		fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
 		fmt.Fprintf(os.Stderr, "WARNING: Synchronization in progress for data source %q.\n", opt.Source)
 		fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
@@ -79,9 +116,6 @@ func Sync(opt *option.Sync) error {
 		return err
 	}
 
-	if err = catalog.SetSyncMode(dp, true, opt.Source); err != nil {
-		return err
-	}
 	//log.Init(ioutil.Discard, false, false)
 	//log.SetDatabase(dp)
 	//log.Info("resync started")
@@ -94,23 +128,23 @@ func Sync(opt *option.Sync) error {
 	sort.Slice(tables, func(i, j int) bool {
 		return tables[i].String() < tables[j].String()
 	})
+	eout.Info("setting up sync mode")
 	for _, t := range tables {
-		eout.Info("sync: %s", t.String())
-		mainTable := t.MainSQL()
-		//q := "VACUUM ANALYZE " + mainTable
-		//if _, err := dp.Exec(context.TODO(), q); err != nil {
-		//	return err
-		//}
-		q := "UPDATE " + mainTable + " SET __cf=FALSE WHERE __cf AND __current"
-		if _, err := dp.Exec(context.TODO(), q); err != nil {
+		synct := SyncTable(&t)
+		synctsql := synct.SQL()
+		q := "DROP INDEX IF EXISTS \"" + synct.S + "\".\"" + synct.T + "___id_idx\""
+		if _, err = dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
-		//q = "VACUUM ANALYZE " + mainTable
-		//if _, err := dp.Exec(context.TODO(), q); err != nil {
-		//	return err
-		//}
+		q = "TRUNCATE " + synctsql
+		if _, err = dp.Exec(context.TODO(), q); err != nil {
+			return err
+		}
 	}
-	eout.Info("completed sync")
+	if err = SetSyncMode(dp, Resync, opt.Source); err != nil {
+		return err
+	}
+	eout.Info("completed")
 	return nil
 }
 

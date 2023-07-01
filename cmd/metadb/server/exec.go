@@ -10,11 +10,12 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
+	"github.com/metadb-project/metadb/cmd/metadb/dsync"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-func execCommandList(cat *catalog.Catalog, cmdlist *command.CommandList, db sqlx.DB, dp *pgxpool.Pool, source string) error {
+func execCommandList(cat *catalog.Catalog, cmdlist *command.CommandList, db sqlx.DB, dp *pgxpool.Pool, source string, syncMode dsync.Mode) error {
 	var cmdlisttxns = partitionTxn(cmdlist)
 	for i := range cmdlisttxns {
 		if len(cmdlisttxns[i].Cmd) == 0 {
@@ -27,7 +28,7 @@ func execCommandList(cat *catalog.Catalog, cmdlist *command.CommandList, db sqlx
 		if err := execCommandAddIndexes(cat, &(cmdlisttxns[i])); err != nil {
 			return fmt.Errorf("exec command indexes: %v", err)
 		}
-		if err := execCommandListData(cat, db, dp, &(cmdlisttxns[i])); err != nil {
+		if err := execCommandListData(cat, db, dp, &(cmdlisttxns[i]), syncMode); err != nil {
 			return fmt.Errorf("exec command data: %v", err)
 		}
 		// log confirmation
@@ -50,7 +51,7 @@ func execCommandSchema(cat *catalog.Catalog, cmd *command.Command, db sqlx.DB, s
 	if delta, err = findDeltaSchema(cat, cmd); err != nil {
 		return fmt.Errorf("schema: %v", err)
 	}
-	if err = addTable(cmd, db, cat, source); err != nil {
+	if err = addTable(cmd, cat, source); err != nil {
 		return fmt.Errorf("schema: %v", err)
 	}
 	if err = addPartition(cat, cmd); err != nil {
@@ -213,7 +214,7 @@ func execCommandAddIndexes(cat *catalog.Catalog, cmdlist *command.CommandList) e
 	return nil
 }
 
-func execCommandListData(cat *catalog.Catalog, db sqlx.DB, dp *pgxpool.Pool, cmdlist *command.CommandList) error {
+func execCommandListData(cat *catalog.Catalog, db sqlx.DB, dp *pgxpool.Pool, cmdlist *command.CommandList, syncMode dsync.Mode) error {
 	tx, err := dp.Begin(context.TODO())
 	if err != nil {
 		return err
@@ -223,7 +224,7 @@ func execCommandListData(cat *catalog.Catalog, db sqlx.DB, dp *pgxpool.Pool, cmd
 	commands := cmdlist.Cmd
 	for i := range cmdlist.Cmd {
 		// Execute data part of command
-		if err = execCommandData(cat, &(commands[i]), tx, db); err != nil {
+		if err = execCommandData(cat, &(commands[i]), tx, db, syncMode); err != nil {
 			return fmt.Errorf("data: %v", err)
 		}
 	}
@@ -292,10 +293,10 @@ func mayRequireSchemaChanges(cmd, lastcmd *command.Command) bool {
 	return false
 }
 
-func execCommandData(cat *catalog.Catalog, cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
+func execCommandData(cat *catalog.Catalog, cmd *command.Command, tx pgx.Tx, db sqlx.DB, syncMode dsync.Mode) error {
 	switch cmd.Op {
 	case command.MergeOp:
-		if err := execMergeData(cmd, tx, db); err != nil {
+		if err := execMergeData(cmd, tx, db, syncMode); err != nil {
 			return fmt.Errorf("merge: %v", err)
 		}
 	case command.DeleteOp:
@@ -313,24 +314,23 @@ func execCommandData(cat *catalog.Catalog, cmd *command.Command, tx pgx.Tx, db s
 }
 
 // execMergeData executes a merge command in the database.
-func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
+func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB, syncMode dsync.Mode) error {
 	table := dbx.Table{S: cmd.SchemaName, T: cmd.TableName}
 	// Check if the current record (if any) is identical to the new one.  If so, we
 	// can avoid making any changes in the database.
-	ident, cf, err := isCurrentIdentical(cmd, tx, &table, db)
+	var id int64
+	ident, id, err := isCurrentIdentical(cmd, tx, &table, db)
 	if err != nil {
 		return fmt.Errorf("matcher: %v", err)
 	}
 	if ident {
-		////////////////////////////////////////////////////////////////////////////////
-		// Temporary: read __cf value which, if false, currently still requires updating
-		// the row.
-		if cf == false {
-			// log.Trace("matcher cf")
-			return updateRowCF(cmd, tx, db, &table)
+		// If resync mode, write __id to sync table.
+		if syncMode == dsync.Resync {
+			q := "INSERT INTO " + dsync.SyncTable(&table).SQL() + " VALUES($1)"
+			if _, err = tx.Exec(context.TODO(), q, id); err != nil {
+				return err
+			}
 		}
-		////////////////////////////////////////////////////////////////////////////////
-		// log.Trace("matcher ok")
 		return nil
 	}
 	// If any columns are "unavailable," extract the previous values from the current record.
@@ -406,7 +406,7 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 	b.WriteString(table.S)
 	b.WriteString("\".\"")
 	b.WriteString(table.T)
-	b.WriteString("__\" SET __cf='t',__end='")
+	b.WriteString("__\" SET __end='")
 	b.WriteString(cmd.SourceTimestamp)
 	b.WriteString("',__current='f'")
 	b.WriteString(" WHERE __current AND __origin='")
@@ -444,15 +444,24 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB) error {
 		b.WriteString(",")
 		b.WriteString(encodeSQLData(columns[i].SQLData, columns[i].DType, db))
 	}
-	b.WriteByte(')')
-	batch.Queue(b.String())
+	b.WriteString(") RETURNING __id")
+	batch.Queue(b.String()).QueryRow(func(row pgx.Row) error {
+		return row.Scan(&id)
+	})
 	if err = tx.SendBatch(context.TODO(), batch).Close(); err != nil {
 		return fmt.Errorf("update and insert: %v", err)
+	}
+	// If resync mode, write __id to sync table.
+	if syncMode == dsync.Resync {
+		q := "INSERT INTO " + dsync.SyncTable(&table).SQL() + " VALUES($1)"
+		if _, err := tx.Exec(context.TODO(), q, id); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func updateRowCF(c *command.Command, tx pgx.Tx, db sqlx.DB, table *dbx.Table) error {
+/*func updateRowCF(c *command.Command, tx pgx.Tx, db sqlx.DB, table *dbx.Table) error {
 	// Select matching current record in history table.
 	var uphist strings.Builder
 	uphist.WriteString("UPDATE \"" + table.S + "\".\"" + table.T + "\" SET __cf=TRUE WHERE __origin='" + c.Origin +
@@ -465,9 +474,10 @@ func updateRowCF(c *command.Command, tx pgx.Tx, db sqlx.DB, table *dbx.Table) er
 	}
 	return nil
 }
+*/
 
 // isCurrentIdentical looks for an identical row in the current table.
-func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sqlx.DB) (bool, bool, error) {
+func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sqlx.DB) (bool, int64, error) {
 	// Match on all columns, except "unavailable" columns (which indicates a column
 	// did not change and we can assume it matches).
 	var b strings.Builder
@@ -495,7 +505,7 @@ func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sq
 	b.WriteString(" LIMIT 1")
 	rows, err := tx.Query(context.TODO(), b.String())
 	if err != nil {
-		return false, false, fmt.Errorf("querying for matching current row: %v", err)
+		return false, 0, fmt.Errorf("querying for matching current row: %v", err)
 	}
 	defer rows.Close()
 	columnNames := make([]string, 0)
@@ -513,45 +523,41 @@ func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sq
 	if rows.Next() {
 		found = true
 		if err = rows.Scan(dest...); err != nil {
-			return false, false, fmt.Errorf("scanning row values: %v", err)
+			return false, 0, fmt.Errorf("scanning row values: %v", err)
 		}
 	}
 	if err = rows.Err(); err != nil {
-		return false, false, fmt.Errorf("reading matching current row: %v", err)
+		return false, 0, fmt.Errorf("reading matching current row: %v", err)
 	}
 	rows.Close()
 	if !found {
-		return false, false, nil
+		return false, 0, nil
 	}
 	// If any extra column values are not NULL, there is no match.
-	var cf bool
+	var id int64
 	for i := range values {
-		//////////////////////////////////////////////////////////////////////////////////////
-		// Temporary: read __cf value which, if false, currently still requires updating
-		// the row.
-		if columnNames[i] == "__cf" {
+		if columnNames[i] == "__id" {
 			var ok bool
-			cf, ok = values[i].(bool)
+			id, ok = values[i].(int64)
 			if !ok {
-				return false, false, fmt.Errorf("error reading __cf as boolean value")
+				return false, 0, fmt.Errorf("error in type assertion of \"__id\" to int64")
 			}
+			continue
 		}
-		//////////////////////////////////////////////////////////////////////////////////////
-		found := false
-		for j := range columns {
-			if columnNames[i] == columns[j].Name {
-				found = true
-				break
-			}
+		if strings.HasPrefix(columnNames[i], "__") {
+			continue
 		}
-		if !found { // This is an extra column.
-			if values[i] != nil {
-				return false, false, nil
-			}
+		_, ok := cmd.ColumnMap[columnNames[i]]
+		if ok {
+			continue
+		}
+		// This is an extra column.
+		if values[i] != nil {
+			return false, 0, nil
 		}
 	}
 	// Otherwise we have found a match.
-	return true, cf, nil
+	return true, id, nil
 }
 
 func execDeleteData(cat *catalog.Catalog, c *command.Command, tx pgx.Tx, db sqlx.DB) error {
@@ -564,7 +570,7 @@ func execDeleteData(cat *catalog.Catalog, c *command.Command, tx pgx.Tx, db sqlx
 	// TODO Use pgx.Batch
 	for i := range tables {
 		var b strings.Builder
-		b.WriteString("UPDATE " + tables[i].MainSQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
+		b.WriteString("UPDATE " + tables[i].MainSQL() + " SET __end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
 		if err := wherePKDataEqual(db, &b, c.Column); err != nil {
 			return err
 		}
@@ -586,7 +592,7 @@ func execTruncateData(cat *catalog.Catalog, c *command.Command, tx pgx.Tx, db sq
 	// TODO Use pgx.Batch
 	for i := range tables {
 		var b strings.Builder
-		b.WriteString("UPDATE " + tables[i].MainSQL() + " SET __cf=TRUE,__end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
+		b.WriteString("UPDATE " + tables[i].MainSQL() + " SET __end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
 		// Run SQL.
 		if _, err := tx.Exec(context.TODO(), b.String()); err != nil {
 			return err

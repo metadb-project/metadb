@@ -1,4 +1,4 @@
-package sync
+package dsync
 
 import (
 	"context"
@@ -44,13 +44,13 @@ func EndSync(opt *option.EndSync) error {
 	if !exists {
 		return fmt.Errorf("data source %q does not exist", opt.Source)
 	}
-	// Continue only if we are in resync mode.
-	resync, err := catalog.IsSyncMode(dp, opt.Source)
+	// Continue only if we are in a sync mode.
+	syncMode, err := ReadSyncMode(dp, opt.Source)
 	if err != nil {
 		return err
 	}
-	if !resync {
-		return fmt.Errorf("\"endsync\" is only permitted after \"sync\"")
+	if syncMode == NoSync {
+		return fmt.Errorf("\"endsync\" can only be used in sync mode")
 	}
 
 	// Check if server is already running.
@@ -82,29 +82,43 @@ func EndSync(opt *option.EndSync) error {
 		return tables[i].String() < tables[j].String()
 	})
 	for _, t := range tables {
-		eout.Info("endsync: %s", t.String())
-		mainTable := t.MainSQL()
-		//q := "VACUUM ANALYZE " + mainTable
-		//if _, err = dp.Exec(context.TODO(), q); err != nil {
-		//	return err
-		//}
-		q := "UPDATE " + mainTable + " SET __cf=TRUE,__end='" + now + "',__current=FALSE " +
-			"WHERE NOT __cf AND __current"
+		eout.Info("endsync: table %s", t.String())
+		synct := SyncTable(&t)
+		synctsql := synct.SQL()
+		q := "CREATE INDEX \"" + synct.T + "___id_idx\" ON " + synctsql + "(__id)"
 		if _, err = dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
-		// Any non-current historical data can be set to __cf=TRUE.
-		q = "UPDATE " + mainTable + " SET __cf=TRUE WHERE NOT __cf"
+		q = "UPDATE " + t.MainSQL() + " SET __end='" + now + "',__current='f' " +
+			"WHERE __current AND" +
+			" NOT EXISTS (SELECT __id FROM " + synctsql + " s WHERE " + t.MainSQL() + ".__id=s.__id)"
 		if _, err = dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}
-		//q = "VACUUM ANALYZE " + mainTable
-		//if _, err = dp.Exec(context.TODO(), q); err != nil {
-		//	return err
-		//}
 	}
-	if err = catalog.SetSyncMode(dp, false, opt.Source); err != nil {
+	eout.Info("endsync: cleaning up")
+	tx, err := dp.Begin(context.TODO())
+	if err != nil {
 		return err
+	}
+	defer dbx.Rollback(tx)
+	for _, t := range tables {
+		synct := SyncTable(&t)
+		synctsql := synct.SQL()
+		q := "DROP INDEX \"" + synct.S + "\".\"" + synct.T + "___id_idx\""
+		if _, err = tx.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+		q = "TRUNCATE " + synctsql
+		if _, err = tx.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+	}
+	if err = SetSyncMode(tx, NoSync, opt.Source); err != nil {
+		return err
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
+		return fmt.Errorf("committing changes: %v", err)
 	}
 	// Sync marctab for full update and schedule maintenance.
 	q := "UPDATE marctab.metadata SET version = 0"
@@ -113,7 +127,7 @@ func EndSync(opt *option.EndSync) error {
 	if _, err = dp.Exec(context.TODO(), q); err != nil {
 		return err
 	}
-	eout.Info("completed endsync")
+	eout.Info("completed")
 	//log.Init(ioutil.Discard, false, false)
 	//log.SetDatabase(dp)
 	//log.Info("resync complete")
