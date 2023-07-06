@@ -4,11 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/signal"
 	"regexp"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -24,9 +22,10 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"golang.org/x/net/context"
 )
 
-func goPollLoop(cat *catalog.Catalog, svr *server) {
+func goPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server) {
 	if svr.opt.NoKafkaCommit {
 		log.Info("Kafka commits disabled")
 	}
@@ -45,10 +44,10 @@ func goPollLoop(cat *catalog.Catalog, svr *server) {
 	if err != nil {
 		log.Error("checking for reshare module: %v", err)
 	}
-	go goMaintenance(svr.opt.Datadir, *(svr.db), cat, spr.source.Name, folio, reshare)
+	go goMaintenance(svr.opt.Datadir, *(svr.db), svr.dp, cat, spr.source.Name, folio, reshare)
 
 	for {
-		err := launchPollLoop(cat, svr, spr)
+		err := launchPollLoop(ctx, cat, svr, spr)
 		if err == nil {
 			break
 		}
@@ -58,21 +57,21 @@ func goPollLoop(cat *catalog.Catalog, svr *server) {
 	}
 }
 
-func launchPollLoop(cat *catalog.Catalog, svr *server, spr *sproc) (reterr error) {
+func launchPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server, spr *sproc) (reterr error) {
 	defer func() {
 		if r := recover(); r != nil {
 			reterr = fmt.Errorf("%v", r)
 			log.Error("%s", reterr)
 		}
 	}()
-	reterr = outerPollLoop(cat, svr, spr)
+	reterr = outerPollLoop(ctx, cat, svr, spr)
 	if reterr != nil {
 		panic(reterr.Error())
 	}
 	return
 }
 
-func outerPollLoop(cat *catalog.Catalog, svr *server, spr *sproc) error {
+func outerPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server, spr *sproc) error {
 	var err error
 	// Set up source log
 	if svr.opt.LogSource != "" {
@@ -97,14 +96,14 @@ func outerPollLoop(cat *catalog.Catalog, svr *server, spr *sproc) error {
 	////
 
 	log.Debug("starting stream processor")
-	if err = pollLoop(cat, spr); err != nil {
+	if err = pollLoop(ctx, cat, spr); err != nil {
 		//log.Error("%s", err)
 		return err
 	}
 	return nil
 }
 
-func pollLoop(cat *catalog.Catalog, spr *sproc) error {
+func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	var err error
 	// var database0 *sysdb.DatabaseConnector = spr.databases[0]
 	//if database0.Type == "postgresql" && database0.DBPort == "" {
@@ -177,7 +176,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 			return fmt.Errorf("caching users: %s", err)
 		}
 	*/
-	// Get sync mode.
+	// Read sync mode from the database.
 	syncMode, err := dsync.ReadSyncMode(dc, spr.source.Name)
 	if err != nil {
 		log.Error("unable to read sync mode: %v", err)
@@ -217,11 +216,11 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		log.Debug("connecting to %q, topics %q", brokers, topics)
 		log.Debug("connecting to source %q", spr.source.Name)
 		var config = &kafka.ConfigMap{
-			"auto.offset.reset":    "earliest",
-			"bootstrap.servers":    brokers,
-			"enable.auto.commit":   false,
-			"enable.partition.eof": true,
-			"group.id":             group,
+			"auto.offset.reset":  "earliest",
+			"bootstrap.servers":  brokers,
+			"enable.auto.commit": false,
+			//"enable.partition.eof": true,
+			"group.id": group,
 			// TODO - Slow updates can trigger:
 			// Local: Maximum application poll interval (max.poll.interval.ms) exceeded: Application maximum poll interval (900000ms) exceeded by 350ms
 			"max.poll.interval.ms": 900000,
@@ -274,7 +273,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(cat, cl, spr.db[0], spr.svr.dp, spr.source.Name, syncMode); err != nil {
+		if err = execCommandList(ctx, cat, cl, spr.db[0], spr.svr.dp, spr.source.Name, syncMode); err != nil {
 			return fmt.Errorf("executor: %s", err)
 		}
 
@@ -301,11 +300,7 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Check if resync snapshot may have completed.
-		sync, err := dsync.ReadSyncMode(dc, spr.source.Name)
-		if err != nil {
-			return err
-		}
-		if sync != dsync.NoSync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 6 {
+		if syncMode != dsync.NoSync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 6 {
 			log.Info("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
 				spr.source.Name)
 			cat.ResetLastSnapshotRecord() // Sync timer.
@@ -313,14 +308,41 @@ func pollLoop(cat *catalog.Catalog, spr *sproc) error {
 	}
 }
 
-func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer *kafka.Consumer,
-	cl *command.CommandList, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix,
-	addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
-	var err error
+func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
+	kafkaPollTimeout := 100     // Poll timeout in milliseconds.
+	pollTimeoutCountLimit := 20 // Maximum allowable number of consecutive poll timeouts.
+	pollLoopTimeout := 120.0    // Overall pool loop timeout in seconds.
 	snapshot := false
 	var eventReadCount int
-	var x int
-	for x = 0; x < 1000; x++ {
+	pollTimeoutCount := 0
+	startTime := time.Now()
+	for x := 0; x < 100000; x++ {
+		// Catch the possibility of many poll timeouts between messages, because each
+		// poll timeouts takes kafkaPollTimeout ms.  This also provides an overall timeout
+		// for the poll loop.
+		if time.Since(startTime).Seconds() >= pollLoopTimeout {
+			log.Trace("poll timeout")
+			break
+		}
+		var err error
+		var msg *kafka.Message
+		if sourceFileScanner == nil {
+			if msg, err = readChangeEvent(consumer, sourceLog, kafkaPollTimeout); err != nil {
+				return 0, fmt.Errorf("reading message from Kafka: %v", err)
+			}
+			if msg == nil { // Poll timeout is indicated by the nil return.
+				pollTimeoutCount++
+				if pollTimeoutCount >= pollTimeoutCountLimit {
+					break // Prevent processing of a small batch from being delayed.
+				} else {
+					continue
+				}
+			} else {
+				pollTimeoutCount = 0 // We are only interested in consecutive timeouts.
+			}
+		}
+		eventReadCount++
+
 		var ce *change.Event
 		if sourceFileScanner != nil {
 			if ce, err = readChangeEventFromFile(sourceFileScanner, sourceLog); err != nil {
@@ -333,18 +355,13 @@ func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer
 				break
 			}
 		} else {
-			var partitionEOF bool
-			if ce, partitionEOF, err = readChangeEvent(consumer, sourceLog); err != nil {
-				return 0, fmt.Errorf("reading change event: %v", err)
-			}
-			if partitionEOF {
-				break
+			ce, err = change.NewEvent(msg)
+			if err != nil {
+				log.Error("%s", err)
+				ce = nil
 			}
 		}
-		if ce == nil {
-			break
-		}
-		eventReadCount++
+
 		c, snap, err := command.NewCommand(pkerr, ce, schemaPassFilter, schemaStopFilter, tableStopFilter,
 			trimSchemaPrefix, addSchemaPrefix)
 		if err != nil {
@@ -359,6 +376,7 @@ func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer
 		}
 		cl.Cmd = append(cl.Cmd, *c)
 	}
+	log.Trace("read %d events", len(cl.Cmd))
 	if snapshot {
 		cat.ResetLastSnapshotRecord()
 	}
@@ -413,86 +431,44 @@ func readChangeEventFromFile(sourceFileScanner *bufio.Scanner, sourceLog *log.So
 	return ce, nil
 }
 
-func readChangeEvent(consumer *kafka.Consumer, sourceLog *log.SourceLog) (*change.Event, bool, error) {
-	var err error
-	var hup = make(chan os.Signal, 1)
-	signal.Notify(hup, syscall.SIGHUP)
-	for {
-		select {
-		case sig := <-hup:
-			return nil, false, fmt.Errorf("caught signal %v: reloading", sig)
-		default:
-			ev := consumer.Poll(100)
-			if ev == nil {
-				continue
-			}
-			switch e := ev.(type) {
-			case *kafka.Message:
-				// fmt.Printf("%% Message on %s:\n%s\n",
-				// e.TopicPartition, string(e.Value))
-
-				// fmt.Printf("%% Message on %s\n", e.TopicPartition)
-				// if e.Headers != nil {
-				// 	fmt.Printf("%% Headers: %v\n", e.Headers)
-				// }
-
-				// msg, ok = ev.(*kafka.Message)
-				// if !ok {
-				// panic("Message not *kafka.Message")
-				// }
-				// msg = e
-				var msg *kafka.Message = e
-				var ce *change.Event
-				if msg != nil { // received message
-					if sourceLog != nil {
-						sourceLog.Log("#")
-						sourceLog.Log(string(msg.Key))
-						sourceLog.Log(string(msg.Value))
-					}
-					//if msg.Key != nil {
-					//        err := json.Unmarshal(msg.Key, &(ce.Key))
-					//        if err != nil {
-					//                log.Info("change event key: %s\n%s", err, util.KafkaMessageString(msg))
-					//        }
-					//}
-					//if msg.Value != nil {
-					//        err = json.Unmarshal(msg.Value, &(ce.Value))
-					//        if err != nil {
-					//                log.Info("change event value: %s\n%s", err, util.KafkaMessageString(msg))
-					//        }
-					//}
-					//ce.Message = msg
-					if ce, err = change.NewEvent(msg); err != nil {
-						log.Error("%s", err)
-						ce = nil
-					}
-
-					// logReceivedChangeEvent(&ce)
-				}
-				return ce, false, nil
-			case kafka.PartitionEOF:
-				log.Trace("%s", e)
-				return nil, true, nil
-			case kafka.Error:
-				// In general, errors from the Kafka
-				// client can be reported and ignored,
-				// because the client will
-				// automatically try to recover.
-				if e.IsFatal() {
-					log.Warning("Kafka poll: %v", e)
-				} else {
-					log.Info("Kafka poll: %v", e)
-				}
-				// We could take some action if
-				// desired:
-				//if e.Code() == kafka.ErrAllBrokersDown {
-				//        // some action
-				//}
-			default:
-				log.Debug("ignoring: %v", e)
+func readChangeEvent(consumer *kafka.Consumer, sourceLog *log.SourceLog, kafkaPollTimeout int) (*kafka.Message, error) {
+	ev := consumer.Poll(kafkaPollTimeout)
+	if ev == nil {
+		return nil, nil
+	}
+	switch e := ev.(type) {
+	case *kafka.Message:
+		msg := e
+		if msg != nil { // received message
+			if sourceLog != nil {
+				sourceLog.Log("#")
+				sourceLog.Log(string(msg.Key))
+				sourceLog.Log(string(msg.Value))
 			}
 		}
+		return e, nil
+	//case kafka.PartitionEOF:
+	//	log.Trace("%s", e)
+	//	return nil, nil
+	case kafka.Error:
+		// In general, errors from the Kafka
+		// client can be reported and ignored,
+		// because the client will
+		// automatically try to recover.
+		if e.IsFatal() {
+			log.Warning("Kafka poll: %v", e)
+		} else {
+			log.Info("Kafka poll: %v", e)
+		}
+		// We could take some action if
+		// desired:
+		//if e.Code() == kafka.ErrAllBrokersDown {
+		//        // some action
+		//}
+	default:
+		log.Debug("ignoring: %v", e)
 	}
+	return nil, nil
 }
 
 func logTraceCommand(c *command.Command) {

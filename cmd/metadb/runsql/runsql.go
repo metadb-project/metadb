@@ -17,7 +17,6 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/dsync"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -113,7 +112,7 @@ func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, sche
 		if q == "" {
 			continue
 		}
-		if err = checkForDirectives(cat, url, tag, fullpath, q, &table, source, syncMode); err != nil {
+		if err = checkForDirectives(cat, url, tag, fullpath, q, &table, source); err != nil {
 			return err
 		}
 		if _, err = tx.Exec(context.TODO(), q); err != nil {
@@ -134,7 +133,7 @@ func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, sche
 
 var sqlSeparator = regexp.MustCompile("\\n\\s*\\n")
 
-func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input string, table *string, source string, syncMode dsync.Mode) error {
+func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input string, table *string, source string) error {
 	if !strings.HasPrefix(strings.TrimSpace(input), "--metadb:") {
 		return nil
 	}
@@ -160,7 +159,7 @@ func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input s
 			if len(c) < 3 {
 				return fmt.Errorf("syntax error in directive %q", line)
 			}
-			requireTable := dbx.Table{S: c[0], T: c[1]}
+			requireTable := &dbx.Table{S: c[0], T: c[1]}
 			switch {
 			case strings.HasSuffix(requireTable.T, "__"):
 				requireTable.T = requireTable.T[0 : len(requireTable.T)-2]
@@ -182,16 +181,14 @@ func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input s
 					line, url, tag, fullpath)
 				continue
 			}
-			if cat.Column(&sqlx.Column{
-				Schema: requireTable.S,
-				Table:  requireTable.T,
-				Column: requireColumn,
-			}) != nil {
+			if cat.Column(&dbx.Column{S: requireTable.S, T: requireTable.T, C: requireColumn}) != nil {
 				continue
 			}
 			// Add table
-			if err := cat.CreateNewTable(&requireTable, false, &dbx.Table{}, source); err != nil {
-				return fmt.Errorf("creating new table: %s: %v", requireTable, err)
+			if !cat.TableExists(requireTable) {
+				if err := cat.CreateNewTable(requireTable, false, &dbx.Table{}, source); err != nil {
+					return fmt.Errorf("creating new table: %s: %v", requireTable, err)
+				}
 			}
 			// Add column
 			t := strings.ToLower(requireColumnType)

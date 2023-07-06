@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,56 +16,107 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
-func execCommandList(cat *catalog.Catalog, cmdlist *command.CommandList, db sqlx.DB, dp *pgxpool.Pool, source string, syncMode dsync.Mode) error {
-	var cmdlisttxns = partitionTxn(cmdlist)
-	for i := range cmdlisttxns {
-		if len(cmdlisttxns[i].Cmd) == 0 {
-			continue
-		}
-		// exec schema changes
-		if err := execCommandSchema(cat, &(cmdlisttxns[i].Cmd[0]), db, source); err != nil {
-			return fmt.Errorf("exec command schema: %v", err)
-		}
-		if err := execCommandAddIndexes(cat, &(cmdlisttxns[i])); err != nil {
-			return fmt.Errorf("exec command indexes: %v", err)
-		}
-		if err := execCommandListData(cat, db, dp, &(cmdlisttxns[i]), syncMode); err != nil {
-			return fmt.Errorf("exec command data: %v", err)
-		}
-		// log confirmation
+func execCommandList(ctx context.Context, cat *catalog.Catalog, cmdlist *command.CommandList, db sqlx.DB, dp *pgxpool.Pool, source string, syncMode dsync.Mode) error {
+	commands := cmdlist.Cmd
+	if len(commands) == 0 {
+		return nil
+	}
+	ebuf := &execbuffer{
+		ctx:       ctx,
+		dp:        dp,
+		syncIDs:   make(map[dbx.Table][][]any),
+		mergeData: make(map[dbx.Table][][]string),
+		syncMode:  syncMode,
+	}
+	txnTime := time.Now()
+	for i := range commands {
 		if log.IsLevelTrace() {
-			for _, c := range cmdlisttxns[i].Cmd {
-				logTraceCommand(&c)
+			logTraceCommand(&(commands[i]))
+		}
+		if err := execCommand(ebuf, cat, &(commands[i]), db, source, syncMode); err != nil {
+			return fmt.Errorf("exec command: %v", err)
+		}
+	}
+	if err := ebuf.flush(); err != nil {
+		return fmt.Errorf("exec command list: %v", err)
+	}
+	log.Trace("=================================================================")
+	log.Trace("exec: %d records %s", len(commands), fmt.Sprintf("[%.4f s]", time.Since(txnTime).Seconds()))
+	log.Trace("=================================================================")
+	return nil
+}
+
+func execCommand(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, db sqlx.DB, source string, syncMode dsync.Mode) error {
+	// Make schema changes if needed by the command.
+	if cmd.Op == command.MergeOp {
+		table := &dbx.Table{S: cmd.SchemaName, T: cmd.TableName}
+		delta, err := findDeltaSchema(cat, cmd, table)
+		if err != nil {
+			return fmt.Errorf("finding schema delta: %v", err)
+		}
+		if err = addTable(ebuf, cmd, cat, table, source); err != nil {
+			return fmt.Errorf("schema: %v", err)
+		}
+		if err = addPartition(ebuf, cat, cmd); err != nil {
+			return fmt.Errorf("schema: %v", err)
+		}
+		// Note that execDeltaSchema() may adjust data types in cmd.
+		if err = execDeltaSchema(ebuf, cat, cmd, delta, table); err != nil {
+			return fmt.Errorf("schema: %v", err)
+		}
+		// Ensure indexes are created on primary key columns.
+		for _, col := range cmd.Column {
+			if col.PrimaryKey != 0 {
+				column := &dbx.Column{S: table.S, T: table.T, C: col.Name}
+				if cat.IndexExists(column) {
+					continue
+				}
+				if err = ebuf.flush(); err != nil {
+					return fmt.Errorf("creating indexes: %v", err)
+				}
+				if err = cat.AddIndex(column); err != nil {
+					return err
+				}
 			}
 		}
 	}
+	if err := execCommandData(ebuf, cat, cmd, db, syncMode); err != nil {
+		return fmt.Errorf("exec data: %v", err)
+	}
 	return nil
 }
 
-func execCommandSchema(cat *catalog.Catalog, cmd *command.Command, db sqlx.DB, source string) error {
+func findDeltaSchema(cat *catalog.Catalog, c *command.Command, table *dbx.Table) (*deltaSchema, error) {
+	schema1, err := selectTableSchema(cat, table)
+	if err != nil {
+		return nil, err
+	}
+	schema2 := tableSchemaFromCommand(c)
+	delta := new(deltaSchema)
+	for i := range schema2.Column {
+		col1 := getColumnSchema(schema1, schema2.Column[i].Name)
+		findDeltaColumnSchema(col1, &(schema2.Column[i]), delta)
+	}
+	// findDeltaPrimaryKey()
+	return delta, nil
+}
 
-	if cmd.Op == command.DeleteOp || cmd.Op == command.TruncateOp {
+func addTable(ebuf *execbuffer, cmd *command.Command, cat *catalog.Catalog, table *dbx.Table, source string) error {
+	if cat.TableExists(table) {
 		return nil
 	}
-	var err error
-	var delta *deltaSchema
-	if delta, err = findDeltaSchema(cat, cmd); err != nil {
-		return fmt.Errorf("schema: %v", err)
+	if err := ebuf.flush(); err != nil {
+		return fmt.Errorf("creating table %q : %v", table, err)
 	}
-	if err = addTable(cmd, cat, source); err != nil {
-		return fmt.Errorf("schema: %v", err)
-	}
-	if err = addPartition(cat, cmd); err != nil {
-		return fmt.Errorf("schema: %v", err)
-	}
-	// Note that execDeltaSchema() may adjust data types in cmd.
-	if err = execDeltaSchema(cat, cmd, delta, cmd.SchemaName, cmd.TableName, db); err != nil {
-		return fmt.Errorf("schema: %v", err)
+	parentTable := dbx.Table{S: cmd.ParentTable.Schema, T: cmd.ParentTable.Table}
+	err := cat.CreateNewTable(table, cmd.Transformed, &parentTable, source)
+	if err != nil {
+		return fmt.Errorf("creating table %q: %v", table, err)
 	}
 	return nil
 }
 
-func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSchema, tschema string, tableName string, db sqlx.DB) error {
+func execDeltaSchema(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, delta *deltaSchema, table *dbx.Table) error {
 	//if len(delta.column) == 0 {
 	//        log.Trace("table %s: no schema changes", util.JoinSchemaTable(tschema, tableName))
 	//}
@@ -72,19 +124,18 @@ func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSch
 		// Is this a new column (as opposed to a modification)?
 		if col.newColumn {
 			dtypesql := command.DataTypeToSQL(col.newType, col.newTypeSize)
-			log.Trace("table %s.%s: new column: %s %s", tschema, tableName, col.name, dtypesql)
-			t := dbx.Table{S: tschema, T: tableName}
-			if err := cat.AddColumn(t, col.name, col.newType, col.newTypeSize); err != nil {
-				return fmt.Errorf("delta schema: %v", err)
+			log.Trace("table %s.%s: new column: %s %s", table.S, table.T, col.name, dtypesql)
+			if err := ebuf.flush(); err != nil {
+				return fmt.Errorf("delta schema: adding column %q in table %q: %v", col.name, table, err)
+			}
+			if err := cat.AddColumn(table, col.name, col.newType, col.newTypeSize); err != nil {
+				return fmt.Errorf("delta schema: adding column %q in table %q: %v", col.name, table, err)
 			}
 			continue
 		}
-		// If the type is changing from varchar to another type, keep
-		// the type as varchar and let the executor cast the data.
-		// This is to prevent poorly typed JSON fields from causing
-		// runaway type changes (and the resulting runaway column
-		// renaming).  Later we can give the user a way to change the
-		// type of a specific column.
+		// If the type is changing from text to another type, keep the type as text and
+		// let the executor cast the data. This is to prevent poorly typed JSON fields
+		// from causing runaway type changes.
 		if col.oldType == command.TextType && col.newType != command.TextType {
 			// Adjust the new data type in the command.
 			var typeSize int64 = -1
@@ -101,81 +152,79 @@ func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSch
 				}
 			}
 			if typeSize == -1 {
-				return fmt.Errorf("delta schema: internal error: column not found in command: %s.%s (%s)", tschema, tableName, col.name)
+				return fmt.Errorf("delta schema: internal error: column not found in command: %s.%s (%s)", table.S, table.T, col.name)
 			}
 			if typeSize <= col.oldTypeSize {
 				continue
 			}
-			// Change the delta column type as well so that column
-			// size can be adjusted below if needed.
+			// Change the delta column type as well so that column size can be adjusted below
+			// if needed.
 			col.newType = command.TextType
 			col.newTypeSize = typeSize
 		}
 
-		// Don't change a UUID type with a null value, because UUID may have been inferred from data.
+		// Don't change a UUID type with a null value, because UUID may have been
+		// inferred from data.
 		if col.oldType == command.UUIDType && col.newType == command.TextType && col.newData == nil {
 			continue
 		}
 
-		// If both the old and new types are varchar, most databases
-		// can alter the column in place.
-		/*		if col.oldType == command.TextType && col.newType == command.TextType {
-					dtypesql, _, _ := command.DataTypeToSQL(col.newType, col.newTypeSize)
-					log.Trace("table %s.%s: alter column: %s %s", tschema, tableName, col.name, dtypesql)
-					if err := alterColumnVarcharSize(cat, sqlx.NewTable(tschema, tableName), col.name, col.newType, col.newTypeSize, db); err != nil {
-						return fmt.Errorf("delta schema: %v", err)
-					}
-					continue
-				}
-		*/
-		// If both the old and new types are IntegerType, change the
-		// column type to handle the larger size.
+		// If both the old and new types are IntegerType, change the column type to
+		// handle the larger size.
 		if col.oldType == command.IntegerType && col.newType == command.IntegerType {
-			// err := alterColumnIntegerSize(sqlx.NewTable(tschema, tableName), col.name, col.newTypeSize, db, schema)
-			err := alterColumnType(cat, db, tschema, tableName, col.name, command.IntegerType, col.newTypeSize, false)
-			if err != nil {
-				return fmt.Errorf("delta schema: %v", err)
+			if err := ebuf.flush(); err != nil {
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.IntegerType, err)
+			}
+			if err := alterColumnType(ebuf.dp, cat, table, col.name, command.IntegerType, col.newTypeSize, false); err != nil {
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.IntegerType, err)
 			}
 			continue
 		}
 
-		// If both the old and new types are FloatType, change the
-		// column type to handle the larger size.
+		// If both the old and new types are FloatType, change the column type to handle
+		// the larger size.
 		if col.oldType == command.FloatType && col.newType == command.FloatType {
-			// err := alterColumnFloatSize(sqlx.NewTable(tschema, tableName), col.name, col.newTypeSize, db, schema)
-			err := alterColumnType(cat, db, tschema, tableName, col.name, command.FloatType, col.newTypeSize, false)
-			if err != nil {
-				return fmt.Errorf("delta schema: %v", err)
+			if err := ebuf.flush(); err != nil {
+				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, command.FloatType, err)
+			}
+			if err := alterColumnType(ebuf.dp, cat, table, col.name, command.FloatType, col.newTypeSize, false); err != nil {
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.FloatType, err)
 			}
 			continue
 		}
 
-		// If this is a change from an integer to float type, the
-		// column type can be changed using a cast.
+		// If this is a change from an integer to float type, the column type can be
+		// changed using a cast.
 		if col.oldType == command.IntegerType && col.newType == command.FloatType {
-			err := alterColumnType(cat, db, tschema, tableName, col.name, command.FloatType, col.newTypeSize, false)
-			if err != nil {
-				return fmt.Errorf("delta schema: %v", err)
+			if err := ebuf.flush(); err != nil {
+				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, command.FloatType, err)
+			}
+			if err := alterColumnType(ebuf.dp, cat, table, col.name, command.FloatType, col.newTypeSize, false); err != nil {
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.FloatType, err)
 			}
 			continue
 		}
 
-		// If this is a change from an integer or float to numeric
-		// type, the column type can be changed using a cast.
+		// If this is a change from an integer or float to numeric type, the column type
+		// can be changed using a cast.
 		if (col.oldType == command.IntegerType || col.oldType == command.FloatType) && col.newType == command.NumericType {
-			err := alterColumnType(cat, db, tschema, tableName, col.name, command.NumericType, 0, false)
-			if err != nil {
-				return fmt.Errorf("delta schema: %v", err)
+			if err := ebuf.flush(); err != nil {
+				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, command.NumericType, err)
+			}
+			if err := alterColumnType(ebuf.dp, cat, table, col.name, command.NumericType, 0, false); err != nil {
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.NumericType, err)
 			}
 			continue
 		}
 
-		// If this is a change from a float to integer type, cast the
-		// column to the numeric type.
+		// If this is a change from a float to integer type, cast the column to the
+		// numeric type.
 		if col.oldType == command.FloatType && col.newType == command.IntegerType {
-			err := alterColumnType(cat, db, tschema, tableName, col.name, command.NumericType, 0, false)
-			if err != nil {
-				return fmt.Errorf("delta schema: %v", err)
+			if err := ebuf.flush(); err != nil {
+				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, command.NumericType, err)
+			}
+			if err := alterColumnType(ebuf.dp, cat, table, col.name, command.NumericType, 0, false); err != nil {
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.NumericType, err)
 			}
 			continue
 		}
@@ -185,126 +234,35 @@ func execDeltaSchema(cat *catalog.Catalog, cmd *command.Command, delta *deltaSch
 			continue
 		}
 
-		// If not a compatible change, adjust new type to varchar in all cases.
-		err := alterColumnType(cat, db, tschema, tableName, col.name, command.TextType, 0, false)
-		if err != nil {
-			return fmt.Errorf("delta schema: %v", err)
-		}
-	}
-	return nil
-}
-
-func execCommandAddIndexes(cat *catalog.Catalog, cmdlist *command.CommandList) error {
-	commands := cmdlist.Cmd
-	for i := range commands {
-		// The table associated with delete/truncate operations may not exist, and any
-		// needed indexes would have been created anyway with a merge operation.
-		if commands[i].Op == command.DeleteOp || commands[i].Op == command.TruncateOp {
-			continue
-		}
-		// Create indexes on primary key columns.
-		for _, col := range commands[i].Column {
-			if col.PrimaryKey != 0 {
-				if err := cat.AddIndexIfNotExists(commands[i].SchemaName, commands[i].TableName, col.Name); err != nil {
-					return err
-				}
+		// If not a compatible change, adjust new type to text in all cases, unless it is
+		// already text.
+		if col.oldType != command.TextType {
+			if err := ebuf.flush(); err != nil {
+				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, command.TextType, err)
+			}
+			for _, d := range delta.column {
+				log.Trace("COLUMN: %#v", d)
+			}
+			if err := alterColumnType(ebuf.dp, cat, table, col.name, command.TextType, 0, false); err != nil {
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.TextType, err)
 			}
 		}
 	}
 	return nil
 }
 
-func execCommandListData(cat *catalog.Catalog, db sqlx.DB, dp *pgxpool.Pool, cmdlist *command.CommandList, syncMode dsync.Mode) error {
-	tx, err := dp.Begin(context.TODO())
-	if err != nil {
-		return err
-	}
-	defer dbx.Rollback(tx)
-	// Exec data
-	commands := cmdlist.Cmd
-	for i := range cmdlist.Cmd {
-		// Execute data part of command
-		if err = execCommandData(cat, &(commands[i]), tx, db, syncMode); err != nil {
-			return fmt.Errorf("data: %v", err)
-		}
-	}
-	// Commit txn
-	log.Trace("commit txn")
-	if err = tx.Commit(context.TODO()); err != nil {
-		return fmt.Errorf("committing changes: %v", err)
-	}
-	return nil
-}
-
-func partitionTxn(cmdlist *command.CommandList) []command.CommandList {
-	// cmdlisttxns is a partition of command lists into transactions.
-	cmdlisttxns := make([]command.CommandList, 0)
-	// newcmdlist is the command list we are currently adding commands to.
-	newcmdlist := new(command.CommandList)
-	// lastcmd stores the previous command that was examined.
-	lastcmd := command.Command{}
-	commands := cmdlist.Cmd
-	for i := range commands {
-		// If a command may require schema changes, end the current transaction and begin
-		// a new one.
-		if mayRequireSchemaChanges(&(commands[i]), &lastcmd) && len(newcmdlist.Cmd) > 0 {
-			cmdlisttxns = append(cmdlisttxns, *newcmdlist)
-			newcmdlist = new(command.CommandList)
-		}
-		newcmdlist.Cmd = append(newcmdlist.Cmd, commands[i])
-		if commands[i].Op == command.MergeOp {
-			lastcmd = commands[i]
-		}
-	}
-	if len(newcmdlist.Cmd) > 0 {
-		cmdlisttxns = append(cmdlisttxns, *newcmdlist)
-	}
-	return cmdlisttxns
-}
-
-func mayRequireSchemaChanges(cmd, lastcmd *command.Command) bool {
-	switch {
-	case cmd.Op != command.MergeOp:
-		return false
-	case cmd.SchemaName != lastcmd.SchemaName:
-		return true
-	case cmd.TableName != lastcmd.TableName:
-		return true
-	case len(cmd.Column) != len(lastcmd.Column):
-		return true
-	}
-	// If the new command has a column not present in the previous command, or
-	// present but different, then schema changes may be required.
-	columns := cmd.Column
-	for i := range columns {
-		lastcol, ok := lastcmd.ColumnMap[columns[i].Name]
-		if !ok {
-			return true
-		}
-		switch {
-		case columns[i].DType != lastcol.DType:
-			return true
-		case columns[i].DTypeSize != lastcol.DTypeSize:
-			return true
-		case columns[i].PrimaryKey != lastcol.PrimaryKey:
-			return true
-		}
-	}
-	return false
-}
-
-func execCommandData(cat *catalog.Catalog, cmd *command.Command, tx pgx.Tx, db sqlx.DB, syncMode dsync.Mode) error {
+func execCommandData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, db sqlx.DB, syncMode dsync.Mode) error {
 	switch cmd.Op {
 	case command.MergeOp:
-		if err := execMergeData(cmd, tx, db, syncMode); err != nil {
+		if err := execMergeData(ebuf, cmd, db, syncMode); err != nil {
 			return fmt.Errorf("merge: %v", err)
 		}
 	case command.DeleteOp:
-		if err := execDeleteData(cat, cmd, tx, db); err != nil {
+		if err := execDeleteData(ebuf, cat, cmd, db); err != nil {
 			return fmt.Errorf("delete: %v", err)
 		}
 	case command.TruncateOp:
-		if err := execTruncateData(cat, cmd, tx, db); err != nil {
+		if err := execTruncateData(ebuf, cat, cmd); err != nil {
 			return fmt.Errorf("truncate: %v", err)
 		}
 	default:
@@ -314,22 +272,20 @@ func execCommandData(cat *catalog.Catalog, cmd *command.Command, tx pgx.Tx, db s
 }
 
 // execMergeData executes a merge command in the database.
-func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB, syncMode dsync.Mode) error {
-	table := dbx.Table{S: cmd.SchemaName, T: cmd.TableName}
+func execMergeData(ebuf *execbuffer, cmd *command.Command, db sqlx.DB, syncMode dsync.Mode) error {
+	table := &dbx.Table{S: cmd.SchemaName, T: cmd.TableName}
 	// Check if the current record (if any) is identical to the new one.  If so, we
 	// can avoid making any changes in the database.
 	var id int64
-	ident, id, err := isCurrentIdentical(cmd, tx, &table, db)
+	ident, id, err := isCurrentIdentical(ebuf.ctx, cmd, ebuf.dp, table, db)
 	if err != nil {
 		return fmt.Errorf("matcher: %v", err)
 	}
 	if ident {
+		log.Trace("new command matches current record")
 		// If resync mode, write __id to sync table.
 		if syncMode == dsync.Resync {
-			q := "INSERT INTO " + catalog.SyncTable(&table).SQL() + " VALUES($1)"
-			if _, err = tx.Exec(context.TODO(), q, id); err != nil {
-				return err
-			}
+			ebuf.queueSyncID(table, id)
 		}
 		return nil
 	}
@@ -364,7 +320,7 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB, syncMode dsync.M
 		}
 		b.WriteString(" LIMIT 1")
 		var rows pgx.Rows
-		rows, err = tx.Query(context.TODO(), b.String())
+		rows, err = ebuf.dp.Query(context.TODO(), b.String())
 		if err != nil {
 			return fmt.Errorf("querying for unavailable data: %v", err)
 		}
@@ -376,7 +332,7 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB, syncMode dsync.M
 			dest[i] = &(values[i])
 		}
 		found := false
-		if rows.Next() {
+		for rows.Next() {
 			found = true
 			if err = rows.Scan(dest...); err != nil {
 				return fmt.Errorf("scanning row values: %v", err)
@@ -415,8 +371,7 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB, syncMode dsync.M
 	if err = wherePKDataEqual(db, &b, cmd.Column); err != nil {
 		return fmt.Errorf("primary key columns equal: %v", err)
 	}
-	batch := &pgx.Batch{}
-	batch.Queue(b.String())
+	update := b.String()
 	// Insert the new row.
 	b.Reset()
 	b.WriteString("INSERT INTO \"")
@@ -445,39 +400,13 @@ func execMergeData(cmd *command.Command, tx pgx.Tx, db sqlx.DB, syncMode dsync.M
 		b.WriteString(encodeSQLData(columns[i].SQLData, columns[i].DType, db))
 	}
 	b.WriteString(") RETURNING __id")
-	batch.Queue(b.String()).QueryRow(func(row pgx.Row) error {
-		return row.Scan(&id)
-	})
-	if err = tx.SendBatch(context.TODO(), batch).Close(); err != nil {
-		return fmt.Errorf("update and insert: %v", err)
-	}
-	// If resync mode, write __id to sync table.
-	if syncMode == dsync.Resync {
-		q := "INSERT INTO " + catalog.SyncTable(&table).SQL() + " VALUES($1)"
-		if _, err := tx.Exec(context.TODO(), q, id); err != nil {
-			return err
-		}
-	}
+	insert := b.String()
+	ebuf.queueMergeData(table, &update, &insert)
 	return nil
 }
-
-/*func updateRowCF(c *command.Command, tx pgx.Tx, db sqlx.DB, table *dbx.Table) error {
-	// Select matching current record in history table.
-	var uphist strings.Builder
-	uphist.WriteString("UPDATE \"" + table.S + "\".\"" + table.T + "\" SET __cf=TRUE WHERE __origin='" + c.Origin +
-		"'")
-	if err := wherePKDataEqual(db, &uphist, c.Column); err != nil {
-		return fmt.Errorf("primary key columns equal: %v", err)
-	}
-	if _, err := tx.Exec(context.TODO(), uphist.String()); err != nil {
-		return fmt.Errorf("setting cf flag: %v", err)
-	}
-	return nil
-}
-*/
 
 // isCurrentIdentical looks for an identical row in the current table.
-func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sqlx.DB) (bool, int64, error) {
+func isCurrentIdentical(ctx context.Context, cmd *command.Command, tx *pgxpool.Pool, table *dbx.Table, db sqlx.DB) (bool, int64, error) {
 	// Match on all columns, except "unavailable" columns (which indicates a column
 	// did not change and we can assume it matches).
 	var b strings.Builder
@@ -503,7 +432,7 @@ func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sq
 		}
 	}
 	b.WriteString(" LIMIT 1")
-	rows, err := tx.Query(context.TODO(), b.String())
+	rows, err := tx.Query(ctx, b.String())
 	if err != nil {
 		return false, 0, fmt.Errorf("querying for matching current row: %v", err)
 	}
@@ -520,7 +449,7 @@ func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sq
 	for i := range dest {
 		dest[i] = &(values[i])
 	}
-	if rows.Next() {
+	for rows.Next() {
 		found = true
 		if err = rows.Scan(dest...); err != nil {
 			return false, 0, fmt.Errorf("scanning row values: %v", err)
@@ -560,41 +489,37 @@ func isCurrentIdentical(cmd *command.Command, tx pgx.Tx, table *dbx.Table, db sq
 	return true, id, nil
 }
 
-func execDeleteData(cat *catalog.Catalog, c *command.Command, tx pgx.Tx, db sqlx.DB) error {
+func execDeleteData(ebuf *execbuffer, cat *catalog.Catalog, c *command.Command, db sqlx.DB) error {
 	// Get the transformed tables so that we can propagate the delete operation.
 	tables := cat.DescendantTables(dbx.Table{S: c.SchemaName, T: c.TableName})
 	// Note that if the table does not exist, "tables" will be an empty slice and the
 	// loop below will not do anything.
 
 	// Find matching current record and mark as not current.
-	// TODO Use pgx.Batch
 	for i := range tables {
 		var b strings.Builder
 		b.WriteString("UPDATE " + tables[i].MainSQL() + " SET __end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
 		if err := wherePKDataEqual(db, &b, c.Column); err != nil {
 			return err
 		}
-		// Run SQL.
-		if _, err := tx.Exec(context.TODO(), b.String()); err != nil {
+		if _, err := ebuf.dp.Exec(ebuf.ctx, b.String()); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func execTruncateData(cat *catalog.Catalog, c *command.Command, tx pgx.Tx, db sqlx.DB) error {
+func execTruncateData(ebuf *execbuffer, cat *catalog.Catalog, c *command.Command) error {
 	// Get the transformed tables so that we can propagate the truncate operation.
 	tables := cat.DescendantTables(dbx.Table{S: c.SchemaName, T: c.TableName})
 	// Note that if the table does not exist, "tables" will be an empty slice and the
 	// loop below will not do anything.
 
 	// Mark as not current.
-	// TODO Use pgx.Batch
 	for i := range tables {
 		var b strings.Builder
 		b.WriteString("UPDATE " + tables[i].MainSQL() + " SET __end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
-		// Run SQL.
-		if _, err := tx.Exec(context.TODO(), b.String()); err != nil {
+		if _, err := ebuf.dp.Exec(ebuf.ctx, b.String()); err != nil {
 			return err
 		}
 	}
@@ -636,36 +561,3 @@ func encodeSQLData(sqldata *string, datatype command.DataType, db sqlx.DB) strin
 		return "(unknown type)"
 	}
 }
-
-/*func checkRowExistsCurrent(c *command.Command, tx *sql.Tx, history bool) (int64, error) {
-	var h string
-	if history {
-		h = "__"
-	}
-	var err error
-	var pkey []command.CommandColumn = command.PrimaryKeyColumns(c.Column)
-	var b strings.Builder
-	_, _ = fmt.Fprintf(&b, ""+
-		"SELECT __id\n"+
-		"    FROM %s\n"+
-		"    WHERE __origin = '%s'", util.JoinSchemaTable(c.SchemaName, c.TableName+h), c.Origin)
-	var col command.CommandColumn
-	for _, col = range pkey {
-		_, _ = fmt.Fprintf(&b, " AND\n        %s = %s", col.Name, command.SQLEncodeData(col.Data, col.DType, col.SemanticType))
-	}
-	if history {
-		_, _ = fmt.Fprintf(&b, " AND\n        __current = TRUE")
-	}
-	_, _ = fmt.Fprintf(&b, ";")
-	var q = b.String()
-	var id int64
-	err = tx.QueryRowContext(context.TODO(), q).Scan(&id)
-	if err == nil {
-		return id, nil
-	}
-	if err == sql.ErrNoRows {
-		return 0, nil
-	}
-	return 0, fmt.Errorf("%s:\n%s", err, q)
-}
-*/

@@ -9,9 +9,9 @@ import (
 )
 
 type Event struct {
-	Key     *EventKey
-	Value   *EventValue
-	Message *kafka.Message
+	Key   *EventKey
+	Value *EventValue
+	Topic *string
 }
 
 func NewEvent(msg *kafka.Message) (*Event, error) {
@@ -30,7 +30,7 @@ func NewEvent(msg *kafka.Message) (*Event, error) {
 			return nil, fmt.Errorf("change event value: %s\n%s", err, util.KafkaMessageString(msg))
 		}
 	}
-	ce.Message = msg
+	ce.Topic = msg.TopicPartition.Topic
 	return ce, nil
 }
 
@@ -41,9 +41,6 @@ func (e Event) String() string {
 	}
 	if e.Value != nil {
 		value = fmt.Sprintf("%v", *e.Value)
-	}
-	if e.Message != nil {
-		message = util.KafkaMessageString(e.Message)
 	}
 	return fmt.Sprintf("key = %s\nvalue = %s\nmessage =\n%s", key, value, message)
 }

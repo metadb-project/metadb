@@ -18,7 +18,7 @@ type ColumnType struct {
 */
 
 func (c *Catalog) initSchema() error {
-	columns := make(map[sqlx.Column]string)
+	columns := make(map[dbx.Column]string)
 	// Read column schemas from database.
 	columnSchemas, err := getColumnSchemas(c.dp)
 	if err != nil {
@@ -31,7 +31,7 @@ func (c *Catalog) initSchema() error {
 		//if !track.Contains(&sqlx.T{S: col.S, T: col.T}) {
 		//	continue
 		//}
-		c := sqlx.Column{Schema: col.Schema, Table: col.Table, Column: col.Column}
+		c := dbx.Column{S: col.Schema, T: col.Table, C: col.Column}
 		columns[c] = col.DataType
 	}
 	c.columns = columns
@@ -78,47 +78,47 @@ func getColumnSchemas(dp *pgxpool.Pool) ([]*sqlx.ColumnSchema, error) {
 	return cs, nil
 }
 
-func (c *Catalog) UpdateColumn(column *sqlx.Column, dataType string) {
+func (c *Catalog) UpdateColumn(column *dbx.Column, dataType string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	updateColumn(c, column, dataType)
 }
 
-func updateColumn(cat *Catalog, column *sqlx.Column, dataType string) {
+func updateColumn(cat *Catalog, column *dbx.Column, dataType string) {
 	cat.columns[*column] = dataType
 }
 
-func (c *Catalog) DeleteColumn(column *sqlx.Column) {
+func (c *Catalog) DeleteColumn(column *dbx.Column) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.columns, *column)
 }
 
-func (c *Catalog) TableColumns(table *sqlx.Table) []string {
+func (c *Catalog) TableColumns(table *dbx.Table) []string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var columns []string
 	for k := range c.columns {
-		if k.Schema == table.Schema && k.Table == table.Table {
-			columns = append(columns, k.Column)
+		if k.S == table.S && k.T == table.T {
+			columns = append(columns, k.C)
 		}
 	}
 	return columns
 }
 
-func (c *Catalog) TableSchema(table *sqlx.Table) map[string]string {
+func (c *Catalog) TableSchema(table *dbx.Table) map[string]string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ts := make(map[string]string)
 	for k, v := range c.columns {
-		if k.Schema == table.Schema && k.Table == table.Table {
-			ts[k.Column] = v
+		if k.S == table.S && k.T == table.T {
+			ts[k.C] = v
 		}
 	}
 	return ts
 }
 
-func (c *Catalog) Column(column *sqlx.Column) *string {
+func (c *Catalog) Column(column *dbx.Column) *string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	cs, ok := c.columns[*column]
@@ -128,7 +128,7 @@ func (c *Catalog) Column(column *sqlx.Column) *string {
 	return nil
 }
 
-func (c *Catalog) AddColumn(table dbx.Table, columnName string, newType command.DataType, newTypeSize int64) error {
+func (c *Catalog) AddColumn(table *dbx.Table, columnName string, newType command.DataType, newTypeSize int64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// Alter table schema in database.
@@ -142,11 +142,14 @@ func (c *Catalog) AddColumn(table dbx.Table, columnName string, newType command.
 	}
 	// Create index if type is uuid.
 	if newType == command.UUIDType {
-		if err := addIndexIfNotExists(c, table.S, table.T, columnName); err != nil {
-			return err
+		column := &dbx.Column{S: table.S, T: table.T, C: columnName}
+		if !c.indexExists(column) {
+			if err := c.addIndex(column); err != nil {
+				return err
+			}
 		}
 	}
 	// Update schema.
-	updateColumn(c, &sqlx.Column{Schema: table.S, Table: table.T, Column: columnName}, dataTypeSQL)
+	updateColumn(c, &dbx.Column{S: table.S, T: table.T, C: columnName}, dataTypeSQL)
 	return nil
 }

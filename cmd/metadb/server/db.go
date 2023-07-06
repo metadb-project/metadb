@@ -1,49 +1,31 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 )
 
-func addTable(cmd *command.Command, cat *catalog.Catalog, source string) error {
-	table := dbx.Table{S: cmd.SchemaName, T: cmd.TableName}
-	parentTable := dbx.Table{S: cmd.ParentTable.Schema, T: cmd.ParentTable.Table}
-	return cat.CreateNewTable(&table, cmd.Transformed, &parentTable, source)
-	/*
-		// if tracked, then assume the table exists
-		if cat.TableExists(table) {
-			return nil
-		}
-		// create tables
-		if err := createSchemaIfNotExists(sqlx.NewTable(cmd.SchemaName, cmd.TableName), db, users); err != nil {
-			return err
-		}
-		if err := createMainTableIfNotExists(sqlx.NewTable(cmd.SchemaName, cmd.TableName), db, users); err != nil {
-			return err
-		}
-		// track new table
-		parentTable := dbx.Table{S: cmd.ParentTable.Schema, T: cmd.ParentTable.Table}
-		if err := cat.AddTableEntry(table, cmd.Transformed, parentTable); err != nil {
-			return err
-		}
-		return nil
-	*/
-}
-
-func addPartition(cat *catalog.Catalog, cmd *command.Command) error {
+func addPartition(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command) error {
 	yearStr := cmd.SourceTimestamp[0:4]
 	year, err := strconv.Atoi(yearStr)
 	if err != nil {
 		return fmt.Errorf("adding partition for table %q: invalid year format: %q",
 			cmd.SchemaName+"."+cmd.TableName, yearStr)
 	}
-	if err = cat.AddPartYearIfNotExists(cmd.SchemaName, cmd.TableName, year); err != nil {
+	if cat.PartYearExists(cmd.SchemaName, cmd.TableName, year) {
+		return nil
+	}
+	if err = ebuf.flush(); err != nil {
+		return fmt.Errorf("adding partition for table %q year %q: %v", cmd.SchemaName+"."+cmd.TableName,
+			yearStr, err)
+	}
+	if err = cat.AddPartYear(cmd.SchemaName, cmd.TableName, year); err != nil {
 		return fmt.Errorf("adding partition for table %q year %q: %v", cmd.SchemaName+"."+cmd.TableName,
 			yearStr, err)
 	}
@@ -192,20 +174,19 @@ func alterColumnToVarchar(table *sqlx.T, column string, typesize int64, db sqlx.
 */
 
 // Change column type to a specified new type, optionally casting data to the new type
-func alterColumnType(cat *catalog.Catalog, db sqlx.DB, schema string, table string, column string, datatype command.DataType, typesize int64, cast bool) error {
-	schemaTable := sqlx.NewTable(schema, table)
+func alterColumnType(dq dbx.Queryable, cat *catalog.Catalog, table *dbx.Table, column string, datatype command.DataType, typesize int64, cast bool) error {
 	sqltype := command.DataTypeToSQL(datatype, typesize)
 	var caststr string
 	if cast {
 		caststr = " USING \"" + column + "\"::" + sqltype
 	}
 	var q = "ALTER TABLE %s ALTER COLUMN \"" + column + "\" TYPE " + sqltype + caststr
-	if _, err := db.Exec(nil, fmt.Sprintf(q, db.HistoryTableSQL(schemaTable))); err != nil {
+	if _, err := dq.Exec(context.TODO(), fmt.Sprintf(q, table.MainSQL())); err != nil {
 		return fmt.Errorf("changing type of column %q in table %q to %q: alter column: %v",
 			column, table, sqltype, err)
 	}
 	// Update schema.
-	cat.UpdateColumn(&sqlx.Column{Schema: schema, Table: table, Column: column}, sqltype)
+	cat.UpdateColumn(&dbx.Column{S: table.S, T: table.T, C: column}, sqltype)
 	return nil
 }
 
@@ -268,7 +249,7 @@ func newNumberedColumnName(table *sqlx.T, column string, schema *cache.S) (strin
 }
 */
 
-func selectTableSchema(cat *catalog.Catalog, table *sqlx.Table) (*sysdb.TableSchema, error) {
+func selectTableSchema(cat *catalog.Catalog, table *dbx.Table) (*sysdb.TableSchema, error) {
 	m := cat.TableSchema(table)
 	ts := new(sysdb.TableSchema)
 	for k, v := range m {

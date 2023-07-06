@@ -123,7 +123,6 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 		Origin:          cmd.Origin,
 		Column:          cols,
 		ColumnMap:       command.BuildColumnMap(cols),
-		ChangeEvent:     cmd.ChangeEvent,
 		SourceTimestamp: cmd.SourceTimestamp,
 	}
 	cl.Cmd = append(cl.Cmd, ncmd)

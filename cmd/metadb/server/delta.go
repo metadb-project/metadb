@@ -1,26 +1,9 @@
 package server
 
 import (
-	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 )
-
-func findDeltaSchema(cat *catalog.Catalog, c *command.Command) (*deltaSchema, error) {
-	schema1, err := selectTableSchema(cat, &sqlx.Table{Schema: c.SchemaName, Table: c.TableName})
-	if err != nil {
-		return nil, err
-	}
-	schema2 := tableSchemaFromCommand(c)
-	delta := new(deltaSchema)
-	for i := range schema2.Column {
-		col1 := getColumnSchema(schema1, schema2.Column[i].Name)
-		findDeltaColumnSchema(col1, &(schema2.Column[i]), delta)
-	}
-	// findDeltaPrimaryKey()
-	return delta, nil
-}
 
 func tableSchemaFromCommand(c *command.Command) *sysdb.TableSchema {
 	var ts = new(sysdb.TableSchema)

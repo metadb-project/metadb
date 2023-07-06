@@ -448,6 +448,13 @@ CREATE DATA SOURCE `*_source_name_*` TYPE *_source_type_*
 
 CREATE DATA SOURCE defines connection settings for an external data source.
 
+The new data source starts out in synchronizing mode, which pauses periodic
+transforms and running external SQL.  When the initial snapshot has finished
+streaming, the message "source snapshot complete (deadline exceeded)" will be
+written to the log.  To complete the synchronization, the Metadb server should
+be stopped in order to run `metadb endsync`, and after the "endsync" has
+completed, the Metadb server can be started again.
+
 [discrete]
 ===== Parameters
 

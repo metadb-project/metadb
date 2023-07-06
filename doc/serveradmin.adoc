@@ -340,12 +340,13 @@ CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
 
 [.aqua-background]#Metadb 1.2#
 When a new data source is first configured using `CREATE DATA SOURCE`, Metadb
-automatically puts the database into "sync" mode, just as if `metadb sync` had
-been run (see *Server administration > Resynchronizing a data source*).  This
-has the effect of pausing periodic transforms and external SQL.  When the
-initial snapshot has finished streaming, the message "source snapshot complete
-(deadline exceeded)" will be written to the log.  Then, to complete this first
-synchronization, stop the Metadb server, and after that run `metadb endsync`:
+automatically puts the database into synchronizing mode, just as if `metadb
+sync` had been run (see *Server administration > Resynchronizing a data
+source*).  This has the effect of pausing periodic transforms and external SQL.
+When the initial snapshot has finished streaming, the message "source snapshot
+complete (deadline exceeded)" will be written to the log.  Then, to complete
+this first synchronization, stop the Metadb server, and after that run `metadb
+endsync`:
 
 [source,bash]
 ----

@@ -93,24 +93,29 @@ SELECT table_schema, table_name, column_name
 	return nil
 }
 
-func (c *Catalog) AddIndexIfNotExists(schema, table, column string) error {
+func (c *Catalog) AddIndex(column *dbx.Column) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return addIndexIfNotExists(c, schema, table, column)
+	return c.addIndex(column)
 }
 
-func addIndexIfNotExists(c *Catalog, schema, table, column string) error {
-	// Return if index already exists.
-	stc := dbx.Column{S: schema, T: table, C: column}
-	_, ok := c.indexes[stc]
-	if ok {
-		return nil
-	}
+func (c *Catalog) addIndex(column *dbx.Column) error {
 	// Create index.
-	q := "CREATE INDEX ON \"" + schema + "\".\"" + table + "__\" (\"" + column + "\")"
+	q := "CREATE INDEX ON \"" + column.S + "\".\"" + column.T + "__\" (\"" + column.C + "\")"
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating index: %v", err)
 	}
-	c.indexes[stc] = struct{}{}
+	c.indexes[*column] = struct{}{}
 	return nil
+}
+
+func (c *Catalog) IndexExists(column *dbx.Column) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.indexExists(column)
+}
+
+func (c *Catalog) indexExists(column *dbx.Column) bool {
+	_, ok := c.indexes[*column]
+	return ok
 }

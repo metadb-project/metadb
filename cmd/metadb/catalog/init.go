@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -24,7 +23,7 @@ type Catalog struct {
 	tableDir           map[dbx.Table]tableEntry
 	partYears          map[string]map[int]struct{}
 	users              map[string]*util.RegexList
-	columns            map[sqlx.Column]string
+	columns            map[dbx.Column]string
 	indexes            map[dbx.Column]struct{}
 	lastSnapshotRecord time.Time
 	dp                 *pgxpool.Pool

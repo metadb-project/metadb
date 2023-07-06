@@ -43,19 +43,19 @@ func (o Operation) String() string {
 type DataType int
 
 const (
-	UnknownType = iota
-	BooleanType
-	DateType
-	FloatType
-	IntegerType
-	JSONType
-	NumericType
-	TimeType
-	TimestampType
-	TimestamptzType
-	TimetzType
-	UUIDType
-	TextType
+	UnknownType     = 0
+	BooleanType     = 1
+	DateType        = 2
+	FloatType       = 3
+	IntegerType     = 4
+	JSONType        = 5
+	NumericType     = 6
+	TimeType        = 7
+	TimestampType   = 8
+	TimestamptzType = 9
+	TimetzType      = 10
+	UUIDType        = 11
+	TextType        = 12
 )
 
 func (d DataType) String() string {
@@ -186,7 +186,6 @@ type Command struct {
 	Column      []CommandColumn
 	// ColumnMap maps the column names to the columns.
 	ColumnMap       map[string]*CommandColumn
-	ChangeEvent     *change.Event
 	SourceTimestamp string
 }
 
@@ -218,7 +217,7 @@ type CommandColumn struct {
 */
 
 func (c Command) String() string {
-	return fmt.Sprintf("command = %s %s.%s (%v)\nevent =\n%v", c.Op, c.SchemaName, c.TableName, c.Column, c.ChangeEvent)
+	return fmt.Sprintf("command = %s %s.%s (%v)\n", c.Op, c.SchemaName, c.TableName, c.Column)
 }
 
 type CommandList struct {
@@ -278,8 +277,8 @@ func extractPrimaryKey(pkerr map[string]struct{}, ce *change.Event) (map[string]
 	var ok bool
 	if ce.Key == nil {
 		var topic string
-		if ce.Message.TopicPartition.Topic != nil {
-			topic = *ce.Message.TopicPartition.Topic
+		if ce.Topic != nil {
+			topic = *(ce.Topic)
 		} else {
 			topic = "(unknown)"
 		}
@@ -584,7 +583,6 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 	}
 	var err error
 	var c = new(Command)
-	c.ChangeEvent = ce
 	if ce.Value == nil || ce.Value.Payload == nil {
 		var name string
 		var key interface{}

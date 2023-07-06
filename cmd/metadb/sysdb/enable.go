@@ -52,7 +52,7 @@ package sysdb
 		return err
 	}
 	defer func(tx *sql.Tx) {
-		_ = tx.Rollback()
+		_ = tx.rollback()
 	}(tx)
 	// enable connectors
 	for _, c = range conn {
@@ -65,7 +65,7 @@ package sysdb
 		}
 	}
 	// commit
-	if err = tx.Commit(); err != nil {
+	if err = tx.commit(); err != nil {
 		return fmt.Errorf("enabling connectors: committing changes: %s", err)
 	}
 	return nil
@@ -110,7 +110,7 @@ package sysdb
 		return err
 	}
 	defer func(tx *sql.Tx) {
-		_ = tx.Rollback()
+		_ = tx.rollback()
 	}(tx)
 	// enable connectors
 	for _, c = range conn {
@@ -123,7 +123,7 @@ package sysdb
 		}
 	}
 	// commit
-	if err = tx.Commit(); err != nil {
+	if err = tx.commit(); err != nil {
 		return fmt.Errorf("disabling connectors: committing changes: %s", err)
 	}
 	return nil

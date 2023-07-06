@@ -45,13 +45,9 @@ func (c *Catalog) initPartYears() error {
 	return nil
 }
 
-func (c *Catalog) AddPartYearIfNotExists(schema, table string, year int) error {
+func (c *Catalog) AddPartYear(schema, table string, year int) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	// If partition already exists, do nothing.
-	if c.partYearExists(schema, table, year) {
-		return nil
-	}
 	// Add partition in database.
 	yearStr := strconv.Itoa(year)
 	nextYearStr := strconv.Itoa(year + 1)
@@ -72,6 +68,12 @@ func (c *Catalog) AddPartYearIfNotExists(schema, table string, year int) error {
 	}
 	p[year] = struct{}{}
 	return nil
+}
+
+func (c *Catalog) PartYearExists(schema, table string, year int) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.partYearExists(schema, table, year)
 }
 
 func (c *Catalog) partYearExists(schema, table string, year int) bool {

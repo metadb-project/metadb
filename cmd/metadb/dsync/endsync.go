@@ -2,12 +2,14 @@ package dsync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
@@ -17,16 +19,6 @@ import (
 )
 
 func EndSync(opt *option.EndSync) error {
-	// Validate options
-	if !opt.Force {
-		// Ask for confirmation
-		_, _ = fmt.Fprintf(os.Stderr, "Remove unsynchronized data for data source %q? ", opt.Source)
-		var confirm string
-		_, err := fmt.Scanln(&confirm)
-		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
-			return nil
-		}
-	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	db, err := util.ReadConfigDatabase(opt.Datadir)
 	if err != nil {
@@ -82,6 +74,68 @@ func EndSync(opt *option.EndSync) error {
 		return tables[i].String() < tables[j].String()
 	})
 	if syncMode == Resync {
+		// Before continuing, pause for confirmation if many records will be deleted.
+		// Count sync table rows.
+		eout.Info("endsync: scanning sync tables")
+		var syncCount int64
+		for _, t := range tables {
+			synct := catalog.SyncTable(&t)
+			var count int64
+			q := "SELECT count(*) FROM " + synct.SQL()
+			err = dp.QueryRow(context.TODO(), q).Scan(&count)
+			switch {
+			case errors.Is(err, pgx.ErrNoRows):
+				return err
+			case err != nil:
+				return err
+			default:
+				syncCount += count
+			}
+		}
+		// Count current records.
+		eout.Info("endsync: scanning current records")
+		var currentCount int64
+		for _, t := range tables {
+			var count int64
+			q := "SELECT count(*) FROM " + t.SQL()
+			err = dp.QueryRow(context.TODO(), q).Scan(&count)
+			switch {
+			case errors.Is(err, pgx.ErrNoRows):
+				return err
+			case err != nil:
+				return err
+			default:
+				currentCount += count
+			}
+		}
+		// Calculate the approximate fraction of affected records.
+		percent := (float64(currentCount) - float64(syncCount)) / float64(currentCount) * 100
+		if percent > 100.0 {
+			percent = 100.0
+		}
+		if percent > 20.0 {
+			fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
+			fmt.Fprintf(os.Stderr, "%.0f%% of current records have not been confirmed by the new snapshot.\n", percent)
+			fmt.Fprintf(os.Stderr, "The unconfirmed records will be marked as deleted.\n")
+			fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
+			fmt.Fprintf(os.Stderr, "Do you want to continue? ")
+			var confirm string
+			_, err = fmt.Scanln(&confirm)
+			if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
+				return nil
+			}
+		}
+		if !opt.Force {
+			// Ask for confirmation
+			_, _ = fmt.Fprintf(os.Stderr, "Finalize synchronization for data source %q? ", opt.Source)
+			var confirm string
+			_, err = fmt.Scanln(&confirm)
+			if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
+				return nil
+			}
+		}
+
+		// Finalize tables.
 		for _, t := range tables {
 			eout.Info("endsync: finalizing table %s", t.String())
 			synct := catalog.SyncTable(&t)

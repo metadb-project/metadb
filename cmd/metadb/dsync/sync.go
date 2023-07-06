@@ -50,16 +50,6 @@ func ReadSyncMode(dq dbx.Queryable, source string) (Mode, error) {
 }
 
 func Sync(opt *option.Sync) error {
-	// Validate options
-	if !opt.Force {
-		// Ask for confirmation
-		_, _ = fmt.Fprintf(os.Stderr, "Synchronize current data for data source %q? ", opt.Source)
-		var confirm string
-		_, err := fmt.Scanln(&confirm)
-		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
-			return nil
-		}
-	}
 	db, err := util.ReadConfigDatabase(opt.Datadir)
 	if err != nil {
 		return err
@@ -90,7 +80,16 @@ func Sync(opt *option.Sync) error {
 		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
 			return nil
 		}
-	} // The mode is resync since initial sync is only started implicitly.
+	}
+	if !opt.Force {
+		// Ask for confirmation
+		_, _ = fmt.Fprintf(os.Stderr, "Begin synchronization process for data source %q? ", opt.Source)
+		var confirm string
+		_, err = fmt.Scanln(&confirm)
+		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
+			return nil
+		}
+	}
 
 	// Check if server is already running.
 	running, pid, err := process.IsServerRunning(opt.Datadir)

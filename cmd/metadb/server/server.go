@@ -184,7 +184,9 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 
 	go libpq.Listen(svr.opt.Listen, svr.opt.Port, svr.db, &svr.state.sources)
 
-	go goPollLoop(cat, svr)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go goPollLoop(ctx, cat, svr)
 
 	/*	folio, err := isFolioModulePresent(svr.db)
 		if err != nil {
@@ -249,15 +251,10 @@ func isReshareModulePresent(db *dbx.DB) (bool, error) {
 	}
 }
 
-func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, source string, folio, reshare bool) {
-	dc, err := db.Connect()
-	if err != nil {
-		log.Error("%v", err)
-	}
-	defer dbx.Close(dc)
+func goMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat *catalog.Catalog, source string, folio, reshare bool) {
 	for {
 		time.Sleep(5 * time.Minute)
-		syncMode, err := dsync.ReadSyncMode(dc, source)
+		syncMode, err := dsync.ReadSyncMode(dp, source)
 		if err != nil {
 			log.Error("unable to read resync mode: %v", err)
 		}
@@ -266,22 +263,22 @@ func goMaintenance(datadir string, db dbx.DB, cat *catalog.Catalog, source strin
 				log.Error("marc__t: %v", err)
 			}
 		}
-		if err := checkTimeDailyMaintenance(datadir, db, dc, cat, source, folio, reshare, syncMode); err != nil {
+		if err := checkTimeDailyMaintenance(datadir, db, dp, cat, source, folio, reshare, syncMode); err != nil {
 			log.Error("%v", err)
 		}
 		time.Sleep(55 * time.Minute)
 	}
 }
 
-func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *catalog.Catalog, source string, folio, reshare bool, syncMode dsync.Mode) error {
+func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat *catalog.Catalog, source string, folio, reshare bool, syncMode dsync.Mode) error {
 	var overdue bool
 	q := "SELECT CURRENT_TIMESTAMP > next_maintenance_time FROM metadb.maintenance"
-	err := dc.QueryRow(context.TODO(), q).Scan(&overdue)
+	err := dp.QueryRow(context.TODO(), q).Scan(&overdue)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		fallthrough
 	case err != nil:
-		return fmt.Errorf("error checking maintenance time: %v", err)
+		return fmt.Errorf("checking maintenance time: %v", err)
 	default:
 		if !overdue {
 			return nil
@@ -333,7 +330,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dc *pgx.Conn, cat *cat
 	q = "UPDATE metadb.maintenance " +
 		"SET next_maintenance_time = next_maintenance_time +" +
 		" make_interval(0, 0, 0, (EXTRACT(DAY FROM (CURRENT_TIMESTAMP - next_maintenance_time)) + 1)::integer)"
-	if _, err = dc.Exec(context.TODO(), q); err != nil {
+	if _, err = dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("error updating maintenance time: %v", err)
 	}
 

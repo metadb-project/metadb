@@ -72,15 +72,8 @@ func tableExists(c *Catalog, table *dbx.Table) bool {
 //	return addTableEntry(c, true, table, transformed, parentTable)
 //}
 
-func addTableEntry(c *Catalog, lock bool, table *dbx.Table, transformed bool, parentTable *dbx.Table, source string) error {
-
-	func(table dbx.Table, transformed bool, parentTable dbx.Table) {
-		if lock {
-			c.mu.Lock()
-			defer c.mu.Unlock()
-		}
-		c.updateCacheTableEntry(table, transformed, parentTable)
-	}(*table, transformed, *parentTable)
+func addTableEntry(c *Catalog, table *dbx.Table, transformed bool, parentTable *dbx.Table, source string) error {
+	c.updateCacheTableEntry(table, transformed, parentTable)
 	if err := insertIntoTableTrack(c, table, transformed, parentTable, source); err != nil {
 		return fmt.Errorf("updating catalog in database for table %q: %v", table, err)
 	}
@@ -97,28 +90,28 @@ func insertIntoTableTrack(c *Catalog, table *dbx.Table, transformed bool, parent
 	return nil
 }
 
-func (c *Catalog) updateCacheTableEntry(table dbx.Table, transformed bool, parentTable dbx.Table) {
+func (c *Catalog) updateCacheTableEntry(table *dbx.Table, transformed bool, parentTable *dbx.Table) {
 	// If table exists, retain its children map.
 	var children map[dbx.Table]struct{}
-	t, ok := c.tableDir[table]
+	t, ok := c.tableDir[*table]
 	if ok {
 		children = t.children
 	} else {
 		children = make(map[dbx.Table]struct{})
 	}
-	c.tableDir[table] = tableEntry{
+	c.tableDir[*table] = tableEntry{
 		transformed: transformed,
-		parentTable: parentTable,
+		parentTable: *parentTable,
 		children:    children,
 	}
 	if parentTable.S != "" && parentTable.T != "" {
 		// In case the parent table entry has not yet been created, we create a stub where we can store
 		// the children map.
-		_, ok := c.tableDir[parentTable]
+		_, ok := c.tableDir[*parentTable]
 		if !ok {
-			c.tableDir[parentTable] = tableEntry{children: make(map[dbx.Table]struct{})}
+			c.tableDir[*parentTable] = tableEntry{children: make(map[dbx.Table]struct{})}
 		}
-		c.tableDir[parentTable].children[table] = struct{}{}
+		c.tableDir[*parentTable].children[*table] = struct{}{}
 	}
 }
 
@@ -157,16 +150,13 @@ func findDescendantTables(tableDir map[dbx.Table]tableEntry, table dbx.Table, de
 func (c *Catalog) CreateNewTable(table *dbx.Table, transformed bool, parentTable *dbx.Table, source string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if tableExists(c, table) {
-		return nil
-	}
 	if err := createSchemaIfNotExists(c, table); err != nil {
 		return fmt.Errorf("creating new table %q: %v", table, err)
 	}
 	if err := createMainTableIfNotExists(c, table); err != nil {
 		return fmt.Errorf("creating new table %q: %v", table, err)
 	}
-	if err := addTableEntry(c, false, table, transformed, parentTable, source); err != nil {
+	if err := addTableEntry(c, table, transformed, parentTable, source); err != nil {
 		return fmt.Errorf("creating new table %q: %v", table, err)
 	}
 	return nil
@@ -223,7 +213,7 @@ func createMainTableIfNotExists(c *Catalog, table *dbx.Table) error {
 	}
 	// Create sync table.
 	synctsql := SyncTable(table).SQL()
-	q = "CREATE TABLE " + synctsql + " (__id bigint NOT NULL)"
+	q = "CREATE TABLE " + synctsql + " (__id bigint)"
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating sync table for %q: %v", table, err)
 	}

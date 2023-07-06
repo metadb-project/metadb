@@ -77,7 +77,7 @@ func upgradeSysdb(datadir string) (bool, error) {
 		return false, err
 	}
 	defer db.Close()
-	// Begin upgrade.
+	// begin upgrade.
 	dbversion, err := sysdb.GetSysdbVersion()
 	if err != nil {
 		return false, err
@@ -418,7 +418,7 @@ func updb8(opt *dbopt) error {
 		return err
 	}
 	defer dbx.Close(dc)
-	// Begin transaction
+	// begin transaction
 	tx, err := dc.BeginTx(context.TODO(), pgx.TxOptions{IsoLevel: "read committed"})
 	if err != nil {
 		return err
@@ -529,7 +529,7 @@ func updb9(opt *dbopt) error {
 		return err
 	}
 	defer dbx.Close(dc)
-	// Begin transaction
+	// begin transaction
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
 		return err
@@ -665,7 +665,7 @@ func updb10(opt *dbopt) error {
 		rows.Close()
 	}
 
-	// Begin transaction
+	// begin transaction
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
 		return err
@@ -816,7 +816,7 @@ func updb11(opt *dbopt) error {
 		return err
 	}
 	defer dbx.Close(dc)
-	// Begin transaction
+	// begin transaction
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
 		return err
@@ -874,7 +874,7 @@ func updb12(opt *dbopt) error {
 		return err
 	}
 
-	// Begin transaction
+	// begin transaction
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
 		return err
@@ -952,7 +952,7 @@ func updb13(opt *dbopt) error {
 		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON metadb.table_update TO "+u)
 	}
 
-	// Begin transaction
+	// begin transaction
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
 		return err
@@ -979,7 +979,7 @@ func updb14(opt *dbopt) error {
 	}
 	defer dbx.Close(dc)
 
-	// Begin transaction
+	// begin transaction
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
 		return err
@@ -1070,7 +1070,7 @@ func updb15(opt *dbopt) error {
 		}
 	}
 
-	// Begin transaction
+	// begin transaction
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
 		return err
@@ -1096,7 +1096,7 @@ func updb16(opt *dbopt) error {
 	}
 	defer dbx.Close(dc)
 
-	// Begin transaction
+	// begin transaction
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
 		return err
@@ -1391,7 +1391,7 @@ func updb19(opt *dbopt) error {
 		}
 	}
 
-	// Begin transaction
+	// begin transaction
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
 		return err
@@ -1484,7 +1484,7 @@ func updb21(opt *dbopt) error {
 	}
 	defer dbx.Close(dc)
 
-	// Begin transaction
+	// begin transaction
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
 		return err
@@ -1554,7 +1554,7 @@ func updb22(opt *dbopt) error {
 			return err
 		}
 		// Create sync table.
-		q = "CREATE TABLE " + synctsql + " (__id bigint NOT NULL)"
+		q = "CREATE TABLE " + synctsql + " (__id bigint)"
 		if _, err = dc.Exec(context.TODO(), q); err != nil {
 			return err
 		}

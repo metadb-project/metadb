@@ -421,8 +421,12 @@ dates directly within the query, we will define them as parameters:
 `start_date` and `end_date`.
 
 ----
-CREATE FUNCTION lisa.count_loans(start_date date, end_date date)
-    RETURNS TABLE(item_id uuid, loan_count integer) AS
+CREATE FUNCTION lisa.count_loans(
+    start_date date DEFAULT '2000-01-01',
+    end_date date DEFAULT '2050-01-01')
+RETURNS TABLE(
+    item_id uuid,
+    loan_count integer) AS
 $$
 SELECT item_id,
        count(*) AS loan_count
@@ -436,9 +440,9 @@ LANGUAGE SQL;
 Now the function can be called with different arguments to generate reports:
 
 ----
-SELECT * FROM lisa.count_loans('2023-01-01', '2024-01-01');
+SELECT * FROM lisa.count_loans(start_date => '2022-01-01', end_date => '2023-01-01');
 
-SELECT * FROM lisa.count_loans('2022-01-01', '2023-01-01');
+SELECT * FROM lisa.count_loans(start_date => '2023-01-01');
 ----
 
 The user `lisa` who created this function can share it with other users in a

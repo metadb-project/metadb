@@ -252,7 +252,7 @@ var helpStart = "Start server\n"
 var helpStop = "Shutdown server\n"
 var helpInit = "Initialize new Metadb instance\n"
 var helpUpgrade = "Upgrade Metadb instance to current version\n"
-var helpSync = "Begin synchronization with a data source\n"
+var helpSync = "begin synchronization with a data source\n"
 var helpEndSync = "End synchronization and remove leftover data\n"
 var helpVersion = "Print metadb version\n"
 
