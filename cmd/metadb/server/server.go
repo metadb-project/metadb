@@ -253,6 +253,9 @@ func isReshareModulePresent(db *dbx.DB) (bool, error) {
 
 func goMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat *catalog.Catalog, source string, folio, reshare bool) {
 	for {
+		stat := dp.Stat()
+		log.Info("connection statistics: AcquireCount=%v AcquireDuration=%v AcquiredConns=%v CanceledAcquireCount=%v ConstructingConns=%v EmptyAcquireCount=%v IdleConns=%v MaxConns=%v MaxIdleDestroyCount=%v MaxLifetimeDestroyCount=%v NewConnsCount=%v TotalConns=%v",
+			stat.AcquireCount(), stat.AcquireDuration(), stat.AcquiredConns(), stat.CanceledAcquireCount(), stat.ConstructingConns(), stat.EmptyAcquireCount(), stat.IdleConns(), stat.MaxConns(), stat.MaxIdleDestroyCount(), stat.MaxLifetimeDestroyCount(), stat.NewConnsCount(), stat.TotalConns())
 		time.Sleep(5 * time.Minute)
 		syncMode, err := dsync.ReadSyncMode(dp, source)
 		if err != nil {
