@@ -63,6 +63,7 @@ func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, sources *[]*sys
 		log.Info("%v", err)
 		return
 	}
+	defer dbx.Close(dbconn)
 	//log.Trace("connected to database")
 	// TODO Close
 

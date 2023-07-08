@@ -166,7 +166,7 @@ func NewPool(ctx context.Context, connString string) (*pgxpool.Pool, error) {
 		return nil, err
 	}
 	config.AfterConnect = setDatabaseParameters
-	config.MaxConns = 20
+	config.MaxConns = 10
 	dp, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, err

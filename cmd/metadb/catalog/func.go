@@ -88,7 +88,7 @@ func createFunction(dc *pgx.Conn, fname, fdef string, users []string) error {
 
 	for _, u := range users {
 		q := "GRANT EXECUTE ON FUNCTION public." + fname + " TO " + u
-		_, _ = tx.Exec(context.TODO(), q)
+		_, _ = dc.Exec(context.TODO(), q)
 	}
 
 	return nil

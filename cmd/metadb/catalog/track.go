@@ -22,13 +22,13 @@ func (c *Catalog) initTableDir() error {
 	if err != nil {
 		return fmt.Errorf("selecting table list: %v", err)
 	}
+	defer rows.Close()
 	tableDir := make(map[dbx.Table]tableEntry)
 	for rows.Next() {
 		var schemaname, tablename, parentschema, parenttable, source string
 		var transformed bool
 		err = rows.Scan(&schemaname, &tablename, &transformed, &parentschema, &parenttable, &source)
 		if err != nil {
-			rows.Close()
 			return fmt.Errorf("reading table list: %v", err)
 		}
 		t := tableEntry{
@@ -40,7 +40,6 @@ func (c *Catalog) initTableDir() error {
 		tableDir[dbx.Table{S: schemaname, T: tablename}] = t
 	}
 	if err = rows.Err(); err != nil {
-		rows.Close()
 		return fmt.Errorf("reading table list: %v", err)
 	}
 	rows.Close()
