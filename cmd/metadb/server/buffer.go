@@ -49,7 +49,7 @@ func (e *execbuffer) flushSyncIDs() error {
 		synct := catalog.SyncTable(&t)
 		copyCount, err := e.dp.CopyFrom(
 			e.ctx,
-			pgx.Identifier{synct.S, synct.T},
+			pgx.Identifier{synct.Schema, synct.Table},
 			[]string{"__id"},
 			pgx.CopyFromRows(a),
 		)
@@ -92,7 +92,7 @@ func (e *execbuffer) flushMergeData() error {
 				synct := catalog.SyncTable(&t)
 				copyCount, err := e.dp.CopyFrom(
 					e.ctx,
-					pgx.Identifier{synct.S, synct.T},
+					pgx.Identifier{synct.Schema, synct.Table},
 					[]string{"__id"},
 					pgx.CopyFromRows(ids),
 				)

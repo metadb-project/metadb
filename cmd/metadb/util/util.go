@@ -13,7 +13,6 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"gopkg.in/ini.v1"
 )
 
@@ -39,7 +38,7 @@ type RegexList struct {
 	Regex  []*regexp.Regexp
 }
 
-func UserPerm(relist *RegexList, table *sqlx.Table) bool {
+func UserPerm(relist *RegexList, table *dbx.Table) bool {
 	for _, re := range relist.Regex {
 		if re.MatchString(table.String()) {
 			return true

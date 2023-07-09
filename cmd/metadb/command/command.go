@@ -13,8 +13,8 @@ import (
 
 	"github.com/metadb-project/metadb/cmd/internal/uuid"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"github.com/shopspring/decimal"
 )
@@ -181,7 +181,7 @@ type Command struct {
 	SchemaName  string
 	TableName   string
 	Transformed bool
-	ParentTable sqlx.Table
+	ParentTable dbx.Table
 	Origin      string
 	Column      []CommandColumn
 	// ColumnMap maps the column names to the columns.
@@ -224,7 +224,7 @@ type CommandList struct {
 	Cmd []Command
 }
 
-func convertTypeSize(data *string, coltype string, datatype DataType) (int64, error) {
+func convertTypeSize(coltype string, datatype DataType) (int64, error) {
 	switch datatype {
 	case IntegerType:
 		switch coltype {
@@ -417,7 +417,7 @@ func extractColumns(pkerr map[string]struct{}, ce *change.Event) ([]CommandColum
 		if col.SQLData, err = DataToSQLData(col.Data, col.DType, semtype); err != nil {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type: %v", field, err)
 		}
-		if col.DTypeSize, err = convertTypeSize(col.SQLData, ftype, col.DType); err != nil {
+		if col.DTypeSize, err = convertTypeSize(ftype, col.DType); err != nil {
 			return nil, fmt.Errorf("value: $.payload.after: \"%s\": unknown type size: %v", field, err)
 		}
 		col.PrimaryKey = primaryKey[field]
@@ -716,7 +716,7 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 				return nil, false, fmt.Errorf("delete: unknown type: %v", err)
 			}
 			var typesize int64
-			typesize, err = convertTypeSize(edata, dt, dtype)
+			typesize, err = convertTypeSize(dt, dtype)
 			if err != nil {
 				return nil, false, fmt.Errorf("delete: unknown type size: %v", data)
 			}

@@ -20,7 +20,7 @@ func lex(input string) []sym {
 	return rs
 }
 
-func TestLexSelectVersion(t *testing.T) {
+func TestLexSelectVersion(t *testing.Table) {
 	s := "select version();"
 	// want := []sym{{SELECT, ""}, {IDENT, "version"}, {OPENPAREN, ""}, {CLOSEPAREN, ""}, {SEMICOLON, ""}}
 	got := lex(s)

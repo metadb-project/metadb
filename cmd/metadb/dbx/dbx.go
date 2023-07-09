@@ -3,6 +3,7 @@ package dbx
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -20,30 +21,30 @@ var _ Queryable = (*pgx.Conn)(nil)
 var _ Queryable = (pgx.Tx)(nil)
 
 type Table struct {
-	S string
-	T string
+	Schema string
+	Table  string
 }
 
 type Column struct {
-	S string
-	T string
-	C string
+	Schema string
+	Table  string
+	Column string
 }
 
 func (t Table) String() string {
-	return t.S + "." + t.T
+	return t.Schema + "." + t.Table
 }
 
 func (t Table) Main() Table {
-	return Table{S: t.S, T: t.T + "__"}
+	return Table{Schema: t.Schema, Table: t.Table + "__"}
 }
 
 func (t Table) SQL() string {
-	return "\"" + t.S + "\".\"" + t.T + "\""
+	return "\"" + t.Schema + "\".\"" + t.Table + "\""
 }
 
 func (t Table) MainSQL() string {
-	return "\"" + t.S + "\".\"" + t.T + "__\""
+	return "\"" + t.Schema + "\".\"" + t.Table + "__\""
 }
 
 type DB struct {
@@ -190,3 +191,30 @@ func CreateUser(db *DB, user, password string) error {
 	return nil
 }
 */
+
+func EncodeString(s string) string {
+	var b strings.Builder
+	b.WriteString("E'")
+	for _, c := range s {
+		switch c {
+		case '\\':
+			b.WriteString("\\\\")
+		case '\'':
+			b.WriteString("''")
+		case '\b':
+			b.WriteString("\\b")
+		case '\f':
+			b.WriteString("\\f")
+		case '\n':
+			b.WriteString("\\n")
+		case '\r':
+			b.WriteString("\\r")
+		case '\t':
+			b.WriteString("\\t")
+		default:
+			b.WriteRune(c)
+		}
+	}
+	b.WriteRune('\'')
+	return b.String()
+}

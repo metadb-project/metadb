@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -29,22 +28,22 @@ func GoUpdateUserPerms(dc, dcsuper *pgx.Conn, trackedTables []dbx.Table) {
 	for _, t := range trackedTables {
 		tables = append(tables, t.Main())
 	}
-	tables = append(tables, dbx.Table{S: "metadb", T: "log"})
-	tables = append(tables, dbx.Table{S: "metadb", T: "table_update"})
-	tables = append(tables, dbx.Table{S: "folio_source_record", T: "marc__t"})
+	tables = append(tables, dbx.Table{Schema: "metadb", Table: "log"})
+	tables = append(tables, dbx.Table{Schema: "metadb", Table: "table_update"})
+	tables = append(tables, dbx.Table{Schema: "folio_source_record", Table: "marc__t"})
 	for u, re := range users {
 		for _, t := range tables {
-			//t := sqlx.Table{Schema: oldt.S, Table: oldt.T}
+			//t := sqlx.Table{Schema: oldt.Schema, Table: oldt.Table}
 			if re.String == "" {
 				// Revoke
-				//_, _ = dcsuper.Exec(context.TODO(), "REVOKE USAGE ON SCHEMA \""+t.S+"\" FROM "+u)
+				//_, _ = dcsuper.Exec(context.TODO(), "REVOKE USAGE ON SCHEMA \""+t.Schema+"\" FROM "+u)
 				_, _ = dcsuper.Exec(context.TODO(), "REVOKE SELECT ON "+t.SQL()+" FROM "+u)
 				_, _ = dcsuper.Exec(context.TODO(), "REVOKE SELECT ON "+t.MainSQL()+" FROM "+u)
 				//_, _ = adb.Exec(nil, "REVOKE SELECT ON "+adb.HistoryTableSQL(&t)+" FROM "+u)
 			} else {
 				// Grant if regex matches
-				if util.UserPerm(re, &sqlx.Table{Schema: t.S, Table: t.T}) {
-					_, _ = dcsuper.Exec(context.TODO(), "GRANT USAGE ON SCHEMA "+t.S+" TO "+u)
+				if util.UserPerm(re, &t) {
+					_, _ = dcsuper.Exec(context.TODO(), "GRANT USAGE ON SCHEMA "+t.Schema+" TO "+u)
 					_, _ = dcsuper.Exec(context.TODO(), "GRANT SELECT ON "+t.SQL()+" TO "+u)
 					_, _ = dcsuper.Exec(context.TODO(), "GRANT SELECT ON "+t.MainSQL()+" TO "+u)
 					//_, _ = adb.Exec(nil, "GRANT SELECT ON "+adb.HistoryTableSQL(&t)+" TO "+u)

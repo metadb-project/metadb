@@ -25,13 +25,13 @@ func (c *Catalog) initSchema() error {
 		return fmt.Errorf("reading column schemas: %s", err)
 	}
 	for _, col := range columnSchemas {
-		if !c.TableExists(&dbx.Table{S: col.Schema, T: col.Table}) {
+		if !c.TableExists(&dbx.Table{Schema: col.Schema, Table: col.Table}) {
 			continue
 		}
-		//if !track.Contains(&sqlx.T{S: col.S, T: col.T}) {
+		//if !track.Contains(&sqlx.Table{Schema: col.Schema, Table: col.Table}) {
 		//	continue
 		//}
-		c := dbx.Column{S: col.Schema, T: col.Table, C: col.Column}
+		c := dbx.Column{Schema: col.Schema, Table: col.Table, Column: col.Column}
 		columns[c] = col.DataType
 	}
 	c.columns = columns
@@ -99,8 +99,8 @@ func (c *Catalog) TableColumns(table *dbx.Table) []string {
 	defer c.mu.Unlock()
 	var columns []string
 	for k := range c.columns {
-		if k.S == table.S && k.T == table.T {
-			columns = append(columns, k.C)
+		if k.Schema == table.Schema && k.Table == table.Table {
+			columns = append(columns, k.Column)
 		}
 	}
 	return columns
@@ -111,8 +111,8 @@ func (c *Catalog) TableSchema(table *dbx.Table) map[string]string {
 	defer c.mu.Unlock()
 	ts := make(map[string]string)
 	for k, v := range c.columns {
-		if k.S == table.S && k.T == table.T {
-			ts[k.C] = v
+		if k.Schema == table.Schema && k.Table == table.Table {
+			ts[k.Column] = v
 		}
 	}
 	return ts
@@ -142,7 +142,7 @@ func (c *Catalog) AddColumn(table *dbx.Table, columnName string, newType command
 	}
 	// Create index if type is uuid.
 	if newType == command.UUIDType {
-		column := &dbx.Column{S: table.S, T: table.T, C: columnName}
+		column := &dbx.Column{Schema: table.Schema, Table: table.Table, Column: columnName}
 		if !c.indexExists(column) {
 			if err := c.addIndex(column); err != nil {
 				return err
@@ -150,6 +150,6 @@ func (c *Catalog) AddColumn(table *dbx.Table, columnName string, newType command
 		}
 	}
 	// Update schema.
-	updateColumn(c, &dbx.Column{S: table.S, T: table.T, C: columnName}, dataTypeSQL)
+	updateColumn(c, &dbx.Column{Schema: table.Schema, Table: table.Table, Column: columnName}, dataTypeSQL)
 	return nil
 }

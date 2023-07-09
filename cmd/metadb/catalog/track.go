@@ -6,7 +6,6 @@ import (
 
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 )
 
 type tableEntry struct {
@@ -33,11 +32,11 @@ func (c *Catalog) initTableDir() error {
 		}
 		t := tableEntry{
 			transformed: transformed,
-			parentTable: dbx.Table{S: parentschema, T: parenttable},
+			parentTable: dbx.Table{Schema: parentschema, Table: parenttable},
 			children:    make(map[dbx.Table]struct{}),
 			source:      source,
 		}
-		tableDir[dbx.Table{S: schemaname, T: tablename}] = t
+		tableDir[dbx.Table{Schema: schemaname, Table: tablename}] = t
 	}
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("reading table list: %v", err)
@@ -82,7 +81,7 @@ func addTableEntry(c *Catalog, table *dbx.Table, transformed bool, parentTable *
 func insertIntoTableTrack(c *Catalog, table *dbx.Table, transformed bool, parentTable *dbx.Table, source string) error {
 	q := "INSERT INTO " + catalogSchema +
 		".track(schemaname,tablename,transformed,parentschema,parenttable,source)VALUES($1,$2,$3,$4,$5,$6)"
-	_, err := c.dp.Exec(context.TODO(), q, table.S, table.T, transformed, parentTable.S, parentTable.T, source)
+	_, err := c.dp.Exec(context.TODO(), q, table.Schema, table.Table, transformed, parentTable.Schema, parentTable.Table, source)
 	if err != nil {
 		return fmt.Errorf("inserting catalog entry for table: %q: %s", table, err)
 	}
@@ -103,7 +102,7 @@ func (c *Catalog) updateCacheTableEntry(table *dbx.Table, transformed bool, pare
 		parentTable: *parentTable,
 		children:    children,
 	}
-	if parentTable.S != "" && parentTable.T != "" {
+	if parentTable.Schema != "" && parentTable.Table != "" {
 		// In case the parent table entry has not yet been created, we create a stub where we can store
 		// the children map.
 		_, ok := c.tableDir[*parentTable]
@@ -162,14 +161,14 @@ func (c *Catalog) CreateNewTable(table *dbx.Table, transformed bool, parentTable
 }
 
 func createSchemaIfNotExists(c *Catalog, table *dbx.Table) error {
-	q := "CREATE SCHEMA IF NOT EXISTS \"" + table.S + "\""
+	q := "CREATE SCHEMA IF NOT EXISTS \"" + table.Schema + "\""
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating schema %q: %v", table.S, err)
+		return fmt.Errorf("creating schema %q: %v", table.Schema, err)
 	}
-	for _, u := range usersWithPerm(c, sqlx.NewTable(table.S, table.T)) {
-		q = "GRANT USAGE ON SCHEMA \"" + table.S + "\" TO " + u
+	for _, u := range usersWithPerm(c, table) {
+		q = "GRANT USAGE ON SCHEMA \"" + table.Schema + "\" TO " + u
 		if _, err := c.dp.Exec(context.TODO(), q); err != nil {
-			log.Warning("granting privileges on schema %q to %q: %v", table.S, u, err)
+			log.Warning("granting privileges on schema %q to %q: %v", table.Schema, u, err)
 		}
 	}
 	return nil
@@ -190,15 +189,15 @@ func createMainTableIfNotExists(c *Catalog, table *dbx.Table) error {
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating partition %q: %v", table, err)
 	}
-	partition := "zzz___" + table.T + "___"
-	nctable := "\"" + table.S + "\".\"" + partition + "\""
+	partition := "zzz___" + table.Table + "___"
+	nctable := "\"" + table.Schema + "\".\"" + partition + "\""
 	q = "CREATE TABLE IF NOT EXISTS " + nctable + " PARTITION OF " + table.MainSQL() + " FOR VALUES IN (FALSE) " +
 		"PARTITION BY RANGE (__start)"
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating partition %q: %v", table.S+"."+partition, err)
+		return fmt.Errorf("creating partition %q: %v", table.Schema+"."+partition, err)
 	}
 	// Grant permissions on new tables.
-	for _, u := range usersWithPerm(c, sqlx.NewTable(table.S, table.T)) {
+	for _, u := range usersWithPerm(c, table) {
 		if _, err := c.dp.Exec(context.TODO(), "GRANT SELECT ON "+table.MainSQL()+" TO "+u+""); err != nil {
 			return fmt.Errorf("granting select privilege on %q to %q: %v", table.Main(), u, err)
 		}
@@ -221,7 +220,7 @@ func createMainTableIfNotExists(c *Catalog, table *dbx.Table) error {
 
 func SyncTable(table *dbx.Table) *dbx.Table {
 	return &dbx.Table{
-		S: table.S,
-		T: "zzz___" + table.T + "___sync",
+		Schema: table.Schema,
+		Table:  "zzz___" + table.Table + "___sync",
 	}
 }

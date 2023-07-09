@@ -18,7 +18,7 @@ package sqlx
 //	Id(string) string
 //	Identity() string
 //	SupportsIndexes() bool
-//	CreateIndex(string, *T, []string) string
+//	CreateIndex(string, *Table, []string) string
 //	JSONType() string
 //}
 

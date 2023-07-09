@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/metadb-project/metadb/cmd/metadb/command"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -119,7 +119,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 		SchemaName:      cmd.SchemaName,
 		TableName:       table,
 		Transformed:     true,
-		ParentTable:     sqlx.Table{Schema: cmd.SchemaName, Table: cmd.TableName},
+		ParentTable:     dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName},
 		Origin:          cmd.Origin,
 		Column:          cols,
 		ColumnMap:       command.BuildColumnMap(cols),
@@ -171,7 +171,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 				Op:              command.MergeOp,
 				SchemaName:      cmd.SchemaName,
 				TableName:       table,
-				ParentTable:     sqlx.T{cmd.SchemaName, cmd.TableName},
+				ParentTable:     sqlx.Table{cmd.SchemaName, cmd.TableName},
 				Origin:          cmd.Origin,
 				Column:          cols,
 				ChangeEvent:     cmd.ChangeEvent,

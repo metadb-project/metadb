@@ -1,27 +1,5 @@
 package sqlx
 
-import (
-	"database/sql"
-	"fmt"
-)
-
-type DB interface {
-	Close()
-	Ping() error
-	VacuumAnalyzeTable(table *Table) error
-	EncodeString(s string) string
-	ExecMultiple(tx *sql.Tx, sql []string) error
-	Exec(tx *sql.Tx, sql string) (sql.Result, error)
-	Query(tx *sql.Tx, query string) (*sql.Rows, error)
-	QueryRow(tx *sql.Tx, query string) *sql.Row
-	HistoryTableSQL(table *Table) string
-	HistoryTable(table *Table) *Table
-	TableSQL(table *Table) string
-	IdentiferSQL(id string) string
-	AutoIncrementSQL() string
-	BeginTx() (*sql.Tx, error)
-}
-
 type ColumnSchema struct {
 	Schema     string
 	Table      string
@@ -30,14 +8,32 @@ type ColumnSchema struct {
 	CharMaxLen *int64
 }
 
-func Open(dbtype string, dataSourceName *DSN) (DB, error) {
-	switch dbtype {
-	case "postgresql":
-		return OpenPostgres(dataSourceName)
-	default:
-		return nil, fmt.Errorf("unknown database type: %s", dbtype)
-	}
-}
+//type DB interface {
+//	Close()
+//	Ping() error
+//	VacuumAnalyzeTable(table *Table) error
+//	EncodeString(s string) string
+//	ExecMultiple(tx *sql.Tx, sql []string) error
+//	Exec(tx *sql.Tx, sql string) (sql.Result, error)
+//	Query(tx *sql.Tx, query string) (*sql.Rows, error)
+//	QueryRow(tx *sql.Tx, query string) *sql.Row
+//	HistoryTableSQL(table *Table) string
+//	HistoryTable(table *Table) *Table
+//	TableSQL(table *Table) string
+//	IdentiferSQL(id string) string
+//	AutoIncrementSQL() string
+//	BeginTx() (*sql.Tx, error)
+//}
+
+/*
+//func Open(dbtype string, dataSourceName *DSN) (DB, error) {
+//	switch dbtype {
+//	case "postgresql":
+//		return OpenPostgres(dataSourceName)
+//	default:
+//		return nil, fmt.Errorf("unknown database type: %s", dbtype)
+//	}
+//}
 
 type DSN struct {
 	// DBURI string
@@ -78,7 +74,7 @@ func NewColumn(schema, table, column string) *Column {
 
 func (t *Table) String() string {
 	return t.Schema + "." + t.Table
-}
+}*/
 
 /*
 func CSVToSQL(csv string) string {

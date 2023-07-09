@@ -1,6 +1,6 @@
 package dbx
 
-//func TestNewDB(t *testing.T) {
+//func TestNewDB(t *testing.Table) {
 //	var uri = "postgres://metadb:mdbpass@a.b.c:5432/testdb?sslmode=require"
 //	var want = DB{
 //		Host:     "a.b.c",
@@ -16,7 +16,7 @@ package dbx
 //	}
 //}
 
-//func TestNewDBNoSSLMode(t *testing.T) {
+//func TestNewDBNoSSLMode(t *testing.Table) {
 //	var uri = "postgres://metadb:mdbpass@a.b.c:5432/testdb"
 //	var want = DB{
 //		Host:     "a.b.c",
@@ -32,7 +32,7 @@ package dbx
 //	}
 //}
 
-//func TestNewDBNoUserinfo(t *testing.T) {
+//func TestNewDBNoUserinfo(t *testing.Table) {
 //	uri := "postgres://a.b.c:5432/testdb?sslmode=require"
 //	_, err := NewDB(uri)
 //	if err == nil {

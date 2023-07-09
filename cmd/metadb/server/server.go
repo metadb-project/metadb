@@ -25,7 +25,6 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/runsql"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
@@ -51,7 +50,6 @@ type serverstate struct {
 
 // sproc stores state for a single poll loop.
 type sproc struct {
-	db               []sqlx.DB
 	schemaPassFilter []*regexp.Regexp
 	schemaStopFilter []*regexp.Regexp
 	tableStopFilter  []*regexp.Regexp
@@ -367,7 +365,7 @@ func vacuumAll(db dbx.DB, cat *catalog.Catalog, folio bool) error {
 		}
 	}
 	if folio {
-		for _, t := range []dbx.Table{{S: "marctab", T: "cksum"}, {S: "folio_source_record", T: "marc__t"}} {
+		for _, t := range []dbx.Table{{Schema: "marctab", Table: "cksum"}, {Schema: "folio_source_record", Table: "marc__t"}} {
 			log.Trace("vacuuming table %s", t)
 			_ = dbx.VacuumAnalyze(dcsuper, t)
 		}

@@ -1032,7 +1032,7 @@ func updb15(opt *dbopt) error {
 			rows.Close()
 			return fmt.Errorf("reading table list: %v", err)
 		}
-		tables = append(tables, dbx.Table{S: schema, T: table})
+		tables = append(tables, dbx.Table{Schema: schema, Table: table})
 	}
 	if err = rows.Err(); err != nil {
 		rows.Close()
@@ -1042,7 +1042,7 @@ func updb15(opt *dbopt) error {
 
 	for _, table := range tables {
 		q = "SELECT indexname FROM pg_indexes WHERE schemaname=$1 and tablename=$2"
-		rows, err = dc.Query(context.TODO(), q, table.S, table.T)
+		rows, err = dc.Query(context.TODO(), q, table.Schema, table.Table)
 		if err != nil {
 			return fmt.Errorf("selecting index list: %v", err)
 		}
@@ -1054,7 +1054,7 @@ func updb15(opt *dbopt) error {
 				rows.Close()
 				return fmt.Errorf("reading index list: %v", err)
 			}
-			indexes = append(indexes, table.S+"."+index)
+			indexes = append(indexes, table.Schema+"."+index)
 		}
 		if err = rows.Err(); err != nil {
 			rows.Close()
@@ -1206,7 +1206,7 @@ SELECT table_schema, table_name, column_name
 		if err = rows.Scan(&schema, &table, &column); err != nil {
 			return fmt.Errorf("reading indexes: %v", err)
 		}
-		indexes = append(indexes, dbx.Column{S: schema, T: table, C: column})
+		indexes = append(indexes, dbx.Column{Schema: schema, Table: table, Column: column})
 	}
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("reading indexes: %v", err)
@@ -1215,13 +1215,13 @@ SELECT table_schema, table_name, column_name
 	// Create an index on each uuid column that does not already have an index.
 	processed := make(map[dbx.Table]struct{})
 	for _, c := range indexes {
-		t := dbx.Table{S: c.S, T: c.T}
+		t := dbx.Table{Schema: c.Schema, Table: c.Table}
 		_, ok := processed[t]
 		if !ok {
 			eout.Info("upgrading: table %q", t.String())
 			processed[t] = struct{}{}
 		}
-		q = "CREATE INDEX ON \"" + c.S + "\".\"" + c.T + "\" (\"" + c.C + "\")"
+		q = "CREATE INDEX ON \"" + c.Schema + "\".\"" + c.Table + "\" (\"" + c.Column + "\")"
 		if _, err = dc.Exec(context.TODO(), q); err != nil {
 			return err
 		}
@@ -1333,7 +1333,7 @@ SELECT table_schema, table_name
 		if err = rows.Scan(&schema, &table); err != nil {
 			return fmt.Errorf("reading indexes: %v", err)
 		}
-		indexes = append(indexes, dbx.Table{S: schema, T: table})
+		indexes = append(indexes, dbx.Table{Schema: schema, Table: table})
 	}
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("reading indexes: %v", err)
@@ -1342,7 +1342,7 @@ SELECT table_schema, table_name
 	// Create an index on each __id column that does not already have an index.
 	for _, t := range indexes {
 		eout.Info("upgrading: table %q", t.String())
-		q = "CREATE INDEX ON \"" + t.S + "\".\"" + t.T + "\" (__id)"
+		q = "CREATE INDEX ON \"" + t.Schema + "\".\"" + t.Table + "\" (__id)"
 		if _, err = dc.Exec(context.TODO(), q); err != nil {
 			return err
 		}
@@ -1377,7 +1377,7 @@ func updb19(opt *dbopt) error {
 		if err = rows.Scan(&schema, &table); err != nil {
 			return fmt.Errorf("reading table names: %v", err)
 		}
-		tables = append(tables, dbx.Table{S: schema, T: table})
+		tables = append(tables, dbx.Table{Schema: schema, Table: table})
 	}
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("reading indexes: %v", err)
@@ -1385,7 +1385,7 @@ func updb19(opt *dbopt) error {
 
 	// Drop column "__source" from each table.
 	for _, t := range tables {
-		q = "ALTER TABLE \"" + t.S + "\".\"" + t.T + "__\" DROP COLUMN IF EXISTS __source"
+		q = "ALTER TABLE \"" + t.Schema + "\".\"" + t.Table + "__\" DROP COLUMN IF EXISTS __source"
 		if _, err = dc.Exec(context.TODO(), q); err != nil {
 			return err
 		}
@@ -1448,7 +1448,7 @@ func updb20(opt *dbopt) error {
 		if err = rows.Scan(&schema, &table, &column); err != nil {
 			return fmt.Errorf("reading varchar columns: %v", err)
 		}
-		columns = append(columns, dbx.Column{S: schema, T: table, C: column})
+		columns = append(columns, dbx.Column{Schema: schema, Table: table, Column: column})
 	}
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("reading varchar columns: %v", err)
@@ -1457,12 +1457,12 @@ func updb20(opt *dbopt) error {
 	// Create an index on each uuid column that does not already have an index.
 	processed := make(map[dbx.Table]struct{})
 	for _, c := range columns {
-		t := dbx.Table{S: c.S, T: c.T}
+		t := dbx.Table{Schema: c.Schema, Table: c.Table}
 		_, ok := processed[t]
 		if !ok {
 			processed[t] = struct{}{}
 		}
-		q = "ALTER TABLE \"" + c.S + "\".\"" + c.T + "\" ALTER COLUMN \"" + c.C + "\" TYPE text"
+		q = "ALTER TABLE \"" + c.Schema + "\".\"" + c.Table + "\" ALTER COLUMN \"" + c.Column + "\" TYPE text"
 		if _, err = dc.Exec(context.TODO(), q); err != nil {
 			return err
 		}
@@ -1535,7 +1535,7 @@ func updb22(opt *dbopt) error {
 		if err = rows.Scan(&schema, &table); err != nil {
 			return fmt.Errorf("reading table names: %v", err)
 		}
-		tables = append(tables, dbx.Table{S: schema, T: table})
+		tables = append(tables, dbx.Table{Schema: schema, Table: table})
 	}
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("reading indexes: %v", err)
@@ -1543,12 +1543,12 @@ func updb22(opt *dbopt) error {
 
 	for _, t := range tables {
 		// Drop column "__cf" from each table.
-		q = "ALTER TABLE \"" + t.S + "\".\"" + t.T + "__\" DROP COLUMN IF EXISTS __cf"
+		q = "ALTER TABLE \"" + t.Schema + "\".\"" + t.Table + "__\" DROP COLUMN IF EXISTS __cf"
 		if _, err = dc.Exec(context.TODO(), q); err != nil {
 			return err
 		}
 		// Drop old sync table if any.
-		synctsql := "\"" + t.S + "\".\"zzz___" + t.T + "___sync\""
+		synctsql := "\"" + t.Schema + "\".\"zzz___" + t.Table + "___sync\""
 		q = "DROP TABLE IF EXISTS " + synctsql
 		if _, err = dc.Exec(context.TODO(), q); err != nil {
 			return err

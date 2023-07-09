@@ -45,10 +45,10 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 		return fmt.Errorf("%v", err)
 	}
 	elapsed := time.Since(start)
-	if err = cat.TableUpdatedNow(dbx.Table{S: "folio_source_record", T: "marc__t"}, elapsed); err != nil {
+	if err = cat.TableUpdatedNow(dbx.Table{Schema: "folio_source_record", Table: "marc__t"}, elapsed); err != nil {
 		return fmt.Errorf("writing table updated time: %v", err)
 	}
-	_ = cat.RemoveTableUpdated(dbx.Table{S: "folio_source_record", T: "marctab"})
+	_ = cat.RemoveTableUpdated(dbx.Table{Schema: "folio_source_record", Table: "marctab"})
 	users, err = catalog.AllUsers(dc)
 	if err != nil {
 		return fmt.Errorf("%v", err)

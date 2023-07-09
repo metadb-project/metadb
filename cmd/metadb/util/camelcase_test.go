@@ -54,9 +54,9 @@ func BenchmarkDecodeCamelCase(b *testing.B) {
 	}
 }
 
-//func TestDecodeCamelCaseAlt(t *testing.T) {
+//func TestDecodeCamelCaseAlt(t *testing.Table) {
 //        for _, tt := range decodeCamelCaseTests {
-//                t.Run(tt.in, func(t *testing.T) {
+//                t.Run(tt.in, func(t *testing.Table) {
 //                        s, err := decodeCamelCaseAlt(tt.in)
 //                        if s != tt.out {
 //                                t.Errorf("got %q, %v; want %q, %v",

@@ -140,7 +140,7 @@ func EndSync(opt *option.EndSync) error {
 			eout.Info("endsync: finalizing table %s", t.String())
 			synct := catalog.SyncTable(&t)
 			synctsql := synct.SQL()
-			q := "CREATE INDEX \"" + synct.T + "___id_idx\" ON " + synctsql + "(__id)"
+			q := "CREATE INDEX \"" + synct.Table + "___id_idx\" ON " + synctsql + "(__id)"
 			if _, err = dp.Exec(context.TODO(), q); err != nil {
 				return err
 			}
@@ -162,7 +162,7 @@ func EndSync(opt *option.EndSync) error {
 		for _, t := range tables {
 			synct := catalog.SyncTable(&t)
 			synctsql := synct.SQL()
-			q := "DROP INDEX \"" + synct.S + "\".\"" + synct.T + "___id_idx\""
+			q := "DROP INDEX \"" + synct.Schema + "\".\"" + synct.Table + "___id_idx\""
 			if _, err = tx.Exec(context.TODO(), q); err != nil {
 				return err
 			}

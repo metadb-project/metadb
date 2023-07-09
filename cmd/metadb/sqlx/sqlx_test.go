@@ -1,7 +1,7 @@
 package sqlx
 
 /*
-func TestCSVToSQLBasic(t *testing.T) {
+func TestCSVToSQLBasic(t *testing.Table) {
 	var csv = "first,second,third"
 	var wantSQL = "'first','second','third'"
 	gotSQL := CSVToSQL(csv)
@@ -10,7 +10,7 @@ func TestCSVToSQLBasic(t *testing.T) {
 	}
 }
 
-func TestCSVToSQLNone(t *testing.T) {
+func TestCSVToSQLNone(t *testing.Table) {
 	var csv = ""
 	var wantSQL = "''"
 	gotSQL := CSVToSQL(csv)
@@ -19,7 +19,7 @@ func TestCSVToSQLNone(t *testing.T) {
 	}
 }
 
-func TestCSVToSQLOne(t *testing.T) {
+func TestCSVToSQLOne(t *testing.Table) {
 	var csv = "first"
 	var wantSQL = "'first'"
 	gotSQL := CSVToSQL(csv)
@@ -28,7 +28,7 @@ func TestCSVToSQLOne(t *testing.T) {
 	}
 }
 
-func TestCSVToSQLEmptyElement(t *testing.T) {
+func TestCSVToSQLEmptyElement(t *testing.Table) {
 	var csv = "first,,third"
 	var wantSQL = "'first','','third'"
 	gotSQL := CSVToSQL(csv)

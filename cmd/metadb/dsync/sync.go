@@ -126,7 +126,7 @@ func Sync(opt *option.Sync) error {
 	for _, t := range tables {
 		synct := catalog.SyncTable(&t)
 		synctsql := synct.SQL()
-		q := "DROP INDEX IF EXISTS \"" + synct.S + "\".\"" + synct.T + "___id_idx\""
+		q := "DROP INDEX IF EXISTS \"" + synct.Schema + "\".\"" + synct.Table + "___id_idx\""
 		if _, err = dp.Exec(context.TODO(), q); err != nil {
 			return err
 		}

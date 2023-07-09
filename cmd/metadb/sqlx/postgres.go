@@ -1,6 +1,6 @@
 package sqlx
 
-import (
+/*import (
 	"context"
 	"database/sql"
 	"strings"
@@ -65,30 +65,8 @@ func (d *PostgresDB) VacuumAnalyzeTable(table *Table) error {
 }
 
 func (d *PostgresDB) EncodeString(s string) string {
-	var b strings.Builder
-	b.WriteString("E'")
-	for _, c := range s {
-		switch c {
-		case '\\':
-			b.WriteString("\\\\")
-		case '\'':
-			b.WriteString("''")
-		case '\b':
-			b.WriteString("\\b")
-		case '\f':
-			b.WriteString("\\f")
-		case '\n':
-			b.WriteString("\\n")
-		case '\r':
-			b.WriteString("\\r")
-		case '\t':
-			b.WriteString("\\t")
-		default:
-			b.WriteRune(c)
-		}
-	}
-	b.WriteRune('\'')
-	return b.String()
+	_ = s
+	return ""
 }
 
 func (d *PostgresDB) ExecMultiple(tx *sql.Tx, sql []string) error {
@@ -179,7 +157,7 @@ func (d *PostgresDB) BeginTx() (*sql.Tx, error) {
 		return nil, err
 	}
 	return tx, nil
-}
+}*/
 
 //type Postgres struct {
 //	//Database *sql.DB
@@ -218,7 +196,7 @@ func (d *PostgresDB) BeginTx() (*sql.Tx, error) {
 //	return true
 //}
 
-//func (d *Postgres) CreateIndex(name string, table *T, columns []string) string {
+//func (d *Postgres) CreateIndex(name string, table *Table, columns []string) string {
 //	var clist strings.Builder
 //	for i, c := range columns {
 //		if i != 0 {

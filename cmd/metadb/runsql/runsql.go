@@ -124,7 +124,7 @@ func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, sche
 		return err
 	}
 	if table != "" {
-		if err = cat.TableUpdatedNow(dbx.Table{S: schema, T: table}, elapsed); err != nil {
+		if err = cat.TableUpdatedNow(dbx.Table{Schema: schema, Table: table}, elapsed); err != nil {
 			return fmt.Errorf("writing table updated time: %v", err)
 		}
 	}
@@ -159,29 +159,29 @@ func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input s
 			if len(c) < 3 {
 				return fmt.Errorf("syntax error in directive %q", line)
 			}
-			requireTable := &dbx.Table{S: c[0], T: c[1]}
+			requireTable := &dbx.Table{Schema: c[0], Table: c[1]}
 			switch {
-			case strings.HasSuffix(requireTable.T, "__"):
-				requireTable.T = requireTable.T[0 : len(requireTable.T)-2]
-			case strings.HasSuffix(requireTable.T, "_"),
-				strings.HasSuffix(requireTable.T, "___"),
-				strings.HasSuffix(requireTable.T, "____"):
+			case strings.HasSuffix(requireTable.Table, "__"):
+				requireTable.Table = requireTable.Table[0 : len(requireTable.Table)-2]
+			case strings.HasSuffix(requireTable.Table, "_"),
+				strings.HasSuffix(requireTable.Table, "___"),
+				strings.HasSuffix(requireTable.Table, "____"):
 				log.Warning("runsql: table name may be invalid in %q: repository=%s tag=%s path=%s",
 					line, url, tag, fullpath)
 				continue
 			}
 			requireColumn := c[2]
 			requireColumnType := s[2]
-			if requireTable.S == "" || requireTable.T == "" || requireColumn == "" || requireColumnType == "" ||
-				requireTable.S != strings.TrimSpace(requireTable.S) ||
-				requireTable.T != strings.TrimSpace(requireTable.T) ||
+			if requireTable.Schema == "" || requireTable.Table == "" || requireColumn == "" || requireColumnType == "" ||
+				requireTable.Schema != strings.TrimSpace(requireTable.Schema) ||
+				requireTable.Table != strings.TrimSpace(requireTable.Table) ||
 				requireColumn != strings.TrimSpace(requireColumn) ||
 				requireColumnType != strings.TrimSpace(requireColumnType) {
 				log.Warning("runsql: invalid identifier in %q: repository=%s tag=%s path=%s",
 					line, url, tag, fullpath)
 				continue
 			}
-			if cat.Column(&dbx.Column{S: requireTable.S, T: requireTable.T, C: requireColumn}) != nil {
+			if cat.Column(&dbx.Column{Schema: requireTable.Schema, Table: requireTable.Table, Column: requireColumn}) != nil {
 				continue
 			}
 			// Add table

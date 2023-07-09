@@ -84,7 +84,7 @@ SELECT table_schema, table_name, column_name
 		if err := rows.Scan(&schema, &table, &column); err != nil {
 			return fmt.Errorf("reading indexes: %v", err)
 		}
-		indexes[dbx.Column{S: schema, T: strings.TrimSuffix(table, "__"), C: column}] = struct{}{}
+		indexes[dbx.Column{Schema: schema, Table: strings.TrimSuffix(table, "__"), Column: column}] = struct{}{}
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("reading indexes: %v", err)
@@ -101,7 +101,7 @@ func (c *Catalog) AddIndex(column *dbx.Column) error {
 
 func (c *Catalog) addIndex(column *dbx.Column) error {
 	// Create index.
-	q := "CREATE INDEX ON \"" + column.S + "\".\"" + column.T + "__\" (\"" + column.C + "\")"
+	q := "CREATE INDEX ON \"" + column.Schema + "\".\"" + column.Table + "__\" (\"" + column.Column + "\")"
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating index: %v", err)
 	}

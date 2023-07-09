@@ -18,10 +18,10 @@ func NewSchema(db sqlx.DB, cat *catalog.Catalog) (*Schema, error) {
 		return nil, fmt.Errorf("reading column schemas: %s", err)
 	}
 	for _, col := range columnSchemas {
-		if !cat.TableExists(dbx.Table{S: col.Schema, T: col.Table}) {
+		if !cat.TableExists(dbx.Table{Schema: col.Schema, Table: col.Table}) {
 			continue
 		}
-		//if !track.Contains(&sqlx.T{S: col.S, T: col.T}) {
+		//if !track.Contains(&sqlx.Table{Schema: col.Schema, Table: col.Table}) {
 		//	continue
 		//}
 		c := sqlx.Column{Schema: col.Schema, Table: col.Table, Column: col.Column}

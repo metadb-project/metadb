@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
+	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
@@ -49,7 +49,7 @@ func (c *Catalog) initUsers() error {
 //	return usersWithPerm(c, table)
 //}
 
-func usersWithPerm(cat *Catalog, table *sqlx.Table) []string {
+func usersWithPerm(cat *Catalog, table *dbx.Table) []string {
 	var users []string
 	for user, relist := range cat.users {
 		if util.UserPerm(relist, table) {
@@ -67,7 +67,6 @@ func usersWithPerm(cat *Catalog, table *sqlx.Table) []string {
 //        return UserPerm(reList, schema, table)
 //}
 
-// func (c *Catalog) Get(username string) *util.RegexList {
 func (c *Catalog) GetUserRegexList(username string) *util.RegexList {
 	c.mu.Lock()
 	defer c.mu.Unlock()

@@ -47,7 +47,7 @@ func addPartition(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command) 
 //}
 
 /*
-func createCurrentTableIfNotExists(table *sqlx.T, db sqlx.DB, users *cache.Users) error {
+func createCurrentTableIfNotExists(table *sqlx.Table, db sqlx.DB, users *cache.Users) error {
 	_, err := db.Exec(nil, ""+
 		"CREATE TABLE IF NOT EXISTS "+db.TableSQL(table)+" ("+
 		"    __id bigint "+db.AutoIncrementSQL()+" PRIMARY KEY,"+
@@ -138,7 +138,7 @@ func alterColumnVarcharSize(cat *catalog.Catalog, table *sqlx.Table, column stri
 */
 
 /*
-func alterColumnIntegerSize(table *sqlx.T, column string, typesize int64, db sqlx.DB, schema *cache.S) error {
+func alterColumnIntegerSize(table *sqlx.Table, column string, typesize int64, db sqlx.DB, schema *cache.Schema) error {
 	dtypesql, _, _ := command.DataTypeToSQL(command.IntegerType, typesize)
 	_, err := db.Exec(nil, "ALTER TABLE "+db.TableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+dtypesql)
 	if err != nil {
@@ -149,13 +149,13 @@ func alterColumnIntegerSize(table *sqlx.T, column string, typesize int64, db sql
 		return err
 	}
 	// Update schema.
-	schema.Update(&sqlx.Column{S: table.S, T: table.T, Column: column}, dtypesql, 0)
+	schema.Update(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: column}, dtypesql, 0)
 	return nil
 }
 */
 
 /*
-func alterColumnToVarchar(table *sqlx.T, column string, typesize int64, db sqlx.DB, schema *cache.S) error {
+func alterColumnToVarchar(table *sqlx.Table, column string, typesize int64, db sqlx.DB, schema *cache.Schema) error {
 	dtypesql, dataType, charMaxLen := command.DataTypeToSQL(command.TextType, typesize)
 	_, err := db.Exec(nil, "ALTER TABLE "+db.TableSQL(table)+" ALTER COLUMN \""+column+"\" TYPE "+dtypesql+
 		" USING \""+column+"\"::varchar")
@@ -168,7 +168,7 @@ func alterColumnToVarchar(table *sqlx.T, column string, typesize int64, db sqlx.
 		return err
 	}
 	// Update schema.
-	schema.Update(&sqlx.Column{S: table.S, T: table.T, Column: column}, dataType, charMaxLen)
+	schema.Update(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: column}, dataType, charMaxLen)
 	return nil
 }
 */
@@ -186,12 +186,12 @@ func alterColumnType(dq dbx.Queryable, cat *catalog.Catalog, table *dbx.Table, c
 			column, table, sqltype, err)
 	}
 	// Update schema.
-	cat.UpdateColumn(&dbx.Column{S: table.S, T: table.T, C: column}, sqltype)
+	cat.UpdateColumn(&dbx.Column{Schema: table.Schema, Table: table.Table, Column: column}, sqltype)
 	return nil
 }
 
 /*
-func renameColumnOldType(table *sqlx.T, column string, datatype command.DataType, typesize int64, db sqlx.DB, schema *cache.S) error {
+func renameColumnOldType(table *sqlx.Table, column string, datatype command.DataType, typesize int64, db sqlx.DB, schema *cache.Schema) error {
 	var err error
 	// Find new name for old column.
 	var newName string
@@ -204,8 +204,8 @@ func renameColumnOldType(table *sqlx.T, column string, datatype command.DataType
 		return err
 	}
 	// Current table: rename index.
-	index := db.IdentiferSQL(table.S) + "." + db.IdentiferSQL(indexName(table.T, column))
-	_, err = db.Exec(nil, "ALTER INDEX IF EXISTS "+index+" RENAME TO "+db.IdentiferSQL(indexName(table.T, newName)))
+	index := db.IdentiferSQL(table.Schema) + "." + db.IdentiferSQL(indexName(table.Table, column))
+	_, err = db.Exec(nil, "ALTER INDEX IF EXISTS "+index+" RENAME TO "+db.IdentiferSQL(indexName(table.Table, newName)))
 	if err != nil {
 		return err
 	}
@@ -215,19 +215,19 @@ func renameColumnOldType(table *sqlx.T, column string, datatype command.DataType
 		return err
 	}
 	// History table: rename index.
-	index = db.IdentiferSQL(table.S) + "." + db.IdentiferSQL(indexName(db.HistoryTable(table).T, column))
-	_, err = db.Exec(nil, "ALTER INDEX IF EXISTS "+index+" RENAME TO "+db.IdentiferSQL(indexName(db.HistoryTable(table).T, newName)))
+	index = db.IdentiferSQL(table.Schema) + "." + db.IdentiferSQL(indexName(db.HistoryTable(table).Table, column))
+	_, err = db.Exec(nil, "ALTER INDEX IF EXISTS "+index+" RENAME TO "+db.IdentiferSQL(indexName(db.HistoryTable(table).Table, newName)))
 	if err != nil {
 		return err
 	}
 	// Update schema.
-	schema.Delete(&sqlx.Column{S: table.S, T: table.T, Column: column})
+	schema.Delete(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: column})
 	_, dataType, charMaxLen := command.DataTypeToSQL(datatype, typesize)
-	schema.Update(&sqlx.Column{S: table.S, T: table.T, Column: newName}, dataType, charMaxLen)
+	schema.Update(&sqlx.Column{Schema: table.Schema, Table: table.Table, Column: newName}, dataType, charMaxLen)
 	return nil
 }
 
-func newNumberedColumnName(table *sqlx.T, column string, schema *cache.S) (string, error) {
+func newNumberedColumnName(table *sqlx.Table, column string, schema *cache.Schema) (string, error) {
 	var columns []string = schema.TableColumns(table)
 	maxn := 0
 	regex := regexp.MustCompile(`^` + column + `__([0-9]+)$`)

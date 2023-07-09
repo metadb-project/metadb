@@ -19,7 +19,6 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/dsync"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"golang.org/x/net/context"
@@ -104,30 +103,29 @@ func outerPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server, spr *
 }
 
 func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
-	var err error
 	// var database0 *sysdb.DatabaseConnector = spr.databases[0]
 	//if database0.Type == "postgresql" && database0.DBPort == "" {
 	//	database0.DBPort = "5432"
 	//}
-	dsn := &sqlx.DSN{
-		// DBURI: spr.svr.dburi,
-		Host:     spr.svr.db.Host,
-		Port:     "5432",
-		User:     spr.svr.db.User,
-		Password: spr.svr.db.Password,
-		DBName:   spr.svr.db.DBName,
-		SSLMode:  "require",
-		// Account:  database0.DBAccount,
-	}
-	db, err := sqlx.Open("postgresql", dsn)
-	if err != nil {
-		return err
-	}
-	// Ping database to test connection
-	if err = db.Ping(); err != nil {
-		spr.databases[0].Status.Error()
-		return fmt.Errorf("connecting to database: ping: %s", err)
-	}
+	//dsn := &sqlx.DSN{
+	//	// DBURI: spr.svr.dburi,
+	//	Host:     spr.svr.db.Host,
+	//	Port:     "5432",
+	//	User:     spr.svr.db.User,
+	//	Password: spr.svr.db.Password,
+	//	DBName:   spr.svr.db.DBName,
+	//	SSLMode:  "require",
+	//	// Account:  database0.DBAccount,
+	//}
+	//db, err := sqlx.Open("postgresql", dsn)
+	//if err != nil {
+	//	return err
+	//}
+	//// Ping database to test connection
+	//if err = db.Ping(); err != nil {
+	//	spr.databases[0].Status.Error()
+	//	return fmt.Errorf("connecting to database: ping: %s", err)
+	//}
 	//////////////////////////////////////////////////////////////////////////////
 	dc, err := spr.svr.db.Connect()
 	if err != nil {
@@ -139,7 +137,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	}
 	//////////////////////////////////////////////////////////////////////////////
 	spr.databases[0].Status.Active()
-	spr.db = append(spr.db, db)
+	//spr.db = append(spr.db, db)
 	// Cache tracking
 	//if err = metadata.Init(spr.svr.db, spr.svr.opt.MetadbVersion); err != nil {
 	//	return err
@@ -153,15 +151,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	// Update user permissions in database
 	var waitUserPerms sync.WaitGroup
 	waitUserPerms.Add(1)
-	dsnsuper := sqlx.DSN{
-		Host:     spr.svr.db.Host,
-		Port:     "5432",
-		User:     spr.svr.db.SuperUser,
-		Password: spr.svr.db.SuperPassword,
-		DBName:   spr.svr.db.DBName,
-		SSLMode:  "require",
-	}
-	go func(dsnsuper sqlx.DSN, trackedTables []dbx.Table) {
+	go func(trackedTables []dbx.Table) {
 		defer waitUserPerms.Done()
 		var dc2 *pgx.Conn
 		dc2, err = spr.svr.db.Connect()
@@ -169,7 +159,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			log.Error("%v", err)
 		}
 		sysdb.GoUpdateUserPerms(dc2, dcsuper, trackedTables)
-	}(dsnsuper, cat.AllTables(spr.source.Name))
+	}(cat.AllTables(spr.source.Name))
 	// Cache users
 	/*	users, err := cache.NewUsers(db)
 		if err != nil {
@@ -273,7 +263,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandList(ctx, cat, cl, spr.db[0], spr.svr.dp, spr.source.Name, syncMode); err != nil {
+		if err = execCommandList(ctx, cat, cl, spr.svr.dp, spr.source.Name, syncMode); err != nil {
 			return fmt.Errorf("executor: %s", err)
 		}
 
@@ -478,7 +468,7 @@ func logTraceCommand(c *command.Command) {
 	} else {
 		schemaTable = c.SchemaName + "." + c.TableName
 	}
-	var pkey []command.CommandColumn = command.PrimaryKeyColumns(c.Column)
+	var pkey = command.PrimaryKeyColumns(c.Column)
 	var b strings.Builder
 	_, _ = fmt.Fprintf(&b, "%s: %s", c.Op, schemaTable)
 	if c.Op != command.TruncateOp {

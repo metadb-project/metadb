@@ -130,14 +130,14 @@ type systemTableDef struct {
 }
 
 var systemTables = []systemTableDef{
-	{table: dbx.Table{S: catalogSchema, T: "auth"}, create: createTableAuth},
-	{table: dbx.Table{S: catalogSchema, T: "init"}, create: createTableInit},
-	{table: dbx.Table{S: catalogSchema, T: "log"}, create: createTableLog},
-	{table: dbx.Table{S: catalogSchema, T: "maintenance"}, create: createTableMaintenance},
-	{table: dbx.Table{S: catalogSchema, T: "origin"}, create: createTableOrigin},
-	{table: dbx.Table{S: catalogSchema, T: "source"}, create: createTableSource},
-	{table: dbx.Table{S: catalogSchema, T: "table_update"}, create: createTableUpdate},
-	{table: dbx.Table{S: catalogSchema, T: "track"}, create: createTableTrack},
+	{table: dbx.Table{Schema: catalogSchema, Table: "auth"}, create: createTableAuth},
+	{table: dbx.Table{Schema: catalogSchema, Table: "init"}, create: createTableInit},
+	{table: dbx.Table{Schema: catalogSchema, Table: "log"}, create: createTableLog},
+	{table: dbx.Table{Schema: catalogSchema, Table: "maintenance"}, create: createTableMaintenance},
+	{table: dbx.Table{Schema: catalogSchema, Table: "origin"}, create: createTableOrigin},
+	{table: dbx.Table{Schema: catalogSchema, Table: "source"}, create: createTableSource},
+	{table: dbx.Table{Schema: catalogSchema, Table: "table_update"}, create: createTableUpdate},
+	{table: dbx.Table{Schema: catalogSchema, Table: "track"}, create: createTableTrack},
 }
 
 func SystemTables() []dbx.Table {
@@ -293,7 +293,7 @@ func (c *Catalog) TableUpdatedNow(table dbx.Table, elapsedTime time.Duration) er
 	q := "INSERT INTO " + u + "(schemaname,tablename,updated,realtime)" +
 		"VALUES($1,$2,now(),$3)" +
 		"ON CONFLICT (schemaname,tablename) DO UPDATE SET updated=now(),realtime=$4"
-	if _, err := c.dp.Exec(context.TODO(), q, table.S, table.T, realtime, realtime); err != nil {
+	if _, err := c.dp.Exec(context.TODO(), q, table.Schema, table.Table, realtime, realtime); err != nil {
 		return fmt.Errorf("updating table %s in %s: %v", table, u, err)
 	}
 	return nil
@@ -302,7 +302,7 @@ func (c *Catalog) TableUpdatedNow(table dbx.Table, elapsedTime time.Duration) er
 func (c *Catalog) RemoveTableUpdated(table dbx.Table) error {
 	u := catalogSchema + ".table_update"
 	q := "DELETE FROM " + u + " WHERE schemaname=$1 AND tablename=$2"
-	if _, err := c.dp.Exec(context.TODO(), q, table.S, table.T); err != nil {
+	if _, err := c.dp.Exec(context.TODO(), q, table.Schema, table.Table); err != nil {
 		return fmt.Errorf("removing table %s from %s: %v", table, u, err)
 	}
 	return nil

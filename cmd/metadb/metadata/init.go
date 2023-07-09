@@ -46,7 +46,7 @@ import (
 	if err != nil {
 		return fmt.Errorf("creating schema metadb: %s", err)
 	}
-	// T metadb.init
+	// Table metadb.init
 	_, err = db.Exec(nil, ""+
 		"CREATE TABLE metadb.init (\n"+
 		"    version VARCHAR(80) NOT NULL,\n"+
@@ -61,7 +61,7 @@ import (
 	if err != nil {
 		return fmt.Errorf("writing to table metadb.init: %s", err)
 	}
-	// T metadb.track
+	// Table metadb.track
 	_, err = db.Exec(nil, ""+
 		"CREATE TABLE metadb.track (\n"+
 		"    schemaname varchar(63) NOT NULL,\n"+
@@ -74,7 +74,7 @@ import (
 	if err != nil {
 		return fmt.Errorf("creating table metadb.track: %s", err)
 	}
-	// T metadb.userperm
+	// Table metadb.userperm
 	_, err = db.Exec(nil, ""+
 		"CREATE TABLE metadb.userperm (\n"+
 		"    username TEXT PRIMARY KEY,\n"+
