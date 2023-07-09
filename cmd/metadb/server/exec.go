@@ -30,9 +30,9 @@ func execCommandList(ctx context.Context, cat *catalog.Catalog, cmdlist *command
 	txnTime := time.Now()
 	for i := range commands {
 		if log.IsLevelTrace() {
-			logTraceCommand(&(commands[i]))
+			logTraceCommand(commands[i])
 		}
-		if err := execCommand(ebuf, cat, &(commands[i]), source, syncMode); err != nil {
+		if err := execCommand(ebuf, cat, commands[i], source, syncMode); err != nil {
 			return fmt.Errorf("exec command: %v", err)
 		}
 	}

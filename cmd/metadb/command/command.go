@@ -176,6 +176,10 @@ func DataTypeToSQL(dtype DataType, typeSize int64) string {
 	}
 }
 
+type CommandList struct {
+	Cmd []*Command
+}
+
 type Command struct {
 	Op          Operation
 	SchemaName  string
@@ -187,6 +191,10 @@ type Command struct {
 	// ColumnMap maps the column names to the columns.
 	ColumnMap       map[string]*CommandColumn
 	SourceTimestamp string
+}
+
+func (c Command) String() string {
+	return fmt.Sprintf("command = %s %s.%s (%v)\n", c.Op, c.SchemaName, c.TableName, c.Column)
 }
 
 type CommandColumn struct {
@@ -215,14 +223,6 @@ type CommandColumn struct {
 	return b.String()
 }
 */
-
-func (c Command) String() string {
-	return fmt.Sprintf("command = %s %s.%s (%v)\n", c.Op, c.SchemaName, c.TableName, c.Column)
-}
-
-type CommandList struct {
-	Cmd []Command
-}
 
 func convertTypeSize(coltype string, datatype DataType) (int64, error) {
 	switch datatype {

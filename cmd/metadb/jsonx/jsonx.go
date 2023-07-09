@@ -114,7 +114,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 		}
 
 	}
-	ncmd := command.Command{
+	ncmd := &command.Command{
 		Op:              command.MergeOp,
 		SchemaName:      cmd.SchemaName,
 		TableName:       table,

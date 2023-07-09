@@ -364,7 +364,7 @@ func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer
 		if snap {
 			snapshot = true
 		}
-		cl.Cmd = append(cl.Cmd, *c)
+		cl.Cmd = append(cl.Cmd, c)
 	}
 	log.Trace("read %d events", len(cl.Cmd))
 	if snapshot {

@@ -12,7 +12,7 @@ import (
 func rewriteCommandList(cl *command.CommandList, rewriteJSON bool) error {
 	for _, c := range cl.Cmd {
 		// Rewrite command
-		if err := rewriteCommand(cl, &c, rewriteJSON); err != nil {
+		if err := rewriteCommand(cl, c, rewriteJSON); err != nil {
 			log.Debug("%v", c)
 			return fmt.Errorf("%v", err)
 		}
