@@ -126,7 +126,24 @@ func (c *Catalog) AllTables(source string) []dbx.Table {
 	return all
 }
 
-func (c *Catalog) DescendantTables(table dbx.Table) []dbx.Table {
+func (c *Catalog) TraverseDescendantTables(table dbx.Table, process func(table dbx.Table)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.traverseDescendantTables(table, process)
+}
+
+func (c *Catalog) traverseDescendantTables(table dbx.Table, process func(table dbx.Table)) {
+	e, ok := c.tableDir[table]
+	if !ok {
+		return
+	}
+	process(table)
+	for t := range e.children {
+		c.traverseDescendantTables(t, process)
+	}
+}
+
+/*func (c *Catalog) DescendantTables(table dbx.Table) []dbx.Table {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	desc := make([]dbx.Table, 0)
@@ -144,6 +161,7 @@ func findDescendantTables(tableDir map[dbx.Table]tableEntry, table dbx.Table, de
 		findDescendantTables(tableDir, t, desc)
 	}
 }
+*/
 
 func (c *Catalog) CreateNewTable(table *dbx.Table, transformed bool, parentTable *dbx.Table, source string) error {
 	c.mu.Lock()

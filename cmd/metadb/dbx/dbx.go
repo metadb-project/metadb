@@ -192,8 +192,7 @@ func CreateUser(db *DB, user, password string) error {
 }
 */
 
-func EncodeString(s string) string {
-	var b strings.Builder
+func EncodeString(b *strings.Builder, s string) {
 	b.WriteString("E'")
 	for _, c := range s {
 		switch c {
@@ -216,5 +215,4 @@ func EncodeString(s string) string {
 		}
 	}
 	b.WriteRune('\'')
-	return b.String()
 }

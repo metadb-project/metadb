@@ -181,15 +181,13 @@ type CommandList struct {
 }
 
 type Command struct {
-	Op          Operation
-	SchemaName  string
-	TableName   string
-	Transformed bool
-	ParentTable dbx.Table
-	Origin      string
-	Column      []CommandColumn
-	// ColumnMap maps the column names to the columns.
-	ColumnMap       map[string]*CommandColumn
+	Op              Operation
+	SchemaName      string
+	TableName       string
+	Transformed     bool
+	ParentTable     dbx.Table
+	Origin          string
+	Column          []CommandColumn
 	SourceTimestamp string
 }
 
@@ -737,17 +735,7 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 	if c.Column == nil {
 		return nil, false, nil
 	}
-	// Create map of the column names to the columns.
-	c.ColumnMap = BuildColumnMap(c.Column)
 	return c, snapshot, nil
-}
-
-func BuildColumnMap(columns []CommandColumn) map[string]*CommandColumn {
-	m := make(map[string]*CommandColumn)
-	for i := range columns {
-		m[columns[i].Name] = &(columns[i])
-	}
-	return m
 }
 
 func extractOrigin(prefixes []string, schema string) (string, string) {

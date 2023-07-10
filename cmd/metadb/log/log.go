@@ -114,6 +114,10 @@ func Trace(format string, args ...interface{}) {
 	printf(nil, false, "TRACE", format, args...)
 }
 
+func Detail(format string, args ...interface{}) {
+	printf(nil, false, "DETAIL", format, args...)
+}
+
 func IsLevelTrace() bool {
 	return std.logTrace
 }

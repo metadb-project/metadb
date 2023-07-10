@@ -122,7 +122,6 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 		ParentTable:     dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName},
 		Origin:          cmd.Origin,
 		Column:          cols,
-		ColumnMap:       command.BuildColumnMap(cols),
 		SourceTimestamp: cmd.SourceTimestamp,
 	}
 	cl.Cmd = append(cl.Cmd, ncmd)

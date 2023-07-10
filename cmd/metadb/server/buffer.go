@@ -69,7 +69,7 @@ func (e *execbuffer) flushMergeData() error {
 		for i := 0; i < lena; i += batchSize {
 			batchEndIndex := min(i+batchSize, lena)
 			actualBatchSize := batchEndIndex - i
-			batch := &pgx.Batch{}
+			batch := pgx.Batch{}
 			ids := make([][]any, actualBatchSize)
 			for j := range ids {
 				ids[j] = []any{0}
@@ -83,7 +83,7 @@ func (e *execbuffer) flushMergeData() error {
 					return row.Scan(p)
 				})
 			}
-			if err := e.dp.SendBatch(e.ctx, batch).Close(); err != nil {
+			if err := e.dp.SendBatch(e.ctx, &batch).Close(); err != nil {
 				return fmt.Errorf("update and insert: %v", err)
 			}
 			// If resync mode, flush IDs to sync table.

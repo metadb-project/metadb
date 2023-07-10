@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -61,6 +62,10 @@ func launchPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server, spr 
 		if r := recover(); r != nil {
 			reterr = fmt.Errorf("%v", r)
 			log.Error("%s", reterr)
+			// Log stack trace.
+			buf := make([]byte, 65536)
+			n := runtime.Stack(buf, true)
+			log.Detail("%s", buf[0:n])
 		}
 	}()
 	reterr = outerPollLoop(ctx, cat, svr, spr)

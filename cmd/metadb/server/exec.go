@@ -85,12 +85,12 @@ func execCommand(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, s
 	return nil
 }
 
-func findDeltaSchema(cat *catalog.Catalog, c *command.Command, table *dbx.Table) (*deltaSchema, error) {
+func findDeltaSchema(cat *catalog.Catalog, cmd *command.Command, table *dbx.Table) (*deltaSchema, error) {
 	schema1, err := selectTableSchema(cat, table)
 	if err != nil {
 		return nil, err
 	}
-	schema2 := tableSchemaFromCommand(c)
+	schema2 := tableSchemaFromCommand(cmd)
 	delta := new(deltaSchema)
 	for i := range schema2.Column {
 		col1 := getColumnSchema(schema1, schema2.Column[i].Name)
@@ -288,6 +288,7 @@ func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode) 
 		}
 		return nil
 	}
+	primaryKeyFilter := wherePKDataEqualSQL(cmd.Column)
 	// If any columns are "unavailable," extract the previous values from the current record.
 	unavailColumns := make([]*command.CommandColumn, 0)
 	columns := cmd.Column
@@ -314,9 +315,7 @@ func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode) 
 		b.WriteString("\" WHERE __origin='")
 		b.WriteString(cmd.Origin)
 		b.WriteString("'")
-		if err = wherePKDataEqual(&b, cmd.Column); err != nil {
-			return fmt.Errorf("primary key columns equal: %v", err)
-		}
+		b.WriteString(primaryKeyFilter)
 		b.WriteString(" LIMIT 1")
 		var rows pgx.Rows
 		rows, err = ebuf.dp.Query(context.TODO(), b.String())
@@ -367,9 +366,7 @@ func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode) 
 	b.WriteString(" WHERE __current AND __origin='")
 	b.WriteString(cmd.Origin)
 	b.WriteByte('\'')
-	if err = wherePKDataEqual(&b, cmd.Column); err != nil {
-		return fmt.Errorf("primary key columns equal: %v", err)
-	}
+	b.WriteString(primaryKeyFilter)
 	update := b.String()
 	// Insert the new row.
 	b.Reset()
@@ -396,7 +393,7 @@ func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode) 
 	}
 	for i := range columns {
 		b.WriteString(",")
-		b.WriteString(encodeSQLData(columns[i].SQLData, columns[i].DType))
+		encodeSQLData(&b, columns[i].SQLData, columns[i].DType)
 	}
 	b.WriteString(") RETURNING __id")
 	insert := b.String()
@@ -427,7 +424,7 @@ func isCurrentIdentical(ctx context.Context, cmd *command.Command, tx *pgxpool.P
 			b.WriteString("\" IS NULL")
 		} else {
 			b.WriteString("\"=")
-			b.WriteString(encodeSQLData(columns[i].SQLData, columns[i].DType))
+			encodeSQLData(&b, columns[i].SQLData, columns[i].DType)
 		}
 	}
 	b.WriteString(" LIMIT 1")
@@ -462,6 +459,7 @@ func isCurrentIdentical(ctx context.Context, cmd *command.Command, tx *pgxpool.P
 		return false, 0, nil
 	}
 	// If any extra column values are not NULL, there is no match.
+	columnMap := buildColumnMap(cmd.Column)
 	var id int64
 	for i := range values {
 		if columnNames[i] == "__id" {
@@ -475,7 +473,7 @@ func isCurrentIdentical(ctx context.Context, cmd *command.Command, tx *pgxpool.P
 		if strings.HasPrefix(columnNames[i], "__") {
 			continue
 		}
-		_, ok := cmd.ColumnMap[columnNames[i]]
+		_, ok := columnMap[columnNames[i]]
 		if ok {
 			continue
 		}
@@ -488,75 +486,82 @@ func isCurrentIdentical(ctx context.Context, cmd *command.Command, tx *pgxpool.P
 	return true, id, nil
 }
 
-func execDeleteData(ebuf *execbuffer, cat *catalog.Catalog, c *command.Command) error {
-	// Get the transformed tables so that we can propagate the delete operation.
-	tables := cat.DescendantTables(dbx.Table{Schema: c.SchemaName, Table: c.TableName})
-	// Note that if the table does not exist, "tables" will be an empty slice and the
-	// loop below will not do anything.
+func buildColumnMap(columns []command.CommandColumn) map[string]*command.CommandColumn {
+	m := make(map[string]*command.CommandColumn)
+	for i := range columns {
+		m[columns[i].Name] = &(columns[i])
+	}
+	return m
+}
 
-	// Find matching current record and mark as not current.
-	for i := range tables {
-		var b strings.Builder
-		b.WriteString("UPDATE " + tables[i].MainSQL() + " SET __end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
-		if err := wherePKDataEqual(&b, c.Column); err != nil {
-			return err
-		}
-		if _, err := ebuf.dp.Exec(ebuf.ctx, b.String()); err != nil {
-			return err
-		}
+func execDeleteData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command) error {
+	primaryKeyFilter := wherePKDataEqualSQL(cmd.Column)
+	// Find matching current records in table and descendants, and mark as not current.
+	batch := pgx.Batch{}
+	cat.TraverseDescendantTables(dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName},
+		func(table dbx.Table) {
+			batch.Queue("UPDATE " + table.MainSQL() +
+				" SET __end='" + cmd.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" +
+				cmd.Origin + "'" + primaryKeyFilter)
+		})
+	if err := ebuf.dp.SendBatch(ebuf.ctx, &batch).Close(); err != nil {
+		return fmt.Errorf("exec delete data: %v", err)
 	}
 	return nil
 }
 
-func execTruncateData(ebuf *execbuffer, cat *catalog.Catalog, c *command.Command) error {
-	// Get the transformed tables so that we can propagate the truncate operation.
-	tables := cat.DescendantTables(dbx.Table{Schema: c.SchemaName, Table: c.TableName})
-	// Note that if the table does not exist, "tables" will be an empty slice and the
-	// loop below will not do anything.
-
-	// Mark as not current.
-	for i := range tables {
-		var b strings.Builder
-		b.WriteString("UPDATE " + tables[i].MainSQL() + " SET __end='" + c.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + c.Origin + "'")
-		if _, err := ebuf.dp.Exec(ebuf.ctx, b.String()); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func wherePKDataEqual(b *strings.Builder, columns []command.CommandColumn) error {
-	found := false
+func wherePKDataEqualSQL(columns []command.CommandColumn) string {
+	var b strings.Builder
 	for _, c := range columns {
 		if c.PrimaryKey != 0 {
-			found = true
 			b.WriteString(" AND")
 			if c.DType == command.JSONType {
-				b.WriteString(" \"" + c.Name + "\"::text=" + encodeSQLData(c.SQLData, c.DType) + "::text")
+				b.WriteString(" \"")
+				b.WriteString(c.Name)
+				b.WriteString("\"::text=")
+				encodeSQLData(&b, c.SQLData, c.DType)
+				b.WriteString("::text")
 			} else {
-				b.WriteString(" \"" + c.Name + "\"=" + encodeSQLData(c.SQLData, c.DType))
+				b.WriteString(" \"")
+				b.WriteString(c.Name)
+				b.WriteString("\"=")
+				encodeSQLData(&b, c.SQLData, c.DType)
 			}
 		}
 	}
-	if !found {
-		return fmt.Errorf("command missing primary key")
-	}
-	return nil
+	return b.String()
 }
 
-func encodeSQLData(sqldata *string, datatype command.DataType) string {
+func encodeSQLData(b *strings.Builder, sqldata *string, datatype command.DataType) {
 	if sqldata == nil {
-		return "NULL"
+		b.WriteString("NULL")
+		return
 	}
 	switch datatype {
 	case command.TextType, command.JSONType:
-		return dbx.EncodeString(*sqldata)
-	case command.DateType, command.TimeType, command.TimetzType, command.TimestampType, command.TimestamptzType, command.UUIDType:
-		return "'" + *sqldata + "'"
+		dbx.EncodeString(b, *sqldata)
+	case command.UUIDType, command.DateType, command.TimeType, command.TimetzType, command.TimestampType, command.TimestamptzType:
+		b.WriteByte('\'')
+		b.WriteString(*sqldata)
+		b.WriteByte('\'')
 	case command.IntegerType, command.FloatType, command.NumericType, command.BooleanType:
-		return *sqldata
+		b.WriteString(*sqldata)
 	default:
 		log.Error("encoding SQL data: unknown data type: %s", datatype)
-		return "(unknown type)"
+		b.WriteString("(unknown type)")
 	}
+}
+
+func execTruncateData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command) error {
+	// Find all current records in table and descendants, and mark as not current.
+	batch := pgx.Batch{}
+	cat.TraverseDescendantTables(dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName},
+		func(table dbx.Table) {
+			batch.Queue("UPDATE " + table.MainSQL() + " SET __end='" +
+				cmd.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + cmd.Origin + "'")
+		})
+	if err := ebuf.dp.SendBatch(ebuf.ctx, &batch).Close(); err != nil {
+		return fmt.Errorf("exec truncate data: %v", err)
+	}
+	return nil
 }
