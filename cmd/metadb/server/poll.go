@@ -295,7 +295,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Check if resync snapshot may have completed.
-		if syncMode != dsync.NoSync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 6 {
+		if syncMode != dsync.NoSync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 3.0 {
 			log.Info("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
 				spr.source.Name)
 			cat.ResetLastSnapshotRecord() // Sync timer.
