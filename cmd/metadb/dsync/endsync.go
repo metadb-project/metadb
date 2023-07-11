@@ -76,7 +76,7 @@ func EndSync(opt *option.EndSync) error {
 	if syncMode == Resync {
 		// Before continuing, pause for confirmation if many records will be deleted.
 		// Count sync table rows.
-		eout.Info("endsync: scanning sync tables")
+		eout.Info("endsync: safety check: reading sync record counts")
 		var syncCount int64
 		for _, t := range tables {
 			synct := catalog.SyncTable(&t)
@@ -93,7 +93,7 @@ func EndSync(opt *option.EndSync) error {
 			}
 		}
 		// Count current records.
-		eout.Info("endsync: scanning current records")
+		eout.Info("endsync: safety check: reading current record counts")
 		var currentCount int64
 		for _, t := range tables {
 			var count int64
