@@ -30,12 +30,12 @@
 * `cpu_tuple_cost`: `0.03`
 * `default_statistics_target`: `1000`
 * `effective_io_concurrency`: `200`
-* `idle_in_transaction_session_timeout`: `3600000`
-* `idle_session_timeout`: `604800000`
+* `idle_in_transaction_session_timeout`: `60000`
+* `idle_session_timeout`: `86400000`
 * `maintenance_work_mem`: `1000000`
 * `max_wal_size`: `10240`
 * `shared_buffers`: `1250000`
-* `statement_timeout`: `7200000`
+* `statement_timeout`: `3600000`
 * `work_mem`: `350000`
 
 === Building the software
