@@ -361,7 +361,8 @@ Once "endsync" has finished running, start the Metadb server.
 
 Sometimes a connection may have to be deleted and recreated (see *Server
 administration > Resynchronizing a data source*).  After deleting a connection,
-the replication slot in the source database can be dropped using:
+the replication slot and publication in the source database should be dropped
+using:
 
 ----
 SELECT pg_drop_replication_slot('debezium');
