@@ -16,7 +16,7 @@ type tableEntry struct {
 }
 
 func (c *Catalog) initTableDir() error {
-	q := "SELECT schemaname, tablename, transformed, parentschema, parenttable, source FROM metadb.track"
+	q := "SELECT schema_name, table_name, source_name, transformed, parent_schema_name, parent_table_name FROM metadb.base_table"
 	rows, err := c.dp.Query(context.TODO(), q)
 	if err != nil {
 		return fmt.Errorf("selecting table list: %v", err)
@@ -24,9 +24,9 @@ func (c *Catalog) initTableDir() error {
 	defer rows.Close()
 	tableDir := make(map[dbx.Table]tableEntry)
 	for rows.Next() {
-		var schemaname, tablename, parentschema, parenttable, source string
+		var schemaname, tablename, source, parentschema, parenttable string
 		var transformed bool
-		err = rows.Scan(&schemaname, &tablename, &transformed, &parentschema, &parenttable, &source)
+		err = rows.Scan(&schemaname, &tablename, &source, &transformed, &parentschema, &parenttable)
 		if err != nil {
 			return fmt.Errorf("reading table list: %v", err)
 		}
@@ -80,8 +80,8 @@ func addTableEntry(c *Catalog, table *dbx.Table, transformed bool, parentTable *
 
 func insertIntoTableTrack(c *Catalog, table *dbx.Table, transformed bool, parentTable *dbx.Table, source string) error {
 	q := "INSERT INTO " + catalogSchema +
-		".track(schemaname,tablename,transformed,parentschema,parenttable,source)VALUES($1,$2,$3,$4,$5,$6)"
-	_, err := c.dp.Exec(context.TODO(), q, table.Schema, table.Table, transformed, parentTable.Schema, parentTable.Table, source)
+		".base_table(schema_name,table_name,source_name,transformed,parent_schema_name,parent_table_name)VALUES($1,$2,$3,$4,$5,$6)"
+	_, err := c.dp.Exec(context.TODO(), q, table.Schema, table.Table, source, transformed, parentTable.Schema, parentTable.Table)
 	if err != nil {
 		return fmt.Errorf("inserting catalog entry for table: %q: %s", table, err)
 	}

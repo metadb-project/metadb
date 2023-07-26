@@ -12,9 +12,9 @@ func (c *Catalog) initIndexes() error {
 	q := `WITH
 attr AS (
     SELECT ns.nspname, t.relname, a.attnum, a.attname, FALSE AS has_index
-        FROM metadb.track AS m
-            JOIN pg_class AS t ON m.tablename||'__' = t.relname
-            JOIN pg_namespace AS ns ON m.schemaname = ns.nspname AND t.relnamespace = ns.oid
+        FROM metadb.base_table AS m
+            JOIN pg_class AS t ON m.table_name||'__' = t.relname
+            JOIN pg_namespace AS ns ON m.schema_name = ns.nspname AND t.relnamespace = ns.oid
             JOIN pg_attribute AS a ON t.oid = a.attrelid
         WHERE t.relkind IN ('r', 'p') AND a.attnum > 0
 ),
@@ -31,9 +31,9 @@ ind AS (
                             WHERE k = attnum
                       ),
                       am.amname
-                   FROM metadb.track AS m
-                       JOIN pg_class AS t ON m.tablename||'__' = t.relname
-                       JOIN pg_namespace AS ns ON m.schemaname = ns.nspname AND t.relnamespace = ns.oid
+                   FROM metadb.base_table AS m
+                       JOIN pg_class AS t ON m.table_name||'__' = t.relname
+                       JOIN pg_namespace AS ns ON m.schema_name = ns.nspname AND t.relnamespace = ns.oid
                        JOIN pg_index AS x ON t.oid = x.indrelid
                        JOIN pg_class AS i ON x.indexrelid = i.oid
                        JOIN pg_attribute AS a

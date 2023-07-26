@@ -7,11 +7,11 @@ import (
 )
 
 func (c *Catalog) initPartYears() error {
-	q := "SELECT t.schemaname||'.'||t.tablename currenttable," +
+	q := "SELECT t.schema_name||'.'||t.table_name currenttable," +
 		"i.inhrelid::regclass yeartable " +
-		"FROM " + catalogSchema + ".track t " +
-		"JOIN pg_class c ON 'zzz___'||t.tablename||'___'=c.relname " +
-		"JOIN pg_namespace n ON c.relnamespace=n.oid AND t.schemaname=n.nspname " +
+		"FROM " + catalogSchema + ".base_table t " +
+		"JOIN pg_class c ON 'zzz___'||t.table_name||'___'=c.relname " +
+		"JOIN pg_namespace n ON c.relnamespace=n.oid AND t.schema_name=n.nspname " +
 		"JOIN pg_partitioned_table p ON c.oid=p.partrelid " +
 		"JOIN pg_inherits i ON p.partrelid=i.inhparent"
 	rows, err := c.dp.Query(context.TODO(), q)

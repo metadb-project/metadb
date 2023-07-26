@@ -137,7 +137,7 @@ var systemTables = []systemTableDef{
 	{table: dbx.Table{Schema: catalogSchema, Table: "origin"}, create: createTableOrigin},
 	{table: dbx.Table{Schema: catalogSchema, Table: "source"}, create: createTableSource},
 	{table: dbx.Table{Schema: catalogSchema, Table: "table_update"}, create: createTableUpdate},
-	{table: dbx.Table{Schema: catalogSchema, Table: "track"}, create: createTableTrack},
+	{table: dbx.Table{Schema: catalogSchema, Table: "base_table"}, create: createTableBaseTable},
 }
 
 func SystemTables() []dbx.Table {
@@ -188,14 +188,12 @@ func createTableAuth(tx pgx.Tx) error {
 
 func createTableInit(tx pgx.Tx) error {
 	q := "CREATE TABLE " + catalogSchema + ".init (" +
-		"version varchar(80) NOT NULL, " +
 		"dbversion integer NOT NULL)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".track: %v", err)
+		return fmt.Errorf("creating table "+catalogSchema+".init: %v", err)
 	}
-	mver := util.MetadbVersionString()
 	dbver := strconv.FormatInt(util.DatabaseVersion, 10)
-	q = "INSERT INTO " + catalogSchema + ".init (version, dbversion) VALUES ('" + mver + "', " + dbver + ")"
+	q = "INSERT INTO " + catalogSchema + ".init (dbversion) VALUES (" + dbver + ")"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("writing to table "+catalogSchema+".init: %v", err)
 	}
@@ -261,28 +259,28 @@ func createTableSource(tx pgx.Tx) error {
 
 func createTableUpdate(tx pgx.Tx) error {
 	q := "CREATE TABLE " + catalogSchema + ".table_update (" +
-		"schemaname text, " +
-		"tablename text, " +
-		"PRIMARY KEY (schemaname, tablename), " +
-		"updated timestamptz, " +
-		"realtime real)"
+		"schema_name varchar(63), " +
+		"table_name varchar(63), " +
+		"PRIMARY KEY (schema_name, table_name), " +
+		"last_update timestamptz, " +
+		"elapsed_real_time real)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".table_update: %v", err)
 	}
 	return nil
 }
 
-func createTableTrack(tx pgx.Tx) error {
-	q := "CREATE TABLE " + catalogSchema + ".track (" +
-		"schemaname varchar(63) NOT NULL, " +
-		"tablename varchar(63) NOT NULL, " +
-		"PRIMARY KEY (schemaname, tablename), " +
+func createTableBaseTable(tx pgx.Tx) error {
+	q := "CREATE TABLE " + catalogSchema + ".base_table (" +
+		"schema_name varchar(63) NOT NULL, " +
+		"table_name varchar(63) NOT NULL, " +
+		"PRIMARY KEY (schema_name, table_name), " +
+		"source_name varchar(63) NOT NULL, " +
 		"transformed boolean NOT NULL, " +
-		"parentschema varchar(63) NOT NULL, " +
-		"parenttable varchar(63) NOT NULL), " +
-		"source varchar(63) NOT NULL"
+		"parent_schema_name varchar(63) NOT NULL, " +
+		"parent_table_name varchar(63) NOT NULL)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".track: %v", err)
+		return fmt.Errorf("creating table "+catalogSchema+".base_table: %v", err)
 	}
 	return nil
 }
@@ -290,9 +288,9 @@ func createTableTrack(tx pgx.Tx) error {
 func (c *Catalog) TableUpdatedNow(table dbx.Table, elapsedTime time.Duration) error {
 	realtime := float32(math.Round(elapsedTime.Seconds()*10000) / 10000)
 	u := catalogSchema + ".table_update"
-	q := "INSERT INTO " + u + "(schemaname,tablename,updated,realtime)" +
+	q := "INSERT INTO " + u + "(schema_name,table_name,last_update,elapsed_real_time)" +
 		"VALUES($1,$2,now(),$3)" +
-		"ON CONFLICT (schemaname,tablename) DO UPDATE SET updated=now(),realtime=$4"
+		"ON CONFLICT (schema_name,table_name) DO UPDATE SET last_update=now(),elapsed_real_time=$4"
 	if _, err := c.dp.Exec(context.TODO(), q, table.Schema, table.Table, realtime, realtime); err != nil {
 		return fmt.Errorf("updating table %s in %s: %v", table, u, err)
 	}
@@ -301,7 +299,7 @@ func (c *Catalog) TableUpdatedNow(table dbx.Table, elapsedTime time.Duration) er
 
 func (c *Catalog) RemoveTableUpdated(table dbx.Table) error {
 	u := catalogSchema + ".table_update"
-	q := "DELETE FROM " + u + " WHERE schemaname=$1 AND tablename=$2"
+	q := "DELETE FROM " + u + " WHERE schema_name=$1 AND table_name=$2"
 	if _, err := c.dp.Exec(context.TODO(), q, table.Schema, table.Table); err != nil {
 		return fmt.Errorf("removing table %s from %s: %v", table, u, err)
 	}

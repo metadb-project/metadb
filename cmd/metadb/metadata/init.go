@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
 // TODO rework
@@ -119,9 +118,8 @@ import (
 //}
 
 func WriteDatabaseVersion(dq dbx.Queryable, version int64) error {
-	mver := util.MetadbVersionString()
 	dbver := strconv.FormatInt(version, 10)
-	_, err := dq.Exec(context.TODO(), "UPDATE metadb.init SET version='"+mver+"',dbversion="+dbver)
+	_, err := dq.Exec(context.TODO(), "UPDATE metadb.init SET dbversion="+dbver)
 	if err != nil {
 		return fmt.Errorf("updating dbversion in table metadb.init: %s", err)
 	}

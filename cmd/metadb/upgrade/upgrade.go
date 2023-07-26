@@ -409,6 +409,7 @@ var updbList = []updbFunc{
 	updb20,
 	updb21,
 	updb22,
+	updb23,
 }
 
 func updb8(opt *dbopt) error {
@@ -1540,6 +1541,7 @@ func updb22(opt *dbopt) error {
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("reading indexes: %v", err)
 	}
+	rows.Close()
 
 	for _, t := range tables {
 		// Drop column "__cf" from each table.
@@ -1581,6 +1583,72 @@ func updb22(opt *dbopt) error {
 	// Write new version number.
 	err = metadata.WriteDatabaseVersion(tx, 22)
 	if err != nil {
+		return err
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb23(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	q := "SELECT username FROM metadb.auth"
+	rows, err := dc.Query(context.TODO(), q)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	users := make([]string, 0)
+	for rows.Next() {
+		var username string
+		err = rows.Scan(&username)
+		if err != nil {
+			return err
+		}
+		users = append(users, username)
+	}
+	if err = rows.Err(); err != nil {
+		return err
+	}
+	rows.Close()
+
+	for _, u := range users {
+		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON metadb.track TO "+u)
+	}
+
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+	qs := []string{
+		"ALTER TABLE metadb.init DROP version",
+		"ALTER TABLE metadb.table_update RENAME schemaname TO schema_name",
+		"ALTER TABLE metadb.table_update RENAME tablename TO table_name",
+		"ALTER TABLE metadb.table_update RENAME updated TO last_update",
+		"ALTER TABLE metadb.table_update RENAME realtime TO elapsed_real_time",
+		"ALTER TABLE metadb.table_update ALTER COLUMN schema_name TYPE varchar(63)",
+		"ALTER TABLE metadb.table_update ALTER COLUMN table_name TYPE varchar(63)",
+		"ALTER TABLE metadb.track RENAME schemaname TO schema_name",
+		"ALTER TABLE metadb.track RENAME tablename TO table_name",
+		"ALTER TABLE metadb.track RENAME parentschema TO parent_schema_name",
+		"ALTER TABLE metadb.track RENAME parenttable TO parent_table_name",
+		"ALTER TABLE metadb.track RENAME source TO source_name",
+		"ALTER TABLE metadb.track RENAME TO base_table",
+	}
+	for _, q := range qs {
+		if _, err = tx.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+	}
+	if err = metadata.WriteDatabaseVersion(tx, 23); err != nil {
 		return err
 	}
 	if err = tx.Commit(context.TODO()); err != nil {

@@ -16,14 +16,10 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-const DatabaseVersion = 22
+const DatabaseVersion = 23
 
 // MetadbVersion is defined at build time via -ldflags.
 var MetadbVersion = "(unknown version)"
-
-func MetadbVersionString() string {
-	return "Metadb " + MetadbVersion
-}
 
 const MaximumTypeSizeIndex = 2500
 

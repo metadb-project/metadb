@@ -178,7 +178,47 @@ SELECT mdbversion();
 
 === System tables
 
+==== metadb.base_table
+
+[.aqua-background]#Metadb 1.2#
+
+The table `metadb.base_table` stores information about tables that are
+extracted from data sources or are transformed from those tables.
+
+[%header,cols="1,1l,3"]
+|===
+|Column name
+|Column type
+|Description
+
+|`schema_name`
+|varchar(63)
+|The base table schema name
+
+|`table_name`
+|varchar(63)
+|The base table name
+
+|`source_name`
+|varchar(63)
+|Name of the data source the table is extracted from
+
+|`transformed`
+|boolean
+|True if the table is transformed from another table
+
+|`parent_schema_name`
+|varchar(63)
+|Schema name of the parent table, if this is a transformed table
+
+|`parent_table_name`
+|varchar(63)
+|Table name of the parent table, if this is a transformed table
+|===
+
 ==== metadb.log
+
+The table `metadb.log` stores logging information for the system.
 
 [%header,cols="1l,1l,3"]
 |===
@@ -201,27 +241,32 @@ SELECT mdbversion();
 
 ==== metadb.table_update
 
+[.aqua-background]#Metadb 1.2#
+
+The table `metadb.table_update` stores information about the updating of
+certain tables.
+
 [%header,cols="1,1l,3"]
 |===
 |Column name
 |Column type
 |Description
 
-|`schemaname`
-|text
+|`schema_name`
+|varchar(63)
 |Schema name of the updated table
 
-|`tablename`
-|text
+|`table_name`
+|varchar(63)
 |Table name of the updated table
 
-|`updated`
+|`last_update`
 |timestamptz
 |Timestamp when the table was last updated successfully
 
-|`realtime` [.aqua-background]#Metadb 1.1#
+|`elapsed_real_time`
 |real
-|Elapsed real time (in seconds) of the completed update process
+|Wall-clock time in seconds of the last completed update process
 |===
 
 === External SQL directives
