@@ -25,8 +25,11 @@ ignore this schema, as all data are accessible via `folio_source_record.marc__t`
 
 ==== Derived tables
 
-FOLIO derived tables are automatically updated once per day, usually at about
+FOLIO "derived tables" are automatically updated once per day, usually at about
 00:00:00 UTC by default.
+
+Note that the derived tables are based on a periodic snapshot of data, and for
+this reason they are generally not up-to-date.
 
 ==== Data model
 
@@ -494,8 +497,11 @@ are suggested:
 
 ==== Derived tables
 
-ReShare derived tables are automatically updated once per day, usually at about
-00:00:00 UTC by default.
+ReShare "derived tables" are automatically updated once per day, usually at
+about 00:00:00 UTC by default.
+
+Note that the derived tables are based on a periodic snapshot of data, and for
+this reason they are generally not up-to-date.
 
 ==== Configuring Metadb for ReShare
 
