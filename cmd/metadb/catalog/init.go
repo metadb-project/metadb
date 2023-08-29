@@ -250,7 +250,7 @@ func createTableSource(tx pgx.Tx) error {
 		"trimschemaprefix text, " +
 		"addschemaprefix text, " +
 		"module text, " +
-		"sync boolean NOT NULL DEFAULT TRUE)"
+		"sync smallint NOT NULL DEFAULT 1)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".source: %v", err)
 	}
