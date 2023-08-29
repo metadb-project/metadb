@@ -257,7 +257,7 @@ func goMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat *catalog.Cat
 		time.Sleep(5 * time.Minute)
 		syncMode, err := dsync.ReadSyncMode(dp, source)
 		if err != nil {
-			log.Error("unable to read resync mode: %v", err)
+			log.Error("unable to read sync mode: %v", err)
 		}
 		if folio && syncMode == dsync.NoSync {
 			if err := marctab.RunMarctab(db, datadir, cat); err != nil {
