@@ -274,17 +274,7 @@ func convertTypeSize(coltype string, datatype DataType) (int64, error) {
 func extractPrimaryKey(pkerr map[string]struct{}, ce *change.Event) (map[string]int, error) {
 	var ok bool
 	if ce.Key == nil {
-		var topic string
-		if ce.Topic != nil {
-			topic = *(ce.Topic)
-		} else {
-			topic = "(unknown)"
-		}
-		_, ok = pkerr[topic]
-		if !ok {
-			log.Warning("primary key not defined: %s", topic)
-			pkerr[topic] = struct{}{}
-		}
+		primaryKeyNotDefined(pkerr, ce.Topic)
 		return nil, nil
 	}
 	if ce.Key.Schema == nil || ce.Key.Schema.Fields == nil {
@@ -662,7 +652,8 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 	if c.Op == DeleteOp {
 		switch {
 		case ce.Key == nil:
-			return nil, false, fmt.Errorf("delete: missing event key: %v", ce.Key)
+			primaryKeyNotDefined(pkerr, ce.Topic)
+			return nil, false, nil
 		case ce.Key.Schema == nil:
 			return nil, false, fmt.Errorf("delete: missing event key schema: %v", ce.Key)
 		case ce.Key.Schema.Fields == nil:
@@ -736,6 +727,20 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 		return nil, false, nil
 	}
 	return c, snapshot, nil
+}
+
+func primaryKeyNotDefined(pkerr map[string]struct{}, topicPtr *string) {
+	var topic string
+	if topicPtr != nil {
+		topic = *(topicPtr)
+	} else {
+		topic = "(unknown)"
+	}
+	_, ok := pkerr[topic]
+	if !ok {
+		log.Warning("primary key not defined: %s", topic)
+		pkerr[topic] = struct{}{}
+	}
 }
 
 func extractOrigin(prefixes []string, schema string) (string, string) {
