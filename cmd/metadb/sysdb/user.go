@@ -58,6 +58,8 @@ func GoUpdateUserPerms(dc, dcsuper *pgx.Conn, trackedTables []dbx.Table) {
 		}
 		////////
 		if re.String == "" {
+			_, _ = dcsuper.Exec(context.TODO(), "REVOKE USAGE ON SCHEMA report FROM "+u)
+			_, _ = dcsuper.Exec(context.TODO(), "REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA report FROM "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "REVOKE USAGE ON SCHEMA folio_derived FROM "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "REVOKE SELECT ON ALL TABLES IN SCHEMA folio_derived FROM "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "REVOKE USAGE ON SCHEMA reshare_derived FROM "+u)
@@ -66,6 +68,8 @@ func GoUpdateUserPerms(dc, dcsuper *pgx.Conn, trackedTables []dbx.Table) {
 			_, _ = dcsuper.Exec(context.TODO(), "REVOKE EXECUTE ON FUNCTION public.ps FROM "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "REVOKE USAGE ON SCHEMA public FROM "+u)
 		} else {
+			_, _ = dcsuper.Exec(context.TODO(), "GRANT USAGE ON SCHEMA report TO "+u)
+			_, _ = dcsuper.Exec(context.TODO(), "GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA report TO "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "GRANT USAGE ON SCHEMA folio_derived TO "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "GRANT SELECT ON ALL TABLES IN SCHEMA folio_derived TO "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "GRANT USAGE ON SCHEMA reshare_derived TO "+u)
