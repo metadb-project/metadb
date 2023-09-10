@@ -308,7 +308,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 			break
 		}
 	}
-	reshareTag := "20230525025851"
+	reshareTag := "20230910042432"
 	if reshare && syncMode == dsync.NoSync {
 		tries := 0
 		for {
