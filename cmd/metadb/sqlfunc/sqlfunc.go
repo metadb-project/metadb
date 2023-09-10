@@ -1,4 +1,4 @@
-package runsql
+package sqlfunc
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -19,7 +18,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, schema string, source string) error {
+func SQLFunc(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, schema string, source string) error {
 	dc, err := db.Connect()
 	if err != nil {
 		return err
@@ -48,7 +47,7 @@ func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, sch
 	if err = os.MkdirAll(tmpdir, util.ModePermRWX); err != nil {
 		return err
 	}
-	rdir := filepath.Join(tmpdir, "runsql")
+	rdir := filepath.Join(tmpdir, "sqlfunc")
 	if err = os.RemoveAll(rdir); err != nil {
 		return err
 	}
@@ -78,10 +77,10 @@ func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, sch
 		file := filepath.Join(workdir, f)
 		fullpath := filepath.Join(path, f)
 		if err = runFile(cat, url, tag, fullpath, dc, schema, file, source); err != nil {
-			log.Warning("runsql: %v: repository=%s tag=%s path=%s", err, url, tag, fullpath)
+			log.Warning("sqlfunc: %v: repository=%s tag=%s path=%s", err, url, tag, fullpath)
 		}
 		for _, u := range users {
-			q = "GRANT SELECT ON ALL TABLES IN SCHEMA " + schema + " TO " + u
+			q = "GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA " + schema + " TO " + u
 			if _, err = dc.Exec(context.TODO(), q); err != nil {
 				return err
 			}
@@ -105,7 +104,7 @@ func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, sche
 		return err
 	}
 	defer dbx.Rollback(tx)
-	start := time.Now()
+	//start := time.Now()
 	for _, l := range list {
 		q := strings.TrimSpace(l)
 		if q == "" {
@@ -118,15 +117,16 @@ func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, sche
 			return fmt.Errorf("%s", strings.TrimPrefix(err.Error(), "ERROR: "))
 		}
 	}
-	elapsed := time.Since(start)
+	//elapsed := time.Since(start)
 	if err = tx.Commit(context.TODO()); err != nil {
 		return err
 	}
-	if table != "" {
-		if err = cat.TableUpdatedNow(dbx.Table{Schema: schema, Table: table}, elapsed); err != nil {
-			return fmt.Errorf("writing table updated time: %v", err)
-		}
-	}
+	_ = schema
+	//if table != "" {
+	//	if err = cat.TableUpdatedNow(dbx.Table{Schema: schema, Table: table}, elapsed); err != nil {
+	//		return fmt.Errorf("writing table updated time: %v", err)
+	//	}
+	//}
 	return nil
 }
 
@@ -139,7 +139,7 @@ func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input s
 	for _, l := range strings.Split(input, "\n") {
 		line := strings.TrimSpace(l)
 		switch {
-		case strings.HasPrefix(line, "--metadb:table "):
+		case strings.HasPrefix(line, "--metadb:function "):
 			s := spaceSeparator.Split(line, -1)
 			if len(s) < 2 {
 				return fmt.Errorf("syntax error in directive %q", line)
@@ -165,7 +165,7 @@ func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input s
 			case strings.HasSuffix(requireTable.Table, "_"),
 				strings.HasSuffix(requireTable.Table, "___"),
 				strings.HasSuffix(requireTable.Table, "____"):
-				log.Warning("runsql: table name may be invalid in %q: repository=%s tag=%s path=%s",
+				log.Warning("sqlfunc: function name may be invalid in %q: repository=%s tag=%s path=%s",
 					line, url, tag, fullpath)
 				continue
 			}
@@ -176,7 +176,7 @@ func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input s
 				requireTable.Table != strings.TrimSpace(requireTable.Table) ||
 				requireColumn != strings.TrimSpace(requireColumn) ||
 				requireColumnType != strings.TrimSpace(requireColumnType) {
-				log.Warning("runsql: invalid identifier in %q: repository=%s tag=%s path=%s",
+				log.Warning("sqlfunc: invalid identifier in %q: repository=%s tag=%s path=%s",
 					line, url, tag, fullpath)
 				continue
 			}

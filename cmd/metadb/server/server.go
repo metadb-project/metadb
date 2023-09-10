@@ -25,6 +25,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/runsql"
+	"github.com/metadb-project/metadb/cmd/metadb/sqlfunc"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
@@ -296,8 +297,28 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 			tag := "20230625024847"
 			path := "sql_metadb/derived_tables"
 			schema := "folio_derived"
-			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema, source, syncMode); err != nil {
+			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema, source); err != nil {
 				log.Warning("runsql: %v: repository=%s tag=%s path=%s", err, url, tag, path)
+				if tries >= 12 {
+					break
+				}
+				time.Sleep(1 * time.Hour)
+				continue
+			}
+			break
+		}
+	}
+	reshareTag := "20230525025851"
+	if reshare && syncMode == dsync.NoSync {
+		tries := 0
+		for {
+			tries++
+			url := "https://github.com/openlibraryenvironment/reshare-analytics.git"
+			tag := reshareTag
+			path := "reports"
+			schema := "report"
+			if err = sqlfunc.SQLFunc(datadir, cat, db, url, tag, path, schema, source); err != nil {
+				log.Warning("sqlfunc: %v: repository=%s tag=%s path=%s", err, url, tag, path)
 				if tries >= 12 {
 					break
 				}
@@ -312,10 +333,10 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 		for {
 			tries++
 			url := "https://github.com/openlibraryenvironment/reshare-analytics.git"
-			tag := "20230525025851"
+			tag := reshareTag
 			path := "sql/derived_tables"
 			schema := "reshare_derived"
-			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema, source, syncMode); err != nil {
+			if err = runsql.RunSQL(datadir, cat, db, url, tag, path, schema, source); err != nil {
 				log.Warning("runsql: %v: repository=%s tag=%s path=%s", err, url, tag, path)
 				if tries >= 12 {
 					break
