@@ -19,7 +19,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, schema string, source string) error {
+func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, ref, path, schema string, source string) error {
 	dc, err := db.Connect()
 	if err != nil {
 		return err
@@ -54,7 +54,7 @@ func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, sch
 	}
 	if _, err = git.PlainClone(rdir, false, &git.CloneOptions{
 		URL:           url,
-		ReferenceName: plumbing.ReferenceName("refs/tags/" + tag),
+		ReferenceName: plumbing.ReferenceName(ref),
 		SingleBranch:  true,
 		Depth:         1,
 		Progress:      nil,
@@ -77,8 +77,8 @@ func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, sch
 		log.Trace("running file: %d %s", i, f)
 		file := filepath.Join(workdir, f)
 		fullpath := filepath.Join(path, f)
-		if err = runFile(cat, url, tag, fullpath, dc, schema, file, source); err != nil {
-			log.Warning("runsql: %v: repository=%s tag=%s path=%s", err, url, tag, fullpath)
+		if err = runFile(cat, url, ref, fullpath, dc, schema, file, source); err != nil {
+			log.Warning("runsql: %v: repository=%s ref=%s path=%s", err, url, ref, fullpath)
 		}
 		for _, u := range users {
 			q = "GRANT SELECT ON ALL TABLES IN SCHEMA " + schema + " TO " + u
@@ -93,7 +93,7 @@ func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, tag, path, sch
 	return nil
 }
 
-func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, schema string, file string, source string) error {
+func runFile(cat *catalog.Catalog, url, ref, fullpath string, dc *pgx.Conn, schema string, file string, source string) error {
 	var table string
 	data, err := os.ReadFile(file)
 	if err != nil {
@@ -111,7 +111,7 @@ func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, sche
 		if q == "" {
 			continue
 		}
-		if err = checkForDirectives(cat, url, tag, fullpath, q, &table, source); err != nil {
+		if err = checkForDirectives(cat, url, ref, fullpath, q, &table, source); err != nil {
 			return err
 		}
 		if _, err = tx.Exec(context.TODO(), q); err != nil {
@@ -132,7 +132,7 @@ func runFile(cat *catalog.Catalog, url, tag, fullpath string, dc *pgx.Conn, sche
 
 var sqlSeparator = regexp.MustCompile("\\n\\s*\\n")
 
-func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input string, table *string, source string) error {
+func checkForDirectives(cat *catalog.Catalog, url, ref, fullpath string, input string, table *string, source string) error {
 	if !strings.HasPrefix(strings.TrimSpace(input), "--metadb:") {
 		return nil
 	}
@@ -165,8 +165,8 @@ func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input s
 			case strings.HasSuffix(requireTable.Table, "_"),
 				strings.HasSuffix(requireTable.Table, "___"),
 				strings.HasSuffix(requireTable.Table, "____"):
-				log.Warning("runsql: table name may be invalid in %q: repository=%s tag=%s path=%s",
-					line, url, tag, fullpath)
+				log.Warning("runsql: table name may be invalid in %q: repository=%s ref=%s path=%s",
+					line, url, ref, fullpath)
 				continue
 			}
 			requireColumn := c[2]
@@ -176,8 +176,8 @@ func checkForDirectives(cat *catalog.Catalog, url, tag, fullpath string, input s
 				requireTable.Table != strings.TrimSpace(requireTable.Table) ||
 				requireColumn != strings.TrimSpace(requireColumn) ||
 				requireColumnType != strings.TrimSpace(requireColumnType) {
-				log.Warning("runsql: invalid identifier in %q: repository=%s tag=%s path=%s",
-					line, url, tag, fullpath)
+				log.Warning("runsql: invalid identifier in %q: repository=%s ref=%s path=%s",
+					line, url, ref, fullpath)
 				continue
 			}
 			if cat.Column(&dbx.Column{Schema: requireTable.Schema, Table: requireTable.Table, Column: requireColumn}) != nil {
