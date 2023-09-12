@@ -345,7 +345,8 @@ func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode) 
 		} else {
 			for i := range unavailColumns {
 				if values[i] == nil {
-					return fmt.Errorf("nil value in replacing unavailable data")
+					log.Warning("nil value in replacing unavailable data in table %q", table)
+					continue
 				}
 				s := values[i].(string)
 				unavailColumns[i].SQLData = &s
