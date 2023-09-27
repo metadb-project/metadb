@@ -450,7 +450,7 @@ func index(opts *MARCTransform, dbc *util.DBC, printerr PrintErr) error {
 	startIndex := time.Now()
 	var err error
 	// Index columns
-	var cols = []string{"srs_id"}
+	var cols = []string{"srs_id", "instance_hrid"}
 	if err = indexColumns(opts, dbc, cols, printerr); err != nil {
 		return err
 	}
