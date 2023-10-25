@@ -211,14 +211,11 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		log.Debug("connecting to %q, topics %q", brokers, topics)
 		log.Debug("connecting to source %q", spr.source.Name)
 		var config = &kafka.ConfigMap{
-			"auto.offset.reset":  "earliest",
-			"bootstrap.servers":  brokers,
-			"enable.auto.commit": false,
-			//"enable.partition.eof": true,
-			"group.id": group,
-			// TODO - Slow updates can trigger:
-			// Local: Maximum application poll interval (max.poll.interval.ms) exceeded: Application maximum poll interval (900000ms) exceeded by 350ms
-			"max.poll.interval.ms": 900000,
+			"auto.offset.reset":    "earliest",
+			"bootstrap.servers":    brokers,
+			"enable.auto.commit":   false,
+			"group.id":             group,
+			"max.poll.interval.ms": 1800000,
 			"security.protocol":    spr.source.Security,
 		}
 		consumer, err = kafka.NewConsumer(config)
