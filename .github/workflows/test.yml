@@ -6,9 +6,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: download go
-      run: curl -O https://dl.google.com/go/go1.19.1.linux-amd64.tar.gz
+      run: curl -O https://dl.google.com/go/go1.21.4.linux-amd64.tar.gz
     - name: unpack go
-      run: tar xf go1.19.1.linux-amd64.tar.gz
+      run: tar xf go1.21.4.linux-amd64.tar.gz
     - name: install go
       run: sudo mkdir -p /usr/local/mdb && sudo mv go /usr/local/mdb/
     - name: install goyacc
