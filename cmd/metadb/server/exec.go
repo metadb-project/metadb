@@ -496,6 +496,11 @@ func buildColumnMap(columns []command.CommandColumn) map[string]*command.Command
 }
 
 func execDeleteData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command) error {
+	// Flush buffer before deletion, to prevent a previous merge with the same tuple
+	// ID from being applied later.
+	if err := ebuf.flush(); err != nil {
+		return fmt.Errorf("exec delete data: %v", err)
+	}
 	primaryKeyFilter := wherePKDataEqualSQL(cmd.Column)
 	// Find matching current records in table and descendants, and mark as not current.
 	batch := pgx.Batch{}
@@ -554,6 +559,11 @@ func encodeSQLData(b *strings.Builder, sqldata *string, datatype command.DataTyp
 }
 
 func execTruncateData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command) error {
+	// Flush buffer before truncation, to prevent a previous merge in the same table
+	// from being applied later.
+	if err := ebuf.flush(); err != nil {
+		return fmt.Errorf("exec truncate data: %v", err)
+	}
 	// Find all current records in table and descendants, and mark as not current.
 	batch := pgx.Batch{}
 	cat.TraverseDescendantTables(dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName},
