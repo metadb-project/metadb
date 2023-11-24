@@ -106,11 +106,3 @@ func (e *execbuffer) flushMergeData() error {
 	e.mergeData = make(map[dbx.Table][][]string) // Clear buffers.
 	return nil
 }
-
-// TODO - Remove this function beginning with Go 1.21.
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
