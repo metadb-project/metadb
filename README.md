@@ -9,4 +9,4 @@ Version 2.0.  See the file
 for more information.
 
 Documentation:
-[https://metadb.dev/doc/](https://d1f3dtrg62pav.cloudfront.net/doc/)
+[https://metadb.dev/doc/](https://metadb.dev/doc/)
