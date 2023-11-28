@@ -498,17 +498,17 @@ func alterTable(conn net.Conn, node *ast.AlterTableStmt, dc *pgx.Conn) error {
 		return fmt.Errorf("converting to type %q not supported", columnType)
 	}
 
-	// Parse the table name and ensure it is a main table.
-	table, err := dbx.ParseTable(node.TableName)
-	if err != nil {
-		return fmt.Errorf("parsing table name %q: %v", node.TableName, err)
-	}
+	// Ensure the table name is a main table, and parse it.
 	if !strings.HasSuffix(node.TableName, "__") {
-		return fmt.Errorf("%q is not a main table", node.TableName)
+		return fmt.Errorf("%q is not a main table name", node.TableName)
+	}
+	table, err := dbx.ParseTable(node.TableName[0 : len(node.TableName)-2])
+	if err != nil {
+		return fmt.Errorf("%q is not a valid table name", node.TableName)
 	}
 
 	// Ensure the table is in the catalog.
-	q := "SELECT 1 FROM metadb.base_table WHERE schema_name=$1 AND table_name||'__'=$2"
+	q := "SELECT 1 FROM metadb.base_table WHERE schema_name=$1 AND table_name=$2"
 	var i int64
 	err = dc.QueryRow(context.TODO(), q, table.Schema, table.Table).Scan(&i)
 	switch {
@@ -528,7 +528,7 @@ func alterTable(conn net.Conn, node *ast.AlterTableStmt, dc *pgx.Conn) error {
         JOIN pg_type t ON t.oid=a.atttypid
     WHERE n.nspname=$1 AND c.relname=$2 AND a.attname=$3`
 	var t string
-	err = dc.QueryRow(context.TODO(), q, table.Schema, table.Table, node.Cmd.ColumnName).Scan(&t)
+	err = dc.QueryRow(context.TODO(), q, table.Schema, table.Table+"__", node.Cmd.ColumnName).Scan(&t)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return fmt.Errorf("column %q of table %q does not exist", node.Cmd.ColumnName, node.TableName)
@@ -539,8 +539,14 @@ func alterTable(conn net.Conn, node *ast.AlterTableStmt, dc *pgx.Conn) error {
 	}
 
 	if t != "uuid" { // No need to do anything if the type is already uuid.
-		q = fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s::%s",
-			node.TableName, node.Cmd.ColumnName, node.Cmd.ColumnType, node.Cmd.ColumnName, node.Cmd.ColumnType)
+		// Convert the column type.
+		q = fmt.Sprintf("ALTER TABLE %s ALTER COLUMN \"%s\" TYPE %s USING \"%s\"::%s",
+			table.MainSQL(), node.Cmd.ColumnName, node.Cmd.ColumnType, node.Cmd.ColumnName, node.Cmd.ColumnType)
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
+		}
+		// Create an index on a uuid column.
+		q = fmt.Sprintf("CREATE INDEX ON %s (\"%s\")", table.MainSQL(), node.Cmd.ColumnName)
 		if _, err = dc.Exec(context.TODO(), q); err != nil {
 			return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
 		}
