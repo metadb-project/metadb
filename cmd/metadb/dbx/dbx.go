@@ -28,11 +28,10 @@ type Table struct {
 // ParseTable parses a string in the form schema.table into a Table.
 func ParseTable(table string) (Table, error) {
 	t := strings.Split(table, ".")
-	lent := len(t)
-	switch {
-	case lent == 2:
+	switch len(t) {
+	case 2:
 		return Table{Schema: t[0], Table: t[1]}, nil
-	case lent == 1:
+	case 1:
 		return Table{Schema: "", Table: t[0]}, nil
 	default:
 		return Table{}, fmt.Errorf("%q is not a valid table name", table)

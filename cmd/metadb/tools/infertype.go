@@ -21,19 +21,19 @@ func RefreshInferredColumnTypes(dq dbx.Queryable, progress func(string)) error {
 	var rows pgx.Rows
 	var err error
 	if rows, err = dq.Query(context.TODO(), q); err != nil {
-		return fmt.Errorf("refresh inferred column types: selecting text columns: %v", err)
+		return fmt.Errorf("selecting text columns: %v", err)
 	}
 	defer rows.Close()
 	var columns = make([]dbx.Column, 0)
 	for rows.Next() {
 		var schema, table, column string
 		if err = rows.Scan(&schema, &table, &column); err != nil {
-			return fmt.Errorf("refresh inferred column types: reading text columns: %v", err)
+			return fmt.Errorf("reading text columns: %v", err)
 		}
 		columns = append(columns, dbx.Column{Schema: schema, Table: table, Column: column})
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("refresh inferred column types: reading text columns: %v", err)
+		return fmt.Errorf("reading text columns: %v", err)
 	}
 	rows.Close()
 
@@ -49,7 +49,7 @@ func RefreshInferredColumnTypes(dq dbx.Queryable, progress func(string)) error {
 		case errors.Is(err, pgx.ErrNoRows):
 			continue
 		case err != nil:
-			return fmt.Errorf("refresh inferred column types: selecting NULL values: %s: %v", colSpec, err)
+			return fmt.Errorf("selecting NULL values: %s: %v", colSpec, err)
 		default:
 			// NOP: there is a non-NULL value.
 		}
@@ -74,7 +74,7 @@ func castColumn(dq dbx.Queryable, col dbx.Column, ctype string, progress func(st
 	var err = dq.QueryRow(context.TODO(), q).Scan(&i)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
-		return fmt.Errorf("refresh inferred column types: testing cast to %s: %s: %v", ctype, colSpec, err)
+		return fmt.Errorf("testing cast to %s: %s: %v", ctype, colSpec, err)
 	case err != nil:
 		return nil // In this case we will take an error to mean the cast failed.
 	default:
@@ -84,12 +84,12 @@ func castColumn(dq dbx.Queryable, col dbx.Column, ctype string, progress func(st
 	q = fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s::%s",
 		col.SchemaTableSQL(), col.ColumnSQL(), ctype, col.ColumnSQL(), ctype)
 	if _, err = dq.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("refresh inferred column types: casting to %s: %s: %v", ctype, colSpec, err)
+		return fmt.Errorf("casting to %s: %s: %v", ctype, colSpec, err)
 	}
 	progress(fmt.Sprintf("converted %s to type %s", colSpec, ctype))
 	q = fmt.Sprintf("CREATE INDEX ON %s (%s)", col.SchemaTableSQL(), col.ColumnSQL())
 	if _, err = dq.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("refresh inferred column types: creating index: %s: %v", colSpec, err)
+		return fmt.Errorf("creating index: %s: %v", colSpec, err)
 	}
 	return nil
 }

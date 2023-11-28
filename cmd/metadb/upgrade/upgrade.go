@@ -1668,7 +1668,7 @@ func updb24(opt *dbopt) error {
 	defer dbx.Close(dc)
 
 	err = tools.RefreshInferredColumnTypes(dc, func(msg string) {
-		eout.Info("upgrading: %s", msg)
+		eout.Info("upgrading: refresh inferred column types: %s", msg)
 	})
 	if err != nil {
 		return fmt.Errorf("%v", err)
