@@ -18,6 +18,8 @@ import (
 %type <node> select_stmt
 %type <node> create_data_source_stmt alter_data_source_stmt drop_data_source_stmt authorize_stmt create_user_stmt
 %type <node> create_data_origin_stmt list_stmt
+%type <node> refresh_inferred_column_types_stmt
+%type <node> alter_table_stmt alter_table_cmd
 %type <optlist> options_clause alter_options_clause option_list alter_option_list option alter_option
 %type <str> option_name option_val
 %type <str> name unreserved_keyword
@@ -27,7 +29,8 @@ import (
 
 %token SELECT
 %token CREATE ALTER DATA SOURCE ORIGIN OPTIONS USER
-%token AUTHORIZE ON ALL TABLES IN TO WITH MAPPING LIST
+%token AUTHORIZE ON ALL TABLE TABLES IN TO WITH MAPPING LIST
+%token REFRESH INFERRED COLUMN TYPES
 %token TYPE
 %token TRUE FALSE
 %token <str> VERSION
@@ -77,6 +80,10 @@ stmt:
 		{
 			$$ = $1
 		}
+	| alter_table_stmt
+		{
+			$$ = $1
+		}
 	| ALTER
 		{
 			yylex.(*lexer).pass = true
@@ -96,6 +103,10 @@ stmt:
 			$$ = $1
 		}
 	| list_stmt
+		{
+			$$ = $1
+		}
+	| refresh_inferred_column_types_stmt
 		{
 			$$ = $1
 		}
@@ -141,6 +152,18 @@ create_user_stmt:
 	| CREATE USER MAPPING
 		{
 			yylex.(*lexer).pass = true
+		}
+
+alter_table_stmt:
+	ALTER TABLE name alter_table_cmd ';'
+		{
+			$$ = &ast.AlterTableStmt{TableName: $3, Cmd: ($4).(*ast.AlterTableCmd)}
+		}
+
+alter_table_cmd:
+	ALTER COLUMN name TYPE name
+		{
+			$$ = &ast.AlterTableCmd{ColumnName: $3, ColumnType: $5}
 		}
 
 alter_data_source_stmt:
@@ -233,6 +256,12 @@ list_stmt:
     LIST name ';'
 		{
 			$$ = &ast.ListStmt{Name: $2}
+		}
+
+refresh_inferred_column_types_stmt:
+    REFRESH INFERRED COLUMN TYPES ';'
+		{
+			$$ = &ast.RefreshInferredColumnTypesStmt{}
 		}
 
 name:

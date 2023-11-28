@@ -74,3 +74,24 @@ type ListStmt struct {
 
 func (*ListStmt) node()     {}
 func (*ListStmt) stmtNode() {}
+
+type RefreshInferredColumnTypesStmt struct {
+}
+
+func (*RefreshInferredColumnTypesStmt) node()     {}
+func (*RefreshInferredColumnTypesStmt) stmtNode() {}
+
+type AlterTableStmt struct {
+	TableName string
+	Cmd       *AlterTableCmd
+}
+
+func (*AlterTableStmt) node()     {}
+func (*AlterTableStmt) stmtNode() {}
+
+type AlterTableCmd struct {
+	ColumnName string
+	ColumnType string
+}
+
+func (*AlterTableCmd) node() {}

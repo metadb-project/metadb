@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/metadb-project/metadb/cmd/metadb/tools"
 	"os"
 	"sort"
 	"strings"
@@ -19,17 +21,21 @@ import (
 )
 
 func EndSync(opt *option.EndSync) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	db, err := util.ReadConfigDatabase(opt.Datadir)
+	var now = time.Now().UTC().Format(time.RFC3339)
+	var db *dbx.DB
+	var err error
+	db, err = util.ReadConfigDatabase(opt.Datadir)
 	if err != nil {
 		return err
 	}
-	dp, err := dbx.NewPool(context.TODO(), db.ConnString(db.User, db.Password))
+	var dp *pgxpool.Pool
+	dp, err = dbx.NewPool(context.TODO(), db.ConnString(db.User, db.Password))
 	if err != nil {
 		return fmt.Errorf("creating database connection pool: %v", err)
 	}
 	defer dp.Close()
-	exists, err := sourceExists(dp, opt.Source)
+	var exists bool
+	exists, err = sourceExists(dp, opt.Source)
 	if err != nil {
 		return err
 	}
@@ -37,7 +43,8 @@ func EndSync(opt *option.EndSync) error {
 		return fmt.Errorf("data source %q does not exist", opt.Source)
 	}
 	// Continue only if we are in a sync mode.
-	syncMode, err := ReadSyncMode(dp, opt.Source)
+	var syncMode Mode
+	syncMode, err = ReadSyncMode(dp, opt.Source)
 	if err != nil {
 		return err
 	}
@@ -46,7 +53,9 @@ func EndSync(opt *option.EndSync) error {
 	} // Allow initial sync or resync to continue.
 
 	// Check if server is already running.
-	running, pid, err := process.IsServerRunning(opt.Datadir)
+	var running bool
+	var pid int
+	running, pid, err = process.IsServerRunning(opt.Datadir)
 	if err != nil {
 		return err
 	}
@@ -65,7 +74,8 @@ func EndSync(opt *option.EndSync) error {
 	}
 
 	// Get list of tables
-	cat, err := catalog.Initialize(db, dp)
+	var cat *catalog.Catalog
+	cat, err = catalog.Initialize(db, dp)
 	if err != nil {
 		return err
 	}
@@ -152,7 +162,17 @@ func EndSync(opt *option.EndSync) error {
 			}
 		}
 	}
-	tx, err := dp.Begin(context.TODO())
+	if syncMode == InitialSync {
+		eout.Info("endsync: refreshing inferred column types")
+		err = tools.RefreshInferredColumnTypes(dp, func(msg string) {
+			eout.Info("endsync: %s", msg)
+		})
+		if err != nil {
+			return fmt.Errorf("%v", err)
+		}
+	}
+	var tx pgx.Tx
+	tx, err = dp.Begin(context.TODO())
 	if err != nil {
 		return err
 	}

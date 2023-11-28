@@ -25,10 +25,18 @@ type Table struct {
 	Table  string
 }
 
-type Column struct {
-	Schema string
-	Table  string
-	Column string
+// ParseTable parses a string in the form schema.table into a Table.
+func ParseTable(table string) (Table, error) {
+	t := strings.Split(table, ".")
+	lent := len(t)
+	switch {
+	case lent == 2:
+		return Table{Schema: t[0], Table: t[1]}, nil
+	case lent == 1:
+		return Table{Schema: "", Table: t[0]}, nil
+	default:
+		return Table{}, fmt.Errorf("%q is not a valid table name", table)
+	}
 }
 
 func (t Table) String() string {
@@ -45,6 +53,20 @@ func (t Table) SQL() string {
 
 func (t Table) MainSQL() string {
 	return "\"" + t.Schema + "\".\"" + t.Table + "__\""
+}
+
+type Column struct {
+	Schema string
+	Table  string
+	Column string
+}
+
+func (c Column) SchemaTableSQL() string {
+	return "\"" + c.Schema + "\".\"" + c.Table + "\""
+}
+
+func (c Column) ColumnSQL() string {
+	return "\"" + c.Column + "\""
 }
 
 type DB struct {
@@ -122,7 +144,7 @@ func (d *DB) connect(user, password string) (*pgx.Conn, error) {
 	return dc, nil
 }
 
-func (d DB) ConnString(user, password string) string {
+func (d *DB) ConnString(user, password string) string {
 	return "connect_timeout=30 host=" + d.Host + " port=" + d.Port + " user=" + user + " password=" + password +
 		" dbname=" + d.DBName + " sslmode=" + d.SSLMode
 }

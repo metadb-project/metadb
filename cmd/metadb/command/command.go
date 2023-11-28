@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/metadb-project/metadb/cmd/internal/uuid"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
@@ -951,8 +950,6 @@ func PrimaryKeyColumns(columns []CommandColumn) []CommandColumn {
 
 func InferTypeFromString(data string) DataType {
 	switch {
-	case uuid.IsUUID(data):
-		return UUIDType
 	case timestamptzRegexp.MatchString(data):
 		return TimestamptzType
 	case timestampRegexp.MatchString(data):

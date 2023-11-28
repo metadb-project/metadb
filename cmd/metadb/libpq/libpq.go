@@ -2,7 +2,9 @@ package libpq
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/metadb-project/metadb/cmd/metadb/tools"
 	"net"
 	"strings"
 	"syscall"
@@ -255,6 +257,8 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 	switch n := node.(type) {
 	case *ast.CreateDataSourceStmt:
 		err = createDataSource(conn, n, dbconn)
+	case *ast.AlterTableStmt:
+		err = alterTable(conn, n, dbconn)
 	case *ast.AlterDataSourceStmt:
 		err = alterDataSource(conn, n, dbconn)
 	case *ast.CreateUserStmt:
@@ -267,6 +271,8 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 		err = createDataOrigin(conn, n, dbconn)
 	case *ast.ListStmt:
 		err = list(conn, n, dbconn, sources)
+	case *ast.RefreshInferredColumnTypesStmt:
+		err = refreshInferredColumnTypesStmt(conn, dbconn)
 	//case *ast.SelectStmt:
 	//	if n.Fn == "version" {
 	//		return version(conn, query)
@@ -480,6 +486,68 @@ func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Con
 
 	b := encode(nil, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("CREATE DATA SOURCE")},
+		&pgproto3.ReadyForQuery{TxStatus: 'I'},
+	})
+	return write(conn, b)
+}
+
+func alterTable(conn net.Conn, node *ast.AlterTableStmt, dc *pgx.Conn) error {
+	// The only type currently supported is uuid.
+	columnType := strings.ToLower(node.Cmd.ColumnType)
+	if columnType != "uuid" {
+		return fmt.Errorf("converting to type %q not supported", columnType)
+	}
+
+	// Parse the table name and ensure it is a main table.
+	table, err := dbx.ParseTable(node.TableName)
+	if err != nil {
+		return fmt.Errorf("parsing table name %q: %v", node.TableName, err)
+	}
+	if !strings.HasSuffix(node.TableName, "__") {
+		return fmt.Errorf("%q is not a main table", node.TableName)
+	}
+
+	// Ensure the table is in the catalog.
+	q := "SELECT 1 FROM metadb.base_table WHERE schema_name=$1 AND table_name||'__'=$2"
+	var i int64
+	err = dc.QueryRow(context.TODO(), q, table.Schema, table.Table).Scan(&i)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return fmt.Errorf("table %q does not exist in a data source", node.TableName)
+	case err != nil:
+		return fmt.Errorf("looking up table %q: %v", node.TableName, err)
+	default:
+		// NOP: table found.
+	}
+
+	// Ensure the table has the requested column.
+	q = `SELECT t.typname
+    FROM pg_class c
+        JOIN pg_namespace n ON c.relnamespace=n.oid
+        JOIN pg_attribute a ON a.attrelid=c.oid
+        JOIN pg_type t ON t.oid=a.atttypid
+    WHERE n.nspname=$1 AND c.relname=$2 AND a.attname=$3`
+	var t string
+	err = dc.QueryRow(context.TODO(), q, table.Schema, table.Table, node.Cmd.ColumnName).Scan(&t)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return fmt.Errorf("column %q of table %q does not exist", node.Cmd.ColumnName, node.TableName)
+	case err != nil:
+		return fmt.Errorf("looking up column %q in table %q: %v", node.Cmd.ColumnName, node.TableName, err)
+	default:
+		// NOP: column found.
+	}
+
+	if t != "uuid" { // No need to do anything if the type is already uuid.
+		q = fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s::%s",
+			node.TableName, node.Cmd.ColumnName, node.Cmd.ColumnType, node.Cmd.ColumnName, node.Cmd.ColumnType)
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
+		}
+	}
+
+	b := encode(nil, []pgproto3.Message{
+		&pgproto3.CommandComplete{CommandTag: []byte("ALTER TABLE")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
 	return write(conn, b)
@@ -875,6 +943,23 @@ func originExists(dc *pgx.Conn, originName string) (bool, error) {
 	default:
 		return true, nil
 	}
+}
+
+func refreshInferredColumnTypesStmt(conn net.Conn, dc *pgx.Conn) error {
+	err := tools.RefreshInferredColumnTypes(dc, func(msg string) {
+		_ = write(conn, encode(nil, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "INFO",
+			Message: msg},
+		}))
+	})
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
+
+	b := encode(nil, []pgproto3.Message{
+		&pgproto3.CommandComplete{CommandTag: []byte("REFRESH INFERRED COLUMN TYPES")},
+		&pgproto3.ReadyForQuery{TxStatus: 'I'},
+	})
+	return write(conn, b)
 }
 
 //func version(conn net.Conn, query *pgproto3.Query, mdbVersion string) error {

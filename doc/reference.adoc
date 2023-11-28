@@ -391,6 +391,49 @@ Change the consumer group:
 ALTER DATA SOURCE sensor OPTIONS (SET consumergroup 'metadb_sensor_1');
 ----
 
+==== ALTER TABLE
+
+[.aqua-background]#Metadb 1.2#
+
+Change a table definition
+
+[source,subs="verbatim,quotes"]
+----
+ALTER TABLE `*_table_name_*`
+    ALTER COLUMN `*_column_name_*` TYPE `*_data_type_*`
+----
+
+[discrete]
+===== Description
+
+ALTER TABLE changes the definition of a table that is extracted from a
+data source.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_table_name_*`
+|Schema-qualified name of a main table.
+
+|`*_column_name_*`
+|Name of a column to alter.
+
+|`*_data_type_*`
+|The new data type of the column.  The only type
+currently supported is `uuid`.
+|===
+
+[discrete]
+===== Examples
+
+Change a column type to `uuid`:
+
+----
+ALTER TABLE library.patron__ ALTER COLUMN patrongroup_id TYPE uuid;
+----
+
 ==== AUTHORIZE
 
 Enable access to tables generated from an external data source
@@ -697,4 +740,35 @@ variables.
 
 ----
 LIST status;
+----
+
+==== REFRESH INFERRED COLUMN TYPES
+
+[.aqua-background]#Metadb 1.2#
+
+Infer column types from data
+
+[source,subs="verbatim,quotes"]
+----
+REFRESH INFERRED COLUMN TYPES
+----
+
+[discrete]
+===== Description
+
+REFRESH INFERRED COLUMN TYPES scans all tables extracted from data
+sources, looking for `text` columns that contain only data of a more
+specific type such as `uuid`, and converts those columns to the
+specific type.
+
+This command is run once automatically after an initial
+synchronization.
+
+[discrete]
+===== Examples
+
+Rescan tables and adjust the column types:
+
+----
+REFRESH INFERRED COLUMN TYPES;
 ----

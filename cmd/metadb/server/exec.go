@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/metadb-project/metadb/cmd/internal/uuid"
 	"strings"
 	"time"
 
@@ -162,10 +163,17 @@ func execDeltaSchema(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comman
 			col.newTypeSize = typeSize
 		}
 
-		// Don't change a UUID type with a null value, because UUID may have been
-		// inferred from data.
-		if col.oldType == command.UUIDType && col.newType == command.TextType && col.newData == nil {
-			continue
+		// If this is a change from a UUID to text type, it may be that the UUID type was
+		// inferred from a text type in the source.  For this reason we will prefer to
+		// retain the UUID type, unless the new data is not a valid UUID.
+		if col.oldType == command.UUIDType && col.newType == command.TextType {
+			if col.newData == nil {
+				continue
+			}
+			newDataStr, ok := col.newData.(string)
+			if ok && uuid.IsUUID(newDataStr) {
+				continue
+			}
 		}
 
 		// If both the old and new types are IntegerType, change the column type to

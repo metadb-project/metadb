@@ -11,7 +11,7 @@ import (
 	variable p lex.p;
 	variable pe lex.pe;
 
-	identifier = [A-Za-z_][0-9A-Za-z_]*;
+	identifier = [A-Za-z_][0-9A-Za-z_.]*;
 	sliteral = ['][^']*['];
 }%%
 
@@ -61,6 +61,7 @@ func (lex *lexer) Lex(out *yySymType) int {
 			'authorize'i => { tok = AUTHORIZE; fbreak; };
 			'on'i => { tok = ON; fbreak; };
 			'all'i => { tok = ALL; fbreak; };
+			'table'i => { tok = TABLE; fbreak; };
 			'tables'i => { tok = TABLES; fbreak; };
 			'in'i => { tok = IN; fbreak; };
 			'to'i => { tok = TO; fbreak; };
@@ -68,6 +69,10 @@ func (lex *lexer) Lex(out *yySymType) int {
 			'with'i => { tok = WITH; fbreak; };
 			'mapping'i => { tok = MAPPING; fbreak; };
 			'list'i => { tok = LIST; fbreak; };
+			'refresh'i => { tok = REFRESH; fbreak; };
+			'inferred'i => { tok = INFERRED; fbreak; };
+			'column'i => { tok = COLUMN; fbreak; };
+			'types'i => { tok = TYPES; fbreak; };
 			'version'i => { out.str = "version"; tok = VERSION; fbreak; };
 			identifier => { out.str = string(lex.data[lex.ts:lex.te]); tok = IDENT; fbreak; };
 			sliteral => { out.str = string(lex.data[lex.ts+1:lex.te-1]); tok = SLITERAL; fbreak; };

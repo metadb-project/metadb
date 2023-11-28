@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/metadb-project/metadb/cmd/metadb/tools"
 	"os"
 	"strconv"
 	"strings"
@@ -410,6 +411,7 @@ var updbList = []updbFunc{
 	updb21,
 	updb22,
 	updb23,
+	updb24,
 }
 
 func updb8(opt *dbopt) error {
@@ -1652,6 +1654,27 @@ func updb23(opt *dbopt) error {
 		return err
 	}
 	if err = tx.Commit(context.TODO()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb24(opt *dbopt) error {
+	// Open database
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	err = tools.RefreshInferredColumnTypes(dc, func(msg string) {
+		eout.Info("upgrading: %s", msg)
+	})
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
+
+	if err = metadata.WriteDatabaseVersion(dc, 24); err != nil {
 		return err
 	}
 	return nil
