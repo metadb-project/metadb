@@ -276,48 +276,20 @@ Metadb allows scheduling external SQL files to run on a regular basis.
 Each SQL statement should be separated from others by an empty line, and any
 tables created should not specify a schema name.
 
-Comment lines beginning with `--metadb:` are used for additional directives;
-each directive should be on a separate line.
+Comment lines beginning with `--metadb:` are used for special
+directives; each directive should be on a separate line.
 
-It is suggested that each SQL file optionally begin with a `--metadb:table`
-directive, optionally followed by `--metadb:require` directives if needed, and
-then followed by an empty line, for example:
+It is suggested that each SQL file begin with a `--metadb:table`
+directive, followed by an empty line, for example:
 
 ----
 --metadb:table library_patrons
---metadb:require library.patrongroup.id uuid
---metadb:require library.patrongroup.name text
 
 DROP TABLE IF EXISTS library_patrons;
 
 CREATE TABLE library_patrons AS
 SELECT . . . ;
 ----
-
-==== --metadb:require
-
-The `--metadb:require` directive asserts a dependency on a specific table and
-column in the database.  Metadb will ensure that the table and column exist
-before it continues executing the SQL file.  The required table can be a main
-table or a current table; both will be created if either is specified and does
-not exist.
-
-The directive takes the form:
-
-----
---metadb:require <schema>.<table>.<column> <columntype>
-----
-
-For example:
-
-----
---metadb:require library.patrongroup.id uuid
---metadb:require library.patrongroup.name text
-----
-
-There is generally no need to list all dependencies.  The intent of this
-directive is to reduce SQL errors by listing tables and columns that are likely
-or known to be missing in some instances.
 
 ==== --metadb:table
 
