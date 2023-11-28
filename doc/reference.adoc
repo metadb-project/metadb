@@ -1,8 +1,6 @@
 == Reference
 
-=== Stream processor
-
-==== Data type conversion
+=== Data type conversion
 
 When reading data from a data source, Metadb will automatically adjust column
 data types in a number of cases:
@@ -16,7 +14,14 @@ data types in a number of cases:
 * A data type in the source can be converted safely to a type that is more
   performant.
 
-This table summarizes the type adjustments that are performed:
+Each type conversion is applied in one of two ways: either by the
+stream processor converting a record-at-a-time, or later by
+"inferring" types from previously updated data.
+
+==== Record-at-a-time
+
+This table summarizes conversions that are performed a
+record-at-a-time by the stream processor:
 
 [width=80%]
 [%header,cols="2,^1,^1,^1,^1"]
@@ -116,6 +121,20 @@ This table summarizes the type adjustments that are performed:
 |
 |
 |✅
+|===
+
+==== Inferred from data
+
+At present the only inferred type is `uuid`:
+
+[width=80%]
+[%header,cols="2,^1,^1,^1,^1"]
+|===
+|*Data type conversions*
+^|*To numeric*
+^|*To uuid*
+^|*To jsonb*
+^|*To text*
 
 |From text/varchar
 |
@@ -123,6 +142,11 @@ This table summarizes the type adjustments that are performed:
 |
 |
 |===
+
+The command `REFRESH INFERRED COLUMN TYPES` can be used to infer data
+types.
+
+Types can also be set manually via the `ALTER TABLE` command.
 
 === Functions
 
