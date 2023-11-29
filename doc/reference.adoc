@@ -611,7 +611,7 @@ Define a new database user
 
 [source,subs="verbatim,quotes"]
 ----
-CREATE USER `*_user_name_*` [ WITH ] *_option_* '*_value_*' [, ... ]
+CREATE USER `*_user_name_*` WITH *_option_* '*_value_*' [, ... ]
 ----
 
 [discrete]
@@ -631,7 +631,7 @@ a workspace for the user.
 |`*_user_name_*`
 |The name of the new user.
 
-|`[ WITH ] ( *_option_* '*_value_*' [, ... ] )`
+|`WITH ( *_option_* '*_value_*' [, ... ] )`
 |Configuration options for the new user.
 |===
 

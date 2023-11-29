@@ -145,10 +145,6 @@ create_user_stmt:
 		{
 			$$ = &ast.CreateUserStmt{UserName: $3, Options: $5}
 		}
-	| CREATE USER name option_list ';'
-		{
-			$$ = &ast.CreateUserStmt{UserName: $3, Options: $4}
-		}
 	| CREATE USER MAPPING
 		{
 			yylex.(*lexer).pass = true
