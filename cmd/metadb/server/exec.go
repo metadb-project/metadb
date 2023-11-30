@@ -1,6 +1,7 @@
 package server
 
 import (
+	"container/list"
 	"context"
 	"fmt"
 	"github.com/metadb-project/metadb/cmd/internal/uuid"
@@ -16,9 +17,8 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 )
 
-func execCommandList(ctx context.Context, cat *catalog.Catalog, cmdlist *command.CommandList, dp *pgxpool.Pool, source string, syncMode dsync.Mode) error {
-	commands := cmdlist.Cmd
-	if len(commands) == 0 {
+func execCommandList(ctx context.Context, cat *catalog.Catalog, cmdlist *list.List, dp *pgxpool.Pool, source string, syncMode dsync.Mode) error {
+	if cmdlist.Len() == 0 {
 		return nil
 	}
 	ebuf := &execbuffer{
@@ -29,11 +29,12 @@ func execCommandList(ctx context.Context, cat *catalog.Catalog, cmdlist *command
 		syncMode:  syncMode,
 	}
 	txnTime := time.Now()
-	for i := range commands {
+	for e := cmdlist.Front(); e != nil; e = e.Next() {
+		cmd := e.Value.(*command.Command)
 		if log.IsLevelTrace() {
-			logTraceCommand(commands[i])
+			logTraceCommand(cmd)
 		}
-		if err := execCommand(ebuf, cat, commands[i], source, syncMode); err != nil {
+		if err := execCommand(ebuf, cat, cmd, source, syncMode); err != nil {
 			return fmt.Errorf("exec command: %v", err)
 		}
 	}
@@ -41,7 +42,7 @@ func execCommandList(ctx context.Context, cat *catalog.Catalog, cmdlist *command
 		return fmt.Errorf("exec command list: %v", err)
 	}
 	log.Trace("=================================================================")
-	log.Trace("exec: %d records %s", len(commands), fmt.Sprintf("[%.4f s]", time.Since(txnTime).Seconds()))
+	log.Trace("exec: %d records %s", cmdlist.Len(), fmt.Sprintf("[%.4f s]", time.Since(txnTime).Seconds()))
 	log.Trace("=================================================================")
 	return nil
 }

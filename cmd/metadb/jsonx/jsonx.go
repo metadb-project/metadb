@@ -1,6 +1,7 @@
 package jsonx
 
 import (
+	"container/list"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -10,7 +11,8 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.CommandColumn) error {
+func RewriteJSON(cmdlist *list.List, cmde *list.Element, column *command.CommandColumn) error {
+	cmd := cmde.Value.(*command.Command)
 	// folio module filter
 	if cmd.SchemaName == "folio_source_record" &&
 		(cmd.TableName == "marc_records_lb" || cmd.TableName == "edifact_records_lb") {
@@ -31,13 +33,14 @@ func RewriteJSON(cl *command.CommandList, cmd *command.Command, column *command.
 	if !ok {
 		return nil
 	}
-	if err := rewriteObject(cl, cmd, 1, obj, cmd.TableName+"__t"); err != nil {
+	if err := rewriteObject(cmdlist, cmde, 1, obj, cmd.TableName+"__t"); err != nil {
 		return fmt.Errorf("rewrite json: %s", err)
 	}
 	return nil
 }
 
-func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj map[string]interface{}, table string) error {
+func rewriteObject(cmdlist *list.List, cmde *list.Element, level int, obj map[string]interface{}, table string) error {
+	cmd := cmde.Value.(*command.Command)
 	if level > 2 {
 		return nil
 	}
@@ -114,7 +117,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 		}
 
 	}
-	ncmd := &command.Command{
+	newcmd := &command.Command{
 		Op:              command.MergeOp,
 		SchemaName:      cmd.SchemaName,
 		TableName:       table,
@@ -124,8 +127,7 @@ func rewriteObject(cl *command.CommandList, cmd *command.Command, level int, obj
 		Column:          cols,
 		SourceTimestamp: cmd.SourceTimestamp,
 	}
-	cl.Cmd = append(cl.Cmd, ncmd)
-
+	_ = cmdlist.InsertAfter(newcmd, cmde)
 	return nil
 }
 

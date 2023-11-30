@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"container/list"
 	"fmt"
 	"os"
 	"regexp"
@@ -240,10 +241,10 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	pkerr := make(map[string]struct{}) // "primary key not defined" errors reported
 	var firstEvent = true
 	for {
-		var cl = &command.CommandList{}
+		cmdlist := list.New()
 
 		// Parse
-		eventReadCount, err := parseChangeEvents(cat, pkerr, consumer, cl, spr.schemaPassFilter,
+		eventReadCount, err := parseChangeEvents(cat, pkerr, consumer, cmdlist, spr.schemaPassFilter,
 			spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
 			spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog)
 		if err != nil {
@@ -255,17 +256,17 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Rewrite
-		before := len(cl.Cmd)
-		if err = rewriteCommandList(cl, spr.svr.opt.RewriteJSON); err != nil {
+		before := cmdlist.Len()
+		if err = rewriteCommandList(cmdlist, spr.svr.opt.RewriteJSON); err != nil {
 			return fmt.Errorf("rewriter: %s", err)
 		}
-		after := len(cl.Cmd)
+		after := cmdlist.Len()
 		if before != after {
 			log.Trace("%d commands added by rewrite", after-before)
 		}
 
 		// Execute
-		if err = execCommandList(ctx, cat, cl, spr.svr.dp, spr.source.Name, syncMode); err != nil {
+		if err = execCommandList(ctx, cat, cmdlist, spr.svr.dp, spr.source.Name, syncMode); err != nil {
 			return fmt.Errorf("executor: %s", err)
 		}
 
@@ -288,7 +289,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		if eventReadCount > 0 {
-			log.Debug("checkpoint: events=%d, commands=%d", eventReadCount, len(cl.Cmd))
+			log.Debug("checkpoint: events=%d, commands=%d", eventReadCount, cmdlist.Len())
 		}
 
 		// Check if resync snapshot may have completed.
@@ -300,7 +301,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	}
 }
 
-func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer *kafka.Consumer, cl *command.CommandList, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
+func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer *kafka.Consumer, cmdlist *list.List, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
 	kafkaPollTimeout := 100     // Poll timeout in milliseconds.
 	pollTimeoutCountLimit := 20 // Maximum allowable number of consecutive poll timeouts.
 	pollLoopTimeout := 120.0    // Overall pool loop timeout in seconds.
@@ -340,7 +341,7 @@ func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer
 			if ce, err = readChangeEventFromFile(sourceFileScanner, sourceLog); err != nil {
 				return 0, fmt.Errorf("reading change event from file: %v", err)
 			}
-			if ce == nil && len(cl.Cmd) == 0 {
+			if ce == nil && cmdlist.Len() == 0 {
 				log.Info("finished processing source file")
 				log.Info("shutting down")
 				process.SetStop()
@@ -366,9 +367,9 @@ func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer
 		if snap {
 			snapshot = true
 		}
-		cl.Cmd = append(cl.Cmd, c)
+		_ = cmdlist.PushBack(c)
 	}
-	log.Trace("read %d events", len(cl.Cmd))
+	log.Trace("read %d events", cmdlist.Len())
 	if snapshot {
 		cat.ResetLastSnapshotRecord()
 	}

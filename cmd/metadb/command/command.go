@@ -175,10 +175,6 @@ func DataTypeToSQL(dtype DataType, typeSize int64) string {
 	}
 }
 
-type CommandList struct {
-	Cmd []*Command
-}
-
 type Command struct {
 	Op              Operation
 	SchemaName      string
