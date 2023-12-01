@@ -220,7 +220,7 @@ func createTableMaintenance(tx pgx.Tx) error {
 	}
 	q = "INSERT INTO " + catalogSchema + ".maintenance " +
 		"(next_maintenance_time) VALUES " +
-		"(CURRENT_DATE::timestamptz + INTERVAL '1 day')"
+		"(CURRENT_DATE::timestamptz + INTERVAL '1 day' + INTERVAL '3 hours')"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return err
 	}
