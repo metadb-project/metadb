@@ -273,6 +273,8 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 		err = list(conn, n, dbconn, sources)
 	case *ast.RefreshInferredColumnTypesStmt:
 		err = refreshInferredColumnTypesStmt(conn, dbconn)
+	case *ast.VerifyConsistencyStmt:
+		err = verifyConsistencyStmt(conn, dbconn)
 	//case *ast.SelectStmt:
 	//	if n.Fn == "version" {
 	//		return version(conn, query)
@@ -963,6 +965,23 @@ func refreshInferredColumnTypesStmt(conn net.Conn, dc *pgx.Conn) error {
 
 	b := encode(nil, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("REFRESH INFERRED COLUMN TYPES")},
+		&pgproto3.ReadyForQuery{TxStatus: 'I'},
+	})
+	return write(conn, b)
+}
+
+func verifyConsistencyStmt(conn net.Conn, dc *pgx.Conn) error {
+	err := tools.VerifyConsistency(dc, func(msg string) {
+		_ = write(conn, encode(nil, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "INFO",
+			Message: msg},
+		}))
+	})
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
+
+	b := encode(nil, []pgproto3.Message{
+		&pgproto3.CommandComplete{CommandTag: []byte("VERIFY CONSISTENCY")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
 	return write(conn, b)

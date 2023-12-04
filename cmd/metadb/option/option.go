@@ -47,6 +47,11 @@ type Sync struct {
 	Force   bool
 }
 
+type Verify struct {
+	Global
+	Datadir string
+}
+
 type EndSync struct {
 	Global
 	Datadir string

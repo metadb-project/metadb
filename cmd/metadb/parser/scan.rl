@@ -45,6 +45,7 @@ func (lex *lexer) Lex(out *yySymType) int {
 			',' => { tok = ','; fbreak; };
 			'(' => { tok = '('; fbreak; };
 			')' => { tok = ')'; fbreak; };
+			'consistency'i => { tok = CONSISTENCY; fbreak; };
 			'true'i => { tok = TRUE; fbreak; };
 			'false'i => { tok = FALSE; fbreak; };
 			'select'i => { tok = SELECT; fbreak; };
@@ -74,6 +75,7 @@ func (lex *lexer) Lex(out *yySymType) int {
 			'column'i => { tok = COLUMN; fbreak; };
 			'types'i => { tok = TYPES; fbreak; };
 			'version'i => { out.str = "version"; tok = VERSION; fbreak; };
+			'verify'i => { tok = VERIFY; fbreak; };
 			identifier => { out.str = string(lex.data[lex.ts:lex.te]); tok = IDENT; fbreak; };
 			sliteral => { out.str = string(lex.data[lex.ts+1:lex.te-1]); tok = SLITERAL; fbreak; };
 			digit+ => { out.str = string(lex.data[lex.ts:lex.te]); tok = NUMBER; fbreak; };

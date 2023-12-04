@@ -95,3 +95,9 @@ type AlterTableCmd struct {
 }
 
 func (*AlterTableCmd) node() {}
+
+type VerifyConsistencyStmt struct {
+}
+
+func (*VerifyConsistencyStmt) node()     {}
+func (*VerifyConsistencyStmt) stmtNode() {}

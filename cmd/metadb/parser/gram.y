@@ -20,6 +20,7 @@ import (
 %type <node> create_data_origin_stmt list_stmt
 %type <node> refresh_inferred_column_types_stmt
 %type <node> alter_table_stmt alter_table_cmd
+%type <node> verify_consistency_stmt
 %type <optlist> options_clause alter_options_clause option_list alter_option_list option alter_option
 %type <str> option_name option_val
 %type <str> name unreserved_keyword
@@ -28,11 +29,13 @@ import (
 */
 
 %token SELECT
+%token CONSISTENCY
 %token CREATE ALTER DATA SOURCE ORIGIN OPTIONS USER
 %token AUTHORIZE ON ALL TABLE TABLES IN TO WITH MAPPING LIST
 %token REFRESH INFERRED COLUMN TYPES
 %token TYPE
 %token TRUE FALSE
+%token VERIFY
 %token <str> VERSION
 %token <str> ADD SET DROP
 %token <str> IDENT NUMBER
@@ -107,6 +110,10 @@ stmt:
 			$$ = $1
 		}
 	| refresh_inferred_column_types_stmt
+		{
+			$$ = $1
+		}
+	| verify_consistency_stmt
 		{
 			$$ = $1
 		}
@@ -258,6 +265,12 @@ refresh_inferred_column_types_stmt:
     REFRESH INFERRED COLUMN TYPES ';'
 		{
 			$$ = &ast.RefreshInferredColumnTypesStmt{}
+		}
+
+verify_consistency_stmt:
+    VERIFY CONSISTENCY ';'
+		{
+			$$ = &ast.VerifyConsistencyStmt{}
 		}
 
 name:
