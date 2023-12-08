@@ -53,6 +53,9 @@ Table names have changed and now are derived from FOLIO internal table names:
 |LDP table
 |Metadb table
 
+|acquisition_method
+|folio_orders.acquisition_method
+
 |acquisitions_memberships
 |folio_orders.acquisitions_unit_membership
 
@@ -67,6 +70,9 @@ Table names have changed and now are derived from FOLIO internal table names:
 
 |circulation_check_ins
 |folio_circulation.check_in
+
+|circulation_fixed_due_date_schedules
+|folio_circulation.fixed_due_date_schedule
 
 |circulation_loan_history
 |folio_circulation.audit_loan
@@ -88,6 +94,9 @@ Table names have changed and now are derived from FOLIO internal table names:
 
 |circulation_request_preference
 |folio_circulation.user_request_preference
+
+|circulation_requests
+|folio_circulation.request
 
 |circulation_scheduled_notices
 |folio_circulation.scheduled_notice
@@ -119,6 +128,9 @@ Table names have changed and now are derived from FOLIO internal table names:
 |course_reserves
 |folio_courses.coursereserves_reserves
 
+|course_roles
+|folio_courses.coursereserves_roles
+
 |course_terms
 |folio_courses.coursereserves_terms
 
@@ -140,6 +152,9 @@ Table names have changed and now are derived from FOLIO internal table names:
 |feesfines_lost_item_fees_policies
 |folio_feesfines.lost_item_fee_policy
 
+|feesfines_manualblocks
+|folio_feesfines.manualblocks
+
 |feesfines_overdue_fines_policies
 |folio_feesfines.overdue_fine_policy
 
@@ -152,11 +167,20 @@ Table names have changed and now are derived from FOLIO internal table names:
 |feesfines_refunds
 |folio_feesfines.refunds
 
+|feesfines_transfer_criterias
+|folio_feesfines.transfer_criteria
+
+|feesfines_transfers
+|folio_feesfines.transfers
+
 |feesfines_waives
 |folio_feesfines.waives
 
 |finance_budgets
 |folio_finance.budget
+
+|finance_expense_classes
+|folio_finance.expense_class
 
 |finance_fiscal_years
 |folio_finance.fiscal_year
@@ -181,6 +205,9 @@ Table names have changed and now are derived from FOLIO internal table names:
 
 |inventory_alternative_title_types
 |folio_inventory.alternative_title_type
+
+|inventory_bound_with_part
+|folio_inventory.bound_with_part
 
 |inventory_call_number_types
 |folio_inventory.call_number_type
@@ -293,11 +320,20 @@ Table names have changed and now are derived from FOLIO internal table names:
 |invoice_vouchers
 |folio_invoice.vouchers
 
+|notes
+|folio_notes.note
+
+|organization_addresses
+|folio_organizations.addresses
+
 |organization_categories
 |folio_organizations.categories
 
 |organization_contacts
 |folio_organizations.contacts
+
+|organization_emails
+|folio_organizations.emails
 
 |organization_interfaces
 |folio_organizations.interfaces
@@ -305,11 +341,29 @@ Table names have changed and now are derived from FOLIO internal table names:
 |organization_organizations
 |folio_organizations.organizations
 
+|organization_phone_numbers
+|folio_organizations.phone_numbers
+
+|organization_urls
+|folio_organizations.urls
+
+|patron_blocks_user_summary
+|folio_patron_blocks.user_summary
+
+|perm_permissions
+|folio_permissions.permissions
+
+|perm_users
+|folio_permissions.permissions_users
+
 |po_alerts
 |folio_orders.alert
 
 |po_lines
 |folio_orders.po_line
+
+|po_order_invoice_relns
+|folio_orders.order_invoice_relationship
 
 |po_order_templates
 |folio_orders.order_templates
@@ -320,6 +374,9 @@ Table names have changed and now are derived from FOLIO internal table names:
 |po_purchase_orders
 |folio_orders.purchase_order
 
+|po_receiving_history
+|(Not supported in Metadb)
+
 |po_reporting_codes
 |folio_orders.reporting_code
 
@@ -329,11 +386,20 @@ Table names have changed and now are derived from FOLIO internal table names:
 |srs_marc
 |folio_source_record.marc_records_lb
 
+|srs_marctab
+|folio_source_record.marc__t
+
 |srs_records
 |folio_source_record.records_lb
 
+|template_engine_template
+|folio_template_engine.template
+
 |user_addresstypes
 |folio_users.addresstype
+
+|user_departments
+|folio_users.departments
 
 |user_groups
 |folio_users.groups
