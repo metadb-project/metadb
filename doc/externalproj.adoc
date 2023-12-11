@@ -84,7 +84,7 @@ Table names have changed and now are derived from FOLIO internal table names:
 |folio_circulation.loan
 
 |circulation_patron_action_sessions
-|circulation_patron_action_sessions
+|folio_circulation.patron_action_session
 
 |circulation_patron_notice_policies
 |folio_circulation.patron_notice_policy
