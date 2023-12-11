@@ -127,12 +127,11 @@ already exist; so they should be created before continuing.
 
 *It is essential to make regular backups of Metadb and to test the backups.*
 
-In general, persistent data are stored in the database, and therefore the
-database is the most important system that should be backed up often.
+In general persistent data are stored in the database, and so the database
+should be backed up often.
 
 The data directory contains the `metadb.conf` configuration file and is also
-used for temporary storage.  The `metadb.conf` file should be backed up, or
-alternatively it should be possible to reconstruct the file's contents.
+used for temporary storage.  The `metadb.conf` file should be backed up.
 
 === Upgrading from a previous version
 

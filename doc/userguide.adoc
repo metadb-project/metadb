@@ -392,9 +392,9 @@ rates, `numeric(19, 14)` may be used.
 [discrete]
 ==== Querying on a range of dates
 
-There are various ways of querying within a range of dates, but the least
-error-prone is to use inequalities of the form `_start_ \<= _t_ < _end_`, for
-example:
+There are various ways of querying within a range of dates, but the most
+reliable method is to use inequalities of the form `_start_ \<= _t_ < _end_`,
+for example:
 
 ----
 SELECT *

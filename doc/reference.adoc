@@ -2,26 +2,26 @@
 
 === Data type conversion
 
-When reading data from a data source, Metadb will automatically adjust
-column data types in a number of cases:
+When reading data from a data source, Metadb will automatically adjust column
+data types in a number of cases:
 
-* A data type in the source has changed in a way that cannot be
-  applied safely by Metadb without more information.
+* A data type in the source has changed in a way that cannot be applied safely
+  by Metadb without more information.
 
-* A data type in the source has changed to a type that is not
-  supported by Metadb.
+* A data type in the source has changed to a type that is not supported by
+  Metadb.
 
-* A data type in the source can be converted safely to a type that is
-  more performant.
+* A data type in the source can be converted safely to a type that is more
+  performant.
 
-Each type conversion is applied in one of two ways: either by the
-stream processor converting a record-at-a-time, or later by
-"inferring" types from previously updated data.
+Each type conversion is applied in one of two ways: either by the stream
+processor converting a record-at-a-time, or later by "inferring" types from
+previously updated data.
 
 ==== Record-at-a-time
 
-This table summarizes conversions that are performed a
-record-at-a-time by the stream processor:
+This table summarizes conversions that are performed a record-at-a-time by the
+stream processor:
 
 [width=80%]
 [%header,cols="2,^1,^1,^1,^1"]
@@ -296,11 +296,11 @@ Metadb allows scheduling external SQL files to run on a regular basis.
 Each SQL statement should be separated from others by an empty line, and any
 tables created should not specify a schema name.
 
-Comment lines beginning with `--metadb:` are used for special
-directives; each directive should be on a separate line.
+Comment lines beginning with `--metadb:` are used for special directives; each
+directive should be on a separate line.
 
-It is suggested that each SQL file begin with a `--metadb:table`
-directive, followed by an empty line, for example:
+It is suggested that each SQL file begin with a `--metadb:table` directive,
+followed by an empty line, for example:
 
 ----
 --metadb:table library_patrons
@@ -398,8 +398,8 @@ ALTER TABLE `*_table_name_*`
 [discrete]
 ===== Description
 
-ALTER TABLE changes the definition of a table that is extracted from a
-data source.
+ALTER TABLE changes the definition of a table that is extracted from a data
+source.
 
 [discrete]
 ===== Parameters
