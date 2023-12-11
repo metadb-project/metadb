@@ -143,10 +143,7 @@ At present the only inferred type is `uuid`:
 |
 |===
 
-The command `REFRESH INFERRED COLUMN TYPES` can be used to infer data
-types.
-
-Types can also be set manually via the `ALTER TABLE` command.
+Types also can be set manually via the `ALTER TABLE` command.
 
 === Functions
 
@@ -738,33 +735,3 @@ variables.
 LIST status;
 ----
 
-==== REFRESH INFERRED COLUMN TYPES
-
-[.aqua-background]#Metadb 1.2#
-
-Infer column types from data
-
-[source,subs="verbatim,quotes"]
-----
-REFRESH INFERRED COLUMN TYPES
-----
-
-[discrete]
-===== Description
-
-REFRESH INFERRED COLUMN TYPES scans all tables extracted from data
-sources, looking for `text` columns that contain only data of a more
-specific type such as `uuid`, and converts those columns to the
-specific type.
-
-This command is run once automatically after an initial
-synchronization.
-
-[discrete]
-===== Examples
-
-Rescan tables and adjust the column types:
-
-----
-REFRESH INFERRED COLUMN TYPES;
-----
