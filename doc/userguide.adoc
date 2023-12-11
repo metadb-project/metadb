@@ -177,6 +177,9 @@ present in this sample table and has been provided by the data source; it may
 or may not be a key, and its name, content, or significance may change if
 schema changes are made in the data source.
 
+Current table names are sometimes referred to as "base tables" because
+they match the original table names in the data source.
+
 === Transformed tables
 
 Metadb applies transformations to some kinds of data, which results in
@@ -321,7 +324,7 @@ To summarize the types of tables that we have covered:
 |Current and historical records
 
 |patrongroup
-|Current table
+|Current table (base table)
 |Current records only
 
 |patrongroup__t__
