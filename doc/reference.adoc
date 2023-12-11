@@ -2,17 +2,17 @@
 
 === Data type conversion
 
-When reading data from a data source, Metadb will automatically adjust column
-data types in a number of cases:
+When reading data from a data source, Metadb will automatically adjust
+column data types in a number of cases:
 
-* A data type in the source has changed in a way that cannot be applied safely
-  by Metadb without more information.
+* A data type in the source has changed in a way that cannot be
+  applied safely by Metadb without more information.
 
-* A data type in the source has changed to a type that is not supported by
-  Metadb.
+* A data type in the source has changed to a type that is not
+  supported by Metadb.
 
-* A data type in the source can be converted safely to a type that is more
-  performant.
+* A data type in the source can be converted safely to a type that is
+  more performant.
 
 Each type conversion is applied in one of two ways: either by the
 stream processor converting a record-at-a-time, or later by
@@ -161,8 +161,7 @@ Types also can be set manually via the `ALTER TABLE` command.
     error_severity text,
     message text
 )
-|Returns recent log messages during the specified interval, or during
- the past 24 hours if no interval is given
+|Returns recent log messages during the specified interval, or during the past 24 hours if no interval is given
 
 |`mdbversion()`
 |text
@@ -414,8 +413,7 @@ data source.
 |Name of a column to alter.
 
 |`*_data_type_*`
-|The new data type of the column.  The only type
-currently supported is `uuid`.
+|The new data type of the column.  The only type currently supported is `uuid`.
 |===
 
 [discrete]
@@ -641,8 +639,7 @@ a workspace for the user.
 |Sets the user's password.  (Required)
 
 |`comment`
-|Stores a comment about the user, e.g. the user's real name.  The comment can be
-viewed in psql using the `\du+` command, or in other user interfaces.
+|Stores a comment about the user, e.g. the user's real name.  The comment can be viewed in psql using the `\du+` command, or in other user interfaces.
 |===
 
 [discrete]
