@@ -248,6 +248,11 @@ To allow capturing data changes in the source PostgreSQL database, logical
 decoding has to be enabled, in particular by setting `wal_level = logical` in
 `postgresql.conf`.
 
+Note that timeout settings in the source database such as
+`idle_in_transaction_session_timeout` can cause the connector to fail, if a
+timeout occurs while the connector is taking an initial snapshot of the
+database.
+
 Next we create a connector configuration file for Kafka Connect:
 
 ----
