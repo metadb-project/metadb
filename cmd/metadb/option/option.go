@@ -58,3 +58,10 @@ type EndSync struct {
 	Source  string
 	Force   bool
 }
+
+type Migrate struct {
+	Global
+	Datadir string
+	Source  string
+	LDPConf string
+}

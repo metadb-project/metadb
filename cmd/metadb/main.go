@@ -57,6 +57,7 @@ func run() error {
 	var stopOpt = option.Stop{}
 	var syncOpt = option.Sync{}
 	var endSyncOpt = option.EndSync{}
+	var migrateOpt = option.Migrate{}
 	var logfile, csvlogfile string
 
 	var cmdInit = &cobra.Command{
@@ -214,6 +215,28 @@ func run() error {
 	_ = verboseFlag(cmdEndSync, &eout.EnableVerbose)
 	_ = traceFlag(cmdEndSync, &eout.EnableTrace)
 
+	var cmdMigrate = &cobra.Command{
+		Use: "migrate",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var err error
+			if err = initColor(); err != nil {
+				return err
+			}
+			migrateOpt.Global = globalOpt
+			if err = upgrade.Migrate(&migrateOpt); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+	cmdMigrate.SetHelpFunc(help)
+	cmdMigrate.Flags().StringVar(&migrateOpt.LDPConf, "ldpconf", "", "")
+	_ = cmdMigrate.MarkFlagRequired("ldpconf")
+	cmdMigrate.Flags().StringVar(&migrateOpt.Source, "source", "", "")
+	_ = cmdMigrate.MarkFlagRequired("source")
+	_ = dirFlag(cmdMigrate, &migrateOpt.Datadir)
+	_ = traceFlag(cmdMigrate, &eout.EnableTrace)
+
 	var cmdVersion = &cobra.Command{
 		Use: "version",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -239,7 +262,7 @@ func run() error {
 	//rootCmd.PersistentFlags().StringVar(&_, "client", metadbClientPort, ""+
 	//        "client port")
 	// Add commands.
-	rootCmd.AddCommand(cmdStart, cmdStop, cmdInit, cmdUpgrade, cmdSync, cmdEndSync, cmdVersion)
+	rootCmd.AddCommand(cmdStart, cmdStop, cmdInit, cmdUpgrade, cmdSync, cmdEndSync, cmdMigrate, cmdVersion)
 	var err error
 	if err = rootCmd.Execute(); err != nil {
 		return err
@@ -254,6 +277,7 @@ var helpInit = "Initialize new Metadb instance\n"
 var helpUpgrade = "Upgrade Metadb instance to current version\n"
 var helpSync = "begin synchronization with a data source\n"
 var helpEndSync = "End synchronization and remove leftover data\n"
+var helpMigrate = "Migrate historical data from LDP\n"
 var helpVersion = "Print metadb version\n"
 
 func help(cmd *cobra.Command, commandLine []string) {
@@ -272,6 +296,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"  upgrade                     - " + helpUpgrade +
 			"  sync                        - " + helpSync +
 			"  endsync                     - " + helpEndSync +
+			"  migrate                     - " + helpMigrate +
 			"  version                     - " + helpVersion +
 			"\n" +
 			"Use \"metadb help <command>\" for more information about a command.\n")
@@ -356,6 +381,18 @@ func help(cmd *cobra.Command, commandLine []string) {
 			dirFlag(nil, nil) +
 			forceFlag(nil, nil) +
 			verboseFlag(nil, nil) +
+			traceFlag(nil, nil) +
+			"")
+	case "migrate":
+		fmt.Printf("" +
+			helpMigrate +
+			"\n" +
+			"Usage:  metadb migrate <options>\n" +
+			"\n" +
+			"Options:\n" +
+			"      --ldpconf <f>           - ldpconf.json file\n" +
+			"      --source <s>            - Data source for creating new tables\n" +
+			"  -D, --dir <d>               - Metadb data directory\n" +
 			traceFlag(nil, nil) +
 			"")
 	case "version":
@@ -500,7 +537,7 @@ func dirFlag(cmd *cobra.Command, datadir *string) string {
 		cmd.Flags().StringVarP(datadir, "dir", "D", "", "")
 	}
 	return "" +
-		"  -D, --dir <d>               - Data directory name\n"
+		"  -D, --dir <d>               - Data directory\n"
 }
 
 /*func databaseFlag(cmd *cobra.Command, database *string) string {
