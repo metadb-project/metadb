@@ -1,6 +1,7 @@
 package command
 
 import (
+	"container/list"
 	"encoding/base64"
 	"fmt"
 	"math"
@@ -175,6 +176,14 @@ func DataTypeToSQL(dtype DataType, typeSize int64) string {
 	}
 }
 
+type CommandGraph struct {
+	Commands *list.List
+}
+
+func NewCommandGraph() *CommandGraph {
+	return &CommandGraph{Commands: list.New()}
+}
+
 type Command struct {
 	Op              Operation
 	SchemaName      string
@@ -184,9 +193,17 @@ type Command struct {
 	Origin          string
 	Column          []CommandColumn
 	SourceTimestamp string
+	Subcommands     *list.List
 }
 
-func (c Command) String() string {
+func (c *Command) AddChild(child *Command) {
+	if c.Subcommands == nil {
+		c.Subcommands = list.New()
+	}
+	_ = c.Subcommands.PushBack(child)
+}
+
+func (c *Command) String() string {
 	return fmt.Sprintf("command = %s %s.%s (%v)\n", c.Op, c.SchemaName, c.TableName, c.Column)
 }
 

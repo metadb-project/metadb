@@ -11,7 +11,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func RewriteJSON(cmdlist *list.List, cmde *list.Element, column *command.CommandColumn) error {
+func RewriteJSON(cmdgraph *command.CommandGraph, cmde *list.Element, column *command.CommandColumn) error {
 	cmd := cmde.Value.(*command.Command)
 	// folio module filter
 	if cmd.SchemaName == "folio_source_record" &&
@@ -33,13 +33,13 @@ func RewriteJSON(cmdlist *list.List, cmde *list.Element, column *command.Command
 	if !ok {
 		return nil
 	}
-	if err := rewriteObject(cmdlist, cmde, 1, obj, cmd.TableName+"__t"); err != nil {
+	if err := rewriteObject(cmdgraph, cmde, 1, obj, cmd.TableName+"__t"); err != nil {
 		return fmt.Errorf("rewrite json: %s", err)
 	}
 	return nil
 }
 
-func rewriteObject(cmdlist *list.List, cmde *list.Element, level int, obj map[string]interface{}, table string) error {
+func rewriteObject(cmdgraph *command.CommandGraph, cmde *list.Element, level int, obj map[string]interface{}, table string) error {
 	cmd := cmde.Value.(*command.Command)
 	if level > 2 {
 		return nil
@@ -127,7 +127,7 @@ func rewriteObject(cmdlist *list.List, cmde *list.Element, level int, obj map[st
 		Column:          cols,
 		SourceTimestamp: cmd.SourceTimestamp,
 	}
-	_ = cmdlist.InsertAfter(newcmd, cmde)
+	cmd.AddChild(newcmd)
 	return nil
 }
 

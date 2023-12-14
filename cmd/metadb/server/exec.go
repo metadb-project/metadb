@@ -1,7 +1,6 @@
 package server
 
 import (
-	"container/list"
 	"context"
 	"fmt"
 	"github.com/metadb-project/metadb/cmd/internal/uuid"
@@ -17,8 +16,8 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 )
 
-func execCommandList(ctx context.Context, cat *catalog.Catalog, cmdlist *list.List, dp *pgxpool.Pool, source string, syncMode dsync.Mode) error {
-	if cmdlist.Len() == 0 {
+func execCommandGraph(ctx context.Context, cat *catalog.Catalog, cmdgraph *command.CommandGraph, dp *pgxpool.Pool, source string, syncMode dsync.Mode) error {
+	if cmdgraph.Commands.Len() == 0 {
 		return nil
 	}
 	ebuf := &execbuffer{
@@ -29,41 +28,75 @@ func execCommandList(ctx context.Context, cat *catalog.Catalog, cmdlist *list.Li
 		syncMode:  syncMode,
 	}
 	txnTime := time.Now()
-	for e := cmdlist.Front(); e != nil; e = e.Next() {
+	for e := cmdgraph.Commands.Front(); e != nil; e = e.Next() {
 		cmd := e.Value.(*command.Command)
 		if log.IsLevelTrace() {
 			logTraceCommand(cmd)
 		}
-		if err := execCommand(ebuf, cat, cmd, source, syncMode); err != nil {
+		match, err := execCommand(ebuf, cat, cmd, source, syncMode)
+		if err != nil {
 			return fmt.Errorf("exec command: %v", err)
+		}
+		if cmd.Subcommands == nil {
+			continue
+		}
+		if match {
+			// We match the transformed records only in order to get the IDs to write them to
+			// sync tables.
+			if syncMode == dsync.Resync {
+				for f := cmd.Subcommands.Front(); f != nil; f = f.Next() {
+					tcmd := f.Value.(*command.Command)
+					table := &dbx.Table{Schema: tcmd.SchemaName, Table: tcmd.TableName}
+					delta, err := findDeltaSchema(cat, tcmd, table)
+					if err != nil {
+						return fmt.Errorf("finding schema delta: %v", err)
+					}
+					if err = execDeltaSchema(ebuf, cat, tcmd, delta, table); err != nil {
+						return fmt.Errorf("schema: %v", err)
+					}
+					m, id, err := isCurrentIdenticalMatch(ebuf.ctx, tcmd, ebuf.dp, table)
+					if err != nil {
+						return fmt.Errorf("matcher: %v", err)
+					}
+					if m {
+						ebuf.queueSyncID(table, id)
+					}
+				}
+			}
+		} else {
+			for f := cmd.Subcommands.Front(); f != nil; f = f.Next() {
+				if _, err := execCommand(ebuf, cat, f.Value.(*command.Command), source, syncMode); err != nil {
+					return fmt.Errorf("exec command: %v", err)
+				}
+			}
 		}
 	}
 	if err := ebuf.flush(); err != nil {
 		return fmt.Errorf("exec command list: %v", err)
 	}
 	log.Trace("=================================================================")
-	log.Trace("exec: %d records %s", cmdlist.Len(), fmt.Sprintf("[%.4f s]", time.Since(txnTime).Seconds()))
+	log.Trace("exec: %d records %s", cmdgraph.Commands.Len(), fmt.Sprintf("[%.4f s]", time.Since(txnTime).Seconds()))
 	log.Trace("=================================================================")
 	return nil
 }
 
-func execCommand(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, source string, syncMode dsync.Mode) error {
+func execCommand(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, source string, syncMode dsync.Mode) (bool, error) {
 	// Make schema changes if needed by the command.
 	if cmd.Op == command.MergeOp {
 		table := &dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName}
 		delta, err := findDeltaSchema(cat, cmd, table)
 		if err != nil {
-			return fmt.Errorf("finding schema delta: %v", err)
+			return false, fmt.Errorf("finding schema delta: %v", err)
 		}
 		if err = addTable(ebuf, cmd, cat, table, source); err != nil {
-			return fmt.Errorf("schema: %v", err)
+			return false, fmt.Errorf("schema: %v", err)
 		}
 		if err = addPartition(ebuf, cat, cmd); err != nil {
-			return fmt.Errorf("schema: %v", err)
+			return false, fmt.Errorf("schema: %v", err)
 		}
 		// Note that execDeltaSchema() may adjust data types in cmd.
 		if err = execDeltaSchema(ebuf, cat, cmd, delta, table); err != nil {
-			return fmt.Errorf("schema: %v", err)
+			return false, fmt.Errorf("schema: %v", err)
 		}
 		// Ensure indexes are created on primary key columns.
 		for _, col := range cmd.Column {
@@ -73,18 +106,19 @@ func execCommand(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, s
 					continue
 				}
 				if err = ebuf.flush(); err != nil {
-					return fmt.Errorf("creating indexes: %v", err)
+					return false, fmt.Errorf("creating indexes: %v", err)
 				}
 				if err = cat.AddIndex(column); err != nil {
-					return err
+					return false, err
 				}
 			}
 		}
 	}
-	if err := execCommandData(ebuf, cat, cmd, syncMode); err != nil {
-		return fmt.Errorf("exec data: %v", err)
+	match, err := execCommandData(ebuf, cat, cmd, syncMode)
+	if err != nil {
+		return false, fmt.Errorf("exec data: %v", err)
 	}
-	return nil
+	return match, nil
 }
 
 func findDeltaSchema(cat *catalog.Catalog, cmd *command.Command, table *dbx.Table) (*deltaSchema, error) {
@@ -259,43 +293,45 @@ func execDeltaSchema(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comman
 	return nil
 }
 
-func execCommandData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, syncMode dsync.Mode) error {
+func execCommandData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, syncMode dsync.Mode) (bool, error) {
 	switch cmd.Op {
 	case command.MergeOp:
-		if err := execMergeData(ebuf, cmd, syncMode); err != nil {
-			return fmt.Errorf("merge: %v", err)
+		match, err := execMergeData(ebuf, cmd, syncMode)
+		if err != nil {
+			return false, fmt.Errorf("merge: %v", err)
 		}
+		return match, nil
 	case command.DeleteOp:
 		if err := execDeleteData(ebuf, cat, cmd); err != nil {
-			return fmt.Errorf("delete: %v", err)
+			return false, fmt.Errorf("delete: %v", err)
 		}
+		return false, nil
 	case command.TruncateOp:
 		if err := execTruncateData(ebuf, cat, cmd); err != nil {
-			return fmt.Errorf("truncate: %v", err)
+			return false, fmt.Errorf("truncate: %v", err)
 		}
+		return false, nil
 	default:
-		return fmt.Errorf("unknown command op: %v", cmd.Op)
+		return false, fmt.Errorf("unknown command op: %v", cmd.Op)
 	}
-	return nil
 }
 
 // execMergeData executes a merge command in the database.
-func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode) error {
+func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode) (bool, error) {
 	table := &dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName}
 	// Check if the current record (if any) is identical to the new one.  If so, we
 	// can avoid making any changes in the database.
-	var id int64
-	ident, id, err := isCurrentIdentical(ebuf.ctx, cmd, ebuf.dp, table)
+	match, id, err := isCurrentIdenticalMatch(ebuf.ctx, cmd, ebuf.dp, table)
 	if err != nil {
-		return fmt.Errorf("matcher: %v", err)
+		return false, fmt.Errorf("matcher: %v", err)
 	}
-	if ident {
+	if match {
 		log.Trace("new command matches current record")
 		// If resync mode, write __id to sync table.
 		if syncMode == dsync.Resync {
 			ebuf.queueSyncID(table, id)
 		}
-		return nil
+		return true, nil
 	}
 	primaryKeyFilter := wherePKDataEqualSQL(cmd.Column)
 	// If any columns are "unavailable," extract the previous values from the current record.
@@ -329,7 +365,7 @@ func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode) 
 		var rows pgx.Rows
 		rows, err = ebuf.dp.Query(context.TODO(), b.String())
 		if err != nil {
-			return fmt.Errorf("querying for unavailable data: %v", err)
+			return false, fmt.Errorf("querying for unavailable data: %v", err)
 		}
 		defer rows.Close()
 		lenColumns := len(unavailColumns)
@@ -342,11 +378,11 @@ func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode) 
 		for rows.Next() {
 			found = true
 			if err = rows.Scan(dest...); err != nil {
-				return fmt.Errorf("scanning row values: %v", err)
+				return false, fmt.Errorf("scanning row values: %v", err)
 			}
 		}
 		if err = rows.Err(); err != nil {
-			return fmt.Errorf("reading matching current row: %v", err)
+			return false, fmt.Errorf("reading matching current row: %v", err)
 		}
 		rows.Close()
 		if !found {
@@ -408,11 +444,11 @@ func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode) 
 	b.WriteString(") RETURNING __id")
 	insert := b.String()
 	ebuf.queueMergeData(table, &update, &insert)
-	return nil
+	return false, nil
 }
 
 // isCurrentIdentical looks for an identical row in the current table.
-func isCurrentIdentical(ctx context.Context, cmd *command.Command, tx *pgxpool.Pool, table *dbx.Table) (bool, int64, error) {
+func isCurrentIdenticalMatch(ctx context.Context, cmd *command.Command, tx *pgxpool.Pool, table *dbx.Table) (bool, int64, error) {
 	// Match on all columns, except "unavailable" columns (which indicates a column
 	// did not change and we can assume it matches).
 	var b strings.Builder

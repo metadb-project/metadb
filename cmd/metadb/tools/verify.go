@@ -29,9 +29,9 @@ func verifyTransformTableSize(dq dbx.Queryable, progress func(string)) error {
 	}
 	// Read table row oounts.
 	for t := range tableSizes {
-		q := fmt.Sprintf("SELECT count(*) FROM %s", t.SQL())
+		q = fmt.Sprintf("SELECT count(*) FROM %s", t.SQL())
 		var i int64
-		err := dq.QueryRow(context.TODO(), q).Scan(&i)
+		err = dq.QueryRow(context.TODO(), q).Scan(&i)
 		if err != nil {
 			return fmt.Errorf("checking row count for table %s: %v", t, err)
 		}
