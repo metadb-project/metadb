@@ -528,6 +528,48 @@ SELECT g.id, g.group, g.desc FROM folio_users.groups__t AS g;
 
 Support for transforming subfields and arrays is planned in Metadb.
 
+===== Migrating historical data from LDP
+
+[.aqua-background]#Metadb 1.3#
+Metadb can import legacy historical data from LDP.  The Metadb server must be
+stopped while this process runs.  As an example:
+
+----
+metadb migrate -D data --ldpconf ldpconf.json --source folio
+----
+
+The file `ldpconf.json` is used to connect to the LDP database.  The output
+looks something like:
+
+----
+Begin migration process? y
+metadb: migrating: folio_audit.circulation_logs__: reading history.audit_circulation_logs where (updated < 2023-06-28 10:31:35.0556 +0000 UTC)
+metadb: migrating: folio_audit.circulation_logs__: 3544356 records written
+metadb: migrating: folio_circulation.audit_loan__: reading history.circulation_loan_history where (updated < 2023-06-28 03:34:57.32423 +0000 UTC)
+metadb: migrating: folio_circulation.audit_loan__: 2201724 records written
+metadb: migrating: folio_circulation.cancellation_reason__: reading history.circulation_cancellation_reasons where (updated < 2023-06-28 03:34:59.911506 +0000 UTC)
+metadb: migrating: folio_circulation.cancellation_reason__: 22 records written
+metadb: migrating: folio_circulation.check_in__: reading history.circulation_check_ins where (updated < 2023-06-28 11:31:38.628637 +0000 UTC)
+metadb: migrating: folio_circulation.check_in__: 1095442 records written
+metadb: migrating: folio_circulation.fixed_due_date_schedule__: reading history.circulation_fixed_due_date_schedules where (updated < 2023-07-04 10:31:46.899899 +0000 UTC)
+metadb: migrating: folio_circulation.fixed_due_date_schedule__: 34 records written
+metadb: migrating: folio_circulation.loan__: reading history.circulation_loans where (updated < 2023-06-28 03:34:57.932582 +0000 UTC)
+metadb: migrating: folio_circulation.loan__: 1600346 records written
+# (etc.)
+----
+
+Note that only records that LDP updated before a specific time stamp will be
+imported.  This is because for each LDP table and corresponding Metadb table
+there may be a range of times in which both LDP and Metadb contain historical
+data.  In such cases, the Metadb data are preferred, and the import stops at
+the point after which the two data sets would otherwise overlap.
+
+Also note that JSON data contained in the imported records are not transformed
+into columns.
+
+Records imported using this process have their `__origin` column set to the
+value `ldp`, which distinguishes them from other FOLIO data in Metadb.
+
 ==== Configuring Metadb for FOLIO
 
 When creating a FOLIO data source, use the `module 'folio'` option, and set
