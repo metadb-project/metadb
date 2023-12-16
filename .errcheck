@@ -1,3 +1,7 @@
+(*os.File).Close
+os.Remove
+os.RemoveAll
+
 (*github.com/jackc/pgx/v5.Conn).Close
 (github.com/jackc/pgx/v5.Tx).Rollback
 

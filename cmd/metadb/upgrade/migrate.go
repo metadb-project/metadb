@@ -149,16 +149,13 @@ func runMigration(dp *pgxpool.Pool, cat *catalog.Catalog, dpLDP *pgxpool.Pool, s
 			return fmt.Errorf("querying current time: %v", err)
 		}
 		// Find minimum start time.
-		minStart, err := selectMinStart(dp, m.metadbTable)
+		minStart, err := selectMinStart(dp, m.metadbTable, now)
 		if err != nil {
 			return fmt.Errorf("querying minimum start: %v", err)
 		}
-		if minStart == nil {
-			minStart = &now
-		}
-		eout.Info("migrating: %s__: reading history.%s where (updated < %s)", m.metadbTable, m.ldpTable, minStart.UTC())
+		eout.Info("migrating: %s__: reading history.%s where (updated < %s)", m.metadbTable, m.ldpTable, minStart)
 		path := filepath.Join(basepath, m.ldpTable)
-		if err := queueMigrationTable(dpLDP, cat, m, table, *minStart, path); err != nil {
+		if err := queueMigrationTable(dpLDP, cat, m, table, minStart, path); err != nil {
 			return err
 		}
 		if err := copyMigrationTable(dp, m, path); err != nil {
@@ -309,9 +306,6 @@ func queueMigrationRecord(cat *catalog.Catalog, metadbTable dbx.Table, encoder *
 	if err := makeRecordPartition(cat, metadbTable, record.Start); err != nil {
 		return fmt.Errorf("making partition for record: %v: %v", err, *record)
 	}
-	if err := makeRecordPartition(cat, metadbTable, record.End); err != nil {
-		return fmt.Errorf("making partition for record: %v: %v", err, *record)
-	}
 	return nil
 }
 
@@ -344,21 +338,25 @@ func selectNow(dp *pgxpool.Pool) (time.Time, error) {
 	case err != nil:
 		return time.Time{}, err
 	default:
-		return now, nil
+		return now.UTC(), nil
 	}
 }
 
-func selectMinStart(dp *pgxpool.Pool, table string) (*time.Time, error) {
+func selectMinStart(dp *pgxpool.Pool, table string, now time.Time) (time.Time, error) {
 	q := fmt.Sprintf("SELECT min(__start) FROM %s__", table)
 	var minStart *time.Time
 	err := dp.QueryRow(context.TODO(), q).Scan(&minStart)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
-		return nil, err
+		return now, nil
 	case err != nil:
-		return nil, err
+		return time.Time{}, err
 	default:
-		return minStart, nil
+		if minStart == nil {
+			return now, nil
+		} else {
+			return minStart.UTC(), nil
+		}
 	}
 }
 
