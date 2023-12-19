@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/metadb-project/metadb/cmd/internal/marct/inc"
-	"github.com/metadb-project/metadb/cmd/internal/marct/local"
-	"github.com/metadb-project/metadb/cmd/internal/marct/marc"
-	"github.com/metadb-project/metadb/cmd/internal/marct/options"
-	"github.com/metadb-project/metadb/cmd/internal/marct/util"
+	"github.com/metadb-project/metadb/cmd/internal/libmarct/inc"
+	"github.com/metadb-project/metadb/cmd/internal/libmarct/local"
+	"github.com/metadb-project/metadb/cmd/internal/libmarct/marc"
+	"github.com/metadb-project/metadb/cmd/internal/libmarct/options"
+	"github.com/metadb-project/metadb/cmd/internal/libmarct/util"
 	"github.com/spf13/viper"
 	"gopkg.in/ini.v1"
 )

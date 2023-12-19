@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/metadb-project/metadb/cmd/internal/marct/util"
+	"github.com/metadb-project/metadb/cmd/internal/libmarct/util"
 	"github.com/metadb-project/metadb/cmd/internal/uuid"
 )
 

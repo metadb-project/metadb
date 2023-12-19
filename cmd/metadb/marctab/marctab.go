@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/metadb-project/metadb/cmd/internal/marct"
+	"github.com/metadb-project/metadb/cmd/internal/libmarct"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"

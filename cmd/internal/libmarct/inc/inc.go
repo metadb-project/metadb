@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/metadb-project/metadb/cmd/internal/marct/marc"
-	"github.com/metadb-project/metadb/cmd/internal/marct/options"
-	"github.com/metadb-project/metadb/cmd/internal/marct/util"
+	"github.com/metadb-project/metadb/cmd/internal/libmarct/marc"
+	"github.com/metadb-project/metadb/cmd/internal/libmarct/options"
+	"github.com/metadb-project/metadb/cmd/internal/libmarct/util"
 	"github.com/metadb-project/metadb/cmd/internal/uuid"
 )
 
