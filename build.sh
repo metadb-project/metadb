@@ -18,10 +18,9 @@ usage() {
     echo '-h  Help'
     echo '-t  Run more checks; requires'
     echo '    go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest'
-    # echo '    go install honnef.co/go/tools/cmd/staticcheck@latest'
+    echo '    go install golang.org/x/tools/cmd/deadcode@latest'
     echo '    go install github.com/kisielk/errcheck@latest'
     echo '    go install github.com/gordonklaus/ineffassign@latest'
-    echo '    go install github.com/remyoudompheng/go-misc/deadcode@latest'
     echo '-v  Enable verbose output'
     echo '-D  Enable "-tags dynamic" compiler option'
     # echo '-q  Enable quiet output'
@@ -127,31 +126,19 @@ if $runalltest; then
         echo 'build.sh: running: vet shadow' 1>&2
     fi
     go vet $v $tags -vettool=$GOPATH/bin/shadow ./cmd/... 1>&2
-    # echo 'build.sh: running: staticcheck' 1>&2
-    # staticcheck ./cmd/... 1>&2
+    if ! $quiet; then
+        echo 'build.sh: running: deadcode' 1>&2
+    fi
+    deadcode -test ./cmd/... 1>&2
     if ! $quiet; then
         echo 'build.sh: running: errcheck' 1>&2
     fi
     # Add -verbose to get the function signature for .errcheck.
     errcheck -exclude .errcheck ./cmd/... 1>&2
-    # echo 'build.sh: running: aligncheck' 1>&2
-    # aligncheck ./cmd/metadb 1>&2
-    # aligncheck ./cmd/mdb 1>&2
-    # echo 'build.sh: running: structcheck' 1>&2
-    # structcheck ./cmd/metadb 1>&2
-    # structcheck ./cmd/mdb 1>&2
-    # echo 'build.sh: running: varcheck' 1>&2
-    # varcheck ./cmd/metadb 1>&2
-    # varcheck ./cmd/mdb 1>&2
     if ! $quiet; then
         echo 'build.sh: running: ineffassign' 1>&2
     fi
     ineffassign ./cmd/... 1>&2
-    if ! $quiet; then
-        echo 'build.sh: running: deadcode' 1>&2
-    fi
-    deadcode -test ./cmd/metadb 1>&2
-#    deadcode -test ./cmd/mdb 1>&2
 fi
 
 if ! $quiet; then
