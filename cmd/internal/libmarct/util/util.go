@@ -77,49 +77,12 @@ func nullString(s *string) string {
 	}
 }
 
-func VacuumAnalyze(ctx context.Context, dbc *DBC, table string) error {
-	if err := Vacuum(ctx, dbc, table); err != nil {
-		return err
-	}
-	if err := Analyze(ctx, dbc, table); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Vacuum(ctx context.Context, dbc *DBC, table string) error {
-	q := "VACUUM (PARALLEL 0) " + table
-	if _, err := dbc.Conn.Exec(ctx, q); err != nil {
-		return fmt.Errorf("vacuuming table: %s: %s", table, err)
-	}
-	return nil
-}
-
-func Analyze(ctx context.Context, dbc *DBC, table string) error {
-	q := "ANALYZE " + table
-	if _, err := dbc.Conn.Exec(ctx, q); err != nil {
-		return fmt.Errorf("analyzing table: %s: %s", table, err)
-	}
-	return nil
-}
-
 func GetAllFieldNames() []string {
 	s := make([]string, 0)
 	for i := 0; i <= 999; i++ {
 		s = append(s, fmt.Sprintf("%03d", i))
 	}
 	return s
-}
-
-func IsTrgmAvailable(dbc *DBC) bool {
-	if _, err := dbc.Conn.Exec(context.TODO(), "CREATE TEMP TABLE trgmtest (v varchar(1))"); err != nil {
-		return false
-	}
-	if _, err := dbc.Conn.Exec(context.TODO(), "CREATE INDEX ON trgmtest USING GIN (v gin_trgm_ops)"); err != nil {
-		return false
-	}
-	_, _ = dbc.Conn.Exec(context.TODO(), "DROP TABLE trgmtest")
-	return true
 }
 
 func IsLZ4Available(dbc *DBC) bool {

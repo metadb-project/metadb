@@ -1,13 +1,11 @@
 package initsys
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/metadb-project/metadb/cmd/internal/eout"
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
@@ -188,19 +186,5 @@ func InitSys(opt *option.Init) error {
 	*/
 
 	eout.Info("initialized new data directory in %s", dd)
-	return nil
-}
-
-func createDatabase(db *dbx.DB, owner string) error {
-	dc, err := db.Connect()
-	if err != nil {
-		return err
-	}
-	defer dc.Close(context.TODO())
-
-	_, err = dc.Exec(context.TODO(), "CREATE DATABASE "+db.DBName+" OWNER "+owner)
-	if err != nil {
-		return fmt.Errorf("%s: %v", db.DBName, err)
-	}
 	return nil
 }

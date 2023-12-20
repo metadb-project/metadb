@@ -3,40 +3,40 @@ set -e
 
 fast='false'
 json=''
-runalltest='false'
+runtests='false'
+runalltests='false'
 verbose='false'
-quiet='false'
 experiment='false'
 tagsdynamic='false'
 
 usage() {
-    echo ''
     echo 'Usage:  build.sh [<flags>]'
     echo ''
+    echo 'Builds the "metadb" executable in the bin directory'
+    echo ''
     echo 'Flags:'
-    echo '-f  "Fast" build (do not remove executables or run tests)'
+    echo '-f  Do not remove executable before compiling'
     echo '-h  Help'
-    echo '-t  Run more checks; requires'
+    echo '-t  Run tests'
+    echo '-T  Run tests and other checks; requires'
     echo '    go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest'
-    echo '    go install golang.org/x/tools/cmd/deadcode@latest'
+    # echo '    go install golang.org/x/tools/cmd/deadcode@latest'
     echo '    go install github.com/kisielk/errcheck@latest'
-    echo '    go install github.com/gordonklaus/ineffassign@latest'
     echo '-v  Enable verbose output'
-    echo '-D  Enable "-tags dynamic" compiler option'
-    # echo '-q  Enable quiet output'
+    # echo '-D  Enable "-tags dynamic" compiler option'
     # echo '-X  Include experimental code'
 }
 
-while getopts 'cfhJtvqXD' flag; do
+while getopts 'cfhJtvTXD' flag; do
     case "${flag}" in
-        t) runalltest='true' ;;
+        t) runtests='true' ;;
+        T) runalltests='true' ;;
         c) ;;
         f) fast='true' ;;
         J) echo "build.sh: -J option is deprecated" 1>&2 ;;
         h) usage
             exit 1 ;;
         v) verbose='true' ;;
-        q) quiet='true' ;;
         X) experiment='true' ;;
         D) tagsdynamic='true' ;;
         *) usage
@@ -75,15 +75,8 @@ fi
 bindir=bin
 
 if ! $fast; then
-    # if ! $quiet; then
-    #     echo 'build.sh: removing executables' 1>&2
-    # fi
     rm -f ./$bindir/metadb ./$bindir/mdb ./cmd/metadb/parser/gram.go ./cmd/metadb/parser/scan.go ./cmd/metadb/parser/y.output
 fi
-
-# if ! $quiet; then
-#     echo 'build.sh: compiling Metadb' 1>&2
-# fi
 
 version=`git describe --tags --always`
 
@@ -106,10 +99,7 @@ go generate $v ./...
 go build -o $bindir $v $tags -ldflags "-X github.com/metadb-project/metadb/cmd/metadb/util.MetadbVersion=$version $json" ./cmd/metadb
 # go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
 
-if $runalltest; then
-    if ! $quiet; then
-        echo 'build.sh: running tests' 1>&2
-    fi
+if $runtests || $runalltests; then
     go test $v $tags -vet=off -count=1 ./cmd/metadb/command 1>&2
 #    go test $v $tags -vet=off -count=1 ./cmd/metadb/dbx 1>&2
 #    go test $v $tags -vet=off -count=1 ./cmd/metadb/parser 1>&2
@@ -117,30 +107,13 @@ if $runalltest; then
     go test $v $tags -vet=off -count=1 ./cmd/metadb/util 1>&2
 fi
 
-if $runalltest; then
-    if ! $quiet && ! $fast; then
-        echo 'build.sh: running: vet' 1>&2
+if $runalltests; then
+    go vet $v $tags $(go list ./cmd/... | grep -v 'github.com/metadb-project/metadb/cmd/metadb/parser') 2>&1 | while read s; do echo "build.sh: $s" 1>&2; done
+    go vet $v $tags -vettool=$GOPATH/bin/shadow ./cmd/... 2>&1 | while read s; do echo "build.sh: $s" 1>&2; done
+    # deadcode -test ./cmd/... 2>&1 | while read s; do echo "build.sh: deadcode: $s" 1>&2; done
+    if $verbose; then
+        # Using -verbose outputs the function signature for .errcheck.
+	verrcheck='-verbose'
     fi
-    go vet $v $tags $(go list ./... | grep -v 'github.com/metadb-project/metadb/cmd/metadb/parser') 1>&2
-    if ! $quiet; then
-        echo 'build.sh: running: vet shadow' 1>&2
-    fi
-    go vet $v $tags -vettool=$GOPATH/bin/shadow ./cmd/... 1>&2
-    if ! $quiet; then
-        echo 'build.sh: running: deadcode' 1>&2
-    fi
-    deadcode -test ./cmd/... 1>&2
-    if ! $quiet; then
-        echo 'build.sh: running: errcheck' 1>&2
-    fi
-    # Add -verbose to get the function signature for .errcheck.
-    errcheck -exclude .errcheck ./cmd/... 1>&2
-    if ! $quiet; then
-        echo 'build.sh: running: ineffassign' 1>&2
-    fi
-    ineffassign ./cmd/... 1>&2
-fi
-
-if ! $quiet; then
-    echo 'build.sh: compiled to executables in bin' 1>&2
+    errcheck $verrcheck -exclude .errcheck ./cmd/... 2>&1 | while read s; do echo "build.sh: errcheck: $s" 1>&2; done
 fi

@@ -260,7 +260,3 @@ func selectTableSchema(cat *catalog.Catalog, table *dbx.Table) (*sysdb.TableSche
 	}
 	return ts, nil
 }
-
-func indexName(table, column string) string {
-	return table + "_" + column + "_idx"
-}

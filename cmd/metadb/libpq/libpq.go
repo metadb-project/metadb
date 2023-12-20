@@ -239,7 +239,7 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 	}
 	log.Trace("query received: query=%q node=%#v err=%q pass=%v\n", query, node, e, pass)
 	if pass {
-		err = proxyQuery(conn, query, args, node, db, dbconn)
+		err = proxyQuery(conn, query, args, node, dbconn)
 		if err != nil {
 			return write(conn, encode(nil, []pgproto3.Message{
 				&pgproto3.ErrorResponse{Message: "ERROR:  " + err.Error()},
@@ -391,13 +391,13 @@ func list(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.Sou
 			"       module"+
 			"    FROM metadb.source", nil, dc)
 	case "status":
-		return listStatus(conn, node, dc, sources)
+		return listStatus(conn, sources)
 	default:
 		return fmt.Errorf("unrecognized parameter %q", node.Name)
 	}
 }
 
-func listStatus(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
+func listStatus(conn net.Conn, sources *[]*sysdb.SourceConnector) error {
 	m := []pgproto3.Message{
 		&pgproto3.RowDescription{Fields: []pgproto3.FieldDescription{
 			{

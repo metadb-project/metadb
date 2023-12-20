@@ -140,13 +140,13 @@ var systemTables = []systemTableDef{
 	{table: dbx.Table{Schema: catalogSchema, Table: "base_table"}, create: createTableBaseTable},
 }
 
-func SystemTables() []dbx.Table {
-	var tables []dbx.Table
-	for _, t := range systemTables {
-		tables = append(tables, t.table)
-	}
-	return tables
-}
+//func SystemTables() []dbx.Table {
+//	var tables []dbx.Table
+//	for _, t := range systemTables {
+//		tables = append(tables, t.table)
+//	}
+//	return tables
+//}
 
 func createCatalogSchema(dp *pgxpool.Pool) error {
 	tx, err := dp.Begin(context.TODO())

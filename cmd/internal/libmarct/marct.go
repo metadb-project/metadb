@@ -3,7 +3,6 @@ package marct
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -51,7 +50,7 @@ var tableout = tableoutSchema + "." + tableoutTable
 
 var allFields = util.GetAllFieldNames()
 
-var csvFile *os.File
+//var csvFile *os.File
 
 func (t *MARCTransform) Transform() error {
 	t.Loc = setupLocations(t)

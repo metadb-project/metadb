@@ -156,32 +156,6 @@ func Rollback(tx pgx.Tx) {
 	_ = tx.Rollback(context.TODO())
 }
 
-func VacuumAnalyze(dc *pgx.Conn, table Table) error {
-	if err := Vacuum(dc, table); err != nil {
-		return err
-	}
-	if err := Analyze(dc, table); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Vacuum(dc *pgx.Conn, table Table) error {
-	q := "VACUUM (PARALLEL 0) " + table.SQL()
-	if _, err := dc.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("vacuuming: %s: %v", table, err)
-	}
-	return nil
-}
-
-func Analyze(dc *pgx.Conn, table Table) error {
-	q := "ANALYZE " + table.SQL()
-	if _, err := dc.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("analyzing: %s: %v", table, err)
-	}
-	return nil
-}
-
 func NewPool(ctx context.Context, connString string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(connString)
 	if err != nil {

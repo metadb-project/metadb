@@ -7,7 +7,7 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-var Active *color.Color = color.New(color.FgGreen, color.Bold)
+// var Active *color.Color = color.New(color.FgGreen, color.Bold)
 var Locus *color.Color = color.New(color.FgWhite, color.Bold)
 var Warning *color.Color = color.New(color.FgMagenta, color.Bold)
 var Error *color.Color = color.New(color.FgRed, color.Bold)

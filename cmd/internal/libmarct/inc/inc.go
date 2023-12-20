@@ -92,14 +92,6 @@ func CreateCksum(dbc *util.DBC, srsRecords, srsMarc, srsMarctab, srsMarcAttr str
 	return nil
 }
 
-func VacuumCksum(ctx context.Context, dbc *util.DBC) error {
-	var err error
-	if err = util.Vacuum(ctx, dbc, cksumTable); err != nil {
-		return err
-	}
-	return nil
-}
-
 func IncrementalUpdate(opts *options.Options, connString string, srsRecords, srsMarc, srsMarcAttr, tablefinal string,
 	printerr func(string, ...any), verbose int) error {
 

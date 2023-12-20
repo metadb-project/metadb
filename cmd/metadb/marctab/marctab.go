@@ -24,7 +24,7 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 	defer dbx.Close(dcsuper)
 
 	start := time.Now()
-	users := []string{}
+	users := make([]string, 0)
 	t := &marct.MARCTransform{
 		FullUpdate: false,
 		Datadir:    datadir,
