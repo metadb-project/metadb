@@ -8,6 +8,8 @@ runalltests='false'
 verbose='false'
 experiment='false'
 tagsdynamic='false'
+checkpointsegmentsize=''
+maxpollinterval=''
 
 usage() {
     echo 'Usage:  build.sh [<flags>]'
@@ -24,10 +26,12 @@ usage() {
     echo '    go install github.com/kisielk/errcheck@latest'
     echo '-v  Enable verbose output'
     # echo '-D  Enable "-tags dynamic" compiler option'
+    echo '-C  Reduce checkpoint segment size (experimental)'
+    echo '-P  Increase maximum poll interval (experimental)'
     # echo '-X  Include experimental code'
 }
 
-while getopts 'cfhJtvTXD' flag; do
+while getopts 'cfhJtvTXDCP' flag; do
     case "${flag}" in
         t) runtests='true' ;;
         T) runalltests='true' ;;
@@ -39,6 +43,8 @@ while getopts 'cfhJtvTXD' flag; do
         v) verbose='true' ;;
         X) experiment='true' ;;
         D) tagsdynamic='true' ;;
+        C) checkpointsegmentsize='-X github.com/metadb-project/metadb/cmd/metadb/util.XCheckpointSegmentSize=10000' ;;
+        P) maxpollinterval='-X github.com/metadb-project/metadb/cmd/metadb/util.XMaxPollInterval=3600000' ;;
         *) usage
             exit 1 ;;
     esac
@@ -96,7 +102,7 @@ mkdir -p $bindir
 
 go generate $v ./...
 
-go build -o $bindir $v $tags -ldflags "-X github.com/metadb-project/metadb/cmd/metadb/util.MetadbVersion=$version $json" ./cmd/metadb
+go build -o $bindir $v $tags -ldflags "-X github.com/metadb-project/metadb/cmd/metadb/util.MetadbVersion=$version $json $checkpointsegmentsize $maxpollinterval" ./cmd/metadb
 # go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
 
 if $runtests || $runalltests; then

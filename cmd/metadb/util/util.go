@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -16,6 +17,26 @@ const DatabaseVersion = 24
 
 // MetadbVersion is defined at build time via -ldflags.
 var MetadbVersion = "(unknown version)"
+
+var XCheckpointSegmentSize = "100000"
+
+func CheckpointSegmentSize() int {
+	i, err := strconv.Atoi(XCheckpointSegmentSize)
+	if err != nil {
+		panic(err)
+	}
+	return i
+}
+
+var XMaxPollInterval = "1800000"
+
+func MaxPollInterval() int {
+	i, err := strconv.Atoi(XMaxPollInterval)
+	if err != nil {
+		panic(err)
+	}
+	return i
+}
 
 const MaximumTypeSizeIndex = 2500
 

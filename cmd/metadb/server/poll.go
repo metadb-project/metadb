@@ -215,7 +215,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			"bootstrap.servers":    brokers,
 			"enable.auto.commit":   false,
 			"group.id":             group,
-			"max.poll.interval.ms": 1800000,
+			"max.poll.interval.ms": util.MaxPollInterval(),
 			"security.protocol":    spr.source.Security,
 		}
 		consumer, err = kafka.NewConsumer(config)
@@ -303,7 +303,7 @@ func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer
 	var eventReadCount int
 	pollTimeoutCount := 0
 	startTime := time.Now()
-	for x := 0; x < 100000; x++ {
+	for x := 0; x < util.CheckpointSegmentSize(); x++ {
 		// Catch the possibility of many poll timeouts between messages, because each
 		// poll timeouts takes kafkaPollTimeout ms.  This also provides an overall timeout
 		// for the poll loop.
