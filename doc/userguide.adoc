@@ -495,7 +495,7 @@ Information about when certain tables were last updated is available
 in a table called `metadb.table_update`:
 
 ----
-SELECT * FROM metadb.table_update ORDER BY schemaname, tablename;
+SELECT * FROM metadb.table_update ORDER BY schema_name, table_name;
 ----
 
 [discrete]

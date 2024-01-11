@@ -15,9 +15,9 @@ few hours or so.  The time of the most recent update can be retrieved from the
 table `metadb.table_update`:
 
 ----
-SELECT updated
+SELECT last_update
     FROM metadb.table_update
-    WHERE schemaname = 'folio_source_record' AND tablename = 'marc__t';
+    WHERE schema_name = 'folio_source_record' AND table_name = 'marc__t';
 ----
 
 The MARC transform stores partition tables in the schema `marctab`.  Users can
@@ -26,7 +26,7 @@ ignore this schema, as all data are accessible via `folio_source_record.marc__t`
 ==== Derived tables
 
 FOLIO "derived tables" are automatically updated once per day, usually at about
-03:00:00 UTC by default.
+3:00 UTC by default.
 
 Note that the derived tables are based on a periodic snapshot of data, and for
 this reason they are generally not up-to-date.
@@ -606,7 +606,7 @@ are suggested:
 ==== Derived tables
 
 ReShare "derived tables" are automatically updated once per day, usually at
-about 03:00:00 UTC by default.
+about 3:00 UTC by default.
 
 Note that the derived tables are based on a periodic snapshot of data, and for
 this reason they are generally not up-to-date.
