@@ -216,7 +216,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			"bootstrap.servers":    brokers,
 			"enable.auto.commit":   false,
 			"group.id":             group,
-			"max.poll.interval.ms": util.MaxPollInterval(),
+			"max.poll.interval.ms": spr.svr.db.MaxPollInterval,
 			"security.protocol":    spr.source.Security,
 		}
 		consumer, err = kafka.NewConsumer(config)
@@ -246,7 +246,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		// Parse
 		eventReadCount, err := parseChangeEvents(cat, pkerr, consumer, cmdlist, spr.schemaPassFilter,
 			spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
-			spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog)
+			spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
 		if err != nil {
 			return fmt.Errorf("parser: %v", err)
 		}
@@ -301,7 +301,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	}
 }
 
-func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer *kafka.Consumer, cmdlist *list.List, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (int, error) {
+func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer *kafka.Consumer, cmdlist *list.List, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog, checkpointSegmentSize int) (int, error) {
 	kafkaPollTimeout := 100     // Poll timeout in milliseconds.
 	pollTimeoutCountLimit := 20 // Maximum allowable number of consecutive poll timeouts.
 	pollLoopTimeout := 120.0    // Overall pool loop timeout in seconds.
@@ -309,7 +309,7 @@ func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer
 	var eventReadCount int
 	pollTimeoutCount := 0
 	startTime := time.Now()
-	for x := 0; x < util.CheckpointSegmentSize(); x++ {
+	for x := 0; x < checkpointSegmentSize; x++ {
 		// Catch the possibility of many poll timeouts between messages, because each
 		// poll timeouts takes kafkaPollTimeout ms.  This also provides an overall timeout
 		// for the poll loop.
