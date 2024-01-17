@@ -18,26 +18,6 @@ const DatabaseVersion = 24
 // MetadbVersion is defined at build time via -ldflags.
 var MetadbVersion = "(unknown version)"
 
-var XCheckpointSegmentSize = "100000"
-
-func CheckpointSegmentSize() int {
-	i, err := strconv.Atoi(XCheckpointSegmentSize)
-	if err != nil {
-		panic(err)
-	}
-	return i
-}
-
-var XMaxPollInterval = "1800000"
-
-func MaxPollInterval() int {
-	i, err := strconv.Atoi(XMaxPollInterval)
-	if err != nil {
-		panic(err)
-	}
-	return i
-}
-
 const MaximumTypeSizeIndex = 2500
 
 // ModePermRW is the umask "-rw-------".
@@ -237,15 +217,36 @@ func ReadConfigDatabase(datadir string) (*dbx.DB, error) {
 		return nil, err
 	}
 	s := cfg.Section("main")
+
+	checkpointSegmentSize := 100000
+	v := s.Key("checkpoint_segment_size").String()
+	if v != "" {
+		checkpointSegmentSize, err = strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("reading checkpoint_segment_size: parsing %q: invalid syntax", v)
+		}
+	}
+
+	maxPollInterval := 1800000
+	v = s.Key("max_poll_interval").String()
+	if v != "" {
+		maxPollInterval, err = strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("reading max_poll_interval: parsing %q: invalid syntax", v)
+		}
+	}
+
 	return &dbx.DB{
-		Host:          s.Key("host").String(),
-		Port:          s.Key("port").String(),
-		User:          s.Key("systemuser").String(),
-		Password:      s.Key("systemuser_password").String(),
-		SuperUser:     s.Key("superuser").String(),
-		SuperPassword: s.Key("superuser_password").String(),
-		DBName:        s.Key("database").String(),
-		SSLMode:       s.Key("sslmode").String(),
+		Host:                  s.Key("host").String(),
+		Port:                  s.Key("port").String(),
+		User:                  s.Key("systemuser").String(),
+		Password:              s.Key("systemuser_password").String(),
+		SuperUser:             s.Key("superuser").String(),
+		SuperPassword:         s.Key("superuser_password").String(),
+		DBName:                s.Key("database").String(),
+		SSLMode:               s.Key("sslmode").String(),
+		CheckpointSegmentSize: checkpointSegmentSize,
+		MaxPollInterval:       maxPollInterval,
 	}, nil
 }
 
