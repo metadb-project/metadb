@@ -23,6 +23,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"golang.org/x/net/context"
+	"golang.org/x/sync/errgroup"
 )
 
 func goPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server) {
@@ -191,8 +192,104 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		sourceFileScanner.Buffer(make([]byte, 0, 10000000), 10000000)
 	}
 	// Kafka source
-	var consumer *kafka.Consumer
+	var consumers = make([]*kafka.Consumer, len(spr.source.Topics))
 	if sourceFileScanner == nil {
+		err = createKafkaConsumers(spr, consumers)
+
+		defer func(consumers []*kafka.Consumer) { //todo move
+			for _, consumer := range consumers {
+				_ = consumer.Close()
+			}
+		}(consumers)
+
+		if err != nil {
+			return err
+		}
+		spr.source.Status.Active()
+	}
+
+	waitUserPerms.Wait()
+	// pkerr keeps track of "primary key not defined" errors that have been logged, in order to reduce duplication
+	// of the error messages.
+	pkerr := make(map[string]struct{}) // "primary key not defined" errors reported
+	var firstEvent = true
+
+	//todo multiply this part in go routines
+
+	g, ctx := errgroup.WithContext(ctx)
+	for i := range consumers {
+		var index = i
+
+		g.Go(func() error {
+			for {
+				cmdgraph := command.NewCommandGraph()
+
+				// Parse
+				eventReadCount, err := parseChangeEvents(cat, pkerr, consumers[index], cmdgraph, spr.schemaPassFilter,
+					spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
+					spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
+				if err != nil {
+					return fmt.Errorf("parser: %v", err)
+				}
+				if firstEvent {
+					firstEvent = false
+					log.Debug("receiving data from source %q", spr.source.Name)
+				}
+
+				// Rewrite
+				if err = rewriteCommandGraph(cmdgraph, spr.svr.opt.RewriteJSON); err != nil {
+					return fmt.Errorf("rewriter: %s", err)
+				}
+
+				// Execute
+				if err = execCommandGraph(ctx, cat, cmdgraph, spr.svr.dp, spr.source.Name, syncMode); err != nil {
+					return fmt.Errorf("executor: %s", err)
+				}
+
+				if eventReadCount > 0 && sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
+					_, err = consumers[index].Commit()
+					if err != nil {
+						e := err.(kafka.Error)
+						if e.IsFatal() {
+							//return fmt.Errorf("Kafka commit: %v", e)
+							log.Warning("Kafka commit: %v", e)
+						} else {
+							switch e.Code() {
+							case kafka.ErrNoOffset:
+								log.Debug("Kafka commit: %v", e)
+							default:
+								log.Info("Kafka commit: %v", e)
+							}
+						}
+					}
+				}
+
+				if eventReadCount > 0 {
+					log.Debug("checkpoint: events=%d, commands=%d", eventReadCount, cmdgraph.Commands.Len())
+				}
+
+				// Check if resync snapshot may have completed.
+				if syncMode != dsync.NoSync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 3.0 {
+					log.Info("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
+						spr.source.Name)
+					cat.ResetLastSnapshotRecord() // Sync timer.
+				}
+				return nil
+			}
+		})
+	}
+
+	if err = g.Wait(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createKafkaConsumers(spr *sproc, consumers []*kafka.Consumer) error {
+	var err error
+
+	for i, topic := range spr.source.Topics {
 		spr.schemaPassFilter, err = util.CompileRegexps(spr.source.SchemaPassFilter)
 		if err != nil {
 			return err
@@ -206,7 +303,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			return err
 		}
 		var brokers = spr.source.Brokers
-		var topics = spr.source.Topics
+		var topics = []string{topic}
 		var group = spr.source.Group
 		log.Debug("connecting to %q, topics %q", brokers, topics)
 		log.Debug("connecting to source %q", spr.source.Name)
@@ -218,81 +315,25 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			"max.poll.interval.ms": spr.svr.db.MaxPollInterval,
 			"security.protocol":    spr.source.Security,
 		}
+
+		var consumer *kafka.Consumer
 		consumer, err = kafka.NewConsumer(config)
 		if err != nil {
 			spr.source.Status.Error()
 			return err
 		}
-		defer func(consumer *kafka.Consumer) {
-			_ = consumer.Close()
-		}(consumer)
+
+		consumers[i] = consumer
+
 		//err = consumer.SubscribeTopics([]string{"^" + topicPrefix + "[.].*"}, nil)
 		err = consumer.SubscribeTopics(topics, nil)
 		if err != nil {
 			spr.source.Status.Error()
 			return err
 		}
-		spr.source.Status.Active()
 	}
-	waitUserPerms.Wait()
-	// pkerr keeps track of "primary key not defined" errors that have been logged, in order to reduce duplication
-	// of the error messages.
-	pkerr := make(map[string]struct{}) // "primary key not defined" errors reported
-	var firstEvent = true
-	for {
-		cmdgraph := command.NewCommandGraph()
 
-		// Parse
-		eventReadCount, err := parseChangeEvents(cat, pkerr, consumer, cmdgraph, spr.schemaPassFilter,
-			spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
-			spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
-		if err != nil {
-			return fmt.Errorf("parser: %v", err)
-		}
-		if firstEvent {
-			firstEvent = false
-			log.Debug("receiving data from source %q", spr.source.Name)
-		}
-
-		// Rewrite
-		if err = rewriteCommandGraph(cmdgraph, spr.svr.opt.RewriteJSON); err != nil {
-			return fmt.Errorf("rewriter: %s", err)
-		}
-
-		// Execute
-		if err = execCommandGraph(ctx, cat, cmdgraph, spr.svr.dp, spr.source.Name, syncMode); err != nil {
-			return fmt.Errorf("executor: %s", err)
-		}
-
-		if eventReadCount > 0 && sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
-			_, err = consumer.Commit()
-			if err != nil {
-				e := err.(kafka.Error)
-				if e.IsFatal() {
-					//return fmt.Errorf("Kafka commit: %v", e)
-					log.Warning("Kafka commit: %v", e)
-				} else {
-					switch e.Code() {
-					case kafka.ErrNoOffset:
-						log.Debug("Kafka commit: %v", e)
-					default:
-						log.Info("Kafka commit: %v", e)
-					}
-				}
-			}
-		}
-
-		if eventReadCount > 0 {
-			log.Debug("checkpoint: events=%d, commands=%d", eventReadCount, cmdgraph.Commands.Len())
-		}
-
-		// Check if resync snapshot may have completed.
-		if syncMode != dsync.NoSync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 3.0 {
-			log.Info("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
-				spr.source.Name)
-			cat.ResetLastSnapshotRecord() // Sync timer.
-		}
-	}
+	return nil
 }
 
 func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer *kafka.Consumer, cmdgraph *command.CommandGraph, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog, checkpointSegmentSize int) (int, error) {
