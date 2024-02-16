@@ -4,20 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/metadb-project/metadb/cmd/metadb/tools"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/nazgaret/metadb/cmd/metadb/tools"
+
 	"github.com/jackc/pgx/v5"
-	"github.com/metadb-project/metadb/cmd/internal/eout"
-	"github.com/metadb-project/metadb/cmd/metadb/catalog"
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/option"
-	"github.com/metadb-project/metadb/cmd/metadb/process"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"github.com/nazgaret/metadb/cmd/internal/eout"
+	"github.com/nazgaret/metadb/cmd/metadb/catalog"
+	"github.com/nazgaret/metadb/cmd/metadb/dbx"
+	"github.com/nazgaret/metadb/cmd/metadb/option"
+	"github.com/nazgaret/metadb/cmd/metadb/process"
+	"github.com/nazgaret/metadb/cmd/metadb/util"
 )
 
 func EndSync(opt *option.EndSync) error {

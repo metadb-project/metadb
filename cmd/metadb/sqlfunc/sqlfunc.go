@@ -11,11 +11,11 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/jackc/pgx/v5"
-	"github.com/metadb-project/metadb/cmd/metadb/catalog"
-	"github.com/metadb-project/metadb/cmd/metadb/command"
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"github.com/nazgaret/metadb/cmd/metadb/catalog"
+	"github.com/nazgaret/metadb/cmd/metadb/command"
+	"github.com/nazgaret/metadb/cmd/metadb/dbx"
+	"github.com/nazgaret/metadb/cmd/metadb/log"
+	"github.com/nazgaret/metadb/cmd/metadb/util"
 )
 
 func SQLFunc(datadir string, cat *catalog.Catalog, db dbx.DB, url, ref, path, schema string, source string) error {

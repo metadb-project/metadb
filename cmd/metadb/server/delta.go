@@ -1,8 +1,8 @@
 package server
 
 import (
-	"github.com/metadb-project/metadb/cmd/metadb/command"
-	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
+	"github.com/nazgaret/metadb/cmd/metadb/command"
+	"github.com/nazgaret/metadb/cmd/metadb/sysdb"
 )
 
 func tableSchemaFromCommand(c *command.Command) *sysdb.TableSchema {

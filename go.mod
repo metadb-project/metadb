@@ -1,4 +1,4 @@
-module github.com/metadb-project/metadb
+module github.com/nazgaret/metadb
 
 go 1.21
 

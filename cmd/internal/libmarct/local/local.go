@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/metadb-project/metadb/cmd/internal/libmarct/util"
-	"github.com/metadb-project/metadb/cmd/internal/uuid"
+	"github.com/nazgaret/metadb/cmd/internal/libmarct/util"
+	"github.com/nazgaret/metadb/cmd/internal/uuid"
 )
 
 type Record struct {

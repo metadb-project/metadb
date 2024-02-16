@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"github.com/nazgaret/metadb/cmd/metadb/util"
 )
 
 type Event struct {

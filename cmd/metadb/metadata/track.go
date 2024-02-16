@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
+	"github.com/nazgaret/metadb/cmd/metadb/sqlx"
 )
 
 func TrackRead(db sqlx.DB) (map[sqlx.Table]bool, error) {

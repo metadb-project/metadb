@@ -3,17 +3,18 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/metadb-project/metadb/cmd/internal/uuid"
 	"strings"
 	"time"
 
+	"github.com/nazgaret/metadb/cmd/internal/uuid"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/metadb-project/metadb/cmd/metadb/catalog"
-	"github.com/metadb-project/metadb/cmd/metadb/command"
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/dsync"
-	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/nazgaret/metadb/cmd/metadb/catalog"
+	"github.com/nazgaret/metadb/cmd/metadb/command"
+	"github.com/nazgaret/metadb/cmd/metadb/dbx"
+	"github.com/nazgaret/metadb/cmd/metadb/dsync"
+	"github.com/nazgaret/metadb/cmd/metadb/log"
 )
 
 func execCommandGraph(ctx context.Context, cat *catalog.Catalog, cmdgraph *command.CommandGraph, dp *pgxpool.Pool, source string, syncMode dsync.Mode) error {

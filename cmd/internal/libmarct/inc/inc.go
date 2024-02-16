@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/metadb-project/metadb/cmd/internal/libmarct/marc"
-	"github.com/metadb-project/metadb/cmd/internal/libmarct/options"
-	"github.com/metadb-project/metadb/cmd/internal/libmarct/util"
-	"github.com/metadb-project/metadb/cmd/internal/uuid"
+	"github.com/nazgaret/metadb/cmd/internal/libmarct/marc"
+	"github.com/nazgaret/metadb/cmd/internal/libmarct/options"
+	"github.com/nazgaret/metadb/cmd/internal/libmarct/util"
+	"github.com/nazgaret/metadb/cmd/internal/uuid"
 )
 
 const schemaVersion int64 = 19

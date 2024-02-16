@@ -4,21 +4,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/metadb-project/metadb/cmd/metadb/tools"
 	"net"
 	"strings"
 	"syscall"
+
+	"github.com/nazgaret/metadb/cmd/metadb/tools"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/metadb-project/metadb/cmd/metadb/ast"
-	"github.com/metadb-project/metadb/cmd/metadb/dberr"
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/parser"
-	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
+	"github.com/nazgaret/metadb/cmd/metadb/ast"
+	"github.com/nazgaret/metadb/cmd/metadb/dberr"
+	"github.com/nazgaret/metadb/cmd/metadb/dbx"
+	"github.com/nazgaret/metadb/cmd/metadb/log"
+	"github.com/nazgaret/metadb/cmd/metadb/parser"
+	"github.com/nazgaret/metadb/cmd/metadb/sysdb"
 )
 
 func Listen(host string, port string, db *dbx.DB, sources *[]*sysdb.SourceConnector) {

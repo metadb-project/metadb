@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/metadb-project/metadb/cmd/metadb/ast"
+	"github.com/nazgaret/metadb/cmd/metadb/ast"
 )
 
 %%{ 

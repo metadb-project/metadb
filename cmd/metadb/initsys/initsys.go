@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/metadb-project/metadb/cmd/internal/eout"
-	"github.com/metadb-project/metadb/cmd/metadb/option"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"github.com/nazgaret/metadb/cmd/internal/eout"
+	"github.com/nazgaret/metadb/cmd/metadb/option"
+	"github.com/nazgaret/metadb/cmd/metadb/util"
 )
 
 func InitSys(opt *option.Init) error {

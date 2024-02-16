@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/metadb-project/metadb/cmd/internal/api"
-	"github.com/metadb-project/metadb/cmd/internal/eout"
-	"github.com/metadb-project/metadb/cmd/mdb/option"
-	"github.com/metadb-project/metadb/cmd/mdb/util"
+	"github.com/nazgaret/metadb/cmd/internal/api"
+	"github.com/nazgaret/metadb/cmd/internal/eout"
+	"github.com/nazgaret/metadb/cmd/mdb/option"
+	"github.com/nazgaret/metadb/cmd/mdb/util"
 )
 
 func Config(opt *option.Config) error {

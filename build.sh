@@ -96,7 +96,7 @@ mkdir -p $bindir
 
 go generate $v ./...
 
-go build -o $bindir $v $tags -ldflags "-X github.com/metadb-project/metadb/cmd/metadb/util.MetadbVersion=$version $json" ./cmd/metadb
+go build -o $bindir $v $tags -ldflags "-X github.com/nazgaret/metadb/cmd/metadb/util.MetadbVersion=$version $json" ./cmd/metadb
 # go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
 
 if $runtests || $runalltests; then
@@ -108,7 +108,7 @@ if $runtests || $runalltests; then
 fi
 
 if $runalltests; then
-    go vet $v $tags $(go list ./cmd/... | grep -v 'github.com/metadb-project/metadb/cmd/metadb/parser') 2>&1 | while read s; do echo "build.sh: $s" 1>&2; done
+    go vet $v $tags $(go list ./cmd/... | grep -v 'github.com/nazgaret/metadb/cmd/metadb/parser') 2>&1 | while read s; do echo "build.sh: $s" 1>&2; done
     go vet $v $tags -vettool=$GOPATH/bin/shadow ./cmd/... 2>&1 | while read s; do echo "build.sh: $s" 1>&2; done
     # deadcode -test ./cmd/... 2>&1 | while read s; do echo "build.sh: deadcode: $s" 1>&2; done
     if $verbose; then
