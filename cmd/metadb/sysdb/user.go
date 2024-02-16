@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"github.com/nazgaret/metadb/cmd/metadb/dbx"
+	"github.com/nazgaret/metadb/cmd/metadb/log"
+	"github.com/nazgaret/metadb/cmd/metadb/util"
 )
 
 func GoUpdateUserPerms(dc, dcsuper *pgx.Conn, trackedTables []dbx.Table) {

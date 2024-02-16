@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/jackc/pgx/v5"
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
+	"github.com/nazgaret/metadb/cmd/metadb/dbx"
 )
 
 func RefreshInferredColumnTypes(dq dbx.Queryable, progress func(string)) error {

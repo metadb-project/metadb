@@ -7,8 +7,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
-	"github.com/metadb-project/metadb/cmd/metadb/ast"
-	"github.com/metadb-project/metadb/cmd/metadb/parser"
+	"github.com/nazgaret/metadb/cmd/metadb/ast"
+	"github.com/nazgaret/metadb/cmd/metadb/parser"
 )
 
 func proxyQuery(conn net.Conn, query string, args []any, node ast.Node, dc *pgx.Conn) error {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
+	"github.com/nazgaret/metadb/cmd/metadb/dbx"
 )
 
 func (c *Catalog) initIndexes() error {

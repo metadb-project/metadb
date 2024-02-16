@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/nazgaret/metadb/cmd/metadb/dbx"
+	"github.com/nazgaret/metadb/cmd/metadb/log"
 )
 
 type tableEntry struct {

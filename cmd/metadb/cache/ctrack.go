@@ -4,9 +4,9 @@ package cache
 import (
 	"fmt"
 
-	"github.com/metadb-project/metadb/cmd/metadb/metadata"
+	"github.com/nazgaret/metadb/cmd/metadb/metadata"
 
-	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
+	"github.com/nazgaret/metadb/cmd/metadb/sqlx"
 )
 
 type Track struct {

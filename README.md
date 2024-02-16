@@ -9,4 +9,4 @@ Version 2.0.  See the file
 for more information.
 
 Documentation:
-[https://metadb.dev/doc/](https://metadb.dev/doc/)
+[https://metadb.dev/doc/](https://meexport GOPATH=$HOME/goexport GOPATH=$HOME/goexport GOPATH=$HOME/gotadb.dev/doc/)

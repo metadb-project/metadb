@@ -6,10 +6,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/metadb-project/metadb/cmd/metadb/catalog"
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/dsync"
-	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/nazgaret/metadb/cmd/metadb/catalog"
+	"github.com/nazgaret/metadb/cmd/metadb/dbx"
+	"github.com/nazgaret/metadb/cmd/metadb/dsync"
+	"github.com/nazgaret/metadb/cmd/metadb/log"
 )
 
 type execbuffer struct {

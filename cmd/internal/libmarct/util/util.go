@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/metadb-project/metadb/cmd/internal/libmarct/marc"
+	"github.com/nazgaret/metadb/cmd/internal/libmarct/marc"
 )
 
 func MD5(srsMarcAttr string) string {

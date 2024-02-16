@@ -6,10 +6,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/metadb-project/metadb/cmd/internal/eout"
-	"github.com/metadb-project/metadb/cmd/metadb/option"
-	"github.com/metadb-project/metadb/cmd/metadb/process"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"github.com/nazgaret/metadb/cmd/internal/eout"
+	"github.com/nazgaret/metadb/cmd/metadb/option"
+	"github.com/nazgaret/metadb/cmd/metadb/process"
+	"github.com/nazgaret/metadb/cmd/metadb/util"
 )
 
 func Stop(opt *option.Stop) error {

@@ -4,18 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/metadb-project/metadb/cmd/metadb/tools"
 	"os"
 	"strconv"
 	"strings"
 
+	"github.com/nazgaret/metadb/cmd/metadb/tools"
+
 	"github.com/jackc/pgx/v5"
-	"github.com/metadb-project/metadb/cmd/internal/eout"
-	"github.com/metadb-project/metadb/cmd/metadb/catalog"
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/metadata"
-	"github.com/metadb-project/metadb/cmd/metadb/option"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"github.com/nazgaret/metadb/cmd/internal/eout"
+	"github.com/nazgaret/metadb/cmd/metadb/catalog"
+	"github.com/nazgaret/metadb/cmd/metadb/dbx"
+	"github.com/nazgaret/metadb/cmd/metadb/metadata"
+	"github.com/nazgaret/metadb/cmd/metadb/option"
+	"github.com/nazgaret/metadb/cmd/metadb/util"
 )
 
 func Upgrade(opt *option.Upgrade) error {

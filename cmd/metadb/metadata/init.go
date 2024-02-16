@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
+	"github.com/nazgaret/metadb/cmd/metadb/dbx"
 )
 
 // TODO rework

@@ -3,9 +3,10 @@ package server
 import (
 	"container/list"
 	"fmt"
-	"github.com/metadb-project/metadb/cmd/metadb/command"
-	"github.com/metadb-project/metadb/cmd/metadb/jsonx"
-	"github.com/metadb-project/metadb/cmd/metadb/log"
+
+	"github.com/nazgaret/metadb/cmd/metadb/command"
+	"github.com/nazgaret/metadb/cmd/metadb/jsonx"
+	"github.com/nazgaret/metadb/cmd/metadb/log"
 )
 
 func rewriteCommandGraph(cmdgraph *command.CommandGraph, rewriteJSON bool) error {

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/metadb-project/metadb/cmd/internal/uuid"
+	"github.com/nazgaret/metadb/cmd/internal/uuid"
 )
 
 // Marc is a single "row" of data extracted from part of a MARC record.

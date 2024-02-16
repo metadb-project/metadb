@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
+	"github.com/nazgaret/metadb/cmd/metadb/dbx"
 )
 
 func Origins(db *dbx.DB) ([]string, error) {

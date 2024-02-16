@@ -1,7 +1,7 @@
 package sysdb
 
 import (
-	"github.com/metadb-project/metadb/cmd/metadb/command"
+	"github.com/nazgaret/metadb/cmd/metadb/command"
 )
 
 type TableSchema struct {

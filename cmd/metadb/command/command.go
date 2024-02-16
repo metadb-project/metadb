@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/metadb-project/metadb/cmd/metadb/change"
-	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"github.com/nazgaret/metadb/cmd/metadb/change"
+	"github.com/nazgaret/metadb/cmd/metadb/dbx"
+	"github.com/nazgaret/metadb/cmd/metadb/log"
+	"github.com/nazgaret/metadb/cmd/metadb/util"
 	"github.com/shopspring/decimal"
 )
 

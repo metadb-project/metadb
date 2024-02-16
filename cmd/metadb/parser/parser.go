@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/metadb-project/metadb/cmd/metadb/ast"
+	"github.com/nazgaret/metadb/cmd/metadb/ast"
 )
 
 //go:generate ragel -Z -G2 -o scan.go scan.rl
