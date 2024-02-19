@@ -344,13 +344,13 @@ func createKafkaConsumers(spr *sproc) ([]*kafka.Consumer, error) {
 		}
 		var brokers = spr.source.Brokers
 		var group = spr.source.Group
-		log.Debug("connecting to %q, topics %q", brokers, topics)
+		log.Debug("connecting to %q, topics %q", brokers, topic)
 		log.Debug("connecting to source %q", spr.source.Name)
 		var config = &kafka.ConfigMap{
 			"auto.offset.reset":    "earliest",
 			"bootstrap.servers":    brokers,
 			"enable.auto.commit":   false,
-			"group.id":             group,
+			"group.id":             group + topic,
 			"max.poll.interval.ms": spr.svr.db.MaxPollInterval,
 			"security.protocol":    spr.source.Security,
 		}
@@ -362,14 +362,14 @@ func createKafkaConsumers(spr *sproc) ([]*kafka.Consumer, error) {
 			return nil, err
 		}
 
-		consumers[i] = consumer
-
 		//err = consumer.SubscribeTopics([]string{"^" + topicPrefix + "[.].*"}, nil)
 		err = consumer.SubscribeTopics([]string{topic}, nil)
 		if err != nil {
 			spr.source.Status.Error()
 			return nil, err
 		}
+
+		consumers[i] = consumer
 	}
 
 	return consumers, nil
