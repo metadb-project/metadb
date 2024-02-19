@@ -192,16 +192,9 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		sourceFileScanner.Buffer(make([]byte, 0, 10000000), 10000000)
 	}
 	// Kafka source
-	var consumers = make([]*kafka.Consumer, len(spr.source.Topics))
+	var consumers []*kafka.Consumer
 	if sourceFileScanner == nil {
-		err = createKafkaConsumers(spr, consumers)
-
-		defer func(consumers []*kafka.Consumer) { //todo move
-			for _, consumer := range consumers {
-				_ = consumer.Close()
-			}
-		}(consumers)
-
+		consumers, err = createKafkaConsumers(spr)
 		if err != nil {
 			return err
 		}
@@ -213,8 +206,6 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	// of the error messages.
 	pkerr := make(map[string]struct{}) // "primary key not defined" errors reported
 	var firstEvent = true
-
-	//todo multiply this part in go routines
 
 	g, ctx := errgroup.WithContext(ctx)
 	for i := range consumers {
@@ -279,11 +270,15 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		})
 	}
 
-	if err = g.Wait(); err != nil {
-		return err
+	// wait till the all groups end work
+	err = g.Wait()
+
+	// close all consumers
+	for _, consumer := range consumers {
+		_ = consumer.Close()
 	}
 
-	return nil
+	return err
 }
 
 // getTopicsMatchedTheRegexp get all topics matched provided regexPattern and bootstrap servers
@@ -322,28 +317,30 @@ func getTopicsMatchedTheRegexp(bootstrapServers, regexPattern string) ([]string,
 	return result, nil
 }
 
-func createKafkaConsumers(spr *sproc, consumers []*kafka.Consumer) error {
+func createKafkaConsumers(spr *sproc) ([]*kafka.Consumer, error) {
 	var err error
 	var topics []string
 
 	topics, err = getTopicsMatchedTheRegexp(spr.source.Brokers, spr.source.Topics[0])
 	if err != nil {
 		spr.source.Status.Error()
-		return err
+		return nil, err
 	}
+
+	var consumers = make([]*kafka.Consumer, len(topics))
 
 	for i, topic := range topics {
 		spr.schemaPassFilter, err = util.CompileRegexps(spr.source.SchemaPassFilter)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		spr.schemaStopFilter, err = util.CompileRegexps(spr.source.SchemaStopFilter)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		spr.tableStopFilter, err = util.CompileRegexps(spr.source.TableStopFilter)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		var brokers = spr.source.Brokers
 		var group = spr.source.Group
@@ -362,7 +359,7 @@ func createKafkaConsumers(spr *sproc, consumers []*kafka.Consumer) error {
 		consumer, err = kafka.NewConsumer(config)
 		if err != nil {
 			spr.source.Status.Error()
-			return err
+			return nil, err
 		}
 
 		consumers[i] = consumer
@@ -371,11 +368,11 @@ func createKafkaConsumers(spr *sproc, consumers []*kafka.Consumer) error {
 		err = consumer.SubscribeTopics([]string{topic}, nil)
 		if err != nil {
 			spr.source.Status.Error()
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return consumers, nil
 }
 
 func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer *kafka.Consumer, cmdgraph *command.CommandGraph, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog, checkpointSegmentSize int) (int, error) {
