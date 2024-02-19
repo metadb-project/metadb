@@ -286,10 +286,53 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	return nil
 }
 
+// getTopicsMatchedTheRegexp get all topics matched provided regexPattern and bootstrap servers
+func getTopicsMatchedTheRegexp(bootstrapServers, regexPattern string) ([]string, error) {
+	config := &kafka.ConfigMap{
+		"bootstrap.servers": bootstrapServers,
+		"client.id":         "kafka-topic-lister",
+	}
+
+	adminClient, err := kafka.NewAdminClient(config)
+	if err != nil {
+		return nil, fmt.Errorf("Error creating Kafka admin client: %v\n", err)
+	}
+	defer adminClient.Close()
+
+	// Fetch the list of topics
+	topics, err := adminClient.GetMetadata(nil, true, 5000)
+	if err != nil {
+		return nil, fmt.Errorf("Error fetching metadata: %v\n", err)
+	}
+
+	// Compile the regular expression pattern
+	pattern, err := regexp.Compile(regexPattern)
+	if err != nil {
+		return nil, fmt.Errorf("Error compiling regex pattern: %v\n", err)
+	}
+
+	// Filter topics matching the regex pattern
+	var result []string
+	for _, topic := range topics.Topics {
+		if pattern.MatchString(topic.Topic) {
+			result = append(result, topic.Topic)
+		}
+	}
+
+	return result, nil
+}
+
 func createKafkaConsumers(spr *sproc, consumers []*kafka.Consumer) error {
 	var err error
+	var topics []string
 
-	for i, topic := range spr.source.Topics {
+	topics, err = getTopicsMatchedTheRegexp(spr.source.Brokers, spr.source.Topics[0])
+	if err != nil {
+		spr.source.Status.Error()
+		return err
+	}
+
+	for i, topic := range topics {
 		spr.schemaPassFilter, err = util.CompileRegexps(spr.source.SchemaPassFilter)
 		if err != nil {
 			return err
@@ -303,7 +346,6 @@ func createKafkaConsumers(spr *sproc, consumers []*kafka.Consumer) error {
 			return err
 		}
 		var brokers = spr.source.Brokers
-		var topics = []string{topic}
 		var group = spr.source.Group
 		log.Debug("connecting to %q, topics %q", brokers, topics)
 		log.Debug("connecting to source %q", spr.source.Name)
@@ -326,7 +368,7 @@ func createKafkaConsumers(spr *sproc, consumers []*kafka.Consumer) error {
 		consumers[i] = consumer
 
 		//err = consumer.SubscribeTopics([]string{"^" + topicPrefix + "[.].*"}, nil)
-		err = consumer.SubscribeTopics(topics, nil)
+		err = consumer.SubscribeTopics([]string{topic}, nil)
 		if err != nil {
 			spr.source.Status.Error()
 			return err
