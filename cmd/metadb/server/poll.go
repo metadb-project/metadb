@@ -209,14 +209,12 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 
 	g, ctx := errgroup.WithContext(ctx)
 	for i := range consumers {
-		var index = i
-
 		g.Go(func() error {
 			for {
 				cmdgraph := command.NewCommandGraph()
 
 				// Parse
-				eventReadCount, err := parseChangeEvents(cat, pkerr, consumers[index], cmdgraph, spr.schemaPassFilter,
+				eventReadCount, err := parseChangeEvents(cat, pkerr, consumers[i], cmdgraph, spr.schemaPassFilter,
 					spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
 					spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
 				if err != nil {
@@ -238,7 +236,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 				}
 
 				if eventReadCount > 0 && sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
-					_, err = consumers[index].Commit()
+					_, err = consumers[i].Commit()
 					if err != nil {
 						e := err.(kafka.Error)
 						if e.IsFatal() {
@@ -265,7 +263,6 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 						spr.source.Name)
 					cat.ResetLastSnapshotRecord() // Sync timer.
 				}
-				return nil
 			}
 		})
 	}
@@ -295,7 +292,7 @@ func getTopicsMatchedTheRegexp(bootstrapServers, regexPattern string) ([]string,
 	defer adminClient.Close()
 
 	// Fetch the list of topics
-	topics, err := adminClient.GetMetadata(nil, true, 5000)
+	metadata, err := adminClient.GetMetadata(nil, true, 5000)
 	if err != nil {
 		return nil, fmt.Errorf("Error fetching metadata: %v\n", err)
 	}
@@ -308,7 +305,7 @@ func getTopicsMatchedTheRegexp(bootstrapServers, regexPattern string) ([]string,
 
 	// Filter topics matching the regex pattern
 	var result []string
-	for _, topic := range topics.Topics {
+	for _, topic := range metadata.Topics {
 		if pattern.MatchString(topic.Topic) {
 			result = append(result, topic.Topic)
 		}
@@ -318,8 +315,13 @@ func getTopicsMatchedTheRegexp(bootstrapServers, regexPattern string) ([]string,
 }
 
 func createKafkaConsumers(spr *sproc) ([]*kafka.Consumer, error) {
-	var err error
-	var topics []string
+	var (
+		err              error
+		topics           []string
+		consumersNum     = 20 // todo add to config if needed
+		consumers        []*kafka.Consumer
+		topicsByConsumer = make([][]string, consumersNum)
+	)
 
 	topics, err = getTopicsMatchedTheRegexp(spr.source.Brokers, spr.source.Topics[0])
 	if err != nil {
@@ -327,9 +329,17 @@ func createKafkaConsumers(spr *sproc) ([]*kafka.Consumer, error) {
 		return nil, err
 	}
 
-	var consumers = make([]*kafka.Consumer, len(topics))
-
 	for i, topic := range topics {
+		index := i / consumersNum
+		topicsByConsumer[index] = append(topicsByConsumer[index], topic)
+	}
+
+	log.Debug("connecting to source %q", spr.source.Name)
+	for i, topics := range topicsByConsumer {
+		if len(topics) == 0 {
+			break // if we have less than 20 topics limit the consumers
+		}
+
 		spr.schemaPassFilter, err = util.CompileRegexps(spr.source.SchemaPassFilter)
 		if err != nil {
 			return nil, err
@@ -343,14 +353,13 @@ func createKafkaConsumers(spr *sproc) ([]*kafka.Consumer, error) {
 			return nil, err
 		}
 		var brokers = spr.source.Brokers
-		var group = spr.source.Group
-		log.Debug("connecting to %q, topics %q", brokers, topic)
-		log.Debug("connecting to source %q", spr.source.Name)
+		var group = fmt.Sprintf("%s_topics_part_%d", spr.source.Group, i)
+		log.Debug("connecting to %q, topics %q", brokers, topics)
 		var config = &kafka.ConfigMap{
 			"auto.offset.reset":    "earliest",
 			"bootstrap.servers":    brokers,
 			"enable.auto.commit":   false,
-			"group.id":             group + topic,
+			"group.id":             group,
 			"max.poll.interval.ms": spr.svr.db.MaxPollInterval,
 			"security.protocol":    spr.source.Security,
 		}
@@ -362,14 +371,16 @@ func createKafkaConsumers(spr *sproc) ([]*kafka.Consumer, error) {
 			return nil, err
 		}
 
+		log.Debug("connecting to source %q", spr.source.Name)
 		//err = consumer.SubscribeTopics([]string{"^" + topicPrefix + "[.].*"}, nil)
-		err = consumer.SubscribeTopics([]string{topic}, nil)
+		err = consumer.SubscribeTopics(topics, nil)
 		if err != nil {
 			spr.source.Status.Error()
 			return nil, err
 		}
 
-		consumers[i] = consumer
+		log.Debug("consumer.SubscribeTopics group:%q, topics:%q", group, topics)
+		consumers = append(consumers, consumer)
 	}
 
 	return consumers, nil
