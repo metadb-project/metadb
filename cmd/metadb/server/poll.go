@@ -201,6 +201,8 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		spr.source.Status.Active()
 	}
 
+	time.Sleep(5 * time.Minute) // todo remove after test
+
 	waitUserPerms.Wait()
 	// pkerr keeps track of "primary key not defined" errors that have been logged, in order to reduce duplication
 	// of the error messages.
