@@ -339,9 +339,13 @@ func createKafkaConsumers(spr *sproc) ([]*kafka.Consumer, error) {
 		return nil, err
 	}
 
-	for i, topic := range topics {
-		index := i / consumersNum
+	index := 0
+	for _, topic := range topics {
 		topicsByConsumer[index] = append(topicsByConsumer[index], topic)
+		index++
+		if index >= consumersNum {
+			index = 0
+		}
 	}
 
 	log.Debug("connecting to source %q", spr.source.Name)
