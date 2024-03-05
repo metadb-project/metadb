@@ -35,7 +35,7 @@
 * `maintenance_work_mem`: `1000000`
 * `max_wal_size`: `10240`
 * `shared_buffers`: `1250000`
-* `statement_timeout`: `3600000`
+* `statement_timeout`: `7200000`
 * `work_mem`: `350000`
 
 === Building the software
