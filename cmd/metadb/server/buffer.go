@@ -31,23 +31,32 @@ func (e *execbuffer) queueMergeData(table *dbx.Table, update, insert *string) {
 }
 
 func (e *execbuffer) flush() error {
+	tx, err := e.dp.Begin(e.ctx)
+	if err != nil {
+		return fmt.Errorf("flush: begin txn: %v", err)
+	}
+	defer tx.Rollback(e.ctx)
 	// Flush merge data.
 	log.Trace("FLUSH merge data")
-	if err := e.flushMergeData(); err != nil {
+	if err = e.flushMergeData(tx); err != nil {
 		return fmt.Errorf("flushing exec buffer: writing merge data: %v", err)
 	}
 	// Flush sync IDs.
 	log.Trace("FLUSH sync IDs")
-	if err := e.flushSyncIDs(); err != nil {
+	if err = e.flushSyncIDs(tx); err != nil {
 		return fmt.Errorf("flushing exec buffer: writing to sync tables: %v", err)
+	}
+	log.Trace("FLUSH commit")
+	if err = tx.Commit(e.ctx); err != nil {
+		return fmt.Errorf("flushing exec buffer: commit: %v", err)
 	}
 	return nil
 }
 
-func (e *execbuffer) flushSyncIDs() error {
+func (e *execbuffer) flushSyncIDs(tx pgx.Tx) error {
 	for t, a := range e.syncIDs {
 		synct := catalog.SyncTable(&t)
-		copyCount, err := e.dp.CopyFrom(
+		copyCount, err := tx.CopyFrom(
 			e.ctx,
 			pgx.Identifier{synct.Schema, synct.Table},
 			[]string{"__id"},
@@ -62,7 +71,7 @@ func (e *execbuffer) flushSyncIDs() error {
 	return nil
 }
 
-func (e *execbuffer) flushMergeData() error {
+func (e *execbuffer) flushMergeData(tx pgx.Tx) error {
 	batchSize := 100
 	for t, a := range e.mergeData {
 		lena := len(a)
@@ -83,14 +92,14 @@ func (e *execbuffer) flushMergeData() error {
 					return row.Scan(p)
 				})
 			}
-			if err := e.dp.SendBatch(e.ctx, &batch).Close(); err != nil {
+			if err := tx.SendBatch(e.ctx, &batch).Close(); err != nil {
 				return fmt.Errorf("update and insert: %v", err)
 			}
 			// If resync mode, flush IDs to sync table.
 			if e.syncMode == dsync.Resync {
 				//e.queueSyncID(&t, id)
 				synct := catalog.SyncTable(&t)
-				copyCount, err := e.dp.CopyFrom(
+				copyCount, err := tx.CopyFrom(
 					e.ctx,
 					pgx.Identifier{synct.Schema, synct.Table},
 					[]string{"__id"},
