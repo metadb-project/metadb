@@ -266,10 +266,10 @@ func convertTypeSize(coltype string, datatype DataType) (int64, error) {
 	}
 }
 
-func extractPrimaryKey(pkerr map[string]struct{}, ce *change.Event) (map[string]int, error) {
+func extractPrimaryKey(dedup *log.MessageSet, ce *change.Event) (map[string]int, error) {
 	var ok bool
 	if ce.Key == nil {
-		primaryKeyNotDefined(pkerr, ce.Topic)
+		primaryKeyNotDefined(dedup, ce.Topic)
 		return nil, nil
 	}
 	if ce.Key.Schema == nil || ce.Key.Schema.Fields == nil {
@@ -296,7 +296,7 @@ func extractPrimaryKey(pkerr map[string]struct{}, ce *change.Event) (map[string]
 	return primaryKey, nil
 }
 
-func extractColumns(pkerr map[string]struct{}, ce *change.Event) ([]CommandColumn, error) {
+func extractColumns(dedup *log.MessageSet, ce *change.Event) ([]CommandColumn, error) {
 	var err error
 	var ok bool
 	// Extract field data from payload
@@ -337,7 +337,7 @@ func extractColumns(pkerr map[string]struct{}, ce *change.Event) ([]CommandColum
 		return nil, fmt.Errorf("value: $.schema.fields: \"fields\" not expected type")
 	}
 	var primaryKey map[string]int
-	if primaryKey, err = extractPrimaryKey(pkerr, ce); err != nil {
+	if primaryKey, err = extractPrimaryKey(dedup, ce); err != nil {
 		return nil, err
 	}
 	if primaryKey == nil {
@@ -557,7 +557,7 @@ func structScale(data any) (int32, string, error) {
 // var FolioTenant string
 var ReshareTenants []string
 
-func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, schemaStopFilter,
+func NewCommand(dedup *log.MessageSet, ce *change.Event, schemaPassFilter, schemaStopFilter,
 	tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string) (*Command, bool, error) {
 	snapshot := false
 	// Note: this function returns nil, nil in some cases.
@@ -647,7 +647,7 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 	if c.Op == DeleteOp {
 		switch {
 		case ce.Key == nil:
-			primaryKeyNotDefined(pkerr, ce.Topic)
+			primaryKeyNotDefined(dedup, ce.Topic)
 			return nil, false, nil
 		case ce.Key.Schema == nil:
 			return nil, false, fmt.Errorf("delete: missing event key schema: %v", ce.Key)
@@ -715,7 +715,7 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 		}
 		return c, snapshot, nil
 	}
-	if c.Column, err = extractColumns(pkerr, ce); err != nil {
+	if c.Column, err = extractColumns(dedup, ce); err != nil {
 		return nil, false, err
 	}
 	if c.Column == nil {
@@ -724,17 +724,14 @@ func NewCommand(pkerr map[string]struct{}, ce *change.Event, schemaPassFilter, s
 	return c, snapshot, nil
 }
 
-func primaryKeyNotDefined(pkerr map[string]struct{}, topicPtr *string) {
-	var topic string
+func primaryKeyNotDefined(dedup *log.MessageSet, topicPtr *string) {
+	topic := ""
 	if topicPtr != nil {
-		topic = *(topicPtr)
-	} else {
-		topic = "(unknown)"
+		topic = *topicPtr
 	}
-	_, ok := pkerr[topic]
-	if !ok {
-		log.Warning("primary key not defined: %s", topic)
-		pkerr[topic] = struct{}{}
+	msg := fmt.Sprintf("primary key not defined: %s", topic)
+	if dedup.Insert(msg) {
+		log.Warning("%s", msg)
 	}
 }
 
