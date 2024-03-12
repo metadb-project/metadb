@@ -65,7 +65,7 @@ func execCommandGraph(ctx context.Context, cat *catalog.Catalog, cmdgraph *comma
 			}
 		} else {
 			for f := cmd.Subcommands.Front(); f != nil; f = f.Next() {
-				if _, err := execCommand(ebuf, cat, f.Value.(*command.Command), source, syncMode); err != nil {
+				if _, err := execCommand(ebuf, cat, f.Value.(*command.Command), source, syncMode, dedup); err != nil {
 					return fmt.Errorf("exec command: %v", err)
 				}
 			}
@@ -296,7 +296,7 @@ func execDeltaSchema(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comman
 func execCommandData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, syncMode dsync.Mode, dedup *log.MessageSet) (bool, error) {
 	switch cmd.Op {
 	case command.MergeOp:
-		match, err := execMergeData(ebuf, cmd, syncMode)
+		match, err := execMergeData(ebuf, cmd, syncMode, dedup)
 		if err != nil {
 			return false, fmt.Errorf("merge: %v", err)
 		}
