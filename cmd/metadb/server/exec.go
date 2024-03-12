@@ -16,7 +16,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 )
 
-func execCommandGraph(ctx context.Context, cat *catalog.Catalog, cmdgraph *command.CommandGraph, dp *pgxpool.Pool, source string, syncMode dsync.Mode) error {
+func execCommandGraph(ctx context.Context, cat *catalog.Catalog, cmdgraph *command.CommandGraph, dp *pgxpool.Pool, source string, syncMode dsync.Mode, dedup *log.MessageSet) error {
 	if cmdgraph.Commands.Len() == 0 {
 		return nil
 	}
@@ -33,7 +33,7 @@ func execCommandGraph(ctx context.Context, cat *catalog.Catalog, cmdgraph *comma
 		if log.IsLevelTrace() {
 			logTraceCommand(cmd)
 		}
-		match, err := execCommand(ebuf, cat, cmd, source, syncMode)
+		match, err := execCommand(ebuf, cat, cmd, source, syncMode, dedup)
 		if err != nil {
 			return fmt.Errorf("exec command: %v", err)
 		}
@@ -80,7 +80,7 @@ func execCommandGraph(ctx context.Context, cat *catalog.Catalog, cmdgraph *comma
 	return nil
 }
 
-func execCommand(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, source string, syncMode dsync.Mode) (bool, error) {
+func execCommand(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, source string, syncMode dsync.Mode, dedup *log.MessageSet) (bool, error) {
 	// Make schema changes if needed by the command.
 	if cmd.Op == command.MergeOp {
 		table := &dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName}
@@ -114,7 +114,7 @@ func execCommand(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, s
 			}
 		}
 	}
-	match, err := execCommandData(ebuf, cat, cmd, syncMode)
+	match, err := execCommandData(ebuf, cat, cmd, syncMode, dedup)
 	if err != nil {
 		return false, fmt.Errorf("exec data: %v", err)
 	}
@@ -293,7 +293,7 @@ func execDeltaSchema(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comman
 	return nil
 }
 
-func execCommandData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, syncMode dsync.Mode) (bool, error) {
+func execCommandData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, syncMode dsync.Mode, dedup *log.MessageSet) (bool, error) {
 	switch cmd.Op {
 	case command.MergeOp:
 		match, err := execMergeData(ebuf, cmd, syncMode)
@@ -317,7 +317,7 @@ func execCommandData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comman
 }
 
 // execMergeData executes a merge command in the database.
-func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode) (bool, error) {
+func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode, dedup *log.MessageSet) (bool, error) {
 	table := &dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName}
 	// Check if the current record (if any) is identical to the new one.  If so, we
 	// can avoid making any changes in the database.
@@ -386,11 +386,17 @@ func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode) 
 		}
 		rows.Close()
 		if !found {
-			log.Warning("no current value for unavailable data in table %q", table)
+			msg := fmt.Sprintf("no current value for unavailable data in table %q", table)
+			if dedup.Insert(msg) {
+				log.Warning("%s", msg)
+			}
 		} else {
 			for i := range unavailColumns {
 				if values[i] == nil {
-					log.Warning("nil value in replacing unavailable data in table %q", table)
+					msg := fmt.Sprintf("nil value in replacing unavailable data in table %q", table)
+					if dedup.Insert(msg) {
+						log.Warning("%s", msg)
+					}
 					continue
 				}
 				s := values[i].(string)

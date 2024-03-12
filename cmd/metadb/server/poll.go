@@ -235,15 +235,16 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		spr.source.Status.Active()
 	}
 	waitUserPerms.Wait()
-	// pkerr keeps track of "primary key not defined" errors that have been logged, in order to reduce duplication
-	// of the error messages.
-	pkerr := make(map[string]struct{}) // "primary key not defined" errors reported
+	// dedup keeps track of "primary key not defined" and similar errors
+	// that have been logged, in order to reduce duplication of the error
+	// messages.
+	dedup := log.NewMessageSet()
 	var firstEvent = true
 	for {
 		cmdgraph := command.NewCommandGraph()
 
 		// Parse
-		eventReadCount, err := parseChangeEvents(cat, pkerr, consumer, cmdgraph, spr.schemaPassFilter,
+		eventReadCount, err := parseChangeEvents(cat, dedup, consumer, cmdgraph, spr.schemaPassFilter,
 			spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
 			spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
 		if err != nil {
@@ -260,7 +261,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		// Execute
-		if err = execCommandGraph(ctx, cat, cmdgraph, spr.svr.dp, spr.source.Name, syncMode); err != nil {
+		if err = execCommandGraph(ctx, cat, cmdgraph, spr.svr.dp, spr.source.Name, syncMode, dedup); err != nil {
 			return fmt.Errorf("executor: %s", err)
 		}
 
@@ -288,14 +289,17 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 
 		// Check if resync snapshot may have completed.
 		if syncMode != dsync.NoSync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 3.0 {
-			log.Info("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
+			msg := fmt.Sprintf("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
 				spr.source.Name)
+			if dedup.Insert(msg) {
+				log.Info("%s", msg)
+			}
 			cat.ResetLastSnapshotRecord() // Sync timer.
 		}
 	}
 }
 
-func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer *kafka.Consumer, cmdgraph *command.CommandGraph, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog, checkpointSegmentSize int) (int, error) {
+func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *kafka.Consumer, cmdgraph *command.CommandGraph, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog, checkpointSegmentSize int) (int, error) {
 	kafkaPollTimeout := 100     // Poll timeout in milliseconds.
 	pollTimeoutCountLimit := 20 // Maximum allowable number of consecutive poll timeouts.
 	pollLoopTimeout := 120.0    // Overall pool loop timeout in seconds.
@@ -349,7 +353,7 @@ func parseChangeEvents(cat *catalog.Catalog, pkerr map[string]struct{}, consumer
 			}
 		}
 
-		c, snap, err := command.NewCommand(pkerr, ce, schemaPassFilter, schemaStopFilter, tableStopFilter,
+		c, snap, err := command.NewCommand(dedup, ce, schemaPassFilter, schemaStopFilter, tableStopFilter,
 			trimSchemaPrefix, addSchemaPrefix)
 		if err != nil {
 			log.Debug("%v", *ce)
