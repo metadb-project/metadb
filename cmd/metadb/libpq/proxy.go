@@ -2,6 +2,7 @@ package libpq
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/jackc/pgx/v5"
@@ -20,10 +21,10 @@ func proxyQuery(conn net.Conn, query string, args []any, node ast.Node, db *dbx.
 		//	return createUser(conn, query, n, db)
 	}
 
-	return write(conn, encode(nil, []pgproto3.Message{
+	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.ErrorResponse{Severity: "ERROR", Message: "syntax error"},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	}))
+	})
 
 	//ctag, err := dc.Exec(context.TODO(), query)
 	//if err != nil {
@@ -46,14 +47,17 @@ func proxySelect(conn net.Conn, query string, args []any, dbconn *pgx.Conn) erro
 			panic("passthroughQuery(): casting error to *pgconn.PgError")
 		}
 		var s = e.Severity + ":  " + e.Message + "\n" + parser.WriteErrorContext(query, int(e.Position-1))
-		return write(conn, encode(nil, []pgproto3.Message{
+		return writeEncoded(conn, []pgproto3.Message{
 			&pgproto3.ErrorResponse{Message: s},
 			&pgproto3.ReadyForQuery{TxStatus: 'I'},
-		}))
+		})
 	}
 	defer rows.Close()
 	var cols = rows.FieldDescriptions()
-	var b = encodeFieldDesc(nil, cols)
+	b, erre := encodeFieldDesc(nil, cols)
+	if erre != nil {
+		return fmt.Errorf("proxy select: field desc: %v", erre)
+	}
 	for rows.Next() {
 		if b, err = encodeRow(b, rows, cols); err != nil {
 			return err
@@ -62,9 +66,12 @@ func proxySelect(conn net.Conn, query string, args []any, dbconn *pgx.Conn) erro
 	if err = rows.Err(); err != nil {
 		return err
 	}
-	b = encode(b, []pgproto3.Message{
+	b, erre = encode(b, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("SELECT 1")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
+	if erre != nil {
+		return fmt.Errorf("proxy select: %v", erre)
+	}
 	return write(conn, b)
 }

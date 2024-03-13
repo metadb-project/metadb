@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/metadb-project/metadb/cmd/metadb/tools"
 	"net"
 	"strings"
 	"syscall"
+
+	"github.com/metadb-project/metadb/cmd/metadb/tools"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -70,10 +71,18 @@ func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, sources *[]*sys
 	// TODO Close
 
 	if err = startup(conn, backend); err != nil {
-		errw := write(conn, encode(nil, []pgproto3.Message{
+		// errw := write(conn, encode(nil, []pgproto3.Message{
+		// 	&pgproto3.ErrorResponse{Message: err.Error()},
+		// 	&pgproto3.ReadyForQuery{TxStatus: 'I'},
+		// }))
+		buffer, erre := encode(nil, []pgproto3.Message{
 			&pgproto3.ErrorResponse{Message: err.Error()},
 			&pgproto3.ReadyForQuery{TxStatus: 'I'},
-		}))
+		})
+		if erre != nil {
+			log.Info("%v", erre)
+		}
+		errw := write(conn, buffer)
 		log.Info("connection from address %q: %v", conn.RemoteAddr(), err)
 		if errw != nil {
 			log.Info("%v", errw)
@@ -241,18 +250,26 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 	if pass {
 		err = proxyQuery(conn, query, args, node, db, dbconn)
 		if err != nil {
-			return write(conn, encode(nil, []pgproto3.Message{
+			buffer, erre := encode(nil, []pgproto3.Message{
 				&pgproto3.ErrorResponse{Message: "ERROR:  " + err.Error()},
 				&pgproto3.ReadyForQuery{TxStatus: 'I'},
-			}))
+			})
+			if erre != nil {
+				return fmt.Errorf("process query: passthrough: error response: %v", erre)
+			}
+			return write(conn, buffer)
 		}
 		return nil
 	}
 	if err != nil {
-		return write(conn, encode(nil, []pgproto3.Message{
+		buffer, erre := encode(nil, []pgproto3.Message{
 			&pgproto3.ErrorResponse{Message: "ERROR:  " + err.Error()},
 			&pgproto3.ReadyForQuery{TxStatus: 'I'},
-		}))
+		})
+		if erre != nil {
+			return fmt.Errorf("process query: error response: %v", erre)
+		}
+		return write(conn, buffer)
 	}
 	switch n := node.(type) {
 	case *ast.CreateDataSourceStmt:
@@ -284,10 +301,14 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 	//		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	//	}))
 	default:
-		return write(conn, encode(nil, []pgproto3.Message{
+		buffer, erre := encode(nil, []pgproto3.Message{
 			&pgproto3.ErrorResponse{Message: "ERROR:  syntax error"},
 			&pgproto3.ReadyForQuery{TxStatus: 'I'},
-		}))
+		})
+		if erre != nil {
+			return fmt.Errorf("process query: syntax error response: %v", erre)
+		}
+		return write(conn, buffer)
 	}
 	if err != nil {
 		//log.Error("%v: %s", err, query)
@@ -297,32 +318,40 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 			hint = errs.Hint
 		}
 		_ = hint // suppress hints until they also can be returned for proxied queries
-		return write(conn, encode(nil, []pgproto3.Message{
+		buffer, erre := encode(nil, []pgproto3.Message{
 			&pgproto3.ErrorResponse{Severity: "ERROR", Message: err.Error(), Hint: "" /*hint*/},
 			&pgproto3.ReadyForQuery{TxStatus: 'I'},
-		}))
+		})
+		if erre != nil {
+			return fmt.Errorf("process query: command error response: %v", erre)
+		}
+		return write(conn, buffer)
 	}
 	return nil
 }
 
 func handleStartup(conn net.Conn, msg *pgproto3.StartupMessage) error {
 	if msg.ProtocolVersion != 0x30000 {
-		return fmt.Errorf("unknown protocol version \"%#x\"", msg.ProtocolVersion)
+		return fmt.Errorf("startup: unknown protocol version \"%#x\"", msg.ProtocolVersion)
 	}
 	if msg.Parameters["application_name"] != "psql" {
-		return fmt.Errorf("unsupported application %q", msg.Parameters["application_name"])
+		return fmt.Errorf("startup: unsupported application %q", msg.Parameters["application_name"])
 	}
 	if msg.Parameters["database"] != "metadb" {
-		return fmt.Errorf("unsupported database name %q (use \"-d metadb\")", msg.Parameters["database"])
+		return fmt.Errorf("startup: unsupported database name %q (use \"-d metadb\")", msg.Parameters["database"])
 	}
-	return write(conn, encode(nil, []pgproto3.Message{
+	buffer, erre := encode(nil, []pgproto3.Message{
 		&pgproto3.AuthenticationOk{},
 		&pgproto3.ParameterStatus{Name: "server_version", Value: "15.3.0"},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	}))
+	})
+	if erre != nil {
+		return fmt.Errorf("startup: %v", erre)
+	}
+	return write(conn, buffer)
 }
 
-func encodeFieldDesc(buffer []byte, cols []pgconn.FieldDescription) []byte {
+func encodeFieldDesc(buffer []byte, cols []pgconn.FieldDescription) ([]byte, error) {
 	var desc pgproto3.RowDescription
 	var col pgconn.FieldDescription
 	for _, col = range cols {
@@ -362,7 +391,7 @@ func encodeRow(buffer []byte, rows pgx.Rows, cols []pgconn.FieldDescription) ([]
 			row.Values[i] = []byte(fmt.Sprintf("%v", v))
 		}
 	}
-	return row.Encode(buffer), nil
+	return row.Encode(buffer)
 }
 
 func list(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
@@ -439,8 +468,7 @@ func listStatus(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sys
 	ctag := fmt.Sprintf("SELECT %d", len(*sources))
 	m = append(m, &pgproto3.CommandComplete{CommandTag: []byte(ctag)})
 	m = append(m, &pgproto3.ReadyForQuery{TxStatus: 'I'})
-	b := encode(nil, m)
-	return write(conn, b)
+	return writeEncoded(conn, m)
 }
 
 func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Conn) error {
@@ -485,12 +513,10 @@ func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Con
 	if err != nil {
 		return fmt.Errorf("writing source configuration: %v", err)
 	}
-
-	b := encode(nil, []pgproto3.Message{
+	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("CREATE DATA SOURCE")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
-	return write(conn, b)
 }
 
 func alterTable(conn net.Conn, node *ast.AlterTableStmt, dc *pgx.Conn) error {
@@ -553,12 +579,10 @@ func alterTable(conn net.Conn, node *ast.AlterTableStmt, dc *pgx.Conn) error {
 			return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
 		}
 	}
-
-	b := encode(nil, []pgproto3.Message{
+	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("ALTER TABLE")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
-	return write(conn, b)
 }
 
 func alterDataSource(conn net.Conn, node *ast.AlterDataSourceStmt, dc *pgx.Conn) error {
@@ -575,15 +599,14 @@ func alterDataSource(conn net.Conn, node *ast.AlterDataSourceStmt, dc *pgx.Conn)
 		return err
 	}
 
-	_ = write(conn, encode(nil, []pgproto3.Message{
+	_ = writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server for data source changes to take effect"},
-	}))
+	})
 
-	b := encode(nil, []pgproto3.Message{
+	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("ALTER DATA SOURCE")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
-	return write(conn, b)
 }
 
 func dropDataSource(conn net.Conn, node *ast.DropDataSourceStmt, dc *pgx.Conn) error {
@@ -600,12 +623,10 @@ func dropDataSource(conn net.Conn, node *ast.DropDataSourceStmt, dc *pgx.Conn) e
 	if err != nil {
 		return fmt.Errorf("deleting data source %q", node.DataSourceName)
 	}
-
-	b := encode(nil, []pgproto3.Message{
+	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("DROP DATA SOURCE")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
-	return write(conn, b)
 }
 
 func alterSourceOptions(dc *pgx.Conn, node *ast.AlterDataSourceStmt) error {
@@ -778,9 +799,9 @@ func createUser(conn net.Conn /*query string,*/, node *ast.CreateUserStmt, db *d
 		return fmt.Errorf("selecting role: %v", err)
 	}
 	if exists {
-		_ = write(conn, encode(nil, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
+		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
 			Message: fmt.Sprintf("role %q already exists, skipping", node.UserName)},
-		}))
+		})
 	} else {
 		q := "CREATE USER " + node.UserName + " PASSWORD '" + opt.Password + "'"
 		if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
@@ -809,12 +830,10 @@ func createUser(conn net.Conn /*query string,*/, node *ast.CreateUserStmt, db *d
 	if _, err = dc.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("granting usage privilege on schema %q to role %q: %s", node.UserName, node.UserName, err)
 	}
-
-	b := encode(nil, []pgproto3.Message{
+	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("CREATE ROLE")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
-	return write(conn, b)
 }
 
 func createUserOptions(options []ast.Option) (*userOptions, error) {
@@ -869,15 +888,14 @@ func authorize(conn net.Conn, node *ast.AuthorizeStmt, dc *pgx.Conn) error {
 		return fmt.Errorf("writing authorization: %v", err)
 	}
 
-	_ = write(conn, encode(nil, []pgproto3.Message{
+	_ = writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server to update all permissions"},
-	}))
+	})
 
-	b := encode(nil, []pgproto3.Message{
+	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("AUTHORIZE")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
-	return write(conn, b)
 }
 
 func sourceExists(dc *pgx.Conn, sourceName string) (bool, error) {
@@ -928,15 +946,14 @@ func createDataOrigin(conn net.Conn, node *ast.CreateDataOriginStmt, dc *pgx.Con
 		return fmt.Errorf("writing origin configuration: %v", err)
 	}
 
-	_ = write(conn, encode(nil, []pgproto3.Message{
+	_ = writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server for new origin to take effect"},
-	}))
+	})
 
-	b := encode(nil, []pgproto3.Message{
+	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("CREATE DATA ORIGIN")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
-	return write(conn, b)
 }
 
 func originExists(dc *pgx.Conn, originName string) (bool, error) {
@@ -955,36 +972,34 @@ func originExists(dc *pgx.Conn, originName string) (bool, error) {
 
 func refreshInferredColumnTypesStmt(conn net.Conn, dc *pgx.Conn) error {
 	err := tools.RefreshInferredColumnTypes(dc, func(msg string) {
-		_ = write(conn, encode(nil, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "INFO",
+		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "INFO",
 			Message: msg},
-		}))
+		})
 	})
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
 
-	b := encode(nil, []pgproto3.Message{
+	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("REFRESH INFERRED COLUMN TYPES")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
-	return write(conn, b)
 }
 
 func verifyConsistencyStmt(conn net.Conn, dc *pgx.Conn) error {
 	err := tools.VerifyConsistency(dc, func(msg string) {
-		_ = write(conn, encode(nil, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "INFO",
+		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "INFO",
 			Message: msg},
-		}))
+		})
 	})
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
 
-	b := encode(nil, []pgproto3.Message{
+	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("VERIFY CONSISTENCY")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
-	return write(conn, b)
 }
 
 //func version(conn net.Conn, query *pgproto3.Query, mdbVersion string) error {
@@ -1007,24 +1022,39 @@ func verifyConsistencyStmt(conn net.Conn, dc *pgx.Conn) error {
 //	return write(conn, b)
 //}
 
-func encode(buffer []byte, messages []pgproto3.Message) []byte {
+func writeEncoded(conn net.Conn, messages []pgproto3.Message) error {
+	buffer, erre := encode(nil, messages)
+	if erre != nil {
+		return erre
+	}
+	errc := write(conn, buffer)
+	if errc != nil {
+		return errc
+	}
+	return nil
+}
+
+func encode(buffer []byte, messages []pgproto3.Message) ([]byte, error) {
 	if messages == nil || len(messages) == 0 {
-		return make([]byte, 0)
+		return make([]byte, 0), nil
 	}
 	var m pgproto3.Message
+	var err error
 	for _, m = range messages {
-		buffer = m.Encode(buffer)
+		buffer, err = m.Encode(buffer)
+		if err != nil {
+			return nil, fmt.Errorf("encode: %v", err)
+		}
 	}
-	return buffer
+	return buffer, nil
 }
 
 func write(conn net.Conn, buffer []byte) error {
 	if buffer == nil || len(buffer) == 0 {
 		return nil
 	}
-	var err error
-	if _, err = conn.Write(buffer); err != nil {
-		return err
+	if _, err := conn.Write(buffer); err != nil {
+		return fmt.Errorf("write: %v", err)
 	}
 	return nil
 }
