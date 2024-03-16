@@ -384,6 +384,10 @@ func encodeRow(buffer []byte, rows pgx.Rows, cols []pgconn.FieldDescription) ([]
 	var row = pgproto3.DataRow{Values: make([][]byte, numCols)}
 	var a any
 	for i, a = range vals {
+		if a == nil {
+			row.Values[i] = []byte("")
+			continue
+		}
 		switch v := a.(type) {
 		case []byte:
 			row.Values[i] = v
