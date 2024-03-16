@@ -415,6 +415,7 @@ func list(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.Sou
 			"       consumergroup,"+
 			"       schemapassfilter,"+
 			"       schemastopfilter,"+
+			"       tablestopfilter,"+
 			"       trimschemaprefix,"+
 			"       addschemaprefix,"+
 			"       module"+
