@@ -214,13 +214,13 @@ The PostgreSQL terminal-based client, `psql`, is used to connect to a Metadb
 server that runs on the same host and listens on a specified port:
 
 ----
-psql -d metadb -h localhost -X -p <port>
+psql -X -h localhost -d metadb -p <port>
 ----
 
 For example:
 
 ----
-psql -d metadb -h localhost -X -p 8550
+psql -X -h localhost -d metadb -p 8550
 ----
 
 See *Reference > Statements* for commands that can be issued via `psql`.
