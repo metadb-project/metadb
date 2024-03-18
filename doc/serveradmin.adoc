@@ -26,10 +26,15 @@
 
 ==== PostgreSQL configuration
 
+* `autovacuum_analyze_scale_factor`: `0.01`
+* `autovacuum_max_workers`: `1`
+* `autovacuum_vacuum_cost_delay`: `0`
+* `autovacuum_vacuum_insert_scale_factor`: `0.01`
+* `autovacuum_vacuum_scale_factor`: `0.01`
 * `checkpoint_timeout`: `3600`
 * `cpu_tuple_cost`: `0.03`
 * `default_statistics_target`: `1000`
-* `effective_io_concurrency`: `200`
+* `effective_io_concurrency`: `1`
 * `idle_in_transaction_session_timeout`: `60000`
 * `idle_session_timeout`: `86400000`
 * `maintenance_work_mem`: `1000000`
