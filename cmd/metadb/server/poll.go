@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -23,6 +24,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"golang.org/x/net/context"
+	"golang.org/x/sync/errgroup"
 )
 
 func goPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server) {
@@ -132,6 +134,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	//	return fmt.Errorf("connecting to database: ping: %s", err)
 	//}
 	//////////////////////////////////////////////////////////////////////////////
+
 	dc, err := spr.svr.db.Connect()
 	if err != nil {
 		return err
@@ -191,25 +194,298 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		sourceFileScanner.Buffer(make([]byte, 0, 10000000), 10000000)
 	}
 	// Kafka source
-	var consumer *kafka.Consumer
+	var consumers []*kafka.Consumer
 	if sourceFileScanner == nil {
-		spr.schemaPassFilter, err = util.CompileRegexps(spr.source.SchemaPassFilter)
+		consumers, err = createKafkaConsumers(spr)
 		if err != nil {
 			return err
+		}
+		spr.source.Status.Active()
+	}
+
+	defer func() {
+		var crashed bool
+		// close all consumers
+		for _, consumer := range consumers {
+			if err := consumer.Close(); err != nil {
+				log.Warning("consumer closing error: %q", err)
+				crashed = true
+			}
+		}
+
+		if !crashed {
+			log.Debug("consumers closed as expected")
+		}
+	}()
+
+	waitUserPerms.Wait()
+	// dedup keeps track of "primary key not defined" and similar errors
+	// that have been logged, in order to reduce duplication of the error
+	// messages.
+	dedup := log.NewMessageSet()
+	var firstEvent = true
+
+	g, ctxErrGroup := errgroup.WithContext(ctx)
+	for i := range consumers {
+		index := i
+		g.Go(func() error {
+			err := func() error {
+				for {
+					cmdgraph := command.NewCommandGraph()
+
+					// Parse
+					eventReadCount, err := parseChangeEvents(cat, dedup, consumers[index], cmdgraph, spr.schemaPassFilter,
+						spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
+						spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
+					if err != nil {
+						return fmt.Errorf("parser: %v", err)
+					}
+					if firstEvent {
+						firstEvent = false
+						log.Debug("receiving data from source %q", spr.source.Name)
+					}
+
+					//// Rewrite
+					if err = rewriteCommandGraph(cmdgraph, spr.svr.opt.RewriteJSON); err != nil {
+						return fmt.Errorf("rewriter: %s", err)
+					}
+
+					// Execute
+					if err = execCommandGraph(ctx, cat, cmdgraph, spr.svr.dp, spr.source.Name, syncMode, dedup); err != nil {
+						return fmt.Errorf("executor: %s", err)
+					}
+
+					if eventReadCount > 0 && sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
+						_, err = consumers[index].Commit()
+						if err != nil {
+							e := err.(kafka.Error)
+							if e.IsFatal() {
+								//return fmt.Errorf("Kafka commit: %v", e)
+								log.Warning("Kafka commit: %v", e)
+							} else {
+								switch e.Code() {
+								case kafka.ErrNoOffset:
+									log.Debug("Kafka commit: %v", e)
+								default:
+									log.Info("Kafka commit: %v", e)
+								}
+							}
+						}
+					}
+
+					//if eventReadCount > 0 {
+					//	log.Debug("checkpoint: events=%d, commands=%d, consumer=%d", eventReadCount, cmdgraph.Commands.Len(), index)
+					//}
+
+					// Check if resync snapshot may have completed.
+					if syncMode != dsync.NoSync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 3.0 {
+						msg := fmt.Sprintf("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
+							spr.source.Name)
+						if dedup.Insert(msg) {
+							log.Info("%s", msg)
+						}
+						cat.ResetLastSnapshotRecord() // Sync timer.
+					}
+				}
+			}()
+
+			if err != nil {
+				log.Warning("ERROR: %q", err)
+				ctxErrGroup.Done()
+			}
+
+			log.Debug("consumer stop consuming: %q", consumers[index])
+			return err
+		})
+	}
+
+	// print the number of the messages still not processed for every topic
+	startUnreadMessagesPrinter(g, consumers, 2*time.Minute) //todo make configurable
+
+	// wait till the all groups end work
+	err = g.Wait()
+
+	return err
+}
+
+func startUnreadMessagesPrinter(g *errgroup.Group, consumers []*kafka.Consumer, period time.Duration) {
+	g.Go(func() error {
+		var (
+			startTime = time.Now()
+			endTime   time.Time
+			duration  time.Duration
+		)
+
+		for {
+			time.Sleep(period)
+
+			var sum int64
+			for _, c := range consumers {
+				count, err2 := countUnreadMessagesNumber(c)
+				if err2 != nil {
+					return err2
+				}
+
+				sum = sum + count
+				log.Debug("Consumer: %s,unread messages count:%d  ", c, count)
+			}
+
+			if sum != 0 {
+				log.Debug("Total unread messages:%d", sum)
+				endTime = time.Now().Add(period)
+			} else {
+				if duration == 0 {
+					duration = endTime.Sub(startTime)
+				}
+
+				log.Warning("All messages was read in %q", duration)
+			}
+		}
+	})
+}
+
+func countUnreadMessagesNumber(c *kafka.Consumer) (int64, error) {
+	topicPartitions, err := c.Assignment()
+	if err != nil {
+		return 0, err
+	}
+
+	var result int64
+	for _, topicPartition := range topicPartitions {
+		_, high, err := c.QueryWatermarkOffsets(*topicPartition.Topic, topicPartition.Partition, 15000)
+		if err != nil {
+			return 0, err
+		}
+
+		//we don't need to count empty topics
+		if high == 0 {
+			continue
+		}
+
+		committedOffsets, err := c.Committed([]kafka.TopicPartition{topicPartition}, 5000)
+		if err != nil {
+			return 0, err
+		}
+
+		lastOffset := committedOffsets[0].Offset
+		// if we don't start the reading (special value -1001) we expect reading from start
+		if lastOffset == -1001 {
+			lastOffset = 0
+		}
+
+		remaining := high - int64(lastOffset)
+
+		result = result + remaining
+	}
+	return result, nil
+}
+
+// getTopicsNamesMatchedTheRegexp get all topics names matched provided regexPattern and bootstrap servers
+func getTopicsNamesMatchedTheRegexp(bootstrapServers, regexPattern string) ([]string, error) {
+	topicsMetadata, err := getTopicsMatchedTheRegexp(bootstrapServers, regexPattern)
+	if err != nil {
+		return nil, err
+	}
+
+	var result = make([]string, len(topicsMetadata))
+	for i, topic := range topicsMetadata {
+		result[i] = topic.Topic
+	}
+
+	return result, nil
+}
+
+// getTopicsMatchedTheRegexp get all topics metadata matched provided regexPattern and bootstrap servers
+func getTopicsMatchedTheRegexp(bootstrapServers string, regexPattern string) ([]kafka.TopicMetadata, error) {
+	config := &kafka.ConfigMap{
+		"bootstrap.servers": bootstrapServers,
+		"client.id":         "kafka-topic-lister",
+	}
+
+	adminClient, err := kafka.NewAdminClient(config)
+	if err != nil {
+		return nil, fmt.Errorf("Error creating Kafka admin client: %v\n", err)
+	}
+	defer adminClient.Close()
+
+	// Fetch the list of topics
+	metadata, err := adminClient.GetMetadata(nil, true, 5000)
+	if err != nil {
+		return nil, fmt.Errorf("Error fetching metadata: %v\n", err)
+	}
+
+	// Compile the regular expression pattern
+	pattern, err := regexp.Compile(regexPattern)
+	if err != nil {
+		return nil, fmt.Errorf("Error compiling regex pattern: %v\n", err)
+	}
+
+	// Filter topics matching the regex pattern
+	var result []kafka.TopicMetadata
+	for _, topic := range metadata.Topics {
+		if pattern.MatchString(topic.Topic) {
+			result = append(result, topic)
+		}
+	}
+
+	//we need to sort them to be sure the result is idempotent
+	slices.SortFunc(result, func(a, b kafka.TopicMetadata) int {
+		if a.Topic < b.Topic {
+			return -1
+		}
+		if a.Topic > b.Topic {
+			return 1
+		}
+
+		return 0
+	})
+
+	return result, nil
+}
+
+func createKafkaConsumers(spr *sproc) ([]*kafka.Consumer, error) {
+	var (
+		err              error
+		topics           []string
+		consumersNum     = 40
+		consumers        []*kafka.Consumer
+		topicsByConsumer = make([][]string, consumersNum)
+	)
+
+	topics, err = getTopicsNamesMatchedTheRegexp(spr.source.Brokers, spr.source.Topics[0])
+	if err != nil {
+		spr.source.Status.Error()
+		return nil, err
+	}
+
+	index := 0
+	for _, topic := range topics { // todo we need to create the way to balance the topics between the consumers and way to be sure the old consumers not be overridden
+		topicsByConsumer[index] = append(topicsByConsumer[index], topic)
+		index++
+		if index >= consumersNum {
+			index = 0
+		}
+	}
+
+	for i, topics := range topicsByConsumer {
+		if len(topics) == 0 {
+			break // if we have less than 40 topics limit the consumers
+		}
+
+		spr.schemaPassFilter, err = util.CompileRegexps(spr.source.SchemaPassFilter)
+		if err != nil {
+			return nil, err
 		}
 		spr.schemaStopFilter, err = util.CompileRegexps(spr.source.SchemaStopFilter)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		spr.tableStopFilter, err = util.CompileRegexps(spr.source.TableStopFilter)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		var brokers = spr.source.Brokers
-		var topics = spr.source.Topics
-		var group = spr.source.Group
-		log.Debug("connecting to %q, topics %q", brokers, topics)
-		log.Debug("connecting to source %q", spr.source.Name)
+		var group = fmt.Sprintf("%s_topics_part_%d", spr.source.Group, i)
 		var config = &kafka.ConfigMap{
 			"auto.offset.reset":    "earliest",
 			"bootstrap.servers":    brokers,
@@ -218,85 +494,26 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			"max.poll.interval.ms": spr.svr.db.MaxPollInterval,
 			"security.protocol":    spr.source.Security,
 		}
+
+		var consumer *kafka.Consumer
 		consumer, err = kafka.NewConsumer(config)
 		if err != nil {
 			spr.source.Status.Error()
-			return err
+			return nil, err
 		}
-		defer func(consumer *kafka.Consumer) {
-			_ = consumer.Close()
-		}(consumer)
+
 		//err = consumer.SubscribeTopics([]string{"^" + topicPrefix + "[.].*"}, nil)
 		err = consumer.SubscribeTopics(topics, nil)
 		if err != nil {
 			spr.source.Status.Error()
-			return err
+			return nil, err
 		}
-		spr.source.Status.Active()
+
+		log.Debug("consumer.SubscribeTopics group:%q, topics:%q", group, topics)
+		consumers = append(consumers, consumer)
 	}
-	waitUserPerms.Wait()
-	// dedup keeps track of "primary key not defined" and similar errors
-	// that have been logged, in order to reduce duplication of the error
-	// messages.
-	dedup := log.NewMessageSet()
-	var firstEvent = true
-	for {
-		cmdgraph := command.NewCommandGraph()
 
-		// Parse
-		eventReadCount, err := parseChangeEvents(cat, dedup, consumer, cmdgraph, spr.schemaPassFilter,
-			spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
-			spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
-		if err != nil {
-			return fmt.Errorf("parser: %v", err)
-		}
-		if firstEvent {
-			firstEvent = false
-			log.Debug("receiving data from source %q", spr.source.Name)
-		}
-
-		// Rewrite
-		if err = rewriteCommandGraph(cmdgraph, spr.svr.opt.RewriteJSON); err != nil {
-			return fmt.Errorf("rewriter: %s", err)
-		}
-
-		// Execute
-		if err = execCommandGraph(ctx, cat, cmdgraph, spr.svr.dp, spr.source.Name, syncMode, dedup); err != nil {
-			return fmt.Errorf("executor: %s", err)
-		}
-
-		if eventReadCount > 0 && sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
-			_, err = consumer.Commit()
-			if err != nil {
-				e := err.(kafka.Error)
-				if e.IsFatal() {
-					//return fmt.Errorf("Kafka commit: %v", e)
-					log.Warning("Kafka commit: %v", e)
-				} else {
-					switch e.Code() {
-					case kafka.ErrNoOffset:
-						log.Debug("Kafka commit: %v", e)
-					default:
-						log.Info("Kafka commit: %v", e)
-					}
-				}
-			}
-		}
-
-		if eventReadCount > 0 {
-			log.Debug("checkpoint: events=%d, commands=%d", eventReadCount, cmdgraph.Commands.Len())
-		}
-
-		// Check if resync snapshot may have completed.
-		if syncMode != dsync.NoSync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 3.0 {
-			msg := fmt.Sprintf("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
-				spr.source.Name)
-			if dedup.Insert(msg) {
-				log.Info("%s", msg)
-			}
-			cat.ResetLastSnapshotRecord() // Sync timer.
-		}
-	}
+	return consumers, nil
 }
 
 func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *kafka.Consumer, cmdgraph *command.CommandGraph, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog, checkpointSegmentSize int) (int, error) {
