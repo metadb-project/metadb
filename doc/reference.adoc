@@ -471,7 +471,7 @@ AUTHORIZE SELECT
     TO beatrice;
 ----
 
-[discrete]
+
 ==== CREATE DATA ORIGIN
 
 Define a new data origin
