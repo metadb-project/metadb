@@ -36,6 +36,12 @@ func goPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server) {
 		os.Exit(1)
 	}
 
+	err = logSyncMode(svr.dp, spr.source.Name)
+	if err != nil {
+		log.Fatal("%s", err)
+		os.Exit(1)
+	}
+
 	folio, err := isFolioModulePresent(svr.db)
 	if err != nil {
 		log.Error("checking for folio module: %v", err)
@@ -55,6 +61,24 @@ func goPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server) {
 		spr.databases[0].Status.Error()
 		time.Sleep(24 * time.Hour)
 	}
+}
+
+func logSyncMode(dq dbx.Queryable, source string) error {
+	mode, err := dsync.ReadSyncMode(dq, source)
+	if err != nil {
+		return fmt.Errorf("logging sync mode: %v", err)
+	}
+	var modestr string
+	switch mode {
+	case dsync.InitialSync:
+		modestr = "initial"
+	case dsync.Resync:
+		modestr = "resync"
+	default:
+		return nil
+	}
+	log.Info("synchronizing source %q (%s)", source, modestr)
+	return nil
 }
 
 func launchPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server, spr *sproc) (reterr error) {
