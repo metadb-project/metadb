@@ -147,7 +147,6 @@ func run() error {
 	_ = debugFlag(cmdStart, &serverOpt.Debug)
 	_ = traceLogFlag(cmdStart, &serverOpt.Trace)
 	_ = noKafkaCommitFlag(cmdStart, &serverOpt.NoKafkaCommit)
-	_ = sourceFileFlag(cmdStart, &serverOpt.SourceFilename)
 	_ = logSourceFlag(cmdStart, &serverOpt.LogSource)
 	//_ = noTLSFlag(cmdStart, &serverOpt.NoTLS)
 	_ = memoryLimitFlag(cmdStart, &serverOpt.MemoryLimit)
@@ -318,7 +317,6 @@ func help(cmd *cobra.Command, commandLine []string) {
 			//noTLSFlag(nil, nil) +
 			traceLogFlag(nil, nil) +
 			noKafkaCommitFlag(nil, nil) +
-			sourceFileFlag(nil, nil) +
 			logSourceFlag(nil, nil) +
 			memoryLimitFlag(nil, nil) +
 			"")
@@ -457,17 +455,6 @@ func logSourceFlag(cmd *cobra.Command, logfile *string) string {
 		}
 		return "" +
 			"      --logsource <f>         - Log source messages to file\n"
-	}
-	return ""
-}
-
-func sourceFileFlag(cmd *cobra.Command, sourcefile *string) string {
-	if devMode {
-		if cmd != nil {
-			cmd.Flags().StringVar(sourcefile, "sourcefile", "", "")
-		}
-		return "" +
-			"      --sourcefile <f>        - Read source data from file\n"
 	}
 	return ""
 }

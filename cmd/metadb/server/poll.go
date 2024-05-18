@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"regexp"
@@ -19,7 +18,6 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/dsync"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
-	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"golang.org/x/net/context"
@@ -201,63 +199,49 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		log.Error("unable to read sync mode: %v", err)
 	}
 
-	// Source file
-	var sourceFile *os.File
-	var sourceFileScanner *bufio.Scanner
-	if spr.svr.opt.SourceFilename != "" {
-		if sourceFile, err = os.Open(spr.svr.opt.SourceFilename); err != nil {
-			return err
-		}
-		defer func(sourceFile *os.File) {
-			_ = sourceFile.Close()
-		}(sourceFile)
-		sourceFileScanner = bufio.NewScanner(sourceFile)
-		sourceFileScanner.Buffer(make([]byte, 0, 10000000), 10000000)
-	}
 	// Kafka source
 	var consumer *kafka.Consumer
-	if sourceFileScanner == nil {
-		spr.schemaPassFilter, err = util.CompileRegexps(spr.source.SchemaPassFilter)
-		if err != nil {
-			return err
-		}
-		spr.schemaStopFilter, err = util.CompileRegexps(spr.source.SchemaStopFilter)
-		if err != nil {
-			return err
-		}
-		spr.tableStopFilter, err = util.CompileRegexps(spr.source.TableStopFilter)
-		if err != nil {
-			return err
-		}
-		var brokers = spr.source.Brokers
-		var topics = spr.source.Topics
-		var group = spr.source.Group
-		log.Debug("connecting to %q, topics %q", brokers, topics)
-		log.Debug("connecting to source %q", spr.source.Name)
-		var config = &kafka.ConfigMap{
-			"auto.offset.reset":    "earliest",
-			"bootstrap.servers":    brokers,
-			"enable.auto.commit":   false,
-			"group.id":             group,
-			"max.poll.interval.ms": spr.svr.db.MaxPollInterval,
-			"security.protocol":    spr.source.Security,
-		}
-		consumer, err = kafka.NewConsumer(config)
-		if err != nil {
-			spr.source.Status.Error()
-			return err
-		}
-		defer func(consumer *kafka.Consumer) {
-			_ = consumer.Close()
-		}(consumer)
-		//err = consumer.SubscribeTopics([]string{"^" + topicPrefix + "[.].*"}, nil)
-		err = consumer.SubscribeTopics(topics, nil)
-		if err != nil {
-			spr.source.Status.Error()
-			return err
-		}
-		spr.source.Status.Active()
+	spr.schemaPassFilter, err = util.CompileRegexps(spr.source.SchemaPassFilter)
+	if err != nil {
+		return err
 	}
+	spr.schemaStopFilter, err = util.CompileRegexps(spr.source.SchemaStopFilter)
+	if err != nil {
+		return err
+	}
+	spr.tableStopFilter, err = util.CompileRegexps(spr.source.TableStopFilter)
+	if err != nil {
+		return err
+	}
+	var brokers = spr.source.Brokers
+	var topics = spr.source.Topics
+	var group = spr.source.Group
+	log.Debug("connecting to %q, topics %q", brokers, topics)
+	log.Debug("connecting to source %q", spr.source.Name)
+	var config = &kafka.ConfigMap{
+		"auto.offset.reset":    "earliest",
+		"bootstrap.servers":    brokers,
+		"enable.auto.commit":   false,
+		"group.id":             group,
+		"max.poll.interval.ms": spr.svr.db.MaxPollInterval,
+		"security.protocol":    spr.source.Security,
+	}
+	consumer, err = kafka.NewConsumer(config)
+	if err != nil {
+		spr.source.Status.Error()
+		return err
+	}
+	defer func(consumer *kafka.Consumer) {
+		_ = consumer.Close()
+	}(consumer)
+	//err = consumer.SubscribeTopics([]string{"^" + topicPrefix + "[.].*"}, nil)
+	err = consumer.SubscribeTopics(topics, nil)
+	if err != nil {
+		spr.source.Status.Error()
+		return err
+	}
+	spr.source.Status.Active()
+
 	waitUserPerms.Wait()
 	// dedup keeps track of "primary key not defined" and similar errors
 	// that have been logged, in order to reduce duplication of the error
@@ -270,7 +254,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		// Parse
 		eventReadCount, err := parseChangeEvents(cat, dedup, consumer, cmdgraph, spr.schemaPassFilter,
 			spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
-			spr.source.AddSchemaPrefix, sourceFileScanner, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
+			spr.source.AddSchemaPrefix, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
 		if err != nil {
 			return fmt.Errorf("parser: %v", err)
 		}
@@ -289,7 +273,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			return fmt.Errorf("executor: %s", err)
 		}
 
-		if eventReadCount > 0 && sourceFileScanner == nil && !spr.svr.opt.NoKafkaCommit {
+		if eventReadCount > 0 && !spr.svr.opt.NoKafkaCommit {
 			_, err = consumer.Commit()
 			if err != nil {
 				e := err.(kafka.Error)
@@ -323,7 +307,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	}
 }
 
-func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *kafka.Consumer, cmdgraph *command.CommandGraph, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog, checkpointSegmentSize int) (int, error) {
+func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *kafka.Consumer, cmdgraph *command.CommandGraph, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceLog *log.SourceLog, checkpointSegmentSize int) (int, error) {
 	kafkaPollTimeout := 100     // Poll timeout in milliseconds.
 	pollTimeoutCountLimit := 20 // Maximum allowable number of consecutive poll timeouts.
 	pollLoopTimeout := 120.0    // Overall pool loop timeout in seconds.
@@ -341,40 +325,26 @@ func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *ka
 		}
 		var err error
 		var msg *kafka.Message
-		if sourceFileScanner == nil {
-			if msg, err = readChangeEvent(consumer, sourceLog, kafkaPollTimeout); err != nil {
-				return 0, fmt.Errorf("reading message from Kafka: %v", err)
-			}
-			if msg == nil { // Poll timeout is indicated by the nil return.
-				pollTimeoutCount++
-				if pollTimeoutCount >= pollTimeoutCountLimit {
-					break // Prevent processing of a small batch from being delayed.
-				} else {
-					continue
-				}
+		if msg, err = readChangeEvent(consumer, sourceLog, kafkaPollTimeout); err != nil {
+			return 0, fmt.Errorf("reading message from Kafka: %v", err)
+		}
+		if msg == nil { // Poll timeout is indicated by the nil return.
+			pollTimeoutCount++
+			if pollTimeoutCount >= pollTimeoutCountLimit {
+				break // Prevent processing of a small batch from being delayed.
 			} else {
-				pollTimeoutCount = 0 // We are only interested in consecutive timeouts.
+				continue
 			}
+		} else {
+			pollTimeoutCount = 0 // We are only interested in consecutive timeouts.
 		}
 		eventReadCount++
 
 		var ce *change.Event
-		if sourceFileScanner != nil {
-			if ce, err = readChangeEventFromFile(sourceFileScanner, sourceLog); err != nil {
-				return 0, fmt.Errorf("reading change event from file: %v", err)
-			}
-			if ce == nil && cmdgraph.Commands.Len() == 0 {
-				log.Info("finished processing source file")
-				log.Info("shutting down")
-				process.SetStop()
-				break
-			}
-		} else {
-			ce, err = change.NewEvent(msg)
-			if err != nil {
-				log.Error("%s", err)
-				ce = nil
-			}
+		ce, err = change.NewEvent(msg)
+		if err != nil {
+			log.Error("%s", err)
+			ce = nil
 		}
 
 		c, snap, err := command.NewCommand(dedup, ce, schemaPassFilter, schemaStopFilter, tableStopFilter,
@@ -396,54 +366,6 @@ func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *ka
 		cat.ResetLastSnapshotRecord()
 	}
 	return eventReadCount, nil
-}
-
-func readChangeEventFromFile(sourceFileScanner *bufio.Scanner, sourceLog *log.SourceLog) (*change.Event, error) {
-	var err error
-	var ok bool
-	var header, key, value string
-	if ok = sourceFileScanner.Scan(); !ok {
-		if sourceFileScanner.Err() == nil {
-			return nil, nil
-		} else {
-			return nil, err
-		}
-	}
-	header = sourceFileScanner.Text()
-	if header != "#" {
-		return nil, fmt.Errorf("header not found")
-	}
-	if ok = sourceFileScanner.Scan(); !ok {
-		if sourceFileScanner.Err() == nil {
-			return nil, fmt.Errorf("incomplete read")
-		} else {
-			return nil, err
-		}
-	}
-	key = sourceFileScanner.Text()
-	if ok = sourceFileScanner.Scan(); !ok {
-		if sourceFileScanner.Err() == nil {
-			return nil, fmt.Errorf("incomplete read")
-		} else {
-			return nil, err
-		}
-	}
-	value = sourceFileScanner.Text()
-	if sourceLog != nil {
-		sourceLog.Log("#")
-		sourceLog.Log(key)
-		sourceLog.Log(value)
-	}
-	var ce *change.Event
-	var msg = &kafka.Message{
-		Value: []byte(value),
-		Key:   []byte(key),
-	}
-	if ce, err = change.NewEvent(msg); err != nil {
-		log.Error("%s", err)
-		ce = nil
-	}
-	return ce, nil
 }
 
 func readChangeEvent(consumer *kafka.Consumer, sourceLog *log.SourceLog, kafkaPollTimeout int) (*kafka.Message, error) {
@@ -525,12 +447,7 @@ func waitForConfig(svr *server) (*sproc, error) {
 			break
 		}
 	}
-	var src *sysdb.SourceConnector
-	if svr.opt.SourceFilename == "" {
-		src = sources[0]
-	} else {
-		src = &sysdb.SourceConnector{}
-	}
+	var src *sysdb.SourceConnector = sources[0]
 	var spr = &sproc{
 		source:    src,
 		databases: databases,
@@ -564,10 +481,6 @@ func waitForConfigSource(svr *server) ([]*sysdb.SourceConnector, bool, error) {
 			}
 			return sources, true, nil
 		}
-	}
-	if svr.opt.SourceFilename != "" {
-		// sources = []*sysdb.SourceConnector{{}}
-		time.Sleep(2 * time.Second)
 	}
 	time.Sleep(2 * time.Second)
 	return nil, false, nil
