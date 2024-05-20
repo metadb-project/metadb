@@ -1,22 +1,28 @@
 package log
 
+import "sync"
+
 type MessageSet struct {
-	Messages map[string]struct{}
+	mu       sync.Mutex
+	messages map[string]struct{}
 }
 
 func NewMessageSet() *MessageSet {
 	return &MessageSet{
-		Messages: make(map[string]struct{}),
+		messages: make(map[string]struct{}),
 	}
 }
 
 // Insert adds a message to the set and returns true if the message
 // was added, false if the set already contained the message.
 func (d *MessageSet) Insert(msg string) bool {
-	_, ok := d.Messages[msg]
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	_, ok := d.messages[msg]
 	if ok {
 		return false
 	}
-	d.Messages[msg] = struct{}{}
+	d.messages[msg] = struct{}{}
 	return true
 }

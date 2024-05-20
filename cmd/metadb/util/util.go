@@ -218,7 +218,7 @@ func ReadConfigDatabase(datadir string) (*dbx.DB, error) {
 	}
 	s := cfg.Section("main")
 
-	checkpointSegmentSize := 100000
+	checkpointSegmentSize := 3000
 	v := s.Key("checkpoint_segment_size").String()
 	if v != "" {
 		checkpointSegmentSize, err = strconv.Atoi(v)

@@ -16,7 +16,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 )
 
-func execCommandGraph(ctx context.Context, cat *catalog.Catalog, cmdgraph *command.CommandGraph, dp *pgxpool.Pool, source string, syncMode dsync.Mode, dedup *log.MessageSet) error {
+func execCommandGraph(thread int, ctx context.Context, cat *catalog.Catalog, cmdgraph *command.CommandGraph, dp *pgxpool.Pool, source string, syncMode dsync.Mode, dedup *log.MessageSet) error {
 	if cmdgraph.Commands.Len() == 0 {
 		return nil
 	}
@@ -31,7 +31,7 @@ func execCommandGraph(ctx context.Context, cat *catalog.Catalog, cmdgraph *comma
 	for e := cmdgraph.Commands.Front(); e != nil; e = e.Next() {
 		cmd := e.Value.(*command.Command)
 		if log.IsLevelTrace() {
-			logTraceCommand(cmd)
+			logTraceCommand(thread, cmd)
 		}
 		match, err := execCommand(ebuf, cat, cmd, source, syncMode, dedup)
 		if err != nil {

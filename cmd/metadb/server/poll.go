@@ -1,12 +1,14 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -199,8 +201,11 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		log.Error("unable to read sync mode: %v", err)
 	}
 
-	// Kafka source
-	var consumer *kafka.Consumer
+	// dedup keeps track of "primary key not defined" and similar errors
+	// that have been logged, in order to reduce duplication of the error
+	// messages.
+	dedup := log.NewMessageSet()
+
 	spr.schemaPassFilter, err = util.CompileRegexps(spr.source.SchemaPassFilter)
 	if err != nil {
 		return err
@@ -219,36 +224,74 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	log.Debug("connecting to %q, topics %q", brokers, topics)
 	log.Debug("connecting to source %q", spr.source.Name)
 	var config = &kafka.ConfigMap{
-		"auto.offset.reset":    "earliest",
-		"bootstrap.servers":    brokers,
-		"enable.auto.commit":   false,
-		"group.id":             group,
-		"max.poll.interval.ms": spr.svr.db.MaxPollInterval,
-		"security.protocol":    spr.source.Security,
+		"auto.offset.reset":             "earliest",
+		"bootstrap.servers":             brokers,
+		"enable.auto.commit":            false,
+		"group.id":                      group,
+		"max.poll.interval.ms":          spr.svr.db.MaxPollInterval,
+		"partition.assignment.strategy": "roundrobin",
+		"security.protocol":             spr.source.Security,
 	}
-	consumer, err = kafka.NewConsumer(config)
-	if err != nil {
-		spr.source.Status.Error()
-		return err
+	consumersN := 32 // Number of concurrent consumers
+	consumers := make([]*kafka.Consumer, consumersN)
+	for i := 0; i < consumersN; i++ {
+		consumers[i], err = kafka.NewConsumer(config)
+		if err != nil {
+			for j := 0; j < i; j++ {
+				_ = consumers[j].Close()
+			}
+			spr.source.Status.Error()
+			return err
+		}
 	}
-	defer func(consumer *kafka.Consumer) {
-		_ = consumer.Close()
-	}(consumer)
-	//err = consumer.SubscribeTopics([]string{"^" + topicPrefix + "[.].*"}, nil)
-	err = consumer.SubscribeTopics(topics, nil)
-	if err != nil {
-		spr.source.Status.Error()
-		return err
+	defer func(consumers []*kafka.Consumer) {
+		for i := 0; i < consumersN; i++ {
+			_ = consumers[i].Close()
+		}
+	}(consumers)
+	var rebalanceFlag int32
+	for i := 0; i < consumersN; i++ {
+		err = consumers[i].SubscribeTopics(topics, func(c *kafka.Consumer, event kafka.Event) error {
+			rebalance(c, event, &rebalanceFlag)
+			return nil
+		})
+		if err != nil {
+			spr.source.Status.Error()
+			return err
+		}
 	}
+
 	spr.source.Status.Active()
 
 	waitUserPerms.Wait()
-	// dedup keeps track of "primary key not defined" and similar errors
-	// that have been logged, in order to reduce duplication of the error
-	// messages.
-	dedup := log.NewMessageSet()
-	var firstEvent = true
+
+	var firstEvent int32
+	atomic.StoreInt32(&firstEvent, int32(1))
 	for {
+		var waitStreamProcs sync.WaitGroup // Stream processors
+		errStrings := make([]string, consumersN)
+		atomic.StoreInt32(&rebalanceFlag, int32(0))
+		for i := 0; i < consumersN; i++ { // Run stream processors concurrently until rebalance
+			waitStreamProcs.Add(1)
+			go func(thread int, consumer *kafka.Consumer, ctx context.Context, cat *catalog.Catalog, spr *sproc, syncMode dsync.Mode, dedup *log.MessageSet, rebalanceFlag *int32, firstEvent *int32, errString *string) {
+				defer waitStreamProcs.Done()
+				processStream(thread, consumer, ctx, cat, spr, syncMode, dedup, rebalanceFlag, firstEvent, errString)
+			}(i, consumers[i], ctx, cat, spr, syncMode, dedup, &rebalanceFlag, &firstEvent, &(errStrings[i]))
+		}
+		waitStreamProcs.Wait()
+		for i := 0; i < consumersN; i++ {
+			if errStrings[i] != "" {
+				spr.source.Status.Error()
+				return errors.New(errStrings[i])
+			}
+		}
+	}
+}
+
+func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, cat *catalog.Catalog, spr *sproc, syncMode dsync.Mode, dedup *log.MessageSet, rebalanceFlag *int32, firstEvent *int32, errString *string) {
+	// Parameters spr and syncMode are not thread-safe and should not be modified during stream processing.
+
+	for { // Streaming processing - main loop
 		cmdgraph := command.NewCommandGraph()
 
 		// Parse
@@ -256,21 +299,24 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
 			spr.source.AddSchemaPrefix, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
 		if err != nil {
-			return fmt.Errorf("parser: %v", err)
+			*errString = fmt.Sprintf("parser: %v", err)
+			return
 		}
-		if firstEvent {
-			firstEvent = false
+		if atomic.LoadInt32(firstEvent) == 1 {
+			atomic.StoreInt32(firstEvent, int32(0))
 			log.Debug("receiving data from source %q", spr.source.Name)
 		}
 
 		// Rewrite
 		if err = rewriteCommandGraph(cmdgraph, spr.svr.opt.RewriteJSON); err != nil {
-			return fmt.Errorf("rewriter: %s", err)
+			*errString = fmt.Sprintf("rewriter: %v", err)
+			return
 		}
 
 		// Execute
-		if err = execCommandGraph(ctx, cat, cmdgraph, spr.svr.dp, spr.source.Name, syncMode, dedup); err != nil {
-			return fmt.Errorf("executor: %s", err)
+		if err = execCommandGraph(thread, ctx, cat, cmdgraph, spr.svr.dp, spr.source.Name, syncMode, dedup); err != nil {
+			*errString = fmt.Sprintf("executor: %v", err)
+			return
 		}
 
 		if eventReadCount > 0 && !spr.svr.opt.NoKafkaCommit {
@@ -292,7 +338,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		}
 
 		if eventReadCount > 0 {
-			log.Debug("checkpoint: events=%d, commands=%d", eventReadCount, cmdgraph.Commands.Len())
+			log.Debug("[%d] checkpoint: events=%d, commands=%d", thread, eventReadCount, cmdgraph.Commands.Len())
 		}
 
 		// Check if resync snapshot may have completed.
@@ -304,7 +350,19 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			}
 			cat.ResetLastSnapshotRecord() // Sync timer.
 		}
+		if atomic.LoadInt32(rebalanceFlag) == 1 {
+			log.Trace("[%d] rebalance", thread)
+			break
+		}
 	}
+
+}
+
+func rebalance(c *kafka.Consumer, event kafka.Event, rebalanceFlag *int32) error {
+	atomic.StoreInt32(rebalanceFlag, int32(1))
+	_ = c
+	_ = event
+	return nil
 }
 
 func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *kafka.Consumer, cmdgraph *command.CommandGraph, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceLog *log.SourceLog, checkpointSegmentSize int) (int, error) {
@@ -408,7 +466,7 @@ func readChangeEvent(consumer *kafka.Consumer, sourceLog *log.SourceLog, kafkaPo
 	return nil, nil
 }
 
-func logTraceCommand(c *command.Command) {
+func logTraceCommand(thread int, c *command.Command) {
 	var schemaTable string
 	if c.SchemaName == "" {
 		schemaTable = c.TableName
@@ -417,7 +475,7 @@ func logTraceCommand(c *command.Command) {
 	}
 	var pkey = command.PrimaryKeyColumns(c.Column)
 	var b strings.Builder
-	_, _ = fmt.Fprintf(&b, "%s: %s", c.Op, schemaTable)
+	_, _ = fmt.Fprintf(&b, "[%d] %s: %s", thread, c.Op, schemaTable)
 	if c.Op != command.TruncateOp {
 		_, _ = fmt.Fprintf(&b, " (")
 		var x int
