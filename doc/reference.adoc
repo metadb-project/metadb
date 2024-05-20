@@ -3,7 +3,7 @@
 === Data type conversion
 
 When reading data from a data source, Metadb will automatically adjust column
-data types in a number of cases:
+data types on the fly in a number of cases:
 
 * A data type in the source has changed in a way that cannot be applied safely
   by Metadb without more information.
@@ -291,7 +291,16 @@ certain tables.
 
 === External SQL directives
 
-Metadb allows scheduling external SQL files to run on a regular basis.
+Metadb allows scheduling external SQL files to run on a regular
+basis. At present, the location and frequency of SQL files to run is
+hardcoded based the `module` setting that is specified when a data
+source is configured (see below). If this is set to either `folio` or
+`reshare`, it enables the external SQL from the appropriate known
+location.  A relatively high priority feature would be to add
+configuration options for this facility, including the Git repository,
+tag, path, etc., and time of day and frequency when the SQL should
+run.  There is https://github.com/metadb-project/metadb/issues/43[a
+placeholder issue for this job-scheduler facility].
 
 Each SQL statement should be separated from others by an empty line, and any
 tables created should not specify a schema name.
@@ -313,9 +322,10 @@ SELECT . . . ;
 
 ==== --metadb:table
 
-The `--metadb:table` directive declares that the SQL file updates a specific
-table.  This allows Metadb to report on the status of the table.  The directive
-takes the form:
+The `--metadb:table` directive declares that the SQL file updates a
+specific table.  This allows Metadb to report on the status of the
+table by maintaining the the `metadb.table_update` table described
+below.  The directive takes the form:
 
 ----
 --metadb:table <table>
@@ -333,7 +343,7 @@ For example:
 
 Metadb extends SQL with statements for configuring and administering the
 server.  These statements are only available when connecting to the Metadb
-server (not the database).
+server (not the PostgreSQL server for the underlying database).
 
 ==== ALTER DATA SOURCE
 
@@ -387,7 +397,9 @@ ALTER DATA SOURCE sensor OPTIONS (SET consumergroup 'metadb_sensor_1');
 
 [.aqua-background]#Metadb 1.2#
 
-Change a table definition
+Change a table definition. This is essentially the same as ALTER TABLE
+in the underlying PostgreSQL database, but performs additional checks
+and should be used instead of the lower-level equivalent.
 
 [source,subs="verbatim,quotes"]
 ----
@@ -484,7 +496,19 @@ CREATE DATA ORIGIN `*_origin_name_*`
 [discrete]
 ===== Description
 
-CREATE DATA ORIGIN defines a new origin.
+CREATE DATA ORIGIN defines a new origin. Data origins form essentially
+a controlled vocabulary for the `__origin` column in tables. They are
+used primarily when using a ReShare data source to indicate which
+tenant in a consortium a given row was taken from.
+
+(When using Metadb
+for FOLIO, each tenant’s data goes into a separate database; but when
+using it for ReShare, all the tenants of a consortium go into a single
+shared database. ReShare internally uses FOLIO-style tenants to
+represent the tenants in a consortium, and Metadb combines the tables
+from all the tenants into a single table and fills in `__origin` to
+tell users which tenant a record belongs to.)
+
 
 .Note
 ****
@@ -533,6 +557,11 @@ streaming, the message "source snapshot complete (deadline exceeded)" will be
 written to the log.  To complete the synchronization, the Metadb server should
 be stopped in order to run `metadb endsync`, and after the "endsync" has
 completed, the Metadb server can be started again.
+
+(The "deadline exceeded" message here refers to a timeout when waiting
+for further change events. So it is communicating that the update has
+completed, not that it has been abandoned due to running out of
+allocated time.)
 
 [discrete]
 ===== Parameters

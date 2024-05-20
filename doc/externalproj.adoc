@@ -1,14 +1,67 @@
 == External projects
 
+Two of the most important uses of Metadb are in streaming events from
+FOLIO and ReShare databases.  Metadb has specific support for both
+kinds of source, described in the following sections.
+
+When configured for FOLIO, a Metadb instance typically handles data
+for a single tenant, harvested using a single data source. If multiple
+tenants are to be supported, then a separate Metadb instance runs for
+each, and a separate PostgreSQL database holds each tenant's data.
+
+When configured for ReShare (by the use of a source that uses the
+`reshare` module), Metadb typically uses a single data source for the
+whole consortium, but it combines data from multiple tenants into
+aggregated tables.  Each record in these tables has an `\__origin`
+field set to the name of the tenant from which it was derived.  The
+ReShare data source does this by matching the start of the schema
+names of incoming records against the set of origins that have been
+defined by `CREATE DATA ORIGIN`.  For example if the source ReShare
+database has `east_mod_rs.table1` and `west_mod_rs.table1`, the data
+in Metadb will be in `mod_rs.table1` and each row's `__origin` will
+contain the value `east` or `west` to indicate which tenant the data
+came from.
+
+(The Kafka stream feeding a ReShare data source is configured to
+return records from all tenants rather than, as for a FOLIO data
+source, a single tenant.  So configuring that stream is another
+aspect that’s different for FOLIO and ReShare.)
+
+The `__origin` field could be used for other things in non-ReShare
+systems.  More generally, origin is intended as an alternative
+category to source.  Source may be just an accident of how data are
+collected, e.g. geographically in a sensor network.  Origin is a way
+of tagging related data that come from different sources.  It's an
+opaque string but it could potentially have a faceted structure like
+`foo.bar.baz`.
+
+One application of this is that it’s perfectly possible for a ReShare
+consortium’s tenants to be hosted by multiple FOLIO instances.  We
+would then set up MetaDB to use multiple sources, one per FOLIO
+instance (or, more precisely, one per Kafka that is listening to a
+FOLIO instance), and each of those sources would contribute records to
+the same MetaDB ReShare schema but provide different sets of values
+for those records’ `__origin` fields.
+
+
+
+
 === FOLIO
 
 ==== MARC transform
 
 Metadb transforms MARC records from the tables `marc_records_lb` and
 `records_lb` in schema `folio_source_record` to a tabular form which is stored
-in a new table, `folio_source_record.marc__t`.  Only records considered to be
-current are transformed, where current is defined as having `state` =
-`'ACTUAL'` and an identifier present in `999 ff $i`.
+in a new table, `folio_source_record.marc__t`.  (These schema and table
+names are hardwired rather than configurable, so that they can be used
+in queries shared across the reporting community.)
+
+Only MARC records considered to be current are transformed. Currency
+is indicated by an established FOLIO-specific convention: the FOLIO
+backing store record needs to have a `state` field with value `ACTUAL`
+and the MARC record that is carried by that FOLIO record needs to have
+a 999 field with both indicators set to `f` and whose `$i` subfield is
+non-empty.
 
 This transform updates the table `folio_source_record.marc__t` usually every
 few hours or so.  The time of the most recent update can be retrieved from the
@@ -25,18 +78,26 @@ ignore this schema, as all data are accessible via `folio_source_record.marc__t`
 
 ==== Derived tables
 
-FOLIO "derived tables" are automatically updated once per day, usually at about
-3:00 UTC by default.
+FOLIO "derived tables" are helper tables for commonly used joins,
+etc. They are created and updated by the Scheduled Query facility
+discussed above, automatically each day, usually at about 3:00
+UTC by default.  The SQL code to create these tables is written by the
+community and kept in
+https://github.com/folio-org/folio-analytics/tree/main/sql_metadb/derived_tables[the
+`sql_metadb/derived_tables/` area of the `folio-analytics`
+repository]. The list of queries to run is held in
+https://github.com/folio-org/folio-analytics/blob/main/sql_metadb/derived_tables/runlist.txt[`runlist.txt`].
+
 
 Note that the derived tables are based on a periodic snapshot of data, and for
 this reason they are generally not up-to-date.
 
 ==== Data model
 
-FOLIO does not provide documentation for its internal data model, which Metadb
-tables are based on, but it does have some data documentation for its "storage
-module" APIs which are roughly equivalent.  This is located at
-`https://dev.folio.org/reference/api/`.  The name of most storage modules ends
+FOLIO modules do not in general provide documentation for their internal data models, which Metadb
+tables are based on, but they do have some data documentation for its "storage
+module" WSAPIs which are roughly equivalent.  This documentation is collected at
+`https://dev.folio.org/reference/api/`.  The names of most storage modules end
 in `-storage`, but some modules use a different convention; for instance, the
 storage module for users is `mod-users`.  (All module names begin with `mod-`.)
 
@@ -46,7 +107,11 @@ This section contains notes related to migrating from LDP to Metadb.
 
 ===== Table names
 
-Table names have changed and now are derived from FOLIO internal table names:
+Table names have changed and now are derived from FOLIO internal table
+names. Whereas in LDP, all the tables were in a single schema, in
+Metadb they are spread across multiple schemas, reflecting the schemas
+in use in the FOLIO database and broadly indicative of the FOLIO
+modules that manage them.
 
 [%header,cols="8l,9l"]
 |===
@@ -565,7 +630,8 @@ data.  In such cases, the Metadb data are preferred, and the import stops at
 the point after which the two data sets would otherwise overlap.
 
 Also note that JSON data contained in the imported records are not transformed
-into columns.
+into columns.  (Also, there is presently no way to trigger this
+transformation after the import is complete.)
 
 Records imported using this process have their `__origin` column set to the
 value `ldp`, which distinguishes them from other FOLIO data in Metadb.
@@ -588,6 +654,25 @@ CREATE DATA SOURCE folio TYPE kafka OPTIONS (
 );
 ----
 
+Specifying `module 'folio'` has multiple effects, including how
+tenants are handled, where to find the scheduled queries to run, and
+that MARC transformation is to be performed.  We trim the tenant-name
+prefix from schema names because the Metadb database handles only a
+single tenant.  (When we're interested in multiple FOLIO tenants, each
+tenant's data goes into an entirely separate MetaDB database.)  We
+conventionally add a `folio_` prefix to the schema names because we
+generally want the option of using MetaDB for _all_ a library's data
+analysis needs, not just those related to FOLIO.  For example, one
+might also make a data-source for VuFind’s Solr database, and use it
+to maintain tables with names like `vufind_inventory.items` and
+`vufind_requests.requests`.
+
+Note that there is nothing in the `CREATE DATA SOURCE` statement to
+indicate which tenant's data is to be harvested. That information has
+to be included in the configuration of the nominated Kafka topic, or
+more precisely of the Debezium connector that publishes events to that
+topic.
+
 It is recommended to use a separate Kafka cluster, rather than the FOLIO Kafka
 instance, until one has experience with administration of Kafka.
 
@@ -601,6 +686,12 @@ are suggested:
 "table.exclude.list": ".*__system,.*_mod_agreements.alternate_resource_name,.*_mod_service_interaction.dashboard_access,.*_mod_agreements.availability_constraint,.*_mod_agreements\\.package_description_url,.*_mod_agreements\\.content_type,.*_mod_agreements\\.entitlement_tag,.*_mod_agreements\\.erm_resource_tag,.*_mod_agreements\\.string_template,.*_mod_agreements\\.string_template_scopes,.*_mod_agreements\\.templated_url,.*_mod_oai_pmh\\.instances,.*_mod_remote_storage\\.original_locations,.*_mod_remote_storage\\.item_notes,.*app_setting,.*alternate_name,.*databasechangelog,.*databasechangeloglock,.*directory_entry_tag,.*license_document_attachment,.*license_supp_doc,.*license_tag,.*log_entry_additional_info,.*subscription_agreement_supp_doc,.*subscription_agreement_document_attachment,.*subscription_agreement_ext_lic_doc,.*subscription_agreement_tag,.*tenant_changelog,.*tenant_changelog_lock,.*marc_indexers.*,.*rmb_internal.*,.*rmb_job.*,.*_mod_agreements\\.match_key,.*system_changelog"
 ----
 
+Various tables are excluded for different reasons. Most of them are
+omitted just because they are not of interest (e.g. pubsub state) but
+data from some modules, e.g. `mod_login`, is omitted for security
+reasons. It is up to individual libraries to tailor this exclusion
+list to their requirements.
+
 === ReShare
 
 ==== Derived tables
@@ -613,8 +704,8 @@ this reason they are generally not up-to-date.
 
 ==== Configuring Metadb for ReShare
 
-Before defining a ReShare data source, create a data origin for each consortial
-tenant.  For example:
+Before defining a ReShare data source, create a data origin for each
+tenant in the consortium.  For example:
 
 ----
 CREATE DATA ORIGIN tenant1;
@@ -645,6 +736,11 @@ CREATE DATA SOURCE reshare TYPE kafka OPTIONS (
 );
 ----
 
+We do not use `trimschemaprefix` when ingesting from ReShare, because
+the `reshare` module uses the tenant names in the prefixes to choose
+between the configured data origins, as described above.
+
+
 Note that the order of commands is important: The initial set of data origins
 should be created before the data source is created so that schema names of
 incoming data will be processed correctly.  Later, whenever a new consortial
@@ -659,7 +755,7 @@ be excluded using the `schema.exclude.list` setting.
 === MARC transform for LDP
 
 [.aqua-background]#Metadb 1.1#
-The MARC transform in Metadb can also be used with LDP (and LDLite).  A
+The MARC transform that is built into Metadb can also be used with LDP (and LDLite).  A
 command-line tool called `marct` is provided which is a drop-in replacement for
 `ldpmarc`.
 

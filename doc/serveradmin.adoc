@@ -5,7 +5,7 @@
 ==== Hardware requirements
 
 * Metadb software:
-** Architecture: x86-64 (AMD64)
+** Architecture: x86-64 (AMD64). Metadb is tested primarily on x86-64. It may also run on ARM64, which is relatively new and may not be fully supported. Developers wishing to attempt work on ARM64 should proceed at their own risk.
 ** CPU: 2 cores
 ** Memory: 1 GB
 ** Local storage: 500 GB SSD
@@ -16,7 +16,7 @@
 
 ==== Software requirements
 
-* Operating system: https://www.debian.org[Debian] 12 or later
+* Operating system: https://www.debian.org[Debian] 12 or later. Metadb is tested primarily on Debian. It may also run on other operating systems. Developers wishing to attempt work on FreeBSD, MacOS, etc. should proceed at their own risk.
 * https://www.postgresql.org/[PostgreSQL] 15 or later
 * Required to build from source:
 ** https://golang.org/[Go] 1.21 or later
@@ -80,6 +80,20 @@ executable there:
 It is suggested that a `metadb` user be created and the server run by that
 user, for example, in `/home/metadb`.
 
+=== Metadb invocation
+
+Just as `git` is invoked with the name of a subcommand as its first
+argument (for example, `git add`, `git commit` or `git pull`) so the
+`metadb` binary is invoked with the name of a subcommand as its first
+argument (for example, `metadb start`, `metadb sync` or `metadb
+migrate`). Different subcommands take different arguments: for
+example, `metadb start` takes arguments to specify the data directory,
+log file, etc.
+
+Running `metadb` alone lists the available subcommands, and `metadb
+help COMMAND` provides information about the command-line options used
+by each subcommand.
+
 === Server configuration
 
 Metadb makes use of local storage in a *data directory* which is created using
@@ -107,6 +121,9 @@ systemuser_password = _password of systemuser_
 sslmode = _should be set to "require" or stronger option_
 ----
 
+Metadb does almost all its work as the specified system user. It
+escalates to superuser only for a very few things such as creating users.
+
 Metadb expects the database name to be `metadb` or to begin with `metadb_`;
 otherwise it logs a warning message.
 
@@ -132,8 +149,8 @@ already exist; so they should be created before continuing.
 
 *It is essential to make regular backups of Metadb and to test the backups.*
 
-In general persistent data are stored in the database, and so the database
-should be backed up often.
+In general persistent data are stored in the database, and so https://www.postgresql.org/docs/current/backup.html[the database
+should be backed up often].
 
 The data directory contains the `metadb.conf` configuration file and is also
 used for temporary storage.  The `metadb.conf` file should be backed up.
@@ -230,18 +247,26 @@ psql -X -h localhost -d metadb -p 8550
 
 See *Reference > Statements* for commands that can be issued via `psql`.
 
+It is not quite the case that a MetaDB server _is_ a Postgres server
+with extensions.  It's close enough that we can and do use the `psql`
+command-line client to communicate with MetaDB instead of the bespoke
+legacy client `mdb`, but MetaDB does not proxy all unrecognized
+commands through to the underlying Postgres.
+
 === Configuring a Kafka data source
 
 ==== Overview
 
-Metadb currently supports reading Kafka messages in the format produced by the
-Debezium PostgreSQL connector for Kafka Connect.  Configuration of Kafka, Kafka
-Connect, Debezium, and PostgreSQL logical decoding is beyond the scope of this
+Metadb currently supports reading https://kafka.apache.org/[Kafka]
+messages in the format produced by the https://debezium.io/[Debezium]
+https://debezium.io/documentation/reference/2.6/connectors/postgresql.html[PostgreSQL
+connector] for Kafka Connect.  Configuration of Kafka, Kafka Connect,
+Debezium, and PostgreSQL logical decoding is beyond the scope of this
 documentation, but a few notes are included here.
 
 Data flow in this direction:
 
-1. A source PostgreSQL database
+1. A source PostgreSQL database (e.g. a FOLIO or ReShare database)
 2. Kafka Connect/Debezium
 3. Kafka
 4. Metadb
@@ -251,7 +276,7 @@ Data flow in this direction:
 
 To allow capturing data changes in the source PostgreSQL database, logical
 decoding has to be enabled, in particular by setting `wal_level = logical` in
-`postgresql.conf`.
+the `postgresql.conf` for the source database.
 
 Note that timeout settings in the source database such as
 `idle_in_transaction_session_timeout` can cause the connector to fail, if a
