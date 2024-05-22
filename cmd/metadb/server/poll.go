@@ -232,7 +232,12 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		"partition.assignment.strategy": "roundrobin",
 		"security.protocol":             spr.source.Security,
 	}
-	consumersN := 32 // Number of concurrent consumers
+	var consumersN int // Number of concurrent consumers
+	if syncMode == dsync.NoSync {
+		consumersN = 1
+	} else {
+		consumersN = 32
+	}
 	consumers := make([]*kafka.Consumer, consumersN)
 	for i := 0; i < consumersN; i++ {
 		consumers[i], err = kafka.NewConsumer(config)
