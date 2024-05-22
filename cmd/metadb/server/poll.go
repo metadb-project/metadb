@@ -257,7 +257,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	var rebalanceFlag int32
 	for i := 0; i < consumersN; i++ {
 		err = consumers[i].SubscribeTopics(topics, func(c *kafka.Consumer, event kafka.Event) error {
-			rebalance(c, event, &rebalanceFlag)
+			atomic.StoreInt32(&rebalanceFlag, int32(1))
 			return nil
 		})
 		if err != nil {
@@ -361,13 +361,6 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 		}
 	}
 
-}
-
-func rebalance(c *kafka.Consumer, event kafka.Event, rebalanceFlag *int32) error {
-	atomic.StoreInt32(rebalanceFlag, int32(1))
-	_ = c
-	_ = event
-	return nil
 }
 
 func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *kafka.Consumer, cmdgraph *command.CommandGraph, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceLog *log.SourceLog, checkpointSegmentSize int) (int, error) {
