@@ -419,7 +419,10 @@ func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *ka
 		}
 		_ = cmdgraph.Commands.PushBack(c)
 	}
-	log.Trace("read %d events", cmdgraph.Commands.Len())
+	commandsN := cmdgraph.Commands.Len()
+	if commandsN > 0 {
+		log.Trace("read %d events", commandsN)
+	}
 	if snapshot {
 		cat.ResetLastSnapshotRecord()
 	}
