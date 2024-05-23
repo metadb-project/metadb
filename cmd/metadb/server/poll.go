@@ -224,20 +224,27 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	log.Debug("connecting to %q, topics %q", brokers, topics)
 	log.Debug("connecting to source %q", spr.source.Name)
 	var config = &kafka.ConfigMap{
-		"auto.offset.reset":             "earliest",
-		"bootstrap.servers":             brokers,
-		"enable.auto.commit":            false,
-		"group.id":                      group,
-		"max.poll.interval.ms":          spr.svr.db.MaxPollInterval,
+		"auto.offset.reset":    "earliest",
+		"bootstrap.servers":    brokers,
+		"enable.auto.commit":   false,
+		"group.id":             group,
+		"max.poll.interval.ms": spr.svr.db.MaxPollInterval,
+		// The default range strategy assigns partition 0 to the same consumer for all topics.
+		// We currently use round robin assignment which does not have this problem.
+		// A custom partitioner could attempt to balance the consumers.
 		"partition.assignment.strategy": "roundrobin",
 		"security.protocol":             spr.source.Security,
 	}
+	// During normal operation, we run single-threaded to give priority to user queries.
+	// During a sync process, we enable concurrency.
+	// This could be made configurable.
 	var consumersN int // Number of concurrent consumers
 	if syncMode == dsync.NoSync {
 		consumersN = 1
 	} else {
 		consumersN = 32
 	}
+	// First create the consumers.
 	consumers := make([]*kafka.Consumer, consumersN)
 	for i := 0; i < consumersN; i++ {
 		consumers[i], err = kafka.NewConsumer(config)
@@ -254,7 +261,8 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			_ = consumers[i].Close()
 		}
 	}(consumers)
-	var rebalanceFlag int32
+	// Next subscribe to the topics and register a rebalance callback which sets rebalanceFlag.
+	var rebalanceFlag int32 // Atomic used to signal a rebalance
 	for i := 0; i < consumersN; i++ {
 		err = consumers[i].SubscribeTopics(topics, func(c *kafka.Consumer, event kafka.Event) error {
 			atomic.StoreInt32(&rebalanceFlag, int32(1))
@@ -270,20 +278,25 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 
 	waitUserPerms.Wait()
 
-	var firstEvent int32
+	// One thread (goroutine) per consumer runs a stream processor in a loop.
+	// When a rebalance occurs, we synchronize the threads to prevent out-of-order database writes.
+	var firstEvent int32 // Atomic used to log that data have been received
 	atomic.StoreInt32(&firstEvent, int32(1))
 	for {
-		var waitStreamProcs sync.WaitGroup // Stream processors
+		var waitStreamProcs sync.WaitGroup
 		errStrings := make([]string, consumersN)
-		atomic.StoreInt32(&rebalanceFlag, int32(0))
-		for i := 0; i < consumersN; i++ { // Run stream processors concurrently until rebalance
+		atomic.StoreInt32(&rebalanceFlag, int32(0)) // Reset
+		for i := 0; i < consumersN; i++ {
 			waitStreamProcs.Add(1)
 			go func(thread int, consumer *kafka.Consumer, ctx context.Context, cat *catalog.Catalog, spr *sproc, syncMode dsync.Mode, dedup *log.MessageSet, rebalanceFlag *int32, firstEvent *int32, errString *string) {
 				defer waitStreamProcs.Done()
 				processStream(thread, consumer, ctx, cat, spr, syncMode, dedup, rebalanceFlag, firstEvent, errString)
 			}(i, consumers[i], ctx, cat, spr, syncMode, dedup, &rebalanceFlag, &firstEvent, &(errStrings[i]))
 		}
-		waitStreamProcs.Wait()
+
+		waitStreamProcs.Wait() // Synchronize the threads
+
+		// TODO This error handling is not quite right.
 		for i := 0; i < consumersN; i++ {
 			if errStrings[i] != "" {
 				spr.source.Status.Error()
@@ -296,7 +309,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, cat *catalog.Catalog, spr *sproc, syncMode dsync.Mode, dedup *log.MessageSet, rebalanceFlag *int32, firstEvent *int32, errString *string) {
 	// Parameters spr and syncMode are not thread-safe and should not be modified during stream processing.
 
-	for { // Streaming processing - main loop
+	for { // Stream processing main loop
 		cmdgraph := command.NewCommandGraph()
 
 		// Parse
@@ -355,7 +368,8 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 			}
 			cat.ResetLastSnapshotRecord() // Sync timer.
 		}
-		if atomic.LoadInt32(rebalanceFlag) == 1 {
+
+		if atomic.LoadInt32(rebalanceFlag) == 1 { // Exit thread on rebalance
 			log.Trace("[%d] rebalance", thread)
 			break
 		}
