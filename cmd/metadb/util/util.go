@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"gopkg.in/ini.v1"
 )
