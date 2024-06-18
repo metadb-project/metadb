@@ -9,8 +9,9 @@ Metadb extends PostgreSQL with features to support analytics such as streaming
 data sources, data model transforms, and historical data.  The data contained
 in the Metadb database originally come from another place: a *data source*
 which could be, for example, a transaction-processing database or a sensor
-network.  Metadb updates its database continuously based on state changes in
-external data sources.
+network.  Metadb updates its database continuously based on state changes in an
+external data source.  Also part of the design of Metadb is to support multiple
+data sources, although this is not yet fully implemented.
 
 === Main tables
 
@@ -27,11 +28,10 @@ that begin with two underscores:
 * `__current` is a Boolean value that indicates whether the row
   is current.
 
-* `\__origin` is an optional identifier used to group related data
-  from one or more data sources.  For example, Metadb can combine data
-  from similar source tables into a single table in the analytic
-  database, and stores an identifier in `__origin` to record where the
-  data came from.
+* `\__origin` is an optional identifier used to group related data from one or
+  more data sources.  For example, Metadb can combine data from similar source
+  tables into a single table in the analytic database, and in that case it
+  stores an identifier in `__origin` to record where the data came from.
 
 A *main table* in Metadb has two underscores at the end of its name (e.g.,
 `patrongroup__`), and it contains both the current state and the history of all
@@ -299,7 +299,8 @@ SELECT __id, __start, id, groupname, description FROM library.patrongroup__t;
 |===
 
 In the current version of Metadb, only top-level, scalar JSON fields are
-extracted into transformed tables.
+extracted into transformed tables.  Therefore array fields are not presently
+extracted, but their values can be accessed using a lateral join.
 
 Main tables are also transformed in the same way.  In this case the main
 transformed table would be called `+patrongroup__t__+`.
@@ -307,7 +308,8 @@ transformed table would be called `+patrongroup__t__+`.
 Note that JSON data are treated as "schemaless," and fields are inferred from
 their presence in the data rather than read from a JSON schema.  As a result, a
 column is only created from a JSON field if the field is present in at least
-one JSON record.
+one JSON record.  Note that a new column may be added dynamically at any time
+when a record containing a new JSON field is streamed.
 
 === Comparing table types
 
@@ -369,38 +371,6 @@ GRANT SELECT ON celia.westgroup TO rosalind;
 ----
 
 The user `rosalind` can then access the table.
-
-=== Working with data types
-
-This section offers a few brief recommendations for working with common data
-types.
-
-[discrete]
-==== Text and varchar
-
-The `text` data type is recommended for strings of characters.
-
-The `varchar(_n_)` type with length _n_ can be used for older database clients
-that require the length to be specified.
-
-[discrete]
-==== Monetary data
-
-For monetary amounts, `numeric(19, 4)` is usually a good choice.  For exchange
-rates, `numeric(19, 14)` may be used.
-
-[discrete]
-==== Querying on a range of dates
-
-There are various ways of querying within a range of dates, but the most
-reliable method is to use inequalities of the form `_start_ \<= _t_ < _end_`,
-for example:
-
-----
-SELECT *
-    FROM folio_circulation.loan__t
-    WHERE '2023-01-01' <= loan_date AND loan_date < '2024-01-01';
-----
 
 === Creating reports
 
@@ -527,4 +497,36 @@ on the status of the query process from another session:
 
 ----
 SELECT * FROM ps();
+----
+
+=== Working with data types
+
+This section offers a few brief recommendations for working with common data
+types.
+
+[discrete]
+==== Text and varchar
+
+The `text` data type is recommended for strings of characters.
+
+The `varchar(_n_)` type with length _n_ can be used for older database clients
+that require the length to be specified.
+
+[discrete]
+==== Monetary data
+
+For monetary amounts, `numeric(19, 4)` is commonly used to avoid round-off
+errors.  For exchange rates, `numeric(19, 14)` may be used.
+
+[discrete]
+==== Querying on a range of dates
+
+There are various ways of querying within a range of dates, but the most
+reliable method is to use inequalities of the form `_start_ \<= _t_ < _end_`,
+for example:
+
+----
+SELECT *
+    FROM folio_circulation.loan__t
+    WHERE '2023-01-01' <= loan_date AND loan_date < '2024-01-01';
 ----

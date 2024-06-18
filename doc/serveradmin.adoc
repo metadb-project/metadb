@@ -45,8 +45,11 @@
 
 === Building the software
 
-First set the `GOPATH` environment variable to specify a path that can serve as
-the build workspace for Go, e.g.:
+It is suggested that a `metadb` user be created and the server run by that
+user, for example, in `/home/metadb`.
+
+To build Metadb, first set the `GOPATH` environment variable to specify a path
+that can serve as the build workspace for Go, e.g.:
 
 [source,bash]
 ----
@@ -77,8 +80,27 @@ executable there:
 ./bin/metadb help
 ----
 
-It is suggested that a `metadb` user be created and the server run by that
-user, for example, in `/home/metadb`.
+In general running `metadb` takes the form:
+
+----
+metadb <command> <arguments>
+----
+
+Some typical commands are:
+
+* `init` initializes a new Metadb instance
+* `start` starts the server
+* `stop` shuts down the server
+* `upgrade` upgrades a Metadb instance to the current version
+* `sync` begins synchronization with a data source
+* `endsync` ends synchronization and cleans up stale data
+* `version` prints the Metadb version
+
+For more infomation about a specific command:
+
+----
+metadb help <command>
+----
 
 === Server configuration
 
@@ -230,6 +252,10 @@ psql -X -h localhost -d metadb -p 8550
 
 See *Reference > Statements* for commands that can be issued via `psql`.
 
+Note that the Metadb server is not a database system, but only implements part
+of the PostgreSQL communication protocol sufficient to allow `psql` to be used
+as a client.
+
 === Configuring a Kafka data source
 
 ==== Overview
@@ -251,7 +277,7 @@ Data flow in this direction:
 
 To allow capturing data changes in the source PostgreSQL database, logical
 decoding has to be enabled, in particular by setting `wal_level = logical` in
-`postgresql.conf`.
+`postgresql.conf` for the source database.
 
 Note that timeout settings in the source database such as
 `idle_in_transaction_session_timeout` can cause the connector to fail, if a

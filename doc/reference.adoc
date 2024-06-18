@@ -291,7 +291,11 @@ certain tables.
 
 === External SQL directives
 
-Metadb allows scheduling external SQL files to run on a regular basis.
+Metadb allows scheduling external SQL files to run on a regular basis.  At
+present this feature is enabled automatically when the "folio" or "reshare"
+module has been specified in the data source.  Details such as the location of
+the SQL files and when they are run are currently hardcoded but will be
+configurable in the future.
 
 Each SQL statement should be separated from others by an empty line, and any
 tables created should not specify a schema name.
@@ -314,8 +318,8 @@ SELECT . . . ;
 ==== --metadb:table
 
 The `--metadb:table` directive declares that the SQL file updates a specific
-table.  This allows Metadb to report on the status of the table.  The directive
-takes the form:
+table.  This allows Metadb to report on the status of the update in the
+`metadb.table_update` system table.  The directive takes the form:
 
 ----
 --metadb:table <table>
@@ -333,7 +337,7 @@ For example:
 
 Metadb extends SQL with statements for configuring and administering the
 server.  These statements are only available when connecting to the Metadb
-server (not the database).
+server (not the PostgreSQL server for the underlying database).
 
 ==== ALTER DATA SOURCE
 
@@ -484,7 +488,12 @@ CREATE DATA ORIGIN `*_origin_name_*`
 [discrete]
 ===== Description
 
-CREATE DATA ORIGIN defines a new origin.
+CREATE DATA ORIGIN defines a new origin.  An origin name can be stored by
+Metadb in the `__origin` column to tag individual records.  The use and meaning
+of origins are typically defined by the application or by a Metadb module, but
+in general origins allow grouping data independently of data sources.  This can
+be useful because data sources may be dictated by how the data are collected,
+e.g. geographically in a sensor network.
 
 .Note
 ****
@@ -528,11 +537,13 @@ CREATE DATA SOURCE `*_source_name_*` TYPE *_source_type_*
 CREATE DATA SOURCE defines connection settings for an external data source.
 
 The new data source starts out in synchronizing mode, which pauses periodic
-transforms and running external SQL.  When the initial snapshot has finished
-streaming, the message "source snapshot complete (deadline exceeded)" will be
-written to the log.  To complete the synchronization, the Metadb server should
-be stopped in order to run `metadb endsync`, and after the "endsync" has
-completed, the Metadb server can be started again.
+transforms and running external SQL.  After no new snapshot records have been
+received for a significant period of time, which suggests that the initial
+snapshot has likely finished streaming, the message "source snapshot complete
+(deadline exceeded)" will be written to the log.  To complete the
+synchronization, the Metadb server should be stopped in order to run `metadb
+endsync`, and after the "endsync" has completed, the Metadb server can be
+started again.
 
 [discrete]
 ===== Parameters

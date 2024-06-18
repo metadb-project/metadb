@@ -1,14 +1,30 @@
 == External projects
 
+Two open-source communities, FOLIO and ReShare, use Metadb to support analytics
+on their data.  Metadb has specific support for these two types of data
+sources; it is referred to conceptually as the "folio" module and the "reshare"
+module.  In the future it is intended that this support will be moved into a
+plug-in or other modular system, where it could be maintained and documented
+independently of the Metadb project.
+
+The following sections document Metadb features that are specific to FOLIO and
+ReShare.
+
 === FOLIO
+
+When configured for FOLIO, a Metadb instance typically manages data for a
+single FOLIO tenant.  If multiple FOLIO tenants are to be supported, then a
+separate Metadb instance and database should be set up for each tenant.
 
 ==== MARC transform
 
 Metadb transforms MARC records from the tables `marc_records_lb` and
 `records_lb` in schema `folio_source_record` to a tabular form which is stored
-in a new table, `folio_source_record.marc__t`.  Only records considered to be
-current are transformed, where current is defined as having `state` =
-`'ACTUAL'` and an identifier present in `999 ff $i`.
+in a new table, `folio_source_record.marc__t`.
+
+Only MARC records considered to be "current" are transformed, where current
+here is defined as having `state` = `'ACTUAL'` and a valid identifier is
+present in `999 ff $i` (field `999`, both indicators `f`, and subfield `$i`).
 
 This transform updates the table `folio_source_record.marc__t` usually every
 few hours or so.  The time of the most recent update can be retrieved from the
@@ -21,24 +37,26 @@ SELECT last_update
 ----
 
 The MARC transform stores partition tables in the schema `marctab`.  Users can
-ignore this schema, as all data are accessible via `folio_source_record.marc__t`.
+ignore this schema, as all data are accessible via
+`folio_source_record.marc__t`.
 
 ==== Derived tables
 
-FOLIO "derived tables" are automatically updated once per day, usually at about
-3:00 UTC by default.
+FOLIO "derived tables" are helper tables that provide commonly used table
+joins, etc.  They are automatically updated once per day, usually at about 3:00
+UTC by default.
 
 Note that the derived tables are based on a periodic snapshot of data, and for
 this reason they are generally not up-to-date.
 
 ==== Data model
 
-FOLIO does not provide documentation for its internal data model, which Metadb
-tables are based on, but it does have some data documentation for its "storage
-module" APIs which are roughly equivalent.  This is located at
-`https://dev.folio.org/reference/api/`.  The name of most storage modules ends
-in `-storage`, but some modules use a different convention; for instance, the
-storage module for users is `mod-users`.  (All module names begin with `mod-`.)
+FOLIO modules do not in general provide documentation for their internal data
+models, which Metadb tables are based on, but they do have some
+https://dev.folio.org/reference/api/[documentation for "storage module" WSAPIs] which are roughly equivalent.
+The names of most storage modules end in `-storage`, but some modules use a
+different convention; for instance, the storage module for users is
+`mod-users`.  (All module names begin with `mod-`.)
 
 ==== Migrating from LDP
 
@@ -46,7 +64,10 @@ This section contains notes related to migrating from LDP to Metadb.
 
 ===== Table names
 
-Table names have changed and now are derived from FOLIO internal table names:
+Table names have changed and now are derived from FOLIO internal table names.
+Note that unlike LDP, Metadb tables are spread across multiple schemas,
+reflecting the naming structure of the source FOLIO database in which tables
+are grouped by FOLIO module.
 
 [%header,cols="8l,9l"]
 |===
@@ -588,6 +609,17 @@ CREATE DATA SOURCE folio TYPE kafka OPTIONS (
 );
 ----
 
+Specifying `module 'folio'` has multiple effects including how tenants are
+handled, where to find the derived tables, and that MARC transformation is to
+be performed.  We trim the tenant-name prefix from schema names because the
+Metadb database handles only a single tenant.  We add the `folio_` prefix as a
+namespace to allow for other (non-FOLIO) library data to be imported into the
+database as well, in order to support cross-domain analytics.
+
+Note that the `CREATE DATA SOURCE` statement does not control which tenant's
+data are to be streamed.  The tenant is typically selected in the configuration
+of the Debezium connector.
+
 It is recommended to use a separate Kafka cluster, rather than the FOLIO Kafka
 instance, until one has experience with administration of Kafka.
 
@@ -601,7 +633,28 @@ are suggested:
 "table.exclude.list": ".*__system,.*_mod_agreements.alternate_resource_name,.*_mod_service_interaction.dashboard_access,.*_mod_agreements.availability_constraint,.*_mod_agreements\\.package_description_url,.*_mod_agreements\\.content_type,.*_mod_agreements\\.entitlement_tag,.*_mod_agreements\\.erm_resource_tag,.*_mod_agreements\\.string_template,.*_mod_agreements\\.string_template_scopes,.*_mod_agreements\\.templated_url,.*_mod_oai_pmh\\.instances,.*_mod_remote_storage\\.original_locations,.*_mod_remote_storage\\.item_notes,.*app_setting,.*alternate_name,.*databasechangelog,.*databasechangeloglock,.*directory_entry_tag,.*license_document_attachment,.*license_supp_doc,.*license_tag,.*log_entry_additional_info,.*subscription_agreement_supp_doc,.*subscription_agreement_document_attachment,.*subscription_agreement_ext_lic_doc,.*subscription_agreement_tag,.*tenant_changelog,.*tenant_changelog_lock,.*marc_indexers.*,.*rmb_internal.*,.*rmb_job.*,.*_mod_agreements\\.match_key,.*system_changelog"
 ----
 
+Tables can be excluded for various reasons.  Most of the tables filtered above
+are excluded because they are not of interest for analytics (e.g. pubsub
+state), but data from some modules, e.g. `mod_login`, are omitted for security
+reasons.  It is up to individual libraries to tailor this exclusion list to
+their requirements.
+
 === ReShare
+
+When configured for ReShare, a Metadb instance typically manages data for a
+consortium using a single data source.  ReShare "tenants" are not separated
+from each other in the usual sense; they each represent a consortium member and
+together form a single consortial tenant.  For this reason, all of the ReShare
+tenants are streamed to a single Metadb instance, unlike FOLIO where a Metadb
+instance only handles a single FOLIO tenant.
+
+The data from consortium members are combined into aggregated tables, with the
+`__origin` column set to the name of the ReShare tenant (i.e. consortium
+member).  The `CREATE DATA ORIGIN` command defines the set of known origins,
+and schema names in the source database are assumed to begin with a prefix that
+identifies the origin (because this is how FOLIO and ReShare store tenant
+data).  For example `west_mod_rs.table1` has the prefix `west` which is taken
+to be the origin if previously defined by `CREATE DATA ORIGIN`.
 
 ==== Derived tables
 
@@ -613,8 +666,8 @@ this reason they are generally not up-to-date.
 
 ==== Configuring Metadb for ReShare
 
-Before defining a ReShare data source, create a data origin for each consortial
-tenant.  For example:
+Before defining a ReShare data source, create a data origin for each ReShare
+tenant (i.e. each member of the consortium).  For example:
 
 ----
 CREATE DATA ORIGIN tenant1;
@@ -645,7 +698,11 @@ CREATE DATA SOURCE reshare TYPE kafka OPTIONS (
 );
 ----
 
-Note that the order of commands is important: The initial set of data origins
+Note that unlike with FOLIO, here we do not use `trimschemaprefix`, because the
+"reshare" module uses the tenant name in the prefix to choose a configured data
+origin, as described above.
+
+Note that the order of commands is important:  The initial set of data origins
 should be created before the data source is created so that schema names of
 incoming data will be processed correctly.  Later, whenever a new consortial
 tenant is to be added, it should be defined in Metadb using `CREATE DATA
@@ -653,15 +710,15 @@ ORIGIN` (and the server restarted) before the tenant is added to ReShare.
 
 In the Debezium PostgreSQL connector configuration, it is suggested that
 credentials (`.+mod_login`), the public schema, the Okapi supertenant
-(`supertenant_mod_.+`), and mod-pubsub data (`pubsub_config,.+_mod_pubsub`)
-be excluded using the `schema.exclude.list` setting.
+(`supertenant_mod_.+`), and mod-pubsub data (`pubsub_config,.+_mod_pubsub`) be
+excluded using the `schema.exclude.list` setting.
 
-=== MARC transform for LDP
+=== MARC transform for LDP/LDLite
 
 [.aqua-background]#Metadb 1.1#
-The MARC transform in Metadb can also be used with LDP (and LDLite).  A
-command-line tool called `marct` is provided which is a drop-in replacement for
-`ldpmarc`.
+The MARC transform (currently included in Metadb) can also be used with LDP and
+LDLite.  A command-line tool called `marct` is provided which is a drop-in
+replacement for `ldpmarc`.
 
 The system requirements are a subset of those for Metadb:
 
