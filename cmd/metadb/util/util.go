@@ -22,6 +22,8 @@ const DatabaseVersion = 24
 // MetadbVersion is defined at build time via -ldflags.
 var MetadbVersion = "(unknown version)"
 
+var FolioVersion = ""
+
 const MaximumTypeSizeIndex = 2500
 
 // ModePermRW is the umask "-rw-------".
