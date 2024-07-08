@@ -59,6 +59,10 @@ if $verbose; then
     v='-v'
 fi
 
+if [[ -v METADB_FOLIO ]]; then
+    echo "build.sh: using folio reference \"$METADB_FOLIO\"" 1>&2
+fi
+
 if $experiment; then
     echo "The \"include experimental code\" option (-X) has been selected."
     read -p "This may prevent later upgrades.  Are you sure? " yn
