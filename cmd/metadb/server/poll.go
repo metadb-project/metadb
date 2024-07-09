@@ -59,6 +59,13 @@ func goPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server) {
 		}
 		spr.source.Status.Error()
 		spr.databases[0].Status.Error()
+
+		// alerting to sns if configured
+		msg := fmt.Sprintf("metadb stopped source %q consuming with error: %v", spr.source.Name, err)
+		if err := spr.svr.notifier.Notify(ctx, msg); err != nil {
+			log.Warning("failed to send notification: %w", err)
+		}
+
 		time.Sleep(24 * time.Hour)
 	}
 }
@@ -365,6 +372,10 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 				spr.source.Name)
 			if dedup.Insert(msg) {
 				log.Info("%s", msg)
+				//alerting to sns if configured
+				if err := spr.svr.notifier.Notify(ctx, msg); err != nil {
+					log.Warning("failed to send notification: %w", err)
+				}
 			}
 			cat.ResetLastSnapshotRecord() // Sync timer.
 		}

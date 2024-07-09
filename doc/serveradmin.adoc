@@ -530,3 +530,16 @@ always setting `addschemaprefix` in data source configurations and avoiding
 names with those prefixes when creating a new schema.
 
 4. Database views should not be created in the database.
+
+=== Notifying
+
+Metadb can send alerts (notify) to the destination described in the flag "notifierstring" (an SNS topic support at now implemented)
+Alert sent when a sync or resync is completed or if the main consuming cycle is broken due to an error.
+For SNS implementation: AWS auth configuration cases are described here:
+https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/[AWS Config].
+Topic ARN should be passed to the flag on `start` (optional)
+
+[source,bash]
+----
+metadb start -D data -l metadb.log --notifierstring ARN
+----

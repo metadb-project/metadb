@@ -10,6 +10,8 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/dsync"
 	"github.com/metadb-project/metadb/cmd/metadb/initsys"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/notifier/mocknotifier"
+	"github.com/metadb-project/metadb/cmd/metadb/notifier/snsnotifier"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/server"
 	"github.com/metadb-project/metadb/cmd/metadb/stop"
@@ -128,9 +130,16 @@ func run() error {
 			//if serverOpt.Port == "" {
 			//        serverOpt.Port = metadbAdminPort
 			//}
+
+			// Setup notifier if specified
+			ntf, err := parseNotifier(serverOpt.NotifierConfigString)
+			if err != nil {
+				return err
+			}
+
 			serverOpt.RewriteJSON = rewriteJSON == "1"
 			serverOpt.Listen = "127.0.0.1"
-			if err = server.Start(&serverOpt); err != nil {
+			if err = server.Start(&serverOpt, ntf); err != nil {
 				return fatal(err, logf, csvlogf)
 			}
 			return nil
@@ -150,6 +159,7 @@ func run() error {
 	_ = logSourceFlag(cmdStart, &serverOpt.LogSource)
 	//_ = noTLSFlag(cmdStart, &serverOpt.NoTLS)
 	_ = memoryLimitFlag(cmdStart, &serverOpt.MemoryLimit)
+	_ = notifierFlag(cmdStart, &serverOpt.NotifierConfigString)
 
 	var cmdStop = &cobra.Command{
 		Use: "stop",
@@ -319,6 +329,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			noKafkaCommitFlag(nil, nil) +
 			logSourceFlag(nil, nil) +
 			memoryLimitFlag(nil, nil) +
+			notifierFlag(nil, nil) +
 			"")
 	case "stop":
 		fmt.Printf("" +
@@ -554,6 +565,15 @@ func memoryLimitFlag(cmd *cobra.Command, memoryLimit *float64) string {
 		"                                (default: 1.0)\n"
 }
 
+func notifierFlag(cmd *cobra.Command, notifierConfigString *string) string {
+	if cmd != nil {
+		cmd.Flags().StringVar(notifierConfigString, "notifierstring", "", "")
+	}
+	return "" +
+		"      --notifierstring      - string for configuring notifier\n" +
+		"                              value depends on provider (topic,connstring,JSON,etc)\n"
+}
+
 func setupLog(logfile, csvlogfile string, debug bool, trace bool) (*os.File, *os.File, error) {
 	var err error
 	var logf, csvlogf *os.File
@@ -623,6 +643,16 @@ func validateServerOptions(opt *option.Server) error {
 		return fmt.Errorf("disabling TLS is not needed for loopback")
 	}
 	return nil
+}
+
+// Creating a notifier depends on the provider.
+func parseNotifier(ntfString string) (server.Notifier, error) {
+	switch {
+	case snsnotifier.IsSNSTopic(ntfString):
+		return snsnotifier.NewSNS(ntfString)
+	default:
+		return mocknotifier.NewMock(), nil
+	}
 }
 
 func fatal(err error, logf, csvlogf *os.File) error {

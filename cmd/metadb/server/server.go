@@ -30,6 +30,11 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
+// Notifier interface
+type Notifier interface {
+	Notify(ctx context.Context, message string) error
+}
+
 // The server thread handling needs to be reworked.  It currently runs an HTTP
 // server and a single poll loop in two goroutines.
 
@@ -39,7 +44,8 @@ type server struct {
 	db    *dbx.DB
 	//dc      *pgx.Conn
 	//dcsuper *pgx.Conn
-	dp *pgxpool.Pool
+	dp       *pgxpool.Pool
+	notifier Notifier
 }
 
 // serverstate is shared between goroutines.
@@ -60,7 +66,7 @@ type sproc struct {
 	svr              *server
 }
 
-func Start(opt *option.Server) error {
+func Start(opt *option.Server, ntf Notifier) error {
 	// Check if server is already running.
 	running, pid, err := process.IsServerRunning(opt.Datadir)
 	if err != nil {
@@ -76,7 +82,11 @@ func Start(opt *option.Server) error {
 	}
 	defer process.RemovePIDFile(opt.Datadir)
 
-	var svr = &server{opt: opt}
+	var svr = &server{
+		opt:      opt,
+		notifier: ntf,
+	}
+
 	if err = loggingServer(svr); err != nil {
 		return err
 	}
