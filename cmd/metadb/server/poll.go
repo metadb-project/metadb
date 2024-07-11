@@ -22,6 +22,9 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/context"
 )
 
@@ -310,56 +313,82 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 	// Parameters spr and syncMode are not thread-safe and should not be modified during stream processing.
 
 	for { // Stream processing main loop
+		consCtx, spanConsume := spr.svr.tracer.Start(ctx, fmt.Sprintf("consumer[%v]", thread),
+			trace.WithAttributes(
+				attribute.Int("thread", thread),
+			),
+		)
+
 		cmdgraph := command.NewCommandGraph()
 
 		// Parse
+		_, spanParse := spr.svr.tracer.Start(consCtx, "parse events")
 		eventReadCount, err := parseChangeEvents(cat, dedup, consumer, cmdgraph, spr.schemaPassFilter,
 			spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
 			spr.source.AddSchemaPrefix, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
 		if err != nil {
+			spanParse.RecordError(err)
+			spanParse.SetStatus(codes.Error, err.Error())
 			*errString = fmt.Sprintf("parser: %v", err)
 			return
 		}
+		spanParse.AddEvent("eventReadCount", trace.WithAttributes(attribute.Int("count", eventReadCount)))
 		if atomic.LoadInt32(firstEvent) == 1 {
 			atomic.StoreInt32(firstEvent, int32(0))
 			log.Debug("receiving data from source %q", spr.source.Name)
 		}
-
-		// Rewrite
-		if err = rewriteCommandGraph(cmdgraph, spr.svr.opt.RewriteJSON); err != nil {
-			*errString = fmt.Sprintf("rewriter: %v", err)
-			return
-		}
-
-		// Execute
-		if err = execCommandGraph(thread, ctx, cat, cmdgraph, spr.svr.dp, spr.source.Name, syncMode, dedup); err != nil {
-			*errString = fmt.Sprintf("executor: %v", err)
-			return
-		}
-
-		if eventReadCount > 0 && !spr.svr.opt.NoKafkaCommit {
-			_, err = consumer.Commit()
-			if err != nil {
-				e := err.(kafka.Error)
-				if e.IsFatal() {
-					//return fmt.Errorf("Kafka commit: %v", e)
-					log.Warning("Kafka commit: %v", e)
-				} else {
-					switch e.Code() {
-					case kafka.ErrNoOffset:
-						log.Debug("Kafka commit: %v", e)
-					default:
-						log.Info("Kafka commit: %v", e)
-					}
-				}
-			}
-		}
+		spanParse.End()
 
 		if eventReadCount > 0 {
+			// Rewrite
+			_, spanRewrite := spr.svr.tracer.Start(consCtx, "rewrite command graph")
+			if err = rewriteCommandGraph(cmdgraph, spr.svr.opt.RewriteJSON); err != nil {
+				spanRewrite.RecordError(err)
+				spanRewrite.SetStatus(codes.Error, err.Error())
+				*errString = fmt.Sprintf("rewriter: %v", err)
+				return
+			}
+			spanRewrite.End()
+
+			// Execute
+			_, spanExecute := spr.svr.tracer.Start(consCtx, "execute command graph")
+			if err = execCommandGraph(thread, ctx, cat, cmdgraph, spr.svr.dp, spr.source.Name, syncMode, dedup); err != nil {
+				spanExecute.RecordError(err)
+				spanExecute.SetStatus(codes.Error, err.Error())
+				if errors.Is(err, context.Canceled) {
+					*errString = ""
+					return
+				}
+				*errString = fmt.Sprintf("executor: %v", err)
+				return
+			}
+			spanExecute.End()
+
+			if !spr.svr.opt.NoKafkaCommit {
+				_, spanCommit := spr.svr.tracer.Start(consCtx, "kafka commit")
+				_, err = consumer.Commit()
+				if err != nil {
+					e := err.(kafka.Error)
+					if e.IsFatal() {
+						//return fmt.Errorf("Kafka commit: %v", e)
+						log.Warning("Kafka commit: %v", e)
+					} else {
+						switch e.Code() {
+						case kafka.ErrNoOffset:
+							log.Debug("Kafka commit: %v", e)
+						default:
+							log.Info("Kafka commit: %v", e)
+						}
+					}
+				}
+				spanCommit.End()
+			}
+
 			log.Debug("[%d] checkpoint: events=%d, commands=%d", thread, eventReadCount, cmdgraph.Commands.Len())
 		}
 
 		// Check if resync snapshot may have completed.
+		_, spanSnapshot := spr.svr.tracer.Start(consCtx, "check snapshot")
 		if syncMode != dsync.NoSync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 3.0 {
 			msg := fmt.Sprintf("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
 				spr.source.Name)
@@ -368,6 +397,8 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 			}
 			cat.ResetLastSnapshotRecord() // Sync timer.
 		}
+		spanSnapshot.End()
+		spanConsume.End()
 
 		if atomic.LoadInt32(rebalanceFlag) == 1 { // Exit thread on rebalance
 			log.Trace("[%d] rebalance", thread)

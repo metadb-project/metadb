@@ -530,3 +530,17 @@ always setting `addschemaprefix` in data source configurations and avoiding
 names with those prefixes when creating a new schema.
 
 4. Database views should not be created in the database.
+
+=== Trace consumption process
+
+Metadb is covered by traces in broker consumption process.
+It uses OTLP (OpenTelemetry Protocol) over GRPC to communicate with
+tracing agent. Currently it is https://www.jaegertracing.io/[Jaeger].
+Tracing is optional, if OTLP url is not provided, it will not collect traces.
+To provide connection URL, Metadb has flag `--jaegertrace` for `start` command,
+for example:
+
+[source,bash]
+----
+metadb start -D data -l metadb.log --jaegertrace 127.0.0.1:4317
+----
