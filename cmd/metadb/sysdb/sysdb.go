@@ -61,7 +61,7 @@ type SourceConnector struct {
 //
 //		var exists bool
 //		if exists, err = systemSchemaExists(dbconn); err != nil {
-//			return fmt.Errorf("checking if database initialized: %v", err)
+//			return fmt.Errorf("checking if database initialized: %w", err)
 //		}
 //		if exists {
 //			return fmt.Errorf("database already initialized")
@@ -134,7 +134,7 @@ type SourceConnector struct {
 //	var q = "CREATE SCHEMA metadb"
 //	_, err = tx.Exec(context.TODO(), q)
 //	if err != nil {
-//		return fmt.Errorf("creating schema: metadb: %v", err)
+//		return fmt.Errorf("creating schema: metadb: %w", err)
 //	}
 //
 //	// eout.Trace("writing database version: %d", util.DatabaseVersion)
@@ -320,7 +320,7 @@ type SourceConnector struct {
 //	var dbconn *pgx.Conn
 //	var err error
 //	if dbconn, err = pgx.Connect(context.TODO(), dbconnstr); err != nil {
-//		return 0, fmt.Errorf("unable to query database version: %v", err)
+//		return 0, fmt.Errorf("unable to query database version: %w", err)
 //	}
 //	defer dbconn.Close(context.TODO())
 //
@@ -331,7 +331,7 @@ type SourceConnector struct {
 //	case err == pgx.ErrNoRows:
 //		return 0, fmt.Errorf("database not initialized")
 //	case err != nil:
-//		return 0, fmt.Errorf("unable to query database version: checking for table metadb.init: %v", err)
+//		return 0, fmt.Errorf("unable to query database version: checking for table metadb.init: %w", err)
 //	default:
 //	}
 //
@@ -342,7 +342,7 @@ type SourceConnector struct {
 //	case err == pgx.ErrNoRows:
 //		return 0, fmt.Errorf("unable to query database version: no rows in metadb.init")
 //	case err != nil:
-//		return 0, fmt.Errorf("unable to query database version: %v", err)
+//		return 0, fmt.Errorf("unable to query database version: %w", err)
 //	default:
 //		return dbversion, nil
 //	}

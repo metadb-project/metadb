@@ -39,12 +39,12 @@ func CreateAllFunctions(dcsuper, dc *pgx.Conn, systemuser string) error {
 	q := "GRANT CREATE, USAGE ON SCHEMA public TO " + systemuser
 	_, err := dcsuper.Exec(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("granting systemuser access to public schema: %v", err)
+		return fmt.Errorf("granting systemuser access to public schema: %w", err)
 	}
 
 	users, err := AllUsers(dc)
 	if err != nil {
-		return fmt.Errorf("accessing user list: %v", err)
+		return fmt.Errorf("accessing user list: %w", err)
 	}
 
 	for _, f := range functionDefs {
@@ -66,19 +66,19 @@ func CreateAllFunctions(dcsuper, dc *pgx.Conn, systemuser string) error {
 func createFunction(dc *pgx.Conn, fname, fdef string, users []string) error {
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
-		return fmt.Errorf("starting transaction for function: %v", err)
+		return fmt.Errorf("starting transaction for function: %w", err)
 	}
 	defer dbx.Rollback(tx)
 
 	q := "DROP FUNCTION IF EXISTS public." + fname
 	_, err = tx.Exec(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("dropping function: %v", err)
+		return fmt.Errorf("dropping function: %w", err)
 	}
 
 	_, err = tx.Exec(context.TODO(), fdef)
 	if err != nil {
-		return fmt.Errorf("creating function: %v", err)
+		return fmt.Errorf("creating function: %w", err)
 	}
 
 	err = tx.Commit(context.TODO())

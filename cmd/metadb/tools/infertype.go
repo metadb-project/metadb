@@ -21,19 +21,19 @@ func RefreshInferredColumnTypes(dq dbx.Queryable, progress func(string)) error {
 	var rows pgx.Rows
 	var err error
 	if rows, err = dq.Query(context.TODO(), q); err != nil {
-		return fmt.Errorf("selecting text columns: %v", err)
+		return fmt.Errorf("selecting text columns: %w", err)
 	}
 	defer rows.Close()
 	var columns = make([]dbx.Column, 0)
 	for rows.Next() {
 		var schema, table, column string
 		if err = rows.Scan(&schema, &table, &column); err != nil {
-			return fmt.Errorf("reading text columns: %v", err)
+			return fmt.Errorf("reading text columns: %w", err)
 		}
 		columns = append(columns, dbx.Column{Schema: schema, Table: table, Column: column})
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("reading text columns: %v", err)
+		return fmt.Errorf("reading text columns: %w", err)
 	}
 	rows.Close()
 

@@ -66,7 +66,7 @@ func goPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server) {
 func logSyncMode(dq dbx.Queryable, source string) error {
 	mode, err := dsync.ReadSyncMode(dq, source)
 	if err != nil {
-		return fmt.Errorf("logging sync mode: %v", err)
+		return fmt.Errorf("logging sync mode: %w", err)
 	}
 	var modestr string
 	switch mode {
@@ -396,7 +396,7 @@ func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *ka
 		var err error
 		var msg *kafka.Message
 		if msg, err = readChangeEvent(consumer, sourceLog, kafkaPollTimeout); err != nil {
-			return 0, fmt.Errorf("reading message from Kafka: %v", err)
+			return 0, fmt.Errorf("reading message from Kafka: %w", err)
 		}
 		if msg == nil { // Poll timeout is indicated by the nil return.
 			pollTimeoutCount++
@@ -421,7 +421,7 @@ func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *ka
 			trimSchemaPrefix, addSchemaPrefix)
 		if err != nil {
 			log.Debug("%v", *ce)
-			return 0, fmt.Errorf("parsing command: %v", err)
+			return 0, fmt.Errorf("parsing command: %w", err)
 		}
 		if c == nil {
 			continue

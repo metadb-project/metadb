@@ -124,7 +124,7 @@ func runFile(cat *catalog.Catalog, url, ref, fullpath string, dc *pgx.Conn, sche
 	}
 	if table != "" {
 		if err = cat.TableUpdatedNow(dbx.Table{Schema: schema, Table: table}, elapsed); err != nil {
-			return fmt.Errorf("writing table updated time: %v", err)
+			return fmt.Errorf("writing table updated time: %w", err)
 		}
 	}
 	return nil

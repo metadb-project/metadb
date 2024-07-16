@@ -56,7 +56,7 @@ func Sync(opt *option.Sync) error {
 	}
 	dp, err := dbx.NewPool(context.TODO(), db.ConnString(db.User, db.Password))
 	if err != nil {
-		return fmt.Errorf("creating database connection pool: %v", err)
+		return fmt.Errorf("creating database connection pool: %w", err)
 	}
 	defer dp.Close()
 	exists, err := sourceExists(dp, opt.Source)

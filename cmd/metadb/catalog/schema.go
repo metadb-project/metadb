@@ -73,7 +73,7 @@ func getColumnSchemas(dp *pgxpool.Pool) ([]*sqlx.ColumnSchema, error) {
 		cs = append(cs, c)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("reading schema from database catalog: %v", err)
+		return nil, fmt.Errorf("reading schema from database catalog: %w", err)
 	}
 	return cs, nil
 }

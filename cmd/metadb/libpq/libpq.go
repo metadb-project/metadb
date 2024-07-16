@@ -179,7 +179,7 @@ func processParse(conn net.Conn, backend *pgproto3.Backend, parse *pgproto3.Pars
 	for {
 		msg, err := backend.Receive()
 		if err != nil {
-			return fmt.Errorf("unexpected message in extended query: %v", err)
+			return fmt.Errorf("unexpected message in extended query: %w", err)
 		}
 		log.Trace("*** %#v", msg)
 
@@ -205,7 +205,7 @@ func processParse(conn net.Conn, backend *pgproto3.Backend, parse *pgproto3.Pars
 			err := processQuery(conn, query, args, db, dc, sources)
 			//err := proxySelect(conn, query, args, dc)
 			if err != nil {
-				return fmt.Errorf("executing prepared statement: %v", err)
+				return fmt.Errorf("executing prepared statement: %w", err)
 			}
 
 			//// TODO: Send pgproto3.ParseComplete?
@@ -479,7 +479,7 @@ func listStatus(conn net.Conn, sources *[]*sysdb.SourceConnector) error {
 func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Conn) error {
 	exists, err := sourceExists(dc, node.DataSourceName)
 	if err != nil {
-		return fmt.Errorf("selecting data source: %v", err)
+		return fmt.Errorf("selecting data source: %w", err)
 	}
 	if exists {
 		return fmt.Errorf("data source %q already exists", node.DataSourceName)
@@ -489,7 +489,7 @@ func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Con
 	q := "SELECT count(*) FROM metadb.source"
 	err = dc.QueryRow(context.TODO(), q).Scan(&count)
 	if err != nil {
-		return fmt.Errorf("checking number of configured sources: %v", err)
+		return fmt.Errorf("checking number of configured sources: %w", err)
 	}
 	if count > 0 {
 		return fmt.Errorf("multiple sources not currently supported")
@@ -516,7 +516,7 @@ func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Con
 		strings.Join(src.TableStopFilter, ","), src.TrimSchemaPrefix, src.AddSchemaPrefix, src.Module,
 		src.Enable)
 	if err != nil {
-		return fmt.Errorf("writing source configuration: %v", err)
+		return fmt.Errorf("writing source configuration: %w", err)
 	}
 	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("CREATE DATA SOURCE")},
@@ -593,7 +593,7 @@ func alterTable(conn net.Conn, node *ast.AlterTableStmt, dc *pgx.Conn) error {
 func alterDataSource(conn net.Conn, node *ast.AlterDataSourceStmt, dc *pgx.Conn) error {
 	exists, err := sourceExists(dc, node.DataSourceName)
 	if err != nil {
-		return fmt.Errorf("selecting data source: %v", err)
+		return fmt.Errorf("selecting data source: %w", err)
 	}
 	if !exists {
 		return fmt.Errorf("data source %q does not exist", node.DataSourceName)
@@ -617,7 +617,7 @@ func alterDataSource(conn net.Conn, node *ast.AlterDataSourceStmt, dc *pgx.Conn)
 func dropDataSource(conn net.Conn, node *ast.DropDataSourceStmt, dc *pgx.Conn) error {
 	exists, err := sourceExists(dc, node.DataSourceName)
 	if err != nil {
-		return fmt.Errorf("selecting data source: %v", err)
+		return fmt.Errorf("selecting data source: %w", err)
 	}
 	if !exists {
 		return fmt.Errorf("data source %q does not exist", node.DataSourceName)
@@ -666,7 +666,7 @@ func alterSourceOptions(dc *pgx.Conn, node *ast.AlterDataSourceStmt) error {
 		}
 		isnull, err := isSourceOptionNull(dc, node.DataSourceName, opt.Name)
 		if err != nil {
-			return fmt.Errorf("reading source option: %v", err)
+			return fmt.Errorf("reading source option: %w", err)
 		}
 		if opt.Action == "DROP" {
 			if isnull {
@@ -708,7 +708,7 @@ func isSourceOptionNull(dc *pgx.Conn, sourceName, optionName string) (bool, erro
 	case err == pgx.ErrNoRows:
 		return false, fmt.Errorf("data source %q does not exist", sourceName)
 	case err != nil:
-		return false, fmt.Errorf("reading data source: %v", err)
+		return false, fmt.Errorf("reading data source: %w", err)
 	default:
 		return val == nil, nil
 	}
@@ -801,7 +801,7 @@ func createUser(conn net.Conn /*query string,*/, node *ast.CreateUserStmt, db *d
 
 	exists, err := userExists(dcsuper, node.UserName)
 	if err != nil {
-		return fmt.Errorf("selecting role: %v", err)
+		return fmt.Errorf("selecting role: %w", err)
 	}
 	if exists {
 		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
@@ -873,7 +873,7 @@ type userOptions struct {
 func authorize(conn net.Conn, node *ast.AuthorizeStmt, dc *pgx.Conn) error {
 	exists, err := sourceExists(dc, node.DataSourceName)
 	if err != nil {
-		return fmt.Errorf("selecting data source: %v", err)
+		return fmt.Errorf("selecting data source: %w", err)
 	}
 	if !exists {
 		return fmt.Errorf("data source %q does not exist", node.DataSourceName)
@@ -881,7 +881,7 @@ func authorize(conn net.Conn, node *ast.AuthorizeStmt, dc *pgx.Conn) error {
 
 	exists, err = userExists(dc, node.RoleName)
 	if err != nil {
-		return fmt.Errorf("selecting role: %v", err)
+		return fmt.Errorf("selecting role: %w", err)
 	}
 	if !exists {
 		return fmt.Errorf("role %q does not exist", node.RoleName)
@@ -890,7 +890,7 @@ func authorize(conn net.Conn, node *ast.AuthorizeStmt, dc *pgx.Conn) error {
 	q := "INSERT INTO metadb.auth(username,tables,dbupdated) VALUES ('" + node.RoleName + "','.*',FALSE) ON CONFLICT (username) DO UPDATE SET tables='.*',dbupdated=FALSE;"
 	_, err = dc.Exec(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("writing authorization: %v", err)
+		return fmt.Errorf("writing authorization: %w", err)
 	}
 
 	_ = writeEncoded(conn, []pgproto3.Message{
@@ -939,7 +939,7 @@ func createDataOrigin(conn net.Conn, node *ast.CreateDataOriginStmt, dc *pgx.Con
 
 	exists, err := originExists(dc, node.OriginName)
 	if err != nil {
-		return fmt.Errorf("selecting data origin: %v", err)
+		return fmt.Errorf("selecting data origin: %w", err)
 	}
 	if exists {
 		return fmt.Errorf("data origin %q already exists", node.OriginName)
@@ -948,7 +948,7 @@ func createDataOrigin(conn net.Conn, node *ast.CreateDataOriginStmt, dc *pgx.Con
 	q := "INSERT INTO metadb.origin(name)VALUES($1)"
 	_, err = dc.Exec(context.TODO(), q, node.OriginName)
 	if err != nil {
-		return fmt.Errorf("writing origin configuration: %v", err)
+		return fmt.Errorf("writing origin configuration: %w", err)
 	}
 
 	_ = writeEncoded(conn, []pgproto3.Message{
@@ -982,7 +982,7 @@ func refreshInferredColumnTypesStmt(conn net.Conn, dc *pgx.Conn) error {
 		})
 	})
 	if err != nil {
-		return fmt.Errorf("%v", err)
+		return err
 	}
 
 	return writeEncoded(conn, []pgproto3.Message{
@@ -998,7 +998,7 @@ func verifyConsistencyStmt(conn net.Conn, dc *pgx.Conn) error {
 		})
 	})
 	if err != nil {
-		return fmt.Errorf("%v", err)
+		return err
 	}
 
 	return writeEncoded(conn, []pgproto3.Message{
@@ -1048,7 +1048,7 @@ func encode(buffer []byte, messages []pgproto3.Message) ([]byte, error) {
 	for _, m = range messages {
 		buffer, err = m.Encode(buffer)
 		if err != nil {
-			return nil, fmt.Errorf("encode: %v", err)
+			return nil, fmt.Errorf("encode: %w", err)
 		}
 	}
 	return buffer, nil
@@ -1059,7 +1059,7 @@ func write(conn net.Conn, buffer []byte) error {
 		return nil
 	}
 	if _, err := conn.Write(buffer); err != nil {
-		return fmt.Errorf("write: %v", err)
+		return fmt.Errorf("write: %w", err)
 	}
 	return nil
 }

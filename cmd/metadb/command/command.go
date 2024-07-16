@@ -411,7 +411,7 @@ func extractColumns(dedup *log.MessageSet, ce *change.Event) ([]CommandColumn, e
 		}
 		if col.DType == NumericType && col.Data != nil {
 			if col.Data, err = decodeNumericBytes(m, col.Data, semtype); err != nil {
-				return nil, fmt.Errorf("decoding numeric bytes: %v", err)
+				return nil, fmt.Errorf("decoding numeric bytes: %w", err)
 			}
 		}
 		if col.SQLData, err = DataToSQLData(col.Data, col.DType, semtype); err != nil {
@@ -439,7 +439,7 @@ func decodeNumericBytes(fieldMap map[string]any, data any, semtype string) (stri
 	case "org.apache.kafka.connect.data.Decimal":
 		// Read scale from parameters object.
 		if scale, err = parameterScale(fieldMap); err != nil {
-			return "", fmt.Errorf("reading numeric scale from parameters: %v", err)
+			return "", fmt.Errorf("reading numeric scale from parameters: %w", err)
 		}
 		if valuestr, ok = data.(string); !ok {
 			return "", fmt.Errorf("data \"%v\" has type %T", data, data)
@@ -447,7 +447,7 @@ func decodeNumericBytes(fieldMap map[string]any, data any, semtype string) (stri
 	case "io.debezium.data.VariableScaleDecimal":
 		// Read scale from struct.
 		if scale, valuestr, err = structScale(data); err != nil {
-			return "", fmt.Errorf("reading numeric scale from struct: %v", err)
+			return "", fmt.Errorf("reading numeric scale from struct: %w", err)
 		}
 	default:
 		return "", fmt.Errorf("unsupported numeric type: %s: %v", semtype, fieldMap)
@@ -700,7 +700,7 @@ func NewCommand(dedup *log.MessageSet, ce *change.Event, schemaPassFilter, schem
 			// if dtype == NumericType {
 			// 	scale, err = parameterScale(m)
 			// 	if err != nil {
-			// 		return nil, fmt.Errorf("reading numeric scale: %v", err)
+			// 		return nil, fmt.Errorf("reading numeric scale: %w", err)
 			// 	}
 			// }
 			data := payload[attr]
@@ -714,7 +714,7 @@ func NewCommand(dedup *log.MessageSet, ce *change.Event, schemaPassFilter, schem
 			var edata *string
 			edata, err = DataToSQLData(data, dtype, semtype)
 			if err != nil {
-				return nil, false, fmt.Errorf("delete: unknown type: %v", err)
+				return nil, false, fmt.Errorf("delete: unknown type: %w", err)
 			}
 			var typesize int64
 			typesize, err = convertTypeSize(dt, dtype)

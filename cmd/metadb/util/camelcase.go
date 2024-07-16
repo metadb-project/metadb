@@ -124,7 +124,7 @@ func decodeCamelCaseAlt(s string) (string, error) {
 			_, err := b.WriteString(strings.ToLower(s))
 			if err != nil {
 				return "", fmt.Errorf(
-					"Error decoding camel case: %v", err)
+					"Error decoding camel case: %w", err)
 			}
 		}
 	}

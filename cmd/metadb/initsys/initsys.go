@@ -20,7 +20,7 @@ func InitSys(opt *option.Init) error {
 	/*
 		var u *url.URL
 		if u, err = url.Parse(opt.DatabaseURI); err != nil {
-			return fmt.Errorf("parsing database connection URI: %v", err)
+			return fmt.Errorf("parsing database connection URI: %w", err)
 		}
 		var username = u.User.Username()
 		if username == "" {
@@ -45,13 +45,13 @@ func InitSys(opt *option.Init) error {
 
 	dd, err := filepath.Abs(opt.Datadir)
 	if err != nil {
-		return fmt.Errorf("absolute path: %v", err)
+		return fmt.Errorf("absolute path: %w", err)
 	}
 
 	// Require that the data directory not already exist.
 	exists, err := util.FileExists(dd)
 	if err != nil {
-		return fmt.Errorf("checking if path exists: %v", err)
+		return fmt.Errorf("checking if path exists: %w", err)
 	}
 	if exists {
 		return fmt.Errorf("%s already exists", dd)
@@ -98,13 +98,13 @@ func InitSys(opt *option.Init) error {
 	eout.Trace("mkdir: %s", dd)
 	err = os.MkdirAll(dd, util.ModePermRWX)
 	if err != nil {
-		return fmt.Errorf("mkdir: %v", err)
+		return fmt.Errorf("mkdir: %w", err)
 	}
 
 	eout.Verbose("writing configuration file")
 	f, err := os.Create(util.ConfigFileName(dd))
 	if err != nil {
-		return fmt.Errorf("creating configuration file: %v", err)
+		return fmt.Errorf("creating configuration file: %w", err)
 	}
 	var s = "[main]\n" +
 		"host = \n" +
@@ -117,11 +117,11 @@ func InitSys(opt *option.Init) error {
 		"sslmode = require\n"
 	_, err = f.WriteString(s)
 	if err != nil {
-		return fmt.Errorf("writing configuration file: %v", err)
+		return fmt.Errorf("writing configuration file: %w", err)
 	}
 	err = f.Close()
 	if err != nil {
-		return fmt.Errorf("closing configuration file: %v", err)
+		return fmt.Errorf("closing configuration file: %w", err)
 	}
 
 	/*
@@ -129,7 +129,7 @@ func InitSys(opt *option.Init) error {
 		var systemUser = "metadb"
 		var systemPassword string
 		if systemPassword, err = util.GeneratePassword(); err != nil {
-			return fmt.Errorf("generating password: %v", err)
+			return fmt.Errorf("generating password: %w", err)
 		}
 		if err = dbx.CreateUser(dburi, systemUser, systemPassword); err != nil {
 			return err
@@ -139,21 +139,21 @@ func InitSys(opt *option.Init) error {
 	/*
 		eout.Verbose("writing system configuration file")
 		if f, err = os.Create(util.SystemConfigFileName(opt.Datadir)); err != nil {
-			return fmt.Errorf("creating system configuration file: %v", err)
+			return fmt.Errorf("creating system configuration file: %w", err)
 		}
 		s = "system_user = " + systemUser + "\nsystem_password = " + systemPassword + "\n"
 		if _, err = f.WriteString(s); err != nil {
-			return fmt.Errorf("writing system configuration file: %v", err)
+			return fmt.Errorf("writing system configuration file: %w", err)
 		}
 		if err = f.Close(); err != nil {
-			return fmt.Errorf("closing system configuration file: %v", err)
+			return fmt.Errorf("closing system configuration file: %w", err)
 		}
 	*/
 
 	/*
 		eout.Verbose("creating database")
 		if err = createDatabase(dburi, systemUser); err != nil {
-			return fmt.Errorf("creating database: %v", err)
+			return fmt.Errorf("creating database: %w", err)
 		}
 	*/
 
@@ -168,12 +168,12 @@ func InitSys(opt *option.Init) error {
 	*/
 
 	// if err = sysdb.InitCreate(opt.DatabaseURI); err != nil {
-	// 	return fmt.Errorf("initializing database: %v", err)
+	// 	return fmt.Errorf("initializing database: %w", err)
 	// }
 	/*
 		eout.Verbose("initializing database")
 		if err = catalog.Initialize(db); err != nil {
-			return fmt.Errorf("initializing database: %v", err)
+			return fmt.Errorf("initializing database: %w", err)
 		}
 	*/
 

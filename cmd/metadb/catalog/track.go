@@ -19,7 +19,7 @@ func (c *Catalog) initTableDir() error {
 	q := "SELECT schema_name, table_name, source_name, transformed, parent_schema_name, parent_table_name FROM metadb.base_table"
 	rows, err := c.dp.Query(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("selecting table list: %v", err)
+		return fmt.Errorf("selecting table list: %w", err)
 	}
 	defer rows.Close()
 	tableDir := make(map[dbx.Table]tableEntry)
@@ -28,7 +28,7 @@ func (c *Catalog) initTableDir() error {
 		var transformed bool
 		err = rows.Scan(&schemaname, &tablename, &source, &transformed, &parentschema, &parenttable)
 		if err != nil {
-			return fmt.Errorf("reading table list: %v", err)
+			return fmt.Errorf("reading table list: %w", err)
 		}
 		t := tableEntry{
 			transformed: transformed,
@@ -39,7 +39,7 @@ func (c *Catalog) initTableDir() error {
 		tableDir[dbx.Table{Schema: schemaname, Table: tablename}] = t
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("reading table list: %v", err)
+		return fmt.Errorf("reading table list: %w", err)
 	}
 	rows.Close()
 	// Fill in children.

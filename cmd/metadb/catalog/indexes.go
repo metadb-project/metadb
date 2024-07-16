@@ -75,19 +75,19 @@ SELECT table_schema, table_name, column_name
     WHERE has_index AND left(column_name, 2) <> '__'`
 	rows, err := c.dp.Query(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("selecting indexes: %v", err)
+		return fmt.Errorf("selecting indexes: %w", err)
 	}
 	defer rows.Close()
 	indexes := make(map[dbx.Column]struct{})
 	for rows.Next() {
 		var schema, table, column string
 		if err := rows.Scan(&schema, &table, &column); err != nil {
-			return fmt.Errorf("reading indexes: %v", err)
+			return fmt.Errorf("reading indexes: %w", err)
 		}
 		indexes[dbx.Column{Schema: schema, Table: strings.TrimSuffix(table, "__"), Column: column}] = struct{}{}
 	}
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("reading indexes: %v", err)
+		return fmt.Errorf("reading indexes: %w", err)
 	}
 	c.indexes = indexes
 	return nil
@@ -103,7 +103,7 @@ func (c *Catalog) addIndex(column *dbx.Column) error {
 	// Create index.
 	q := "CREATE INDEX ON \"" + column.Schema + "\".\"" + column.Table + "__\" (\"" + column.Column + "\")"
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating index: %v", err)
+		return fmt.Errorf("creating index: %w", err)
 	}
 	c.indexes[*column] = struct{}{}
 	return nil
