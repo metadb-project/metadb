@@ -6,8 +6,8 @@
 
 * Metadb software:
 ** Architecture: x86-64 (AMD64)
-** CPU: 2 cores
-** Memory: 1 GB
+** CPU: 4 cores
+** Memory: 8 GB
 ** Local storage: 500 GB SSD
 * PostgreSQL database:
 ** CPU: 4 cores
@@ -188,7 +188,7 @@ nohup metadb start -D data -l metadb.log &
 ----
 
 The `--memlimit` option can be used to set a soft memory limit (in GiB) if
-needed, for example:
+needed (default 75% of RAM), for example:
 
 [source,bash]
 ----
