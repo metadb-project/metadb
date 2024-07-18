@@ -1,8 +1,26 @@
 # Running Metadb/FOLIO on a new Linux box
 
+<!-- md2toc -l 2 get-started-developing.md -->
+* [Prerequisites](#prerequisites)
+    * [Debian packages](#debian-packages)
+    * [VirtualBox](#virtualbox)
+* [FOLIO](#folio)
+* [Kafka](#kafka)
+* [Debezium](#debezium)
+* [Metadb](#metadb)
+
 
 ## Prerequisites
 
+
+### Debian packages
+
+Vagrant is used to manage the VirtualBox VMs, and the Go language compiles Metadb.
+
+```
+sudo apt-get install vagrant
+sudo apt-get unstall golang
+```
 
 ### VirtualBox
 
@@ -17,14 +35,6 @@ When running `virtualbox` for the firt time, the terminal where it was launched 
 
 If this happens, `sudo /sbin/vboxconfig` should solve the problem.
 
-### Other prerequisites
-
-Vagrant is used to manage the VirtualBox VMs, and the Go language compiles Metadb.
-
-```
-sudo apt-get install vagrant
-sudo apt-get unstall golang
-```
 
 
 ## FOLIO
@@ -61,4 +71,24 @@ host$ curl -w '\n' localhost:9130/_/version
 5.1.2
 ```
 Congratulations, you now have a FOLIO system running in a virtual machine and accessible from the host. You could now, if you wished, run Stripes against this FOLIO backend.
+
+
+
+## Kafka
+
+XXX
+
+
+
+## Debezium
+
+XXX
+
+
+
+## Metadb
+
+XXX
+
+
 
