@@ -1,13 +1,16 @@
-# Running Metadb/FOLIO on a new Linux box
+# Running Metadb/FOLIO on a new Debian GNU/Linux box
 
 <!-- md2toc -l 2 get-started-developing.md -->
 * [Prerequisites](#prerequisites)
     * [Debian packages](#debian-packages)
     * [VirtualBox](#virtualbox)
-* [FOLIO](#folio)
-* [Kafka](#kafka)
-* [Debezium](#debezium)
-* [Metadb](#metadb)
+    * [FOLIO](#folio)
+* [Configuration](#configuration)
+    * [Different hosting options](#different-hosting-options)
+    * [FOLIO's Postgres](#folios-postgres)
+    * [Debezium](#debezium)
+    * [Kafka](#kafka)
+    * [Metadb](#metadb)
 
 
 ## Prerequisites
@@ -15,11 +18,21 @@
 
 ### Debian packages
 
-Vagrant is used to manage the VirtualBox VMs, and the Go language compiles Metadb.
+Vagrant is used to manage the VirtualBox VMs, Docker to run containers for Debezium and Docker, and the Go language is used to compile Metadb.
 
 ```
 sudo apt-get install vagrant
+sudo apt-get install docker.io
 sudo apt-get unstall golang
+```
+
+If when running `docker` you encounter the error
+> permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock
+
+the most likely reason is that your user -- `mike`, say -- does not belong to the `docker` group which has access to the socket file. You can fix this with:
+```
+sudo usermod -a -G docker mike
+newgrp docker
 ```
 
 ### VirtualBox
@@ -37,7 +50,7 @@ If this happens, `sudo /sbin/vboxconfig` should solve the problem.
 
 
 
-## FOLIO
+### FOLIO
 
 Before you can run Metadb in a meaningful way, you need a FOLIO system set up to feed it events. It's politically difficult to get event feeds from existing FOLIO installations, and probaby impossible to get permission to set up your own feed -- which you want to do if you're going to get to grips with the whole Metadb system. So you want your own FOLIO system that you can do with as you please.
 
@@ -74,19 +87,36 @@ Congratulations, you now have a FOLIO system running in a virtual machine and ac
 
 
 
-## Kafka
+## Configuration
+
+
+### Different hosting options
+
+To get information from FOLIO in your VM, you will need Debezium to run against it and extract change events, Kafka to store those change events, and Metadb to consume them. In principle, you could run all those components inside the VM. At the other extreme, Debezium could run on the host OS, accessing the FOLIO Postgres database in the guest OS, feeding events to Kafka running on a separate host, and Metadb running on yet another host could read those events from Kafka.
+
+Choosing the allocation of programs to machines is a complex business with a lot of variables, and different solutions will apply in a different scenarios. But for Metadb development, one strong options is to run Debezium and Kafka inside the VM (possibly from within Docker containers), and only Metadb on the host machine where you will want to be constantly modifying and rebuilding it.
+
+Another option would be to run both Debezium and Kafka as Docker containers within the host OS (again possibly from within Docker containers). The advantage would be that the VM would contain no configuration or state that couldn't be fixed by blowing it all away and loading a new one.
+
+The guide takes the second approach.
+
+
+### FOLIO's Postgres
 
 XXX
 
 
-
-## Debezium
+### Debezium
 
 XXX
 
 
+### Kafka
 
-## Metadb
+XXX
+
+
+### Metadb
 
 XXX
 
