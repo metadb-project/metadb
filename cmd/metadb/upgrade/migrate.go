@@ -7,6 +7,14 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
@@ -18,13 +26,6 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"github.com/spf13/viper"
-	"io"
-	"os"
-	"path/filepath"
-	"slices"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func Migrate(opt *option.Migrate) error {
@@ -57,7 +58,7 @@ func Migrate(opt *option.Migrate) error {
 	}
 	dp, err := dbx.NewPool(context.TODO(), db.ConnString(db.User, db.Password))
 	if err != nil {
-		return fmt.Errorf("creating Metadb database connection pool: %v", err)
+		return fmt.Errorf("creating Metadb database connection pool: %w", err)
 	}
 	defer dp.Close()
 
@@ -78,7 +79,7 @@ func Migrate(opt *option.Migrate) error {
 	}
 	dpLDP, err := dbx.NewPool(context.TODO(), dbLDP.ConnString(dbLDP.User, dbLDP.Password))
 	if err != nil {
-		return fmt.Errorf("creating LDP database connection pool: %v", err)
+		return fmt.Errorf("creating LDP database connection pool: %w", err)
 	}
 	defer dpLDP.Close()
 
@@ -89,7 +90,7 @@ func Migrate(opt *option.Migrate) error {
 	case errors.Is(err, pgx.ErrNoRows):
 		fallthrough
 	case err != nil:
-		return fmt.Errorf("invalid LDP database: %v", err)
+		return fmt.Errorf("invalid LDP database: %w", err)
 	default:
 		// NOP
 	}
@@ -146,12 +147,12 @@ func runMigration(dp *pgxpool.Pool, cat *catalog.Catalog, dpLDP *pgxpool.Pool, s
 		// Get the current time from the database, to use as a consistent cut-off time.
 		now, err := selectNow(dp)
 		if err != nil {
-			return fmt.Errorf("querying current time: %v", err)
+			return fmt.Errorf("querying current time: %w", err)
 		}
 		// Find minimum start time.
 		minStart, err := selectMinStart(dp, m.metadbTable, now)
 		if err != nil {
-			return fmt.Errorf("querying minimum start: %v", err)
+			return fmt.Errorf("querying minimum start: %w", err)
 		}
 		eout.Info("migrating: %s__: reading history.%s where (updated < %s)", m.metadbTable, m.ldpTable, minStart)
 		path := filepath.Join(basepath, m.ldpTable)
@@ -183,7 +184,7 @@ func copyMigrationTable(dp *pgxpool.Pool, tm ldpTableMap, path string) error {
 		[]string{"__start", "__end", "__current", "__origin", "id", "jsonb"},
 		src)
 	if err != nil {
-		return fmt.Errorf("copying to database: %v", err)
+		return fmt.Errorf("copying to database: %w", err)
 	}
 	eout.Info("migrating: %s__: %d records written", tm.metadbTable, copyCount)
 	return nil
@@ -221,7 +222,7 @@ func (s *migrationSource) Values() ([]any, error) {
 	default:
 		id, err := uuid.EncodeUUID(s.record.ID)
 		if err != nil {
-			return nil, fmt.Errorf("encoding ID: %v", err)
+			return nil, fmt.Errorf("encoding ID: %w", err)
 		}
 		var v = []any{
 			s.record.Start, // __start
@@ -253,7 +254,7 @@ func queueMigrationTable(dpLDP *pgxpool.Pool, cat *catalog.Catalog, tm ldpTableM
 		tm.ldpTable)
 	rows, err := dpLDP.Query(context.TODO(), q, minStart)
 	if err != nil {
-		return fmt.Errorf("selecting historical data: %v", err)
+		return fmt.Errorf("selecting historical data: %w", err)
 	}
 	defer rows.Close()
 	var prevRecord, nextRecord migrationRecord
@@ -263,7 +264,7 @@ func queueMigrationTable(dpLDP *pgxpool.Pool, cat *catalog.Catalog, tm ldpTableM
 		var id, data string
 		var up time.Time
 		if err = rows.Scan(&id, &data, &up); err != nil {
-			return fmt.Errorf("reading historical records: %v", err)
+			return fmt.Errorf("reading historical records: %w", err)
 		}
 		updated := up.UTC()
 		if id == prevID {
@@ -291,7 +292,7 @@ func queueMigrationTable(dpLDP *pgxpool.Pool, cat *catalog.Catalog, tm ldpTableM
 		}
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("reading text columns: %v", err)
+		return fmt.Errorf("reading text columns: %w", err)
 	}
 	if err = writer.Flush(); err != nil {
 		return fmt.Errorf("flushing buffer for file: %v: %v", path, err)

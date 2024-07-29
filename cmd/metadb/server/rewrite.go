@@ -13,7 +13,7 @@ func rewriteCommandGraph(cmdgraph *command.CommandGraph, rewriteJSON bool) error
 		// Rewrite command
 		if err := rewriteCommand(e, rewriteJSON); err != nil {
 			log.Debug("%v", *(e.Value.(*command.Command)))
-			return fmt.Errorf("%v", err)
+			return err
 		}
 	}
 	return nil

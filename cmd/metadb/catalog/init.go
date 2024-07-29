@@ -33,7 +33,7 @@ type Catalog struct {
 func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
 	exists, err := catalogSchemaExists(dp)
 	if err != nil {
-		return nil, fmt.Errorf("checking if database initialized: %v", err)
+		return nil, fmt.Errorf("checking if database initialized: %w", err)
 	}
 	if !exists {
 		log.Info("initializing database")
@@ -159,7 +159,7 @@ func createCatalogSchema(dp *pgxpool.Pool) error {
 	var q = "CREATE SCHEMA " + catalogSchema
 	_, err = tx.Exec(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("creating schema: "+catalogSchema+": %v", err)
+		return fmt.Errorf("creating schema: "+catalogSchema+": %w", err)
 	}
 
 	for _, t := range systemTables {
@@ -170,7 +170,7 @@ func createCatalogSchema(dp *pgxpool.Pool) error {
 	}
 
 	if err = tx.Commit(context.TODO()); err != nil {
-		return fmt.Errorf("initializing system database: committing changes: %v", err)
+		return fmt.Errorf("initializing system database: committing changes: %w", err)
 	}
 	return nil
 }
@@ -181,7 +181,7 @@ func createTableAuth(tx pgx.Tx) error {
 		"tables text NOT NULL, " +
 		"dbupdated boolean NOT NULL)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".auth: %v", err)
+		return fmt.Errorf("creating table "+catalogSchema+".auth: %w", err)
 	}
 	return nil
 }
@@ -190,12 +190,12 @@ func createTableInit(tx pgx.Tx) error {
 	q := "CREATE TABLE " + catalogSchema + ".init (" +
 		"dbversion integer NOT NULL)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".init: %v", err)
+		return fmt.Errorf("creating table "+catalogSchema+".init: %w", err)
 	}
 	dbver := strconv.FormatInt(util.DatabaseVersion, 10)
 	q = "INSERT INTO " + catalogSchema + ".init (dbversion) VALUES (" + dbver + ")"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("writing to table "+catalogSchema+".init: %v", err)
+		return fmt.Errorf("writing to table "+catalogSchema+".init: %w", err)
 	}
 	return nil
 }
@@ -231,7 +231,7 @@ func createTableOrigin(tx pgx.Tx) error {
 	q := "CREATE TABLE " + catalogSchema + ".origin (" +
 		"name text PRIMARY KEY)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".origin: %v", err)
+		return fmt.Errorf("creating table "+catalogSchema+".origin: %w", err)
 	}
 	return nil
 }
@@ -252,7 +252,7 @@ func createTableSource(tx pgx.Tx) error {
 		"module text, " +
 		"sync smallint NOT NULL DEFAULT 1)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".source: %v", err)
+		return fmt.Errorf("creating table "+catalogSchema+".source: %w", err)
 	}
 	return nil
 }
@@ -265,7 +265,7 @@ func createTableUpdate(tx pgx.Tx) error {
 		"last_update timestamptz, " +
 		"elapsed_real_time real)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".table_update: %v", err)
+		return fmt.Errorf("creating table "+catalogSchema+".table_update: %w", err)
 	}
 	return nil
 }
@@ -280,7 +280,7 @@ func createTableBaseTable(tx pgx.Tx) error {
 		"parent_schema_name varchar(63) NOT NULL, " +
 		"parent_table_name varchar(63) NOT NULL)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating table "+catalogSchema+".base_table: %v", err)
+		return fmt.Errorf("creating table "+catalogSchema+".base_table: %w", err)
 	}
 	return nil
 }

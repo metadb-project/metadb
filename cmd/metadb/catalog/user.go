@@ -15,7 +15,7 @@ func AllUsers(dc *pgx.Conn) ([]string, error) {
 	q := "SELECT username FROM metadb.auth"
 	rows, err := dc.Query(context.TODO(), q)
 	if err != nil {
-		return nil, fmt.Errorf("selecting user list: %v", err)
+		return nil, fmt.Errorf("selecting user list: %w", err)
 	}
 	defer rows.Close()
 	users := make([]string, 0)
@@ -23,12 +23,12 @@ func AllUsers(dc *pgx.Conn) ([]string, error) {
 		var username string
 		err := rows.Scan(&username)
 		if err != nil {
-			return nil, fmt.Errorf("reading user list: %v", err)
+			return nil, fmt.Errorf("reading user list: %w", err)
 		}
 		users = append(users, username)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("reading user list: %v", err)
+		return nil, fmt.Errorf("reading user list: %w", err)
 	}
 	return users, nil
 }
@@ -37,7 +37,7 @@ func (c *Catalog) initUsers() error {
 	// read users
 	users, err := sysdb.UserRead(c.dp)
 	if err != nil {
-		return fmt.Errorf("reading user permissions: %v", err)
+		return fmt.Errorf("reading user permissions: %w", err)
 	}
 	c.users = users
 	return nil

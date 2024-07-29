@@ -16,7 +16,7 @@ func (c *Catalog) initPartYears() error {
 		"JOIN pg_inherits i ON p.partrelid=i.inhparent"
 	rows, err := c.dp.Query(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("selecting partition years: %v", err)
+		return fmt.Errorf("selecting partition years: %w", err)
 	}
 	defer rows.Close()
 	part := make(map[string]map[int]struct{})
@@ -24,7 +24,7 @@ func (c *Catalog) initPartYears() error {
 		var currentTable, yearTable string
 		err := rows.Scan(&currentTable, &yearTable)
 		if err != nil {
-			return fmt.Errorf("reading partition years: %v", err)
+			return fmt.Errorf("reading partition years: %w", err)
 		}
 		p, ok := part[currentTable]
 		if !ok {
@@ -39,7 +39,7 @@ func (c *Catalog) initPartYears() error {
 		p[yearInt] = struct{}{}
 	}
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("reading partition years: %v", err)
+		return fmt.Errorf("reading partition years: %w", err)
 	}
 	c.partYears = part
 	return nil
@@ -57,7 +57,7 @@ func (c *Catalog) AddPartYear(schema, table string, year int) error {
 		" PARTITION OF " + nctable +
 		" FOR VALUES FROM ('" + yearStr + "-01-01') TO ('" + nextYearStr + "-01-01')"
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating partition: %v", err)
+		return fmt.Errorf("creating partition: %w", err)
 	}
 	// Update the cache.
 	schemaTable := schema + "." + table

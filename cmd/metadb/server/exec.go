@@ -35,7 +35,7 @@ func execCommandGraph(thread int, ctx context.Context, cat *catalog.Catalog, cmd
 		}
 		match, err := execCommand(ebuf, cat, cmd, source, syncMode, dedup)
 		if err != nil {
-			return fmt.Errorf("exec command: %v", err)
+			return fmt.Errorf("exec command: %w", err)
 		}
 		if cmd.Subcommands == nil {
 			continue
@@ -49,14 +49,14 @@ func execCommandGraph(thread int, ctx context.Context, cat *catalog.Catalog, cmd
 					table := &dbx.Table{Schema: tcmd.SchemaName, Table: tcmd.TableName}
 					delta, err := findDeltaSchema(cat, tcmd, table)
 					if err != nil {
-						return fmt.Errorf("finding schema delta: %v", err)
+						return fmt.Errorf("finding schema delta: %w", err)
 					}
 					if err = execDeltaSchema(ebuf, cat, tcmd, delta, table); err != nil {
-						return fmt.Errorf("schema: %v", err)
+						return fmt.Errorf("schema: %w", err)
 					}
 					m, id, err := isCurrentIdenticalMatch(ebuf.ctx, tcmd, ebuf.dp, table)
 					if err != nil {
-						return fmt.Errorf("matcher: %v", err)
+						return fmt.Errorf("matcher: %w", err)
 					}
 					if m {
 						ebuf.queueSyncID(table, id)
@@ -66,13 +66,13 @@ func execCommandGraph(thread int, ctx context.Context, cat *catalog.Catalog, cmd
 		} else {
 			for f := cmd.Subcommands.Front(); f != nil; f = f.Next() {
 				if _, err := execCommand(ebuf, cat, f.Value.(*command.Command), source, syncMode, dedup); err != nil {
-					return fmt.Errorf("exec command: %v", err)
+					return fmt.Errorf("exec command: %w", err)
 				}
 			}
 		}
 	}
 	if err := ebuf.flush(); err != nil {
-		return fmt.Errorf("exec command list: %v", err)
+		return fmt.Errorf("exec command list: %w", err)
 	}
 	log.Trace("=================================================================")
 	log.Trace("exec: %d records %s", cmdgraph.Commands.Len(), fmt.Sprintf("[%.4f s]", time.Since(txnTime).Seconds()))
@@ -86,17 +86,17 @@ func execCommand(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, s
 		table := &dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName}
 		delta, err := findDeltaSchema(cat, cmd, table)
 		if err != nil {
-			return false, fmt.Errorf("finding schema delta: %v", err)
+			return false, fmt.Errorf("finding schema delta: %w", err)
 		}
 		if err = addTable(ebuf, cmd, cat, table, source); err != nil {
-			return false, fmt.Errorf("schema: %v", err)
+			return false, fmt.Errorf("schema: %w", err)
 		}
 		if err = addPartition(ebuf, cat, cmd); err != nil {
-			return false, fmt.Errorf("schema: %v", err)
+			return false, fmt.Errorf("schema: %w", err)
 		}
 		// Note that execDeltaSchema() may adjust data types in cmd.
 		if err = execDeltaSchema(ebuf, cat, cmd, delta, table); err != nil {
-			return false, fmt.Errorf("schema: %v", err)
+			return false, fmt.Errorf("schema: %w", err)
 		}
 		// Ensure indexes are created on primary key columns.
 		for _, col := range cmd.Column {
@@ -106,7 +106,7 @@ func execCommand(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, s
 					continue
 				}
 				if err = ebuf.flush(); err != nil {
-					return false, fmt.Errorf("creating indexes: %v", err)
+					return false, fmt.Errorf("creating indexes: %w", err)
 				}
 				if err = cat.AddIndex(column); err != nil {
 					return false, err
@@ -116,7 +116,7 @@ func execCommand(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command, s
 	}
 	match, err := execCommandData(ebuf, cat, cmd, syncMode, dedup)
 	if err != nil {
-		return false, fmt.Errorf("exec data: %v", err)
+		return false, fmt.Errorf("exec data: %w", err)
 	}
 	return match, nil
 }
@@ -298,17 +298,17 @@ func execCommandData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comman
 	case command.MergeOp:
 		match, err := execMergeData(ebuf, cmd, syncMode, dedup)
 		if err != nil {
-			return false, fmt.Errorf("merge: %v", err)
+			return false, fmt.Errorf("merge: %w", err)
 		}
 		return match, nil
 	case command.DeleteOp:
 		if err := execDeleteData(ebuf, cat, cmd); err != nil {
-			return false, fmt.Errorf("delete: %v", err)
+			return false, fmt.Errorf("delete: %w", err)
 		}
 		return false, nil
 	case command.TruncateOp:
 		if err := execTruncateData(ebuf, cat, cmd); err != nil {
-			return false, fmt.Errorf("truncate: %v", err)
+			return false, fmt.Errorf("truncate: %w", err)
 		}
 		return false, nil
 	default:
@@ -323,7 +323,7 @@ func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode, 
 	// can avoid making any changes in the database.
 	match, id, err := isCurrentIdenticalMatch(ebuf.ctx, cmd, ebuf.dp, table)
 	if err != nil {
-		return false, fmt.Errorf("matcher: %v", err)
+		return false, fmt.Errorf("matcher: %w", err)
 	}
 	if match {
 		log.Trace("new command matches current record")
@@ -365,7 +365,7 @@ func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode, 
 		var rows pgx.Rows
 		rows, err = ebuf.dp.Query(context.TODO(), b.String())
 		if err != nil {
-			return false, fmt.Errorf("querying for unavailable data: %v", err)
+			return false, fmt.Errorf("querying for unavailable data: %w", err)
 		}
 		defer rows.Close()
 		lenColumns := len(unavailColumns)
@@ -378,11 +378,11 @@ func execMergeData(ebuf *execbuffer, cmd *command.Command, syncMode dsync.Mode, 
 		for rows.Next() {
 			found = true
 			if err = rows.Scan(dest...); err != nil {
-				return false, fmt.Errorf("scanning row values: %v", err)
+				return false, fmt.Errorf("scanning row values: %w", err)
 			}
 		}
 		if err = rows.Err(); err != nil {
-			return false, fmt.Errorf("reading matching current row: %v", err)
+			return false, fmt.Errorf("reading matching current row: %w", err)
 		}
 		rows.Close()
 		if !found {
@@ -482,7 +482,7 @@ func isCurrentIdenticalMatch(ctx context.Context, cmd *command.Command, tx *pgxp
 	b.WriteString(" LIMIT 1")
 	rows, err := tx.Query(ctx, b.String())
 	if err != nil {
-		return false, 0, fmt.Errorf("querying for matching current row: %v", err)
+		return false, 0, fmt.Errorf("querying for matching current row: %w", err)
 	}
 	defer rows.Close()
 	columnNames := make([]string, 0)
@@ -500,11 +500,11 @@ func isCurrentIdenticalMatch(ctx context.Context, cmd *command.Command, tx *pgxp
 	for rows.Next() {
 		found = true
 		if err = rows.Scan(dest...); err != nil {
-			return false, 0, fmt.Errorf("scanning row values: %v", err)
+			return false, 0, fmt.Errorf("scanning row values: %w", err)
 		}
 	}
 	if err = rows.Err(); err != nil {
-		return false, 0, fmt.Errorf("reading matching current row: %v", err)
+		return false, 0, fmt.Errorf("reading matching current row: %w", err)
 	}
 	rows.Close()
 	if !found {
@@ -550,7 +550,7 @@ func execDeleteData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command
 	// Flush buffer before deletion, to prevent a previous merge with the same tuple
 	// ID from being applied later.
 	if err := ebuf.flush(); err != nil {
-		return fmt.Errorf("exec delete data: %v", err)
+		return fmt.Errorf("exec delete data: %w", err)
 	}
 	primaryKeyFilter := wherePKDataEqualSQL(cmd.Column)
 	// Find matching current records in table and descendants, and mark as not current.
@@ -562,7 +562,7 @@ func execDeleteData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command
 				cmd.Origin + "'" + primaryKeyFilter)
 		})
 	if err := ebuf.dp.SendBatch(ebuf.ctx, &batch).Close(); err != nil {
-		return fmt.Errorf("exec delete data: %v", err)
+		return fmt.Errorf("exec delete data: %w", err)
 	}
 	return nil
 }
@@ -613,7 +613,7 @@ func execTruncateData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comma
 	// Flush buffer before truncation, to prevent a previous merge in the same table
 	// from being applied later.
 	if err := ebuf.flush(); err != nil {
-		return fmt.Errorf("exec truncate data: %v", err)
+		return fmt.Errorf("exec truncate data: %w", err)
 	}
 	// Find all current records in table and descendants, and mark as not current.
 	batch := pgx.Batch{}
@@ -623,7 +623,7 @@ func execTruncateData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comma
 				cmd.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + cmd.Origin + "'")
 		})
 	if err := ebuf.dp.SendBatch(ebuf.ctx, &batch).Close(); err != nil {
-		return fmt.Errorf("exec truncate data: %v", err)
+		return fmt.Errorf("exec truncate data: %w", err)
 	}
 	return nil
 }

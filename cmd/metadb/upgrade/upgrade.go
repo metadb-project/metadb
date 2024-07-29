@@ -159,13 +159,13 @@ func upsys8(opt *sysopt) error {
 	// Write to configuration file.
 	var f *os.File
 	if f, err = os.Create(util.ConfigFileName(opt.Datadir)); err != nil {
-		return fmt.Errorf("creating configuration file: %v", err)
+		return fmt.Errorf("creating configuration file: %w", err)
 	}
 	if _, err = f.WriteString("database = " + connString + "\n"); err != nil {
-		return fmt.Errorf("writing configuration file: %v", err)
+		return fmt.Errorf("writing configuration file: %w", err)
 	}
 	if err = f.Close(); err != nil {
-		return fmt.Errorf("closing configuration file: %v", err)
+		return fmt.Errorf("closing configuration file: %w", err)
 	}
 	if err = sysdb.WriteSysdbVersion(8); err != nil {
 		return err
@@ -241,7 +241,7 @@ func upgradeDatabase(datadir string) (bool, error) {
 		// Read from config file
 		db, err = util.ReadConfigDatabase(datadir)
 		if err != nil {
-			return false, fmt.Errorf("reading configuration file: %v", err)
+			return false, fmt.Errorf("reading configuration file: %w", err)
 		}
 		/*
 			var cfg *ini.File
@@ -272,7 +272,7 @@ func upgradeDatabase(datadir string) (bool, error) {
 		var cs []*databaseConnector
 		cs, err = oldReadDatabaseConnectors(datadir)
 		if err != nil {
-			return false, fmt.Errorf("reading database connectors: %v", err)
+			return false, fmt.Errorf("reading database connectors: %w", err)
 		}
 		c := cs[0]
 		/*
@@ -332,7 +332,7 @@ func upgradeDatabase(datadir string) (bool, error) {
 func createConfigFile(datadir string, c *databaseConnector) error {
 	f, err := os.Create(util.ConfigFileName(datadir))
 	if err != nil {
-		return fmt.Errorf("creating configuration file: %v", err)
+		return fmt.Errorf("creating configuration file: %w", err)
 	}
 	var s = "[main]\n" +
 		"host = " + c.DBHost + "\n" +
@@ -345,11 +345,11 @@ func createConfigFile(datadir string, c *databaseConnector) error {
 		"sslmode = require\n"
 	_, err = f.WriteString(s)
 	if err != nil {
-		return fmt.Errorf("writing configuration file: %v", err)
+		return fmt.Errorf("writing configuration file: %w", err)
 	}
 	err = f.Close()
 	if err != nil {
-		return fmt.Errorf("closing configuration file: %v", err)
+		return fmt.Errorf("closing configuration file: %w", err)
 	}
 	return nil
 }
@@ -573,7 +573,7 @@ func updb10(opt *dbopt) error {
 	q := "SELECT schemaname, tablename FROM metadb.track ORDER BY schemaname, tablename"
 	rows, err := dc.Query(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("selecting table list: %v", err)
+		return fmt.Errorf("selecting table list: %w", err)
 	}
 	type attrschema struct {
 		attrname      string
@@ -591,7 +591,7 @@ func updb10(opt *dbopt) error {
 		err = rows.Scan(&schema, &table)
 		if err != nil {
 			rows.Close()
-			return fmt.Errorf("reading table list: %v", err)
+			return fmt.Errorf("reading table list: %w", err)
 		}
 		t := tableschema{
 			name:  schema + "." + table,
@@ -602,7 +602,7 @@ func updb10(opt *dbopt) error {
 	}
 	if err = rows.Err(); err != nil {
 		rows.Close()
-		return fmt.Errorf("reading table list: %v", err)
+		return fmt.Errorf("reading table list: %w", err)
 	}
 	rows.Close()
 	// Read table attributes.
@@ -621,7 +621,7 @@ func updb10(opt *dbopt) error {
 			"ORDER BY a.attnum"
 		rows, err = dc.Query(context.TODO(), q, t.name)
 		if err != nil {
-			return fmt.Errorf("selecting attributes: %v", err)
+			return fmt.Errorf("selecting attributes: %w", err)
 		}
 		for rows.Next() {
 			var attname, typname string
@@ -629,7 +629,7 @@ func updb10(opt *dbopt) error {
 			err = rows.Scan(&attname, &typname, &varcharLength)
 			if err != nil {
 				rows.Close()
-				return fmt.Errorf("reading attributes: %v", err)
+				return fmt.Errorf("reading attributes: %w", err)
 			}
 			a := attrschema{
 				attrname:      attname,
@@ -640,7 +640,7 @@ func updb10(opt *dbopt) error {
 		}
 		if err = rows.Err(); err != nil {
 			rows.Close()
-			return fmt.Errorf("reading attributes: %v", err)
+			return fmt.Errorf("reading attributes: %w", err)
 		}
 		rows.Close()
 	}
@@ -650,20 +650,20 @@ func updb10(opt *dbopt) error {
 		q = "SELECT DISTINCT EXTRACT(YEAR FROM __start)::smallint AS year FROM " + t.name + "__ ORDER BY year"
 		rows, err = dc.Query(context.TODO(), q)
 		if err != nil {
-			return fmt.Errorf("selecting year list: %v", err)
+			return fmt.Errorf("selecting year list: %w", err)
 		}
 		for rows.Next() {
 			var year int
 			err = rows.Scan(&year)
 			if err != nil {
 				rows.Close()
-				return fmt.Errorf("reading year list: %v", err)
+				return fmt.Errorf("reading year list: %w", err)
 			}
 			tables[i].years = append(tables[i].years, year)
 		}
 		if err = rows.Err(); err != nil {
 			rows.Close()
-			return fmt.Errorf("reading year list: %v", err)
+			return fmt.Errorf("reading year list: %w", err)
 		}
 		rows.Close()
 	}
@@ -762,7 +762,7 @@ func updb10(opt *dbopt) error {
 		q = "SELECT username FROM metadb.auth WHERE tables='.*'"
 		rows, err = dc.Query(context.TODO(), q)
 		if err != nil {
-			return fmt.Errorf("selecting user authorizations: %v", err)
+			return fmt.Errorf("selecting user authorizations: %w", err)
 		}
 		users := make([]string, 0)
 		for rows.Next() {
@@ -770,13 +770,13 @@ func updb10(opt *dbopt) error {
 			err = rows.Scan(&username)
 			if err != nil {
 				rows.Close()
-				return fmt.Errorf("reading user authorizations: %v", err)
+				return fmt.Errorf("reading user authorizations: %w", err)
 			}
 			users = append(users, username)
 		}
 		if err = rows.Err(); err != nil {
 			rows.Close()
-			return fmt.Errorf("reading user authorizations: %v", err)
+			return fmt.Errorf("reading user authorizations: %w", err)
 		}
 		rows.Close()
 		for _, u := range users {
@@ -1025,7 +1025,7 @@ func updb15(opt *dbopt) error {
 	q := "SELECT schemaname, tablename FROM metadb.track ORDER BY schemaname, tablename"
 	rows, err := dc.Query(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("selecting table list: %v", err)
+		return fmt.Errorf("selecting table list: %w", err)
 	}
 	tables := make([]dbx.Table, 0)
 	for rows.Next() {
@@ -1033,13 +1033,13 @@ func updb15(opt *dbopt) error {
 		err = rows.Scan(&schema, &table)
 		if err != nil {
 			rows.Close()
-			return fmt.Errorf("reading table list: %v", err)
+			return fmt.Errorf("reading table list: %w", err)
 		}
 		tables = append(tables, dbx.Table{Schema: schema, Table: table})
 	}
 	if err = rows.Err(); err != nil {
 		rows.Close()
-		return fmt.Errorf("reading table list: %v", err)
+		return fmt.Errorf("reading table list: %w", err)
 	}
 	rows.Close()
 
@@ -1047,7 +1047,7 @@ func updb15(opt *dbopt) error {
 		q = "SELECT indexname FROM pg_indexes WHERE schemaname=$1 and tablename=$2"
 		rows, err = dc.Query(context.TODO(), q, table.Schema, table.Table)
 		if err != nil {
-			return fmt.Errorf("selecting index list: %v", err)
+			return fmt.Errorf("selecting index list: %w", err)
 		}
 		indexes := make([]string, 0)
 		for rows.Next() {
@@ -1055,13 +1055,13 @@ func updb15(opt *dbopt) error {
 			err = rows.Scan(&index)
 			if err != nil {
 				rows.Close()
-				return fmt.Errorf("reading index list: %v", err)
+				return fmt.Errorf("reading index list: %w", err)
 			}
 			indexes = append(indexes, table.Schema+"."+index)
 		}
 		if err = rows.Err(); err != nil {
 			rows.Close()
-			return fmt.Errorf("reading index list: %v", err)
+			return fmt.Errorf("reading index list: %w", err)
 		}
 		rows.Close()
 		for _, schemaIndex := range indexes {
@@ -1200,19 +1200,19 @@ SELECT table_schema, table_name, column_name
     ORDER BY table_schema, table_name, column_name`
 	rows, err := dc.Query(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("selecting indexes: %v", err)
+		return fmt.Errorf("selecting indexes: %w", err)
 	}
 	defer rows.Close()
 	indexes := make([]dbx.Column, 0)
 	for rows.Next() {
 		var schema, table, column string
 		if err = rows.Scan(&schema, &table, &column); err != nil {
-			return fmt.Errorf("reading indexes: %v", err)
+			return fmt.Errorf("reading indexes: %w", err)
 		}
 		indexes = append(indexes, dbx.Column{Schema: schema, Table: table, Column: column})
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("reading indexes: %v", err)
+		return fmt.Errorf("reading indexes: %w", err)
 	}
 
 	// Create an index on each uuid column that does not already have an index.
@@ -1327,19 +1327,19 @@ SELECT table_schema, table_name
     ORDER BY table_schema, table_name, column_name`
 	rows, err := dc.Query(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("selecting indexes: %v", err)
+		return fmt.Errorf("selecting indexes: %w", err)
 	}
 	defer rows.Close()
 	indexes := make([]dbx.Table, 0)
 	for rows.Next() {
 		var schema, table string
 		if err = rows.Scan(&schema, &table); err != nil {
-			return fmt.Errorf("reading indexes: %v", err)
+			return fmt.Errorf("reading indexes: %w", err)
 		}
 		indexes = append(indexes, dbx.Table{Schema: schema, Table: table})
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("reading indexes: %v", err)
+		return fmt.Errorf("reading indexes: %w", err)
 	}
 
 	// Create an index on each __id column that does not already have an index.
@@ -1371,19 +1371,19 @@ func updb19(opt *dbopt) error {
 	q := `SELECT schemaname, tablename FROM metadb.track ORDER BY schemaname, tablename`
 	rows, err := dc.Query(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("selecting table names: %v", err)
+		return fmt.Errorf("selecting table names: %w", err)
 	}
 	defer rows.Close()
 	tables := make([]dbx.Table, 0)
 	for rows.Next() {
 		var schema, table string
 		if err = rows.Scan(&schema, &table); err != nil {
-			return fmt.Errorf("reading table names: %v", err)
+			return fmt.Errorf("reading table names: %w", err)
 		}
 		tables = append(tables, dbx.Table{Schema: schema, Table: table})
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("reading indexes: %v", err)
+		return fmt.Errorf("reading indexes: %w", err)
 	}
 
 	// Drop column "__source" from each table.
@@ -1442,19 +1442,19 @@ func updb20(opt *dbopt) error {
     ORDER BY ns.nspname, t.relname, a.attnum`
 	rows, err := dc.Query(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("selecting varchar columns: %v", err)
+		return fmt.Errorf("selecting varchar columns: %w", err)
 	}
 	defer rows.Close()
 	columns := make([]dbx.Column, 0)
 	for rows.Next() {
 		var schema, table, column string
 		if err = rows.Scan(&schema, &table, &column); err != nil {
-			return fmt.Errorf("reading varchar columns: %v", err)
+			return fmt.Errorf("reading varchar columns: %w", err)
 		}
 		columns = append(columns, dbx.Column{Schema: schema, Table: table, Column: column})
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("reading varchar columns: %v", err)
+		return fmt.Errorf("reading varchar columns: %w", err)
 	}
 
 	// Create an index on each uuid column that does not already have an index.
@@ -1529,19 +1529,19 @@ func updb22(opt *dbopt) error {
 	q := `SELECT schemaname, tablename FROM metadb.track ORDER BY schemaname, tablename`
 	rows, err := dc.Query(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("selecting table names: %v", err)
+		return fmt.Errorf("selecting table names: %w", err)
 	}
 	defer rows.Close()
 	tables := make([]dbx.Table, 0)
 	for rows.Next() {
 		var schema, table string
 		if err = rows.Scan(&schema, &table); err != nil {
-			return fmt.Errorf("reading table names: %v", err)
+			return fmt.Errorf("reading table names: %w", err)
 		}
 		tables = append(tables, dbx.Table{Schema: schema, Table: table})
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("reading indexes: %v", err)
+		return fmt.Errorf("reading indexes: %w", err)
 	}
 	rows.Close()
 
@@ -1671,7 +1671,7 @@ func updb24(opt *dbopt) error {
 		eout.Info("upgrading: refresh inferred column types: %s", msg)
 	})
 	if err != nil {
-		return fmt.Errorf("%v", err)
+		return err
 	}
 
 	if err = metadata.WriteDatabaseVersion(dc, 24); err != nil {

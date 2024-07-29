@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/metadb-project/metadb/cmd/metadb/tools"
 	"os"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/metadb-project/metadb/cmd/metadb/tools"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/internal/eout"
@@ -31,7 +32,7 @@ func EndSync(opt *option.EndSync) error {
 	var dp *pgxpool.Pool
 	dp, err = dbx.NewPool(context.TODO(), db.ConnString(db.User, db.Password))
 	if err != nil {
-		return fmt.Errorf("creating database connection pool: %v", err)
+		return fmt.Errorf("creating database connection pool: %w", err)
 	}
 	defer dp.Close()
 	var exists bool
@@ -168,7 +169,7 @@ func EndSync(opt *option.EndSync) error {
 			eout.Info("endsync: %s", msg)
 		})
 		if err != nil {
-			return fmt.Errorf("%v", err)
+			return err
 		}
 	}
 	var tx pgx.Tx
@@ -196,7 +197,7 @@ func EndSync(opt *option.EndSync) error {
 		return err
 	}
 	if err = tx.Commit(context.TODO()); err != nil {
-		return fmt.Errorf("committing changes: %v", err)
+		return fmt.Errorf("committing changes: %w", err)
 	}
 	eout.Info("endsync: completed")
 	// Sync marctab for full update and schedule maintenance.

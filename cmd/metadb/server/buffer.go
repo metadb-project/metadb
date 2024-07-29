@@ -33,22 +33,22 @@ func (e *execbuffer) queueMergeData(table *dbx.Table, update, insert *string) {
 func (e *execbuffer) flush() error {
 	tx, err := e.dp.Begin(e.ctx)
 	if err != nil {
-		return fmt.Errorf("flush: begin txn: %v", err)
+		return fmt.Errorf("flush: begin txn: %w", err)
 	}
 	defer tx.Rollback(e.ctx)
 	// Flush merge data.
 	log.Trace("FLUSH merge data")
 	if err = e.flushMergeData(tx); err != nil {
-		return fmt.Errorf("flushing exec buffer: writing merge data: %v", err)
+		return fmt.Errorf("flushing exec buffer: writing merge data: %w", err)
 	}
 	// Flush sync IDs.
 	log.Trace("FLUSH sync IDs")
 	if err = e.flushSyncIDs(tx); err != nil {
-		return fmt.Errorf("flushing exec buffer: writing to sync tables: %v", err)
+		return fmt.Errorf("flushing exec buffer: writing to sync tables: %w", err)
 	}
 	log.Trace("FLUSH commit")
 	if err = tx.Commit(e.ctx); err != nil {
-		return fmt.Errorf("flushing exec buffer: commit: %v", err)
+		return fmt.Errorf("flushing exec buffer: commit: %w", err)
 	}
 	return nil
 }
@@ -63,7 +63,7 @@ func (e *execbuffer) flushSyncIDs(tx pgx.Tx) error {
 			pgx.CopyFromRows(a),
 		)
 		if err != nil {
-			return fmt.Errorf("copy to sync table: %v", err)
+			return fmt.Errorf("copy to sync table: %w", err)
 		}
 		log.Trace("copy %d rows to table %q", copyCount, synct)
 	}
@@ -93,7 +93,7 @@ func (e *execbuffer) flushMergeData(tx pgx.Tx) error {
 				})
 			}
 			if err := tx.SendBatch(e.ctx, &batch).Close(); err != nil {
-				return fmt.Errorf("update and insert: %v", err)
+				return fmt.Errorf("update and insert: %w", err)
 			}
 			// If resync mode, flush IDs to sync table.
 			if e.syncMode == dsync.Resync {
@@ -106,7 +106,7 @@ func (e *execbuffer) flushMergeData(tx pgx.Tx) error {
 					pgx.CopyFromRows(ids),
 				)
 				if err != nil {
-					return fmt.Errorf("copy to sync table: %v", err)
+					return fmt.Errorf("copy to sync table: %w", err)
 				}
 				log.Trace("copy %d rows to table %q", copyCount, synct)
 			}
