@@ -13,6 +13,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/server"
 	"github.com/metadb-project/metadb/cmd/metadb/stop"
+	"github.com/metadb-project/metadb/cmd/metadb/tracer"
 	"github.com/metadb-project/metadb/cmd/metadb/upgrade"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"github.com/spf13/cobra"
@@ -128,9 +129,17 @@ func run() error {
 			//if serverOpt.Port == "" {
 			//        serverOpt.Port = metadbAdminPort
 			//}
+
+			// Init Jaeger tracer and flush function
+			t, flush, err := tracer.Init(serverOpt.TracingAgentURL)
+			if err != nil {
+				return err
+			}
+			defer flush()
+
 			serverOpt.RewriteJSON = rewriteJSON == "1"
 			serverOpt.Listen = "127.0.0.1"
-			if err = server.Start(&serverOpt); err != nil {
+			if err = server.Start(&serverOpt, t); err != nil {
 				return fatal(err, logf, csvlogf)
 			}
 			return nil
@@ -145,11 +154,12 @@ func run() error {
 	//_ = certFlag(cmdStart, &serverOpt.TLSCert)
 	//_ = keyFlag(cmdStart, &serverOpt.TLSKey)
 	_ = debugFlag(cmdStart, &serverOpt.Debug)
-	_ = traceLogFlag(cmdStart, &serverOpt.Trace)
+	_ = traceFlag(cmdStart, &serverOpt.Trace)
 	_ = noKafkaCommitFlag(cmdStart, &serverOpt.NoKafkaCommit)
 	_ = logSourceFlag(cmdStart, &serverOpt.LogSource)
 	//_ = noTLSFlag(cmdStart, &serverOpt.NoTLS)
 	_ = memoryLimitFlag(cmdStart, &serverOpt.MemoryLimit)
+	_ = traceJaegerFlag(cmdStart, &serverOpt.TracingAgentURL)
 
 	var cmdStop = &cobra.Command{
 		Use: "stop",
@@ -315,10 +325,11 @@ func help(cmd *cobra.Command, commandLine []string) {
 			//keyFlag(nil, nil) +
 			debugFlag(nil, nil) +
 			//noTLSFlag(nil, nil) +
-			traceLogFlag(nil, nil) +
+			traceFlag(nil, nil) +
 			noKafkaCommitFlag(nil, nil) +
 			logSourceFlag(nil, nil) +
 			memoryLimitFlag(nil, nil) +
+			traceJaegerFlag(nil, nil) +
 			"")
 	case "stop":
 		fmt.Printf("" +
@@ -459,15 +470,12 @@ func logSourceFlag(cmd *cobra.Command, logfile *string) string {
 	return ""
 }
 
-func traceLogFlag(cmd *cobra.Command, trace *bool) string {
-	if devMode {
-		if cmd != nil {
-			cmd.Flags().BoolVar(trace, "trace", false, "")
-		}
-		return "" +
-			"      --trace                 - Enable extremely detailed logging\n"
+func traceJaegerFlag(cmd *cobra.Command, jaegerURL *string) string {
+	if cmd != nil {
+		cmd.Flags().StringVar(jaegerURL, "jaegertrace", "", "")
 	}
-	return ""
+	return "" +
+		"      --jaegertrace                 - Jaeger URL for tracing (OTLP over gRPC)\n"
 }
 
 //func listenFlag(cmd *cobra.Command, listen *string) string {
