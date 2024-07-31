@@ -11,6 +11,7 @@ const (
 	WaitingStatus
 	StartingStatus
 	ActiveStatus
+	CompletedStatus
 	ErrorStatus
 )
 
@@ -41,6 +42,8 @@ func (st *Status) GetString() string {
 		return "starting"
 	case ActiveStatus:
 		return "active"
+	case CompletedStatus:
+		return "completed"
 	case ErrorStatus:
 		return "error"
 	default:
@@ -62,6 +65,10 @@ func (st *Status) Starting() {
 
 func (st *Status) Active() {
 	st.set(ActiveStatus)
+}
+
+func (st *Status) Completed() {
+	st.set(CompletedStatus)
 }
 
 func (st *Status) Error() {
