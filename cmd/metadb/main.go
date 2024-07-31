@@ -150,6 +150,7 @@ func run() error {
 	_ = logSourceFlag(cmdStart, &serverOpt.LogSource)
 	//_ = noTLSFlag(cmdStart, &serverOpt.NoTLS)
 	_ = memoryLimitFlag(cmdStart, &serverOpt.MemoryLimit)
+	_ = readUncommittedFlag(cmdStart, &serverOpt.ReadUncommitted)
 
 	var cmdStop = &cobra.Command{
 		Use: "stop",
@@ -319,6 +320,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			noKafkaCommitFlag(nil, nil) +
 			logSourceFlag(nil, nil) +
 			memoryLimitFlag(nil, nil) +
+			readUncommittedFlag(nil, nil) +
 			"")
 	case "stop":
 		fmt.Printf("" +
@@ -552,6 +554,15 @@ func memoryLimitFlag(cmd *cobra.Command, memoryLimit *float64) string {
 	return "" +
 		"      --memlimit <m>          - Approximate limit on memory usage in GiB\n" +
 		"                                (default: 1.0)\n"
+}
+
+func readUncommittedFlag(cmd *cobra.Command, readUncommitted *bool) string {
+	if cmd != nil {
+		cmd.Flags().BoolVar(readUncommitted, "readuncommitted", false, "")
+	}
+	return "" +
+		"      --readuncommitted      - Set the read_uncommitted isolation level for Kafka consumers.\n" +
+		"							    Requirement for Tiered Storage\n"
 }
 
 func setupLog(logfile, csvlogfile string, debug bool, trace bool) (*os.File, *os.File, error) {
