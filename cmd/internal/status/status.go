@@ -7,41 +7,24 @@ import (
 type Status int32
 
 const (
-	InactiveStatus Status = iota
-	WaitingStatus
-	StartingStatus
-	ActiveStatus
-	ErrorStatus
+	StreamInactive Status = iota
+	StreamWaiting
+	StreamStarting
+	StreamActive
+	StreamError
 )
-
-//func (st *Status) GetString() string {
-//	switch st.Get() {
-//	case InactiveStatus:
-//		return color.Error.SprintFunc()("inactive")
-//	case WaitingStatus:
-//		return color.Active.SprintFunc()("waiting")
-//	case StartingStatus:
-//		return color.Active.SprintFunc()("starting")
-//	case ActiveStatus:
-//		return color.Active.SprintFunc()("active")
-//	case ErrorStatus:
-//		return color.Error.SprintFunc()("error")
-//	default:
-//		return color.Error.SprintFunc()("unknown")
-//	}
-//}
 
 func (st *Status) GetString() string {
 	switch st.Get() {
-	case InactiveStatus:
+	case StreamInactive:
 		return "inactive"
-	case WaitingStatus:
+	case StreamWaiting:
 		return "waiting"
-	case StartingStatus:
+	case StreamStarting:
 		return "starting"
-	case ActiveStatus:
+	case StreamActive:
 		return "active"
-	case ErrorStatus:
+	case StreamError:
 		return "error"
 	default:
 		return "unknown"
@@ -53,21 +36,58 @@ func (st *Status) Get() Status {
 }
 
 func (st *Status) Waiting() {
-	st.set(WaitingStatus)
+	st.set(StreamWaiting)
 }
 
 func (st *Status) Starting() {
-	st.set(StartingStatus)
+	st.set(StreamStarting)
 }
 
 func (st *Status) Active() {
-	st.set(ActiveStatus)
+	st.set(StreamActive)
 }
 
 func (st *Status) Error() {
-	st.set(ErrorStatus)
+	st.set(StreamError)
 }
 
 func (st *Status) set(s Status) {
 	atomic.StoreInt32((*int32)(st), int32(s))
+}
+
+type Sync int32
+
+const (
+	SyncNormal Sync = iota
+	SyncSnapshot
+	SyncSnapshotComplete
+)
+
+func (sy *Sync) GetString() string {
+	switch sy.Get() {
+	case SyncNormal:
+		return "normal"
+	case SyncSnapshot:
+		return "snapshot"
+	case SyncSnapshotComplete:
+		return "snapshot_complete"
+	default:
+		return "unknown"
+	}
+}
+
+func (sy *Sync) Get() Sync {
+	return Sync(atomic.LoadInt32((*int32)(sy)))
+}
+
+func (sy *Sync) Snapshot() {
+	sy.set(SyncSnapshot)
+}
+
+func (sy *Sync) SnapshotComplete() {
+	sy.set(SyncSnapshotComplete)
+}
+
+func (sy *Sync) set(s Sync) {
+	atomic.StoreInt32((*int32)(sy), int32(s))
 }

@@ -200,6 +200,9 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	if err != nil {
 		log.Error("unable to read sync mode: %v", err)
 	}
+	if syncMode != dsync.NoSync {
+		spr.source.Sync.Snapshot()
+	}
 
 	// dedup keeps track of "primary key not defined" and similar errors
 	// that have been logged, in order to reduce duplication of the error
@@ -359,14 +362,18 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 			log.Debug("[%d] checkpoint: events=%d, commands=%d", thread, eventReadCount, cmdgraph.Commands.Len())
 		}
 
-		// Check if resync snapshot may have completed.
-		if syncMode != dsync.NoSync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 3.0 {
-			msg := fmt.Sprintf("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
-				spr.source.Name)
-			if dedup.Insert(msg) {
-				log.Info("%s", msg)
+		// Check if sync snapshot may have completed.
+		if syncMode != dsync.NoSync {
+			if spr.source.Status.Get() == status.StreamActive && cat.HoursSinceLastSnapshotRecord() > 3.0 {
+				spr.source.Sync.SnapshotComplete()
+				msg := fmt.Sprintf("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
+					spr.source.Name)
+				if dedup.Insert(msg) {
+					log.Info("%s", msg)
+				}
+			} else {
+				spr.source.Sync.Snapshot()
 			}
-			cat.ResetLastSnapshotRecord() // Sync timer.
 		}
 
 		if atomic.LoadInt32(rebalanceFlag) == 1 { // Exit thread on rebalance

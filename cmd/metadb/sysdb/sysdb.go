@@ -36,6 +36,7 @@ type SourceConnector struct {
 	AddSchemaPrefix  string
 	Module           string
 	Status           status.Status
+	Sync             status.Sync
 }
 
 //var sysMu dsync.Mutex
