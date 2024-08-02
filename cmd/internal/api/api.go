@@ -97,8 +97,8 @@ type GetStatusRequest struct {
 }
 
 type GetStatusResponse struct {
-	Sources   map[string]status.Status `json:"sources"`
-	Databases map[string]status.Status `json:"databases"`
+	Sources   map[string]status.Stream `json:"sources"`
+	Databases map[string]status.Stream `json:"databases"`
 }
 
 type EnableRequest struct {

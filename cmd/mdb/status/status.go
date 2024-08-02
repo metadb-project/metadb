@@ -34,7 +34,7 @@ func Status(opt *option.Status) error {
 	}
 
 	var s string
-	var a status.Status
+	var a status.Stream
 	for s, a = range stat.Databases {
 		fmt.Printf("%-20s %s\n", "db."+s, a.GetString())
 	}

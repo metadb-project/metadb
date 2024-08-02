@@ -4,17 +4,17 @@ import (
 	"sync/atomic"
 )
 
-type Status int32
+type Stream int32
 
 const (
-	StreamInactive Status = iota
+	StreamInactive Stream = iota
 	StreamWaiting
 	StreamStarting
 	StreamActive
 	StreamError
 )
 
-func (st *Status) GetString() string {
+func (st *Stream) GetString() string {
 	switch st.Get() {
 	case StreamInactive:
 		return "inactive"
@@ -31,27 +31,27 @@ func (st *Status) GetString() string {
 	}
 }
 
-func (st *Status) Get() Status {
-	return Status(atomic.LoadInt32((*int32)(st)))
+func (st *Stream) Get() Stream {
+	return Stream(atomic.LoadInt32((*int32)(st)))
 }
 
-func (st *Status) Waiting() {
+func (st *Stream) Waiting() {
 	st.set(StreamWaiting)
 }
 
-func (st *Status) Starting() {
+func (st *Stream) Starting() {
 	st.set(StreamStarting)
 }
 
-func (st *Status) Active() {
+func (st *Stream) Active() {
 	st.set(StreamActive)
 }
 
-func (st *Status) Error() {
+func (st *Stream) Error() {
 	st.set(StreamError)
 }
 
-func (st *Status) set(s Status) {
+func (st *Stream) set(s Stream) {
 	atomic.StoreInt32((*int32)(st), int32(s))
 }
 

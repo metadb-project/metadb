@@ -18,7 +18,7 @@ type DatabaseConnector struct {
 	// DBUsers         string
 	// DBSSLMode       string
 	DBAccount string
-	Status    status.Status
+	Status    status.Stream
 }
 
 type SourceConnector struct {
@@ -35,7 +35,7 @@ type SourceConnector struct {
 	TrimSchemaPrefix string
 	AddSchemaPrefix  string
 	Module           string
-	Status           status.Status
+	Status           status.Stream
 	Sync             status.Sync
 }
 
