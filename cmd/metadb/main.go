@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/metadb-project/metadb/cmd/internal/color"
-	"github.com/metadb-project/metadb/cmd/internal/common"
-	"github.com/metadb-project/metadb/cmd/internal/eout"
+	"github.com/metadb-project/metadb/cmd/metadb/color"
 	"github.com/metadb-project/metadb/cmd/metadb/dsync"
+	"github.com/metadb-project/metadb/cmd/metadb/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/initsys"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
@@ -28,6 +27,8 @@ var colorMode string
 var devMode bool
 
 var colorInitialized bool
+
+var defaultPort = "8550"
 
 func main() {
 	colorMode = os.Getenv("METADB_COLOR")
@@ -480,10 +481,10 @@ func traceLogFlag(cmd *cobra.Command, trace *bool) string {
 
 func portFlag(cmd *cobra.Command, adminPort *string) string {
 	if cmd != nil {
-		cmd.Flags().StringVarP(adminPort, "port", "p", common.DefaultPort, "")
+		cmd.Flags().StringVarP(adminPort, "port", "p", defaultPort, "")
 	}
 	return "" +
-		"  -p, --port <p>              - Port to listen on (default: " + common.DefaultPort + ")\n"
+		"  -p, --port <p>              - Port to listen on (default: " + defaultPort + ")\n"
 }
 
 //func certFlag(cmd *cobra.Command, cert *string) string {

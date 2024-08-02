@@ -1,7 +1,7 @@
 package sysdb
 
 import (
-	"github.com/metadb-project/metadb/cmd/internal/status"
+	"github.com/metadb-project/metadb/cmd/metadb/status"
 )
 
 type DatabaseConnector struct {

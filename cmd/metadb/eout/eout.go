@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/metadb-project/metadb/cmd/internal/color"
+	"github.com/metadb-project/metadb/cmd/metadb/color"
 )
 
 var EnableVerbose bool

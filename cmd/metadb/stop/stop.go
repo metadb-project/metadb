@@ -6,7 +6,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/metadb-project/metadb/cmd/internal/eout"
+	"github.com/metadb-project/metadb/cmd/metadb/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
