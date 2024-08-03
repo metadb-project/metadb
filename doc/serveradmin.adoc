@@ -373,7 +373,6 @@ CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
 
 ==== Initial synchronization
 
-[.aqua-background]#Metadb 1.2#
 When a new data source is first configured using `CREATE DATA SOURCE`, Metadb
 automatically puts the database into synchronizing mode, just as if `metadb
 sync` had been run (see *Server administration > Resynchronizing a data
@@ -419,14 +418,6 @@ usual, and there temporarily may be missing records (until they are
 re-streamed) or "extra" records (recently deleted in the source database).
 Also, periodic transforms and external SQL are paused during synchronization.
 
-.Note
-****
-[.text-center]
-The instructions below use the Metadb commands "sync" and "endsync".  In Metadb
-versions before 1.2, these commands were called "reset" and "clean",
-respectively.
-****
-
 1. Update the `topics` and `consumergroup` configuration settings for the new
    data stream.
 +
@@ -468,6 +459,9 @@ restreamed).
 Metadb detects when snapshot data are no longer being received, and then writes
 "source snapshot complete (deadline exceeded)" to the log.  This generally
 means it is a good time to run "endsync".
++
+[.aqua-background]#Metadb 1.4#
+The snapshot status is also available via the `LIST status` command.
 
 5. Start the server.
 +

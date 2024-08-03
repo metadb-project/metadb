@@ -12,8 +12,8 @@ import (
 
 	fcolor "github.com/fatih/color"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/metadb-project/metadb/cmd/internal/color"
-	"github.com/metadb-project/metadb/cmd/mdb/util"
+	"github.com/metadb-project/metadb/cmd/metadb/color"
+	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
 var DisableColor bool

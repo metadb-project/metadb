@@ -13,13 +13,13 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/jackc/pgx/v5"
-	"github.com/metadb-project/metadb/cmd/internal/status"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/dsync"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/status"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"golang.org/x/net/context"
@@ -57,8 +57,7 @@ func goPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server) {
 		if err == nil {
 			break
 		}
-		spr.source.Status.Error()
-		spr.databases[0].Status.Error()
+		spr.source.Status.Stream.Error()
 		time.Sleep(24 * time.Hour)
 	}
 }
@@ -165,7 +164,6 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		return err
 	}
 	//////////////////////////////////////////////////////////////////////////////
-	spr.databases[0].Status.Active()
 	//spr.db = append(spr.db, db)
 	// Cache tracking
 	//if err = metadata.Init(spr.svr.db, spr.svr.opt.MetadbVersion); err != nil {
@@ -199,6 +197,9 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	syncMode, err := dsync.ReadSyncMode(dc, spr.source.Name)
 	if err != nil {
 		log.Error("unable to read sync mode: %v", err)
+	}
+	if syncMode != dsync.NoSync {
+		spr.source.Status.Sync.Snapshot()
 	}
 
 	// dedup keeps track of "primary key not defined" and similar errors
@@ -252,7 +253,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			for j := 0; j < i; j++ {
 				_ = consumers[j].Close()
 			}
-			spr.source.Status.Error()
+			spr.source.Status.Stream.Error()
 			return err
 		}
 	}
@@ -269,12 +270,12 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			return nil
 		})
 		if err != nil {
-			spr.source.Status.Error()
+			spr.source.Status.Stream.Error()
 			return err
 		}
 	}
 
-	spr.source.Status.Active()
+	spr.source.Status.Stream.Active()
 
 	waitUserPerms.Wait()
 
@@ -299,7 +300,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		// TODO This error handling is not quite right.
 		for i := 0; i < consumersN; i++ {
 			if errStrings[i] != "" {
-				spr.source.Status.Error()
+				spr.source.Status.Stream.Error()
 				return errors.New(errStrings[i])
 			}
 		}
@@ -359,14 +360,18 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 			log.Debug("[%d] checkpoint: events=%d, commands=%d", thread, eventReadCount, cmdgraph.Commands.Len())
 		}
 
-		// Check if resync snapshot may have completed.
-		if syncMode != dsync.NoSync && spr.source.Status.Get() == status.ActiveStatus && cat.HoursSinceLastSnapshotRecord() > 3.0 {
-			msg := fmt.Sprintf("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
-				spr.source.Name)
-			if dedup.Insert(msg) {
-				log.Info("%s", msg)
+		// Check if sync snapshot may have completed.
+		if syncMode != dsync.NoSync {
+			if spr.source.Status.Stream.Get() == status.StreamActive && cat.HoursSinceLastSnapshotRecord() > 3.0 {
+				spr.source.Status.Sync.SnapshotComplete()
+				msg := fmt.Sprintf("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
+					spr.source.Name)
+				if dedup.Insert(msg) {
+					log.Info("%s", msg)
+				}
+			} else {
+				spr.source.Status.Sync.Snapshot()
 			}
-			cat.ResetLastSnapshotRecord() // Sync timer.
 		}
 
 		if atomic.LoadInt32(rebalanceFlag) == 1 { // Exit thread on rebalance
@@ -549,7 +554,7 @@ func waitForConfigSource(svr *server) ([]*sysdb.SourceConnector, bool, error) {
 				return nil, false, err
 			}
 			if len(sources) > 0 {
-				sources[0].Status.Waiting()
+				sources[0].Status.Stream.Waiting()
 				svr.state.sources = sources
 			}
 			return sources, true, nil

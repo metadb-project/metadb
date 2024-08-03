@@ -1,7 +1,7 @@
 package sysdb
 
 import (
-	"github.com/metadb-project/metadb/cmd/internal/status"
+	"github.com/metadb-project/metadb/cmd/metadb/status"
 )
 
 type DatabaseConnector struct {
@@ -18,7 +18,7 @@ type DatabaseConnector struct {
 	// DBUsers         string
 	// DBSSLMode       string
 	DBAccount string
-	Status    status.Status
+	//Status    status.Database
 }
 
 type SourceConnector struct {
@@ -35,7 +35,7 @@ type SourceConnector struct {
 	TrimSchemaPrefix string
 	AddSchemaPrefix  string
 	Module           string
-	Status           status.Status
+	Status           status.Source
 }
 
 //var sysMu dsync.Mutex
