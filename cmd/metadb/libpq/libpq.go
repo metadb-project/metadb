@@ -453,7 +453,7 @@ func listStatus(conn net.Conn, sources *[]*sysdb.SourceConnector) error {
 				Format:               0,
 			},
 			{
-				Name:                 []byte("status"),
+				Name:                 []byte("source_stream"),
 				TableOID:             0,
 				TableAttributeNumber: 0,
 				DataTypeOID:          25,
@@ -462,7 +462,7 @@ func listStatus(conn net.Conn, sources *[]*sysdb.SourceConnector) error {
 				Format:               0,
 			},
 			{
-				Name:                 []byte("sync"),
+				Name:                 []byte("source_sync"),
 				TableOID:             0,
 				TableAttributeNumber: 0,
 				DataTypeOID:          25,
@@ -476,8 +476,8 @@ func listStatus(conn net.Conn, sources *[]*sysdb.SourceConnector) error {
 		m = append(m, &pgproto3.DataRow{Values: [][]byte{
 			[]byte("data_source"),
 			[]byte(s.Name),
-			[]byte(s.Status.GetString()),
-			[]byte(s.Sync.GetString()),
+			[]byte(s.Status.Stream.GetString()),
+			[]byte(s.Status.Sync.GetString()),
 		}})
 	}
 	ctag := fmt.Sprintf("SELECT %d", len(*sources))

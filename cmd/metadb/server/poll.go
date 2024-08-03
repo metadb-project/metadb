@@ -57,8 +57,7 @@ func goPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server) {
 		if err == nil {
 			break
 		}
-		spr.source.Status.Error()
-		spr.databases[0].Status.Error()
+		spr.source.Status.Stream.Error()
 		time.Sleep(24 * time.Hour)
 	}
 }
@@ -165,7 +164,6 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		return err
 	}
 	//////////////////////////////////////////////////////////////////////////////
-	spr.databases[0].Status.Active()
 	//spr.db = append(spr.db, db)
 	// Cache tracking
 	//if err = metadata.Init(spr.svr.db, spr.svr.opt.MetadbVersion); err != nil {
@@ -201,7 +199,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		log.Error("unable to read sync mode: %v", err)
 	}
 	if syncMode != dsync.NoSync {
-		spr.source.Sync.Snapshot()
+		spr.source.Status.Sync.Snapshot()
 	}
 
 	// dedup keeps track of "primary key not defined" and similar errors
@@ -255,7 +253,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			for j := 0; j < i; j++ {
 				_ = consumers[j].Close()
 			}
-			spr.source.Status.Error()
+			spr.source.Status.Stream.Error()
 			return err
 		}
 	}
@@ -272,12 +270,12 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			return nil
 		})
 		if err != nil {
-			spr.source.Status.Error()
+			spr.source.Status.Stream.Error()
 			return err
 		}
 	}
 
-	spr.source.Status.Active()
+	spr.source.Status.Stream.Active()
 
 	waitUserPerms.Wait()
 
@@ -302,7 +300,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		// TODO This error handling is not quite right.
 		for i := 0; i < consumersN; i++ {
 			if errStrings[i] != "" {
-				spr.source.Status.Error()
+				spr.source.Status.Stream.Error()
 				return errors.New(errStrings[i])
 			}
 		}
@@ -364,15 +362,15 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 
 		// Check if sync snapshot may have completed.
 		if syncMode != dsync.NoSync {
-			if spr.source.Status.Get() == status.StreamActive && cat.HoursSinceLastSnapshotRecord() > 3.0 {
-				spr.source.Sync.SnapshotComplete()
+			if spr.source.Status.Stream.Get() == status.StreamActive && cat.HoursSinceLastSnapshotRecord() > 3.0 {
+				spr.source.Status.Sync.SnapshotComplete()
 				msg := fmt.Sprintf("source %q snapshot complete (deadline exceeded); consider running \"metadb endsync\"",
 					spr.source.Name)
 				if dedup.Insert(msg) {
 					log.Info("%s", msg)
 				}
 			} else {
-				spr.source.Sync.Snapshot()
+				spr.source.Status.Sync.Snapshot()
 			}
 		}
 
@@ -556,7 +554,7 @@ func waitForConfigSource(svr *server) ([]*sysdb.SourceConnector, bool, error) {
 				return nil, false, err
 			}
 			if len(sources) > 0 {
-				sources[0].Status.Waiting()
+				sources[0].Status.Stream.Waiting()
 				svr.state.sources = sources
 			}
 			return sources, true, nil

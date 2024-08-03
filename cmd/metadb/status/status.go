@@ -4,6 +4,11 @@ import (
 	"sync/atomic"
 )
 
+type Source struct {
+	Stream Stream
+	Sync   Sync
+}
+
 type Stream int32
 
 const (
