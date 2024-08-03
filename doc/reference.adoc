@@ -200,8 +200,6 @@ SELECT mdbversion();
 
 ==== metadb.base_table
 
-[.aqua-background]#Metadb 1.2#
-
 The table `metadb.base_table` stores information about tables that are
 extracted from data sources or are transformed from those tables.
 
@@ -260,8 +258,6 @@ The table `metadb.log` stores logging information for the system.
 |===
 
 ==== metadb.table_update
-
-[.aqua-background]#Metadb 1.2#
 
 The table `metadb.table_update` stores information about the updating of
 certain tables.
@@ -388,8 +384,6 @@ ALTER DATA SOURCE sensor OPTIONS (SET consumergroup 'metadb_sensor_1');
 ----
 
 ==== ALTER TABLE
-
-[.aqua-background]#Metadb 1.2#
 
 Change a table definition
 

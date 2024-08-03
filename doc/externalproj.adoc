@@ -715,7 +715,6 @@ excluded using the `schema.exclude.list` setting.
 
 === MARC transform for LDP/LDLite
 
-[.aqua-background]#Metadb 1.1#
 The MARC transform (currently included in Metadb) can also be used with LDP and
 LDLite.  A command-line tool called `marct` is provided which is a drop-in
 replacement for `ldpmarc`.
