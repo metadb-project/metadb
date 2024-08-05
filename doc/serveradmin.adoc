@@ -19,7 +19,7 @@
 * Operating system: https://www.debian.org[Debian] 12 or later
 * https://www.postgresql.org/[PostgreSQL] 15 or later
 * Required to build from source:
-** https://golang.org/[Go] 1.21 or later
+** https://golang.org/[Go] 1.22 or later
 ** goyacc (installation instructions below)
 ** https://www.colm.net/open-source/ragel/[Ragel] 6.10 or later
 ** https://gcc.gnu.org/[GCC C compiler] 9.3.0 or later
