@@ -524,3 +524,18 @@ always setting `addschemaprefix` in data source configurations and avoiding
 names with those prefixes when creating a new schema.
 
 4. Database views should not be created in the database.
+
+=== Kafka Tiered Storage
+
+For reading logs from Kafka Tiered Storage, there is a requirement to create 
+consumers with the 'read_uncommitted' isolation level. The "confluent-kafka-go" 
+client defaults to "isolation.level": "read_committed" which enables 
+transactional reads, this creates a bottleneck when fetching from the start 
+of the topic in tiered storage and is not a valid use-case as transactions 
+are not long lived as far as the earliest offset. To change this config
+Metadb has flag `--readuncommitted` for `start` command:
+
+[source,bash]
+----
+metadb start -D data -l metadb.log --readuncommitted true
+----
