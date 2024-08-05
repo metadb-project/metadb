@@ -79,7 +79,7 @@ fi
 bindir=bin
 
 if ! $fast; then
-    rm -f ./$bindir/metadb ./$bindir/mdb ./cmd/metadb/parser/gram.go ./cmd/metadb/parser/scan.go ./cmd/metadb/parser/y.output
+    rm -f ./$bindir/metadb ./cmd/metadb/parser/gram.go ./cmd/metadb/parser/scan.go ./cmd/metadb/parser/y.output
 fi
 
 version=`git describe --tags --always`
@@ -101,7 +101,6 @@ mkdir -p $bindir
 go generate $v ./...
 
 go build -o $bindir $v $tags -ldflags "-X github.com/metadb-project/metadb/cmd/metadb/util.MetadbVersion=$version -X github.com/metadb-project/metadb/cmd/metadb/util.FolioVersion=$METADB_FOLIO $json" ./cmd/metadb
-# go build -o $bindir $v $tags -ldflags "-X main.metadbVersion=$version" ./cmd/mdb
 
 if $runtests || $runalltests; then
     go test $v $tags -vet=off -count=1 ./cmd/metadb/command 1>&2

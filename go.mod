@@ -1,6 +1,6 @@
 module github.com/metadb-project/metadb
 
-go 1.21
+go 1.22
 
 require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.4.0
@@ -13,7 +13,6 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.17.0
 	golang.org/x/net v0.22.0
-	golang.org/x/term v0.18.0
 	golang.org/x/tools v0.15.0
 	gopkg.in/ini.v1 v1.67.0
 )
