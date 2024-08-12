@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
+debug='false'
 fast='false'
 json=''
 runtests='false'
@@ -15,6 +16,7 @@ usage() {
     echo 'Builds the "metadb" executable in the bin directory'
     echo ''
     echo 'Flags:'
+    echo '-d  Build with debug tag'
     echo '-f  Do not remove executable before compiling'
     echo '-h  Help'
     echo '-t  Run tests'
@@ -27,11 +29,12 @@ usage() {
     # echo '-X  Include experimental code'
 }
 
-while getopts 'cfhJtvTXD' flag; do
+while getopts 'cdfhJtvTXD' flag; do
     case "${flag}" in
         t) runtests='true' ;;
         T) runalltests='true' ;;
         c) ;;
+        d) debug='true' ;;
         f) fast='true' ;;
         J) echo "build.sh: -J option is deprecated" 1>&2 ;;
         h) usage
@@ -92,8 +95,13 @@ case "$(uname -s)" in
     *)          tags='' ;;
 esac
 
-if $tagsdynamic; then
-    tags='-tags dynamic'
+# if $tagsdynamic; then
+#     tags='-tags dynamic'
+# fi
+
+if $debug; then
+    tags='-tags debug'
+    echo "build.sh: building with debug tag" 1>&2
 fi
 
 mkdir -p $bindir
