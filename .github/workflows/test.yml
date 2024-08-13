@@ -34,7 +34,7 @@ jobs:
     - name: run marct
       run: ./bin/marct -h
     - name: create test coverage out file
-      run: run: go test -json -coverprofile=coverage.out ./... > report.json
+      run: go test -json -coverprofile=coverage.out ./... > report.json
     - name: SonarCloud Scan
       uses: SonarSource/sonarcloud-github-action@master
       env:
