@@ -40,9 +40,12 @@ func execCommandGraph(thread int, ctx context.Context, cat *catalog.Catalog, cmd
 		if cmd.Subcommands == nil {
 			continue
 		}
+		// This is a "short-circuit" update optimization in which we omit updating
+		// subcommand records if the parent command matched its equivalent record in the
+		// database.
 		if match {
-			// We match the transformed records only in order to get the IDs to write them to
-			// sync tables.
+			// We still need to match the transformed records, only in order to get the IDs
+			// to write them to sync tables.
 			if syncMode == dsync.Resync {
 				for f := cmd.Subcommands.Front(); f != nil; f = f.Next() {
 					tcmd := f.Value.(*command.Command)

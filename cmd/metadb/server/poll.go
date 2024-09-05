@@ -327,7 +327,7 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 		}
 
 		// Rewrite
-		if err = rewriteCommandGraph(cmdgraph, spr.svr.opt.RewriteJSON); err != nil {
+		if err = rewriteCommandGraph(cmdgraph); err != nil {
 			*errString = fmt.Sprintf("rewriter: %v", err)
 			return
 		}

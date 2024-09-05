@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/metadb-project/metadb/cmd/metadb/color"
+	"github.com/metadb-project/metadb/cmd/metadb/config"
 	"github.com/metadb-project/metadb/cmd/metadb/dsync"
 	"github.com/metadb-project/metadb/cmd/metadb/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/initsys"
@@ -18,10 +19,6 @@ import (
 )
 
 var program = "metadb"
-
-// // rewriteJSON is defined at build time via -ldflags.
-// var rewriteJSON string = "0"
-var rewriteJSON string = "1"
 
 var colorMode string
 var devMode bool
@@ -39,6 +36,9 @@ func main() {
 func metadbMain() {
 	// Initialize error output
 	eout.Init(program)
+	if config.Experimental {
+		eout.Info("experimental mode")
+	}
 	// Run
 	var err error
 	if err = run(); err != nil {
@@ -129,7 +129,6 @@ func run() error {
 			//if serverOpt.Port == "" {
 			//        serverOpt.Port = metadbAdminPort
 			//}
-			serverOpt.RewriteJSON = rewriteJSON == "1"
 			serverOpt.Listen = "127.0.0.1"
 			if err = server.Start(&serverOpt); err != nil {
 				return fatal(err, logf, csvlogf)

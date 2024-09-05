@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-debug='false'
 fast='false'
 json=''
 runtests='false'
@@ -16,8 +15,7 @@ usage() {
     echo 'Builds the "metadb" executable in the bin directory'
     echo ''
     echo 'Flags:'
-    echo '-d  Build with debug tag'
-    echo '-f  Do not remove executable before compiling'
+    echo '-f  Fast build (do not remove executable before compiling)'
     echo '-h  Help'
     echo '-t  Run tests'
     echo '-T  Run tests and other checks; requires'
@@ -26,15 +24,13 @@ usage() {
     echo '    go install github.com/kisielk/errcheck@latest'
     echo '-v  Enable verbose output'
     # echo '-D  Enable "-tags dynamic" compiler option'
-    # echo '-X  Include experimental code'
+    echo '-X  Build with experimental code included'
 }
 
-while getopts 'cdfhJtvTXD' flag; do
+while getopts 'fhJtvTXD' flag; do
     case "${flag}" in
         t) runtests='true' ;;
         T) runalltests='true' ;;
-        c) ;;
-        d) debug='true' ;;
         f) fast='true' ;;
         J) echo "build.sh: -J option is deprecated" 1>&2 ;;
         h) usage
@@ -66,26 +62,7 @@ if [[ -v METADB_FOLIO ]]; then
     echo "build.sh: using folio reference \"$METADB_FOLIO\"" 1>&2
 fi
 
-if $experiment; then
-    echo "The \"include experimental code\" option (-X) has been selected."
-    read -p "This may prevent later upgrades.  Are you sure? " yn
-    case $yn in
-        [Yy] ) break ;;
-        [Yy][Ee][Ss] ) break ;;
-        * ) echo "Exiting" 1>&2
-            exit 1 ;;
-    esac
-    # json='-X main.rewriteJSON=1'
-    echo "build.sh: experimental code will be included" 1>&2
-fi
-
-bindir=bin
-
-if ! $fast; then
-    rm -f ./$bindir/metadb ./cmd/metadb/parser/gram.go ./cmd/metadb/parser/scan.go ./cmd/metadb/parser/y.output
-fi
-
-version=`git describe --tags --always`
+tags=''
 
 # Check which operating system is running.
 case "$(uname -s)" in
@@ -99,12 +76,36 @@ esac
 #     tags='-tags dynamic'
 # fi
 
-if $debug; then
-    tags='-tags debug'
-    echo "build.sh: building with debug tag" 1>&2
+if $experiment; then
+    # echo "The \"build with experimental code\" option (-X) has been selected."
+    # read -p "This may prevent later upgrades.  Are you sure? " yn
+    # case $yn in
+    #     [Yy] ) break ;;
+    #     [Yy][Ee][Ss] ) break ;;
+    #     * ) echo "Exiting" 1>&2
+    #         exit 1 ;;
+    # esac
+    # json='-X main.rewriteJSON=1'
+    if [ -n "$tags" ]; then
+        tags="${tags},"
+    fi
+    tags="${tags}experimental"
+    echo "build.sh: building with experimental code" 1>&2
+fi
+
+if [ -n "$tags" ]; then
+    tags="-tags $tags"
+fi
+
+bindir=bin
+
+if ! $fast; then
+    rm -f ./$bindir/metadb ./cmd/metadb/parser/gram.go ./cmd/metadb/parser/scan.go ./cmd/metadb/parser/y.output
 fi
 
 mkdir -p $bindir
+
+version=`git describe --tags --always`
 
 go generate $v ./...
 
