@@ -215,19 +215,19 @@ $
 
 ### Configuring Debezium to read from FOLIO
 
-Create a Debezium connection definition file, `folio-vbox-connector.json` with these contents:
+Create a Debezium connection definition file, `folio-vbox-connector-1.json` with these contents, replacing the `database.hostname` value `172.17.0.1` with the address inn the output of `ip addr show dev docker0` (see above):
 ```
 {
-  "name": "folio-vbox-connector",
+  "name": "folio-vbox-connector-1",
   "config": {
     "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
     "tasks.max": "1",
-    "database.hostname": "example.host.name",
+    "database.hostname": "172.17.0.1",
     "database.port": "5432",
     "database.user": "dbuser",
     "database.password": "eHrkGrZL8mMJOFgToqqL",
     "database.dbname": "sourcedb",
-    "database.server.name": "metadb_sensor_1",
+    "database.server.name": "metadb-1",
     "plugin.name": "pgoutput",
     "snapshot.mode": "exported",
     "truncate.handling.mode": "include",
