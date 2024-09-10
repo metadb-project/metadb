@@ -10,8 +10,7 @@
     * [FOLIO](#folio)
 * [Configuration](#configuration)
     * [FOLIO's Postgres](#folios-postgres)
-    * [Debezium](#debezium)
-    * [Kafka](#kafka)
+    * [Debezium (including Zookeeper, Kafka and Kafka Connect)](#debezium-including-zookeeper-kafka-and-kafka-connect)
     * [Metadb](#metadb)
 
 
@@ -23,7 +22,7 @@
 
 This document is an expansion of [section 3.8. Configuring a Kafka data source](https://metadb.dev/doc/#_configuring_a_kafka_data_source) of the Metadb documentation. It aims to give a full, step-by-step account of getting a complete Metadb setup working in a development context. It does this by running FOLIO inside a readily available virtual machine (VM), and connecting it to Metadb running on the host machine.
 
-The Metadb documentation and this document are in conflict, the former should be considered definitive.
+If the Metadb documentation and this document are in conflict at any point, the former should be considered definitive.
 
 
 ### Different hosting options
@@ -34,7 +33,9 @@ Choosing the allocation of programs to machines is a complex business with a lot
 
 Another option would be to run both Debezium and Kafka as Docker containers within the host OS (again possibly from within Docker containers). The advantage would be that the VM would contain no configuration or state that couldn't be fixed by blowing it all away and loading a new one.
 
-The guide takes the second approach.
+This guide takes the second approach.
+
+As [noted in the Debezium Tutorial](https://debezium.io/documentation/reference/stable/tutorial.html#considerations-running-debezium-docker), in a production environment, you would run multiple instances of each service to provide performance, reliability, replication, and fault tolerance. Typically, you would either deploy these services on a platform like OpenShift or Kubernetes that manages multiple Docker containers running on multiple hosts and machines, or you would install on dedicated hardware. For our present purposes, it suffices to run a single instance of each service.
 
 
 
@@ -43,7 +44,7 @@ The guide takes the second approach.
 
 ### Debian packages
 
-Vagrant is used to manage the VirtualBox VMs, Docker to run containers for Debezium and Docker, and the Go language is used to compile Metadb.
+Vagrant is used to manage the VirtualBox VMs, Docker to run containers for Debezium and Docker, and the Go language to compile Metadb.
 
 ```
 sudo apt-get install vagrant
@@ -77,7 +78,7 @@ If this happens, `sudo /sbin/vboxconfig` should solve the problem.
 
 ### FOLIO
 
-Before you can run Metadb in a meaningful way, you need a FOLIO system set up to feed it events. It's politically difficult to get event feeds from existing FOLIO installations, and probaby impossible to get permission to set up your own feed -- which you want to do if you're going to get to grips with the whole Metadb system. So you want your own FOLIO system that you can do with as you please.
+Before you can run Metadb in a meaningful way, you need a FOLIO system set up to feed it events. It's politically difficult to get event feeds from existing FOLIO installations, and probably impossible to get permission to set up your own feed -- which you want to do if you're going to get to grips with the whole Metadb system. So you want your own FOLIO system that you can do with as you please.
 
 The simplest way to get a running FOLIO system is as a pre-packaged vagrant box. The process is described in detail in [Create workspace and launch the VM](https://dev.folio.org/tutorials/folio-vm/01-create-workspace/), but in a nutshell:
 ```
@@ -100,7 +101,7 @@ Once this file is in place, you can download and start the VM with:
 ```
 host$ vagrant up
 ```
-If `vagrant up` fails with "Call to virConnectOpen failed: Failed to connect socket to '/var/run/libvirt/libvirt-sock': No such file or directory", that most likely means that you forgot to install Vagrant: see above.
+If `vagrant up` fails with "Call to virConnectOpen failed: Failed to connect socket to '/var/run/libvirt/libvirt-sock': No such file or directory", that most likely means that you forgot to install VirtualBox: see above.
 
 Once the VM is running, you can enter it and check that it's running Okapi by asking it for its version number:
 ```
@@ -114,7 +115,7 @@ Then check that Okapi is being correctly tunnelled out to the host system:
 host$ curl -w '\n' localhost:9130/_/version
 5.1.2
 ```
-Congratulations, you now have a FOLIO system running in a virtual machine and accessible from the host. You could now, if you wished, run Stripes against this FOLIO backend.
+Congratulations, you now have a FOLIO system running in a virtual machine and accessible from the host. You could now, if you wished, run Stripes against this FOLIO backend. Or you can load the Stripes bundle provided by the VM itself on port 3000, by pointing your browser to http://localhost:3000/
 
 
 
@@ -165,14 +166,77 @@ okapi_modules=# \l
 (The `\l` command in Postgres lists all the available databases. Of these, `postgres`, `template0` and `template1` are used by Postgres itself, `okapi` is used by Okapi to track which modules and tenants are in use, and `okapi_modules` is used by all the various FOLIO modules for their own application-level data. `ldp` is an unused spandrel.)
 
 
-### Debezium
+### Debezium (including Zookeeper, Kafka and Kafka Connect)
 
-XXX
+We follow [the Debezium Tutorial](https://debezium.io/documentation/reference/stable/tutorial.html) in using pre-made Docker containers for Zookeeper, Kafka and Kafka Connect.
+
+Apparently, as of Kafka v3.3 (2 October 2022), [it is no longer necessary to run Zookeeper](https://www.confluent.io/blog/apache-kafka-3-3-0-new-features-and-updates/), as Kafka can do its own record-keeping. But since the Debezium tutorial has not been updated to take advantage of this simplification, we will follow the better documented path rather than the potentially simpler one.
+
+In three separate terminal windows, start Zookeeper, Kafka and Kafka Connect, each from its own container. (Docker will automatically fetch each container the first time you do this, so the initial startup will be slow; subsequent startups will be fast.)
+```
+host1$ docker run -it --rm --name zookeeper -p 2181:2181 -p 2888:2888 -p 3888:3888 quay.io/debezium/zookeeper:2.7
+host2$ docker run -it --rm --name kafka -p 9092:9092 --link zookeeper:zookeeper quay.io/debezium/kafka:2.7
+host3$ docker run -it --rm --name connect -p 8083:8083 -e GROUP_ID=1 -e CONFIG_STORAGE_TOPIC=my_connect_configs -e OFFSET_STORAGE_TOPIC=my_connect_offsets -e STATUS_STORAGE_TOPIC=my_connect_statuses --link kafka:kafka quay.io/debezium/connect:2.7
+```
+
+(In the original Debezium tutorial, this last line which launches Debezium itself also includes the option `--link mysql:mysql`, because the MySQL database that is the source of events is running in yet another Docker container. In our case, we don't need this as we will be connecting to the Postgres database in the VirtualBox VM that has been forwarded to the host machine.)
+
+To make connections from within the `connect` container to the host, which in turn has access to the VM's Postgres connection, there is no simple equivalent to the `-p` option. Instead, you must determine in the host what it's using as the IP address of the `docker0` inteface, and then use that address from within the container to contact the host machine:
+```
+host$ ip addr show dev docker0
+4: docker0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:82:83:1a:dc brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::42:82ff:fe83:1adc/64 scope link 
+       valid_lft forever preferred_lft forever
+host$ docker exec -it connect /bin/bash
+[kafka@433ddb4f3fea ~]$ curl -I http://172.17.0.1/
+HTTP/1.1 200 OK
+Date: Thu, 29 Aug 2024 11:59:09 GMT
+Server: Apache/2.4.59 (Debian)
+Last-Modified: Thu, 23 May 2024 18:17:05 GMT
+ETag: "29cd-619230ef01301"
+Accept-Ranges: bytes
+Content-Length: 10701
+Vary: Accept-Encoding
+Content-Type: text/html
+```
+
+Check that Debezium is running correctly and has no connectors registered:
+```
+host$ curl -H "Accept:application/json" localhost:8083/
+{"version":"3.7.0","commit":"2ae524ed625438c5","kafka_cluster_id":"SHBZ1Xi1RO2SLklsjPC5Cw"}
+host$ curl -H "Accept:application/json" localhost:8083/connectors/
+[]
+$ 
+```
 
 
-### Kafka
+### Configuring Debezium to read from FOLIO
 
-XXX
+Create a Debezium connection definition file, `folio-vbox-connector.json` with these contents:
+```
+{
+  "name": "folio-vbox-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "example.host.name",
+    "database.port": "5432",
+    "database.user": "dbuser",
+    "database.password": "eHrkGrZL8mMJOFgToqqL",
+    "database.dbname": "sourcedb",
+    "database.server.name": "metadb_sensor_1",
+    "plugin.name": "pgoutput",
+    "snapshot.mode": "exported",
+    "truncate.handling.mode": "include",
+    "publication.autocreate.mode": "filtered",
+    "heartbeat.interval.ms": "30000",
+    "heartbeat.action.query": "UPDATE admin.heartbeat set last_heartbeat = now();"
+  }
+}
+```
 
 
 ### Metadb
