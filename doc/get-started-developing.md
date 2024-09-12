@@ -165,6 +165,10 @@ okapi_modules=# \l
 ```
 (The `\l` command in Postgres lists all the available databases. Of these, `postgres`, `template0` and `template1` are used by Postgres itself, `okapi` is used by Okapi to track which modules and tenants are in use, and `okapi_modules` is used by all the various FOLIO modules for their own application-level data. `ldp` is an unused spandrel.)
 
+You can also explore the database using the GUI such as [DBeaver](https://dbeaver.io/):
+```
+$ snap install dbeaver-ce
+```
 
 ### Debezium (including Zookeeper, Kafka and Kafka Connect)
 
@@ -224,24 +228,31 @@ Create a Debezium connection definition file, `folio-vbox-connector-1.json` with
     "tasks.max": "1",
     "database.hostname": "172.17.0.1",
     "database.port": "5432",
-    "database.user": "dbuser",
-    "database.password": "eHrkGrZL8mMJOFgToqqL",
-    "database.dbname": "sourcedb",
+    "database.user": "folio_admin",
+    "database.password": "folio_admin",
+    "database.dbname": "okapi_modules",
     "database.server.name": "metadb-1",
     "plugin.name": "pgoutput",
     "snapshot.mode": "exported",
     "truncate.handling.mode": "include",
     "publication.autocreate.mode": "filtered",
+    "topic.prefix": "dbserver1",
     "heartbeat.interval.ms": "30000",
     "heartbeat.action.query": "UPDATE admin.heartbeat set last_heartbeat = now();"
   }
 }
 ```
-
+Now use the Debezium WSAPI to insert the connector:
+```
+host$ curl -X POST -i -H "Accept: application/json" -H "Content-Type: application/json" -d @folio-vbox-connector-1.json localhost:8083/connectors/
+```
 
 ### Metadb
 
 XXX
 
 
-
+Connector configuration is invalid and contains the following 2 error(s):
+The 'topic.prefix' value is invalid: A value is required
+The 'snapshot.mode' value is invalid: Value must be one of always, never, initial_only, configuration_based, when_needed, initial, custom, no_data
+You can also find the above list of errors at the endpoint `/connector-plugins/{connectorType}/config/validate`
