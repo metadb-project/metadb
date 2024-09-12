@@ -231,12 +231,10 @@ Create a Debezium connection definition file, `folio-vbox-connector-1.json` with
     "database.user": "folio_admin",
     "database.password": "folio_admin",
     "database.dbname": "okapi_modules",
-    "database.server.name": "metadb-1",
+    "topic.prefix": "metadb-1",
     "plugin.name": "pgoutput",
-    "snapshot.mode": "exported",
     "truncate.handling.mode": "include",
     "publication.autocreate.mode": "filtered",
-    "topic.prefix": "dbserver1",
     "heartbeat.interval.ms": "30000",
     "heartbeat.action.query": "UPDATE admin.heartbeat set last_heartbeat = now();"
   }
@@ -246,6 +244,10 @@ Now use the Debezium WSAPI to insert the connector:
 ```
 host$ curl -X POST -i -H "Accept: application/json" -H "Content-Type: application/json" -d @folio-vbox-connector-1.json localhost:8083/connectors/
 ```
+
+If all is well, the definition will be echoed back in the response, augmented by a couple of additional fields. Now `curl localhost:8083/connectors/` should return the single-element list `["folio-vbox-connector-1"]` rather than the empty list as previously; and `curl localhost:8083/connectors/folio-vbox-connector-1` will return information about the connector.
+
+
 
 ### Metadb
 
