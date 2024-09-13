@@ -10,6 +10,7 @@
     "database.dbname": "okapi_modules",
     "topic.prefix": "metadb-1",
     "plugin.name": "pgoutput",
+    "schema.exclude.list": "diku_mod_fqm_manager,diku_mod_lists,diku_mod_source_record_storage",
     "truncate.handling.mode": "include",
     "publication.autocreate.mode": "filtered",
     "heartbeat.interval.ms": "30000",
