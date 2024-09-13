@@ -1,0 +1,18 @@
+{
+  "name": "folio-vbox-connector-1",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "172.17.0.1",
+    "database.port": "5432",
+    "database.user": "folio_admin",
+    "database.password": "folio_admin",
+    "database.dbname": "okapi_modules",
+    "topic.prefix": "metadb-1",
+    "plugin.name": "pgoutput",
+    "truncate.handling.mode": "include",
+    "publication.autocreate.mode": "filtered",
+    "heartbeat.interval.ms": "30000",
+    "heartbeat.action.query": "UPDATE admin.heartbeat set last_heartbeat = now();"
+  }
+}
