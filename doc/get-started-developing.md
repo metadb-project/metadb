@@ -131,11 +131,11 @@ vagrant@vagrant$ sudo vi /etc/postgresql/12/main/postgresql.conf
 (Change `#wal_level = replica` to `wal_level = logical` and save)
 vagrant@vagrant$ sudo service postgresql restart
 vagrant@vagrant:~$ sudo -i -u postgres
-postgres@vagrant:~$ psql
-postgres=# CREATE SCHEMA admin;
-postgres=# CREATE TABLE admin.heartbeat (last_heartbeat timestamptz PRIMARY KEY);
-postgres=# INSERT INTO admin.heartbeat (last_heartbeat) VALUES (now());
-postgres=# exit
+postgres@vagrant:~$ psql okapi_modules
+okapi_modules=# CREATE SCHEMA admin;
+okapi_modules=# CREATE TABLE admin.heartbeat (last_heartbeat timestamptz PRIMARY KEY);
+okapi_modules=# INSERT INTO admin.heartbeat (last_heartbeat) VALUES (now());
+okapi_modules=# exit
 postgres@vagrant:~$ exit
 vagrant@vagrant$ exit
 host$ 
@@ -233,6 +233,7 @@ Create a Debezium connection definition file, `folio-vbox-connector-1.json` with
     "database.dbname": "okapi_modules",
     "topic.prefix": "metadb-1",
     "plugin.name": "pgoutput",
+    "schema.exclude.list": "diku_mod_fqm_manager,diku_mod_lists,diku_mod_source_record_storage",
     "truncate.handling.mode": "include",
     "publication.autocreate.mode": "filtered",
     "heartbeat.interval.ms": "30000",
@@ -240,6 +241,8 @@ Create a Debezium connection definition file, `folio-vbox-connector-1.json` with
   }
 }
 ```
+(We need the `schema.exclude.list` entry to omit the three names schemas, because they all contain partitioned tables, and those do not work: Debezium reports "ERROR: "query_results" is a partitioned table [...] Adding partitioned tables to publications is not supported.")
+
 Now use the Debezium WSAPI to insert the connector:
 ```
 host$ curl -X POST -i -H "Accept: application/json" -H "Content-Type: application/json" -d @folio-vbox-connector-1.json localhost:8083/connectors/
