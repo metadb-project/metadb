@@ -219,28 +219,8 @@ $
 
 ### Configuring Debezium to read from FOLIO
 
-Create a Debezium connection definition file, `folio-vbox-connector-1.json` with these contents, replacing the `database.hostname` value `172.17.0.1` with the address inn the output of `ip addr show dev docker0` (see above):
-```
-{
-  "name": "folio-vbox-connector-1",
-  "config": {
-    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
-    "tasks.max": "1",
-    "database.hostname": "172.17.0.1",
-    "database.port": "5432",
-    "database.user": "folio_admin",
-    "database.password": "folio_admin",
-    "database.dbname": "okapi_modules",
-    "topic.prefix": "metadb-1",
-    "plugin.name": "pgoutput",
-    "schema.exclude.list": "diku_mod_fqm_manager,diku_mod_lists,diku_mod_source_record_storage",
-    "truncate.handling.mode": "include",
-    "publication.autocreate.mode": "filtered",
-    "heartbeat.interval.ms": "30000",
-    "heartbeat.action.query": "UPDATE admin.heartbeat set last_heartbeat = now();"
-  }
-}
-```
+Create a Debezium connection definition file, `folio-vbox-connector-1.json` with [the contents of this sample definition file](folio-vbox-connector-1.json), replacing the `database.hostname` value `172.17.0.1` with the address inn the output of `ip addr show dev docker0` (see above).
+
 (We need the `schema.exclude.list` entry to omit the three names schemas, because they all contain partitioned tables, and those do not work: Debezium reports "ERROR: "query_results" is a partitioned table [...] Adding partitioned tables to publications is not supported.")
 
 Now use the Debezium WSAPI to insert the connector:
