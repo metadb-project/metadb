@@ -237,7 +237,3 @@ If all is well, the definition will be echoed back in the response, augmented by
 XXX
 
 
-Connector configuration is invalid and contains the following 2 error(s):
-The 'topic.prefix' value is invalid: A value is required
-The 'snapshot.mode' value is invalid: Value must be one of always, never, initial_only, configuration_based, when_needed, initial, custom, no_data
-You can also find the above list of errors at the endpoint `/connector-plugins/{connectorType}/config/validate`
