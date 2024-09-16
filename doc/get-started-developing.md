@@ -46,12 +46,13 @@ As [noted in the Debezium Tutorial](https://debezium.io/documentation/reference/
 
 ### Debian packages
 
-Vagrant is used to manage the VirtualBox VMs, Docker to run containers for Debezium and Docker, and the Go language to compile Metadb.
+Vagrant is used to manage the VirtualBox VMs, Docker to run containers for Debezium and Docker, and the Go language to compile Metadb. Go's Metadb build process uses an external tool called ragel.
 
 ```
 sudo apt-get install vagrant
 sudo apt-get install docker.io
 sudo apt-get unstall golang
+sudo apt-get install ragel
 ```
 
 If when running `docker` you encounter the error
