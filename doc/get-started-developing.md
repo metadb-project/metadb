@@ -11,6 +11,8 @@
 * [Configuration](#configuration)
     * [FOLIO's Postgres](#folios-postgres)
     * [Debezium (including Zookeeper, Kafka and Kafka Connect)](#debezium-including-zookeeper-kafka-and-kafka-connect)
+    * [Configuring Debezium to read from FOLIO](#configuring-debezium-to-read-from-folio)
+    * [Metadb's Postgres](#metadbs-postgres)
     * [Metadb](#metadb)
 
 
@@ -232,7 +234,7 @@ If all is well, the definition will be echoed back in the response, augmented by
 
 
 
-### Postgres
+### Metadb's Postgres
 
 Quite distinct from the Postgres database that is used by FOLIO within its VM, Metadb needs its own Postgres database, which becomes the destination for all the data it harvests. We will use yet another Docker container for this:
 ```
