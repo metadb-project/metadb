@@ -13,7 +13,9 @@
     * [Debezium (including Zookeeper, Kafka and Kafka Connect)](#debezium-including-zookeeper-kafka-and-kafka-connect)
     * [Configuring Debezium to read from FOLIO](#configuring-debezium-to-read-from-folio)
     * [Metadb's Postgres](#metadbs-postgres)
-    * [Metadb](#metadb)
+* [Running Metadb](#running-metadb)
+    * [Building Metadb](#building-metadb)
+    * [Configuring Metadb](#configuring-metadb)
 
 
 
@@ -255,7 +257,23 @@ Type "help" for help.
 
 
 
-### Metadb
+## Running Metadb
+
+
+
+### Building Metadb
+
+Building Metadb itsef should be simple so long as the Go language and Ragel are installed (see above). First, `goyacc` must be installed:
+```
+host$ go install golang.org/x/tools/cmd/goyacc@master
+```
+And it must be placed on the path, for example using `(cd ~/bin; ln -s $HOME/go/bin/ragel)` or `PATH=$PATH:$HOME/go/bin`.
+
+Then simply run `./build.sh`, which should complete with no output other than (the first time it is run) a line for each dependency that is downloaded.
+
+
+
+### Configuring Metadb
 
 XXX
 
