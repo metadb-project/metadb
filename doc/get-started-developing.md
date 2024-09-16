@@ -15,7 +15,7 @@
     * [Metadb's Postgres](#metadbs-postgres)
 * [Running Metadb](#running-metadb)
     * [Building Metadb](#building-metadb)
-    * [Configuring Metadb](#configuring-metadb)
+    * [Configuring and starting Metadb](#configuring-and-starting-metadb)
 
 
 
@@ -148,8 +148,7 @@ host$
 
 Now, verify that you can access the VM's FOLIO database from the host, using the command-line `psql` utility. `okapi_modules` is the name of the database to connect to, and the adminstrative user to use is `folio_admin` with password `folio_admin`:
 ```shell
-host$ psql -h localhost -U folio_admin okapi_modules
-Password for user folio_admin: folio_admin
+host$ PGPASSWORD=folio_admin psql -h localhost -U folio_admin okapi_modules
 psql (15.7 (Debian 15.7-0+deb12u1), server 12.18 (Ubuntu 12.18-1.pgdg20.04+1))
 SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, compression: off)
 Type "help" for help.
@@ -245,14 +244,18 @@ host4$ docker run -it --rm --name postgres -p 5433:5432 -e POSTGRES_PASSWORD=swo
 ```
 (Note that we do not simply expose port 5432, as that port is already in use on the host system for access to FOLIO's instance of Postgres. Instead, we map the container's post 5432 to host post 5433.)
 
-Check that all is well by connecting to the new, empty database with the `psql` command-line client:
+Now connect to the new Postgres service with the `psql` command-line client, and use this to create the user account that Metadb will use for updating the database, and the database itself.
 ```shell
-$host psql -h localhost -p 5433 -U postgres
-Password for user postgres: swordfish
+host$ PGPASSWORD=swordfish psql -h localhost -p 5433 -U postgres
 psql (15.7 (Debian 15.7-0+deb12u1), server 16.4 (Debian 16.4-1.pgdg120+1))
 WARNING: psql major version 15, server major version 16.
          Some psql features might not work.
 Type "help" for help.
+
+postgres=# CREATE USER mdbadmin WITH PASSWORD 'mdbadmin';
+CREATE ROLE
+postgres=# CREATE DATABASE metadb OWNER mdbadmin;
+CREATE DATABASE
 ```
 
 
@@ -273,9 +276,50 @@ Then simply run `./build.sh`, which should complete with no output other than (t
 
 
 
-### Configuring Metadb
+### Configuring and starting Metadb
 
-XXX
+First, create a data directory:
+```
+host$ bin/metadb init -D data
+```
+This creates a new directory called `data` and places a template `metadb.conf` file in this directory. You will need to edit this file to specify details about the Postgres database in the container:
+```
+[main]
+host = localhost
+port = 5433
+database = metadb
+superuser = postgres
+superuser_password = swordfish
+systemuser = mdbadmin
+systemuser_password = mdbadmin
+```
+
+(Host and port match those of the Postgres service provided by the Docker container; database matches the name of the database we created above; the superuser `postgres` is the default superuser and its password `swordfish` is what we specified with `-e` when starting the container; the systemuser and password are those of the user we created who owns the `metadb` database. In production we would add `sslmode = require` but this not necessary for development, and does not seem to be supported by Docker Hub's standard Postgres container.)
+
+Now you can start Metadb in its own terminal to watch its logs:
+```
+host$5 bin/metadb start -D data
+2024-09-16 20:17:48 UTC  INFO:  initializing database
+2024-09-16 20:17:48 UTC  INFO:  starting Metadb v1.4.0-20240424143738-25-gbdd0eed
+```
+And in another terminal, connect to it using `psql` so you can connect it to Kafka:	
+```
+host$ psql -X -h localhost -d metadb -p 8550
+
+psql (15.7 (Debian 15.7-0+deb12u1), server 15.3.0)
+Type "help" for help.
+
+metadb=> CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
+    module 'folio',
+    trimschemaprefix 'diku_',
+    addschemaprefix 'folio_',
+    brokers 'kafka:9092',
+    topics '^metadb_folio_1\.',
+    consumergroup 'metadb_folio_1_1',
+    schemastopfilter 'admin'
+);
+```
+
 
 
 
