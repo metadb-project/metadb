@@ -232,8 +232,29 @@ If all is well, the definition will be echoed back in the response, augmented by
 
 
 
+### Postgres
+
+Quite distinct from the Postgres database that is used by FOLIO within its VM, Metadb needs its own Postgres database, which becomes the destination for all the data it harvests. We will use yet another Docker container for this:
+```
+host4$ docker run -it --rm --name postgres -p 5433:5432 -e POSTGRES_PASSWORD=swordfish postgres
+```
+(Note that we do not simply expose port 5432, as that port is already in use on the host system for access to FOLIO's instance of Postgres. Instead, we map the container's post 5432 to host post 5433.)
+
+Check that all is well by connecting to the new, empty database with the `psql` command-line client:
+```shell
+$host psql -h localhost -p 5433 -U postgres
+Password for user postgres: swordfish
+psql (15.7 (Debian 15.7-0+deb12u1), server 16.4 (Debian 16.4-1.pgdg120+1))
+WARNING: psql major version 15, server major version 16.
+         Some psql features might not work.
+Type "help" for help.
+```
+
+
+
 ### Metadb
 
 XXX
+
 
 
