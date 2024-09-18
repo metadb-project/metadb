@@ -1,12 +1,12 @@
 package jsonx
 
 import (
-	"container/list"
 	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
 
+	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/config"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
@@ -15,8 +15,7 @@ import (
 
 // RewriteJSON transforms a JSON object stored in a specified column within a
 // command.
-func RewriteJSON(cmde *list.Element, column *command.CommandColumn) error {
-	cmd := cmde.Value.(*command.Command)
+func RewriteJSON(cat *catalog.Catalog, cmd *command.Command, column *command.CommandColumn, path config.JSONPath, tmap string) error {
 	if column.Data == nil {
 		return nil
 	}
@@ -33,35 +32,30 @@ func RewriteJSON(cmde *list.Element, column *command.CommandColumn) error {
 	}
 	objectLevel := 1
 	arrayLevel := 0
+	table := cmd.TableName + "__" + tmap
+	rootkey := command.PrimaryKeyColumns(cmd.Column)
+	for i := range rootkey {
+		rootkey[i].Name = "__root__" + rootkey[i].Name
+	}
 	quasikey := make([]command.CommandColumn, 0)
-	if err := rewriteExtendedObject(cmde, objectLevel, arrayLevel, "", obj, cmd.TableName+"__t", quasikey); err != nil {
+	deletions := make(map[string]struct{})
+	if err := rewriteExtendedObject(cat, cmd, objectLevel, arrayLevel, "", obj, table, rootkey, quasikey, path, deletions); err != nil {
 		return fmt.Errorf("rewrite json: %s", err)
 	}
 	return nil
 }
 
 // rewriteExtendedObject transforms a specified JSON object, and recursively the
-// JSON fields it contains.  Here "extended" refers to JSON objects nested
-// within the specified object; the scalar fields of these nested objects are
-// added to the same record as the parent object.  JSON arrays are transformed
-// in a new table.  Primary key columns of the root command are included with
-// the prefix "__root__" added to the column names.  Scalar fields from parent
-// transformed records are also added to the primary key.
-func rewriteExtendedObject(cmde *list.Element, objectLevel, arrayLevel int, attrPrefix string, obj map[string]any, table string, quasikey []command.CommandColumn) error {
-	cmd := cmde.Value.(*command.Command)
+// fields it contains.  Here "extended" refers to objects nested within the
+// specified object; the scalar fields of nested objects are added to the same
+// record as the parent.  Arrays are transformed in a new table, and the array
+// indices are added in a column named with the prefix "__ord__".  Primary key
+// columns of the root command are included with the prefix "__root__" added to
+// the column names.
+func rewriteExtendedObject(cat *catalog.Catalog, cmd *command.Command, objectLevel, arrayLevel int, attrPrefix string, obj map[string]any, table string, rootkey, quasikey []command.CommandColumn, path config.JSONPath, deletions map[string]struct{}) error {
 	cols := make([]command.CommandColumn, 0)
-	pkcols := command.PrimaryKeyColumns(cmd.Column)
-	pkcolsmap := make(map[string]bool) // Needed only temporarily for older implementation.
-	for _, col := range pkcols {
-		if config.Experimental {
-			col.Name = "__root__" + col.Name
-		}
-		cols = append(cols, col)
-		if !config.Experimental {
-			pkcolsmap[col.Name] = true
-		}
-	}
-	if err := rewriteObject(cmde, objectLevel, arrayLevel, attrPrefix, obj, table, &cols, pkcolsmap, quasikey); err != nil {
+	cols = append(cols, rootkey...)
+	if err := rewriteObject(cat, cmd, objectLevel, arrayLevel, attrPrefix, obj, table, &cols, rootkey, quasikey, path, deletions); err != nil {
 		return fmt.Errorf("rewrite json object: %s", err)
 	}
 	newcmd := &command.Command{
@@ -78,120 +72,125 @@ func rewriteExtendedObject(cmde *list.Element, objectLevel, arrayLevel int, attr
 	return nil
 }
 
-func rewriteObject(cmde *list.Element, objectLevel, arrayLevel int, attrPrefix string, obj map[string]any, table string, cols *[]command.CommandColumn, pkcolsmap map[string]bool, quasikey []command.CommandColumn) error {
+func rewriteObject(cat *catalog.Catalog, cmd *command.Command, objectLevel, arrayLevel int, attrPrefix string, obj map[string]any, table string, cols *[]command.CommandColumn, rootkey, quasikey []command.CommandColumn, path config.JSONPath, deletions map[string]struct{}) error {
 	if objectLevel > 5 {
 		return nil
 	}
 	qkey := slices.Clone(quasikey)
 	for name, value := range obj {
+		if value == nil {
+			continue
+		}
 		decodedName, err := util.DecodeCamelCase(name)
 		if err != nil {
 			return fmt.Errorf("converting from camel case: %s: %v", err, obj)
 		}
-		if !config.Experimental && pkcolsmap[name] {
-			continue
-		}
 		n := attrPrefix + decodedName
-		if value == nil {
-			continue // For nil values, do not add the column to this record.
-		}
 		switch v := value.(type) {
+		case float64:
+			if err := rewriteNumber(n, v, cols); err != nil {
+				return err
+			}
 		case string:
-			if err := rewriteString(arrayLevel, n, v, cols, &qkey); err != nil {
+			if err := rewriteString(n, v, cols); err != nil {
 				return err
 			}
 		case bool:
-			if err := rewriteBool(arrayLevel, n, v, cols, &qkey); err != nil {
-				return err
-			}
-		case float64:
-			if err := rewriteFloat64(arrayLevel, n, v, cols, &qkey); err != nil {
+			if err := rewriteBoolean(n, v, cols); err != nil {
 				return err
 			}
 		}
 	}
 	for name, value := range obj {
-		decodedName, err := util.DecodeCamelCase(name)
-		if err != nil {
-			return fmt.Errorf("converting from camel case: %s: %v", err, obj)
-		}
-		n := attrPrefix + decodedName
 		if value == nil {
-			continue // For nil values, do not add the column to this record.
+			continue
 		}
 		switch v := value.(type) {
-		case map[string]any:
-			if config.Experimental {
-				if err := rewriteObject(cmde, objectLevel+1, arrayLevel, n+"__", v, table, cols, pkcolsmap, qkey); err != nil {
-					return err
-				}
-			}
 		case []any:
-			if config.Experimental {
-				if err := rewriteArray(cmde, objectLevel, arrayLevel+1, n, v, table+"__"+n, pkcolsmap, qkey); err != nil {
-					return err
-				}
+			p := path.Append(name)
+			t := cat.JSONPathLookup(p)
+			if t == "" {
+				continue
+			}
+			if arrayLevel > 0 {
+				t = attrPrefix + t
+			}
+			if err := rewriteArray(cat, cmd, objectLevel, arrayLevel+1, t, v, cmd.TableName+"__"+t, rootkey, qkey, path.Append(name), deletions); err != nil {
+				return err
+			}
+		case map[string]any:
+			p := path.Append(name)
+			t := cat.JSONPathLookup(p)
+			if t == "" {
+				continue
+			}
+			if err := rewriteObject(cat, cmd, objectLevel+1, arrayLevel, attrPrefix+t+"__", v, table, cols, rootkey, qkey, p, deletions); err != nil {
+				return err
 			}
 		}
 	}
 	return nil
 }
 
-func rewriteArray(cmde *list.Element, objectLevel, arrayLevel int, aname string, adata []any, table string, pkcolsmap map[string]bool, quasikey []command.CommandColumn) error {
-	if arrayLevel > 1 {
+func rewriteArray(cat *catalog.Catalog, cmd *command.Command, objectLevel, arrayLevel int, aname string, adata []any, table string, rootkey, quasikey []command.CommandColumn, path config.JSONPath, deletions map[string]struct{}) error {
+	if arrayLevel > 3 {
 		return nil
 	}
-	cmd := cmde.Value.(*command.Command)
-	pkcols := command.PrimaryKeyColumns(cmd.Column)
-	var delcols []command.CommandColumn
-	for _, col := range pkcols {
-		col.Name = "__root__" + col.Name
-		delcols = append(delcols, col)
-	}
-	delcmd := &command.Command{
-		Op:              command.DeleteOp,
-		SchemaName:      cmd.SchemaName,
-		TableName:       table,
-		Transformed:     true,
-		ParentTable:     dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName},
-		Origin:          cmd.Origin,
-		Column:          delcols,
-		SourceTimestamp: cmd.SourceTimestamp,
-	}
-	cmd.AddChild(delcmd)
-	qkey := slices.Clone(quasikey)
-	for i, value := range adata {
-		var cols []command.CommandColumn
-		for _, col := range pkcols {
-			col.Name = "__root__" + col.Name
-			cols = append(cols, col)
+	_, ok := deletions[table]
+	if !ok {
+		delcmd := &command.Command{
+			Op:              command.DeleteOp,
+			SchemaName:      cmd.SchemaName,
+			TableName:       table,
+			Transformed:     true,
+			ParentTable:     dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName},
+			Origin:          cmd.Origin,
+			Column:          rootkey,
+			SourceTimestamp: cmd.SourceTimestamp,
 		}
-		pkindex := len(pkcols)
+		cmd.AddChild(delcmd)
+		deletions[table] = struct{}{}
+	}
+	for i, value := range adata {
+		if value == nil {
+			continue
+		}
+		cols := slices.Clone(rootkey)
+		pkindex := len(rootkey)
 		for _, col := range quasikey {
 			pkindex++
 			col.PrimaryKey = pkindex
 			cols = append(cols, col)
 		}
 		ord := strconv.Itoa(i + 1)
-		cols = append(cols, command.CommandColumn{
+		ordcol := command.CommandColumn{
 			Name:       "__ord__" + aname,
 			DType:      command.IntegerType,
 			DTypeSize:  4,
 			Data:       i + 1,
 			SQLData:    &ord,
 			PrimaryKey: pkindex + 1,
-		})
-		if value == nil {
-			// TODO store null value
-			continue
 		}
+		cols = append(cols, ordcol)
+		qkey := slices.Clone(quasikey)
+		qkey = append(qkey, ordcol)
 		switch v := value.(type) {
-		case string:
-			if err := rewriteString(arrayLevel, aname, v, &cols, &qkey); err != nil {
+		case float64:
+			if err := rewriteNumber(aname, v, &cols); err != nil {
 				return err
 			}
+		case string:
+			if err := rewriteString(aname, v, &cols); err != nil {
+				return err
+			}
+		case bool:
+			if err := rewriteBoolean(aname, v, &cols); err != nil {
+				return err
+			}
+		case []any: // Not supported
+			continue
 		case map[string]any:
-			if err := rewriteObject(cmde, objectLevel+1, arrayLevel, aname+"__", v, table, &cols, pkcolsmap, qkey); err != nil {
+			if err := rewriteObject(cat, cmd, objectLevel+1, arrayLevel, aname+"__", v, table, &cols, rootkey, qkey, path, deletions); err != nil {
 				return fmt.Errorf("rewrite json: %s", err)
 			}
 		}
@@ -210,48 +209,7 @@ func rewriteArray(cmde *list.Element, objectLevel, arrayLevel int, aname string,
 	return nil
 }
 
-func rewriteString(arrayLevel int, name string, data string, cols *[]command.CommandColumn, quasikey *[]command.CommandColumn) error {
-	sqldata, err := command.DataToSQLData(data, command.TextType, "")
-	if err != nil {
-		return err
-	}
-	dtype := command.InferTypeFromString(data)
-	c := command.CommandColumn{
-		Name:       name,
-		DType:      dtype,
-		DTypeSize:  0,
-		Data:       data,
-		SQLData:    sqldata,
-		PrimaryKey: 0,
-	}
-	*cols = append(*cols, c)
-	if arrayLevel > 1 {
-		*quasikey = append(*quasikey, c)
-	}
-	return nil
-}
-
-func rewriteBool(arrayLevel int, name string, data bool, cols *[]command.CommandColumn, quasikey *[]command.CommandColumn) error {
-	sqldata, err := command.DataToSQLData(data, command.BooleanType, "")
-	if err != nil {
-		return err
-	}
-	c := command.CommandColumn{
-		Name:       name,
-		DType:      command.BooleanType,
-		DTypeSize:  0,
-		Data:       data,
-		SQLData:    sqldata,
-		PrimaryKey: 0,
-	}
-	*cols = append(*cols, c)
-	if arrayLevel > 1 {
-		*quasikey = append(*quasikey, c)
-	}
-	return nil
-}
-
-func rewriteFloat64(arrayLevel int, name string, data float64, cols *[]command.CommandColumn, quasikey *[]command.CommandColumn) error {
+func rewriteNumber(name string, data float64, cols *[]command.CommandColumn) error {
 	s := strconv.FormatFloat(data, 'E', -1, 64)
 	sqldata, err := command.DataToSQLData(s, command.NumericType, "")
 	if err != nil {
@@ -266,8 +224,40 @@ func rewriteFloat64(arrayLevel int, name string, data float64, cols *[]command.C
 		PrimaryKey: 0,
 	}
 	*cols = append(*cols, c)
-	if arrayLevel > 1 {
-		*quasikey = append(*quasikey, c)
+	return nil
+}
+
+func rewriteString(name string, data string, cols *[]command.CommandColumn) error {
+	sqldata, err := command.DataToSQLData(data, command.TextType, "")
+	if err != nil {
+		return err
 	}
+	dtype := command.InferTypeFromString(data)
+	c := command.CommandColumn{
+		Name:       name,
+		DType:      dtype,
+		DTypeSize:  0,
+		Data:       data,
+		SQLData:    sqldata,
+		PrimaryKey: 0,
+	}
+	*cols = append(*cols, c)
+	return nil
+}
+
+func rewriteBoolean(name string, data bool, cols *[]command.CommandColumn) error {
+	sqldata, err := command.DataToSQLData(data, command.BooleanType, "")
+	if err != nil {
+		return err
+	}
+	c := command.CommandColumn{
+		Name:       name,
+		DType:      command.BooleanType,
+		DTypeSize:  0,
+		Data:       data,
+		SQLData:    sqldata,
+		PrimaryKey: 0,
+	}
+	*cols = append(*cols, c)
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/metadb-project/metadb/cmd/metadb/config"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
@@ -25,6 +26,7 @@ type Catalog struct {
 	users              map[string]*util.RegexList
 	columns            map[dbx.Column]string
 	indexes            map[dbx.Column]struct{}
+	jsonTransform      map[config.JSONPath]string
 	lastSnapshotRecord time.Time
 	dp                 *pgxpool.Pool
 	lz4                bool
@@ -64,6 +66,9 @@ func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
 		return nil, err
 	}
 	if err := c.initIndexes(); err != nil {
+		return nil, err
+	}
+	if err := c.initJSON(); err != nil {
 		return nil, err
 	}
 	c.initSnapshot()
@@ -138,6 +143,7 @@ var systemTables = []systemTableDef{
 	{table: dbx.Table{Schema: catalogSchema, Table: "source"}, create: createTableSource},
 	{table: dbx.Table{Schema: catalogSchema, Table: "table_update"}, create: createTableUpdate},
 	{table: dbx.Table{Schema: catalogSchema, Table: "base_table"}, create: createTableBaseTable},
+	{table: dbx.Table{Schema: catalogSchema, Table: "transform_json"}, create: createTableJSON},
 }
 
 //func SystemTables() []dbx.Table {
@@ -281,6 +287,20 @@ func createTableBaseTable(tx pgx.Tx) error {
 		"parent_table_name varchar(63) NOT NULL)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".base_table: %w", err)
+	}
+	return nil
+}
+
+func createTableJSON(tx pgx.Tx) error {
+	q := "CREATE TABLE " + catalogSchema + ".transform_json (" +
+		"schema_name varchar(63) NOT NULL, " +
+		"table_name varchar(63) NOT NULL, " +
+		"column_name varchar(63) NOT NULL, " +
+		"path text NOT NULL, " +
+		"PRIMARY KEY (schema_name, table_name, column_name, path), " +
+		"map text NOT NULL)"
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("creating table "+catalogSchema+".transform_json: %w", err)
 	}
 	return nil
 }

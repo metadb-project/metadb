@@ -8,14 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/metadb-project/metadb/cmd/metadb/eout"
-	"github.com/metadb-project/metadb/cmd/metadb/tools"
-
 	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
+	"github.com/metadb-project/metadb/cmd/metadb/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/metadata"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
+	"github.com/metadb-project/metadb/cmd/metadb/tools"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -413,6 +412,7 @@ var updbList = []updbFunc{
 	updb22,
 	updb23,
 	updb24,
+	updb25,
 }
 
 func updb8(opt *dbopt) error {
@@ -1676,6 +1676,45 @@ func updb24(opt *dbopt) error {
 	}
 
 	if err = metadata.WriteDatabaseVersion(dc, 24); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb25(opt *dbopt) error {
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+
+	q := "CREATE TABLE metadb.transform_json (" +
+		"schema_name varchar(63) NOT NULL, " +
+		"table_name varchar(63) NOT NULL, " +
+		"column_name varchar(63) NOT NULL, " +
+		"path text NOT NULL, " +
+		"PRIMARY KEY (schema_name, table_name, column_name, path), " +
+		"map text NOT NULL)"
+	_, err = tx.Exec(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("creating table metadb.transform_json: %w", err)
+	}
+
+	q = "INSERT INTO metadb.transform_json SELECT DISTINCT parent_schema_name AS schema_name, parent_table_name AS table_name, 'jsonb' AS column_name, '$' AS path, 't' AS map FROM metadb.base_table WHERE transformed AND parent_table_name<>'instance_authority_linking_rule'"
+	_, err = tx.Exec(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("writing metadb.transform_json: %w", err)
+	}
+
+	if err = metadata.WriteDatabaseVersion(tx, 25); err != nil {
+		return err
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
 		return err
 	}
 	return nil

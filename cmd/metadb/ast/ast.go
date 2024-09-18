@@ -30,6 +30,17 @@ type CreateDataSourceStmt struct {
 func (*CreateDataSourceStmt) node()     {}
 func (*CreateDataSourceStmt) stmtNode() {}
 
+type CreateDataMappingStmt struct {
+	TypeName         string
+	TableName        string
+	ColumnName       string
+	Path             string
+	TargetIdentifier string
+}
+
+func (*CreateDataMappingStmt) node()     {}
+func (*CreateDataMappingStmt) stmtNode() {}
+
 type CreateDataOriginStmt struct {
 	OriginName string
 }

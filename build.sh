@@ -24,10 +24,10 @@ usage() {
     echo '    go install github.com/kisielk/errcheck@latest'
     echo '-v  Enable verbose output'
     # echo '-D  Enable "-tags dynamic" compiler option'
-    echo '-X  Build with experimental code included'
+    # echo '-X  Build with experimental code included'
 }
 
-while getopts 'fhJtvTXD' flag; do
+while getopts 'fhJtvTD' flag; do
     case "${flag}" in
         t) runtests='true' ;;
         T) runalltests='true' ;;
@@ -36,7 +36,6 @@ while getopts 'fhJtvTXD' flag; do
         h) usage
             exit 1 ;;
         v) verbose='true' ;;
-        X) experiment='true' ;;
         D) tagsdynamic='true' ;;
         *) usage
             exit 1 ;;

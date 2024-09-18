@@ -470,6 +470,77 @@ AUTHORIZE SELECT
 ----
 
 
+==== CREATE DATA MAPPING
+
+[.aqua-background]#Metadb 1.4#
+Define a new mapping for data transformation
+
+[source,subs="verbatim,quotes"]
+----
+CREATE DATA MAPPING FOR *_mapping_type_*
+    FROM TABLE `*_table_name_*` COLUMN `*_column_name_*` PATH '*_object_path_*'
+    TO '*_target_identifier_*'
+----
+
+[discrete]
+===== Description
+
+CREATE DATA MAPPING defines mapping rules for data transformation.  The output
+of a mapping is written to a new column or table based on the specified target
+identifier.
+
+In JSON mapping, the specified path identifies a JSON object or array to
+transform.  For example, the path `'$.a.b'` means an object or array named `b`
+contained within an object or array named `a`.  The path `'$'` means the
+outermost enclosing object.  Note that an object or array will not be
+transformed unless all of its parents are also transformed; for example, a
+mapping from path `'$.a.b'` will only take effect if mappings are also defined
+for both the paths `'$.a'` and `'$'` within the same table and column.
+
+.Note
+****
+[.text-center]
+CREATE DATA MAPPING currently requires restarting the server before it will
+take effect.
+****
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_mapping_type_*`
+|The type of data mapping.  The only type currently supported is `json`.
+
+|`*_table_name_*`
+|The table to transform.
+
+|`*_column_name_*`
+|The column to transform.
+
+|`'*_object_path_*'`
+|Path to a JSON object or array.
+
+|`'*_target_identifier_*'`
+|A short identifier to be used in naming the transformed data.
+|===
+
+[discrete]
+===== Examples
+
+Create mappings to transform a nested "metadata" object:
+
+----
+CREATE DATA MAPPING FOR json
+    FROM TABLE users.groups__ COLUMN jsonb PATH '$'
+    TO 't';
+
+CREATE DATA MAPPING FOR json
+    FROM TABLE users.groups__ COLUMN jsonb PATH '$.metadata'
+    TO 'md';
+----
+
+
 ==== CREATE DATA ORIGIN
 
 Define a new data origin
@@ -716,6 +787,10 @@ variables.
 |
 |`authorizations`
 |Authorized users.
+
+|
+|`data_mappings`
+|Configured data mappings.
 
 |
 |`data_origins`

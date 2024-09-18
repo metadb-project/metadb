@@ -31,6 +31,7 @@ type Server struct {
 	TLSKey        string
 	NoTLS         bool
 	MemoryLimit   float64
+	UUOpt         bool
 }
 
 type Stop struct {

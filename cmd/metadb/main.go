@@ -96,9 +96,9 @@ func run() error {
 				return err
 			}
 			// err = sysdb.Close()
-			if err != nil {
-				log.Error("%s", err)
-			}
+			// if err != nil {
+			// 	log.Error("%s", err)
+			// }
 			return nil
 		},
 	}
@@ -144,6 +144,7 @@ func run() error {
 	_ = portFlag(cmdStart, &serverOpt.Port)
 	//_ = certFlag(cmdStart, &serverOpt.TLSCert)
 	//_ = keyFlag(cmdStart, &serverOpt.TLSKey)
+	_ = uuoptFlag(cmdStart, &serverOpt.UUOpt)
 	_ = debugFlag(cmdStart, &serverOpt.Debug)
 	_ = traceLogFlag(cmdStart, &serverOpt.Trace)
 	_ = noKafkaCommitFlag(cmdStart, &serverOpt.NoKafkaCommit)
@@ -313,6 +314,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			portFlag(nil, nil) +
 			//certFlag(nil, nil) +
 			//keyFlag(nil, nil) +
+			uuoptFlag(nil, nil) +
 			debugFlag(nil, nil) +
 			//noTLSFlag(nil, nil) +
 			traceLogFlag(nil, nil) +
@@ -408,6 +410,14 @@ func verboseFlag(cmd *cobra.Command, verbose *bool) string {
 	}
 	return "" +
 		"  -v, --verbose               - Enable verbose output\n"
+}
+
+func uuoptFlag(cmd *cobra.Command, uuopt *bool) string {
+	if cmd != nil {
+		cmd.Flags().BoolVar(uuopt, "uuopt", false, "")
+	}
+	return "" +
+		"      --uuopt                 - Enable \"unnecessary update\" optimization\n"
 }
 
 func debugFlag(cmd *cobra.Command, debug *bool) string {

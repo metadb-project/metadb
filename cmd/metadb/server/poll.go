@@ -327,13 +327,13 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 		}
 
 		// Rewrite
-		if err = rewriteCommandGraph(cmdgraph); err != nil {
+		if err = rewriteCommandGraph(cat, cmdgraph); err != nil {
 			*errString = fmt.Sprintf("rewriter: %v", err)
 			return
 		}
 
 		// Execute
-		if err = execCommandGraph(thread, ctx, cat, cmdgraph, spr.svr.dp, spr.source.Name, syncMode, dedup); err != nil {
+		if err = execCommandGraph(thread, ctx, cat, cmdgraph, spr.svr.dp, spr.source.Name, spr.svr.opt.UUOpt, syncMode, dedup); err != nil {
 			*errString = fmt.Sprintf("executor: %v", err)
 			return
 		}

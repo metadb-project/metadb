@@ -17,7 +17,7 @@ import (
 %type <node> top_level_stmt stmt
 %type <node> select_stmt
 %type <node> create_data_source_stmt alter_data_source_stmt drop_data_source_stmt authorize_stmt create_user_stmt
-%type <node> create_data_origin_stmt list_stmt
+%type <node> create_data_mapping_stmt create_data_origin_stmt list_stmt
 %type <node> refresh_inferred_column_types_stmt
 %type <node> alter_table_stmt alter_table_cmd
 %type <node> verify_consistency_stmt
@@ -35,7 +35,7 @@ import (
 %token REFRESH INFERRED COLUMN TYPES
 %token TYPE
 %token TRUE FALSE
-%token VERIFY
+%token VERIFY FOR FROM PATH
 %token <str> VERSION
 %token <str> ADD SET DROP
 %token <str> IDENT NUMBER
@@ -63,6 +63,10 @@ stmt:
 			$$ = $1
 		}
 	| create_data_source_stmt
+		{
+			$$ = $1
+		}
+	| create_data_mapping_stmt
 		{
 			$$ = $1
 		}
@@ -139,6 +143,12 @@ create_data_source_stmt:
 	CREATE DATA SOURCE name TYPE name options_clause ';'
 		{
 			$$ = &ast.CreateDataSourceStmt{DataSourceName: $4, TypeName: $6, Options: $7}
+		}
+
+create_data_mapping_stmt:
+	CREATE DATA MAPPING FOR name FROM TABLE name COLUMN name PATH SLITERAL TO SLITERAL ';'
+		{
+			$$ = &ast.CreateDataMappingStmt{TypeName: $5, TableName: $8, ColumnName: $10, Path: $12, TargetIdentifier: $14}
 		}
 
 create_data_origin_stmt:

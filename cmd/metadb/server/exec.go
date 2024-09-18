@@ -16,7 +16,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 )
 
-func execCommandGraph(thread int, ctx context.Context, cat *catalog.Catalog, cmdgraph *command.CommandGraph, dp *pgxpool.Pool, source string, syncMode dsync.Mode, dedup *log.MessageSet) error {
+func execCommandGraph(thread int, ctx context.Context, cat *catalog.Catalog, cmdgraph *command.CommandGraph, dp *pgxpool.Pool, source string, uuopt bool, syncMode dsync.Mode, dedup *log.MessageSet) error {
 	if cmdgraph.Commands.Len() == 0 {
 		return nil
 	}
@@ -40,10 +40,10 @@ func execCommandGraph(thread int, ctx context.Context, cat *catalog.Catalog, cmd
 		if cmd.Subcommands == nil {
 			continue
 		}
-		// This is a "short-circuit" update optimization in which we omit updating
-		// subcommand records if the parent command matched its equivalent record in the
-		// database.
-		if match {
+		// This is an "unnecessary update" optimization in which we omit
+		// updating subcommand records if the parent command matched its
+		// equivalent record in the database.
+		if uuopt && match {
 			// We still need to match the transformed records, only in order to get the IDs
 			// to write them to sync tables.
 			if syncMode == dsync.Resync {
@@ -525,7 +525,7 @@ func isCurrentIdenticalMatch(ctx context.Context, cmd *command.Command, tx *pgxp
 			}
 			continue
 		}
-		if strings.HasPrefix(columnNames[i], "__") {
+		if catalog.IsReservedColumn(columnNames[i]) {
 			continue
 		}
 		_, ok := columnMap[columnNames[i]]

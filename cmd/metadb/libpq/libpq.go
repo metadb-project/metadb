@@ -274,6 +274,8 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 	switch n := node.(type) {
 	case *ast.CreateDataSourceStmt:
 		err = createDataSource(conn, n, dbconn)
+	case *ast.CreateDataMappingStmt:
+		err = createDataMapping(conn, n, dbconn)
 	case *ast.AlterTableStmt:
 		err = alterTable(conn, n, dbconn)
 	case *ast.AlterDataSourceStmt:
@@ -408,6 +410,8 @@ func list(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.Sou
 			"            ELSE 'not authorized'"+
 			"       END note"+
 			"    FROM metadb.auth", nil, dc)
+	case "data_mappings":
+		return proxySelect(conn, "SELECT 'json' AS mapping_type, schema_name||'.'||table_name AS table_name, column_name, path AS object_path, map AS target_identifier FROM metadb.transform_json", nil, dc)
 	case "data_origins":
 		return proxySelect(conn, "SELECT name FROM metadb.origin", nil, dc)
 	case "data_sources":
@@ -530,6 +534,51 @@ func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Con
 	}
 	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("CREATE DATA SOURCE")},
+		&pgproto3.ReadyForQuery{TxStatus: 'I'},
+	})
+}
+
+func createDataMapping(conn net.Conn, node *ast.CreateDataMappingStmt, dc *pgx.Conn) error {
+	// The only mapping type currently supported is json.
+	if node.TypeName != "json" {
+		return fmt.Errorf("mapping type %q not supported", node.TypeName)
+	}
+
+	// Validate path.
+	var invalidPath bool
+	p := strings.Split(node.Path, ".")
+	if len(p) < 1 || p[0] != "$" {
+		invalidPath = true
+	}
+	for i := 1; i < len(p); i++ {
+		if p[i] == "" || strings.Contains(p[i], " ") || strings.Contains(p[i], "__") || strings.HasPrefix(p[i], "_") || strings.HasSuffix(p[i], "_") {
+			invalidPath = true
+		}
+	}
+	if invalidPath {
+		return fmt.Errorf("path %q is invalid", node.Path)
+	}
+
+	// Ensure the table name is a main table, and parse it.
+	if !strings.HasSuffix(node.TableName, "__") {
+		return fmt.Errorf("%q is not a main table name", node.TableName)
+	}
+	table, err := dbx.ParseTable(node.TableName[0 : len(node.TableName)-2])
+	if err != nil {
+		return fmt.Errorf("%q is not a valid table name", node.TableName)
+	}
+
+	q := "INSERT INTO metadb.transform_json (schema_name, table_name, column_name, path, map) VALUES ($1, $2, $3, $4, $5)"
+	if _, err = dc.Exec(context.TODO(), q, table.Schema, table.Table, node.ColumnName, node.Path, node.TargetIdentifier); err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return fmt.Errorf("mapping already exists from table %q, column %q, path %q",
+				node.TableName, node.ColumnName, node.Path)
+		}
+		return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
+	}
+
+	return writeEncoded(conn, []pgproto3.Message{
+		&pgproto3.CommandComplete{CommandTag: []byte("CREATE DATA MAPPING")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
 }

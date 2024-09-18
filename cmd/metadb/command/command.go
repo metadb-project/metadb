@@ -189,47 +189,6 @@ func NewCommandGraph() *CommandGraph {
 	return &CommandGraph{Commands: list.New()}
 }
 
-func (g *CommandGraph) String() string {
-	var b strings.Builder
-	g.writeCommands(&b, g.Commands, 0)
-	return b.String()
-}
-
-func (g *CommandGraph) writeCommands(b *strings.Builder, commands *list.List, indent int) {
-	if commands == nil {
-		return
-	}
-	for e := commands.Front(); e != nil; e = e.Next() {
-		for i := 0; i < indent; i++ {
-			b.WriteRune(' ')
-		}
-		cmd := *(e.Value.(*Command))
-		fmt.Fprintf(b, "> %s %s.%s\n", cmd.Op, cmd.SchemaName, cmd.TableName)
-		for i := range cmd.Column {
-			for j := 0; j < indent+8; j++ {
-				b.WriteRune(' ')
-			}
-			if cmd.Column[i].PrimaryKey == 0 {
-				b.WriteRune('-')
-			} else {
-				fmt.Fprintf(b, "= [%d]", cmd.Column[i].PrimaryKey)
-			}
-			fmt.Fprintf(b, " %s (%s): ", cmd.Column[i].Name, DataTypeToSQL(cmd.Column[i].DType, cmd.Column[i].DTypeSize))
-			if cmd.Column[i].SQLData == nil {
-				b.WriteString("null")
-			} else {
-				s := *(cmd.Column[i].SQLData)
-				if len(s) > 40 {
-					s = s[:40] + "..."
-				}
-				fmt.Fprintf(b, "%s", s)
-			}
-			b.WriteRune('\n')
-		}
-		g.writeCommands(b, (e.Value.(*Command)).Subcommands, indent+4)
-	}
-}
-
 type Command struct {
 	Op              Operation
 	SchemaName      string
@@ -632,7 +591,7 @@ func NewCommand(dedup *log.MessageSet, ce *change.Event, schemaPassFilter, schem
 	if ce.Value == nil || ce.Value.Payload == nil {
 		var name string
 		var key interface{}
-		if ce != nil && ce.Key != nil {
+		if ce.Key != nil {
 			name = *ce.Key.Schema.Name
 			key = ce.Key.Payload
 		}
@@ -993,9 +952,9 @@ func trimFractionalZeros(s string) string {
 
 func PrimaryKeyColumns(columns []CommandColumn) []CommandColumn {
 	var pkey []CommandColumn
-	for _, col := range columns {
-		if col.PrimaryKey != 0 {
-			pkey = append(pkey, col)
+	for i := range columns {
+		if columns[i].PrimaryKey != 0 {
+			pkey = append(pkey, columns[i])
 		}
 	}
 	sort.Slice(pkey, func(i, j int) bool {
