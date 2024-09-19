@@ -530,7 +530,8 @@ take effect.
 [discrete]
 ===== Examples
 
-Create mappings to transform a "metadata" object and an "identifiers" array:
+Create JSON mappings to transform a "metadata" object and an "identifiers"
+array:
 
 ----
 CREATE DATA MAPPING FOR json
@@ -547,9 +548,9 @@ CREATE DATA MAPPING FOR json
 ----
 
 When the JSON data are next updated, this will produce a table
-`library.inventory\__t\__` which includes the metadata columns, using
-`metadata\__` as a prefix in column names, and another table
-`library.inventory__identifier__` which contains the identifiers array data.
+`inventory\__t__` which includes the "metadata" object columns, using
+`metadata` as a prefix in column names, and another table
+`inventory\__identifier__` which contains the "identifiers" array data.
 
 
 ==== CREATE DATA ORIGIN

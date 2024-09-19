@@ -256,12 +256,13 @@ SELECT __id,
     FROM library.patrongroup;
 ----
 
-Metadb can be configured to generate a *transformed table*, for example called
-`patrongroup__t`.  Transformed tables based on JSON objects contain JSON fields
-extracted into columns, which allows for simpler queries.
+Metadb can be configured to generate a *transformed table*, which in our
+example will be called `patrongroup__t`.  Transformed tables based on JSON
+objects contain JSON fields extracted into columns, which allows for simpler
+queries.
 
-In order to enable the transformation, the Metadb system administrator would
-use this command:
+To define the transformation, the Metadb system administrator would run this
+command:
 
 ----
 CREATE DATA MAPPING FOR json
@@ -269,7 +270,8 @@ CREATE DATA MAPPING FOR json
     TO 't';
 ----
 
-The query can now be written as:
+The transformation will take effect when the JSON data are next updated.  The
+query can now be written as:
 
 [source]
 ----
@@ -315,8 +317,8 @@ transformed table would be called `+patrongroup__t__+`.
 Note that JSON data are treated as "schemaless," and fields are inferred from
 their presence in the data rather than read from a JSON schema.  As a result, a
 column is only created from a JSON field if the field is present in at least
-one JSON record.  Note that a new column may be added dynamically at any time
-when a record containing a new JSON field is streamed.
+one JSON record.  A new column may be added dynamically at any time when a
+record containing a new JSON field is streamed.
 
 === Comparing table types
 
