@@ -2,7 +2,7 @@
 // To build HTML:
 //     asciidoctor -a docinfo=shared *.adoc
 
-// Text is styled using "pre-wrap" and wrapped at column 79.
+// Text is styled using "pre-wrap" and wrapped at column 70.
 
 = Metadb Documentation
 :sectnums:

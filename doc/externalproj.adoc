@@ -1,34 +1,37 @@
 == External projects
 
-Two open-source communities, FOLIO and ReShare, use Metadb to support analytics
-on their data.  Metadb has specific support for these two types of data
-sources; it is referred to conceptually as the "folio" module and the "reshare"
-module.  In the future it is intended that this support will be moved into a
-plug-in or other modular system, where it could be maintained and documented
-independently of the Metadb project.
+Two open-source communities, FOLIO and ReShare, use Metadb to support
+analytics on their data.  Metadb has specific support for these two
+types of data sources; it is referred to conceptually as the "folio"
+module and the "reshare" module.  In the future it is intended that
+this support will be moved into a plug-in or other modular system,
+where it could be maintained and documented independently of the
+Metadb project.
 
-The following sections document Metadb features that are specific to FOLIO and
-ReShare.
+The following sections document Metadb features that are specific to
+FOLIO and ReShare.
 
 === FOLIO
 
-When configured for FOLIO, a Metadb instance typically manages data for a
-single FOLIO tenant.  If multiple FOLIO tenants are to be supported, then a
-separate Metadb instance and database should be set up for each tenant.
+When configured for FOLIO, a Metadb instance typically manages data
+for a single FOLIO tenant.  If multiple FOLIO tenants are to be
+supported, then a separate Metadb instance and database should be set
+up for each tenant.
 
 ==== MARC transform
 
 Metadb transforms MARC records from the tables `marc_records_lb` and
-`records_lb` in schema `folio_source_record` to a tabular form which is stored
-in a new table, `folio_source_record.marc__t`.
+`records_lb` in schema `folio_source_record` to a tabular form which
+is stored in a new table, `folio_source_record.marc__t`.
 
-Only MARC records considered to be "current" are transformed, where current
-here is defined as having `state` = `'ACTUAL'` and a valid identifier is
-present in `999 ff $i` (field `999`, both indicators `f`, and subfield `$i`).
+Only MARC records considered to be "current" are transformed, where
+current here is defined as having `state` = `'ACTUAL'` and a valid
+identifier is present in `999 ff $i` (field `999`, both indicators
+`f`, and subfield `$i`).
 
-This transform updates the table `folio_source_record.marc__t` usually every
-few hours or so.  The time of the most recent update can be retrieved from the
-table `metadb.table_update`:
+This transform updates the table `folio_source_record.marc__t` usually
+every few hours or so.  The time of the most recent update can be
+retrieved from the table `metadb.table_update`:
 
 ----
 SELECT last_update
@@ -36,25 +39,26 @@ SELECT last_update
     WHERE schema_name = 'folio_source_record' AND table_name = 'marc__t';
 ----
 
-The MARC transform stores partition tables in the schema `marctab`.  Users can
-ignore this schema, as all data are accessible via
+The MARC transform stores partition tables in the schema `marctab`.
+Users can ignore this schema, as all data are accessible via
 `folio_source_record.marc__t`.
 
 ==== Derived tables
 
-FOLIO "derived tables" are helper tables that provide commonly used table
-joins, etc.  They are automatically updated once per day, usually at about 3:00
-UTC by default.
+FOLIO "derived tables" are helper tables that provide commonly used
+table joins, etc.  They are automatically updated once per day,
+usually at about 3:00 UTC by default.
 
-Note that the derived tables are based on a periodic snapshot of data, and for
-this reason they are generally not up-to-date.
+Note that the derived tables are based on a periodic snapshot of data,
+and for this reason they are generally not up-to-date.
 
 ==== Data model
 
-FOLIO modules do not in general provide documentation for their internal data
-models, which Metadb tables are based on, but they do have some
-https://dev.folio.org/reference/api/[documentation for "storage module" WSAPIs] which are roughly equivalent.
-The names of most storage modules end in `-storage`, but some modules use a
+FOLIO modules do not in general provide documentation for their
+internal data models, which Metadb tables are based on, but they do
+have some https://dev.folio.org/reference/api/[documentation for
+"storage module" WSAPIs] which are roughly equivalent.  The names of
+most storage modules end in `-storage`, but some modules use a
 different convention; for instance, the storage module for users is
 `mod-users`.  (All module names begin with `mod-`.)
 
@@ -64,10 +68,10 @@ This section contains notes related to migrating from LDP to Metadb.
 
 ===== Table names
 
-Table names have changed and now are derived from FOLIO internal table names.
-Note that unlike LDP, Metadb tables are spread across multiple schemas,
-reflecting the naming structure of the source FOLIO database in which tables
-are grouped by FOLIO module.
+Table names have changed and now are derived from FOLIO internal table
+names.  Note that unlike LDP, Metadb tables are spread across multiple
+schemas, reflecting the naming structure of the source FOLIO database
+in which tables are grouped by FOLIO module.
 
 [%header,cols="8l,9l"]
 |===
@@ -434,23 +438,23 @@ are grouped by FOLIO module.
 
 ===== Column names
 
-The `data` column in LDP contains JSON objects.  In Metadb this column appears
-as `jsonb` or in some cases `content`, matching the FOLIO internal column
-names.
+The `data` column in LDP contains JSON objects.  In Metadb this column
+appears as `jsonb` or in some cases `content`, matching the FOLIO
+internal column names.
 
 ===== Data types
 
-In Metadb, UUIDs generally have the `uuid` data type.  If a UUID has the `text`
-data type preserved from the source data, it should be cast using `::uuid` in
-queries.
+In Metadb, UUIDs generally have the `uuid` data type.  If a UUID has
+the `text` data type preserved from the source data, it should be cast
+using `::uuid` in queries.
 
-Columns with the `json` data type in LDP have been changed to use the `jsonb`
-data type in Metadb.
+Columns with the `json` data type in LDP have been changed to use the
+`jsonb` data type in Metadb.
 
 ===== JSON queries
 
-Querying JSON is very similar with Metadb as compared to LDP.  For clarity we
-give a few examples below.
+Querying JSON is very similar with Metadb as compared to LDP.  For
+clarity we give a few examples below.
 
 [discrete]
 ====== JSON source data
@@ -476,8 +480,8 @@ SELECT jsonb_pretty(jsonb) FROM folio_users.groups;
 [discrete]
 ====== JSON fields: non-array data
 
-For non-array JSON fields, extracting the data directly from JSON in LDP
-usually takes the form:
+For non-array JSON fields, extracting the data directly from JSON in
+LDP usually takes the form:
 
 ----
 SELECT json_extract_path_text(data, 'group') FROM user_groups;
@@ -492,9 +496,10 @@ SELECT jsonb_extract_path_text(jsonb, 'group') FROM folio_users.groups;
 [discrete]
 ====== JSON fields: array data
 
-To extract JSON arrays, the syntax for Metadb is similar to LDP.  A lateral
-join can be used with the function `jsonb_array_elements()` to convert the
-elements of a JSON array to a set of rows, one row per array element.
+To extract JSON arrays, the syntax for Metadb is similar to LDP.  A
+lateral join can be used with the function `jsonb_array_elements()` to
+convert the elements of a JSON array to a set of rows, one row per
+array element.
 
 For example, if the array elements are simple `text` strings:
 
@@ -526,8 +531,8 @@ FROM folio_inventory.holdings_record
 [discrete]
 ====== JSON fields as columns
 
-LDP transforms simple, first-level JSON fields into columns, which can be
-queried as, for example:
+LDP transforms simple, first-level JSON fields into columns, which can
+be queried as, for example:
 
 ----
 SELECT id, "group", "desc" FROM user_groups;
@@ -539,9 +544,9 @@ The Metadb equivalent of this query is:
 SELECT id, "group", "desc" FROM folio_users.groups__t;
 ----
 
-Note that the double quotation marks are needed here only because `group` and
-`desc` are reserved words in SQL.  Alternatively, they can be removed if the
-column names are prefixed with a table alias:
+Note that the double quotation marks are needed here only because
+`group` and `desc` are reserved words in SQL.  Alternatively, they can
+be removed if the column names are prefixed with a table alias:
 
 ----
 SELECT g.id, g.group, g.desc FROM folio_users.groups__t AS g;
@@ -552,15 +557,15 @@ Support for transforming subfields and arrays is planned in Metadb.
 ===== Migrating historical data from LDP
 
 [.aqua-background]#Metadb 1.3#
-Metadb can import legacy historical data from LDP.  The Metadb server must be
-stopped while this process runs.  As an example:
+Metadb can import legacy historical data from LDP.  The Metadb server
+must be stopped while this process runs.  As an example:
 
 ----
 metadb migrate -D data --ldpconf ldpconf.json --source folio
 ----
 
-The file `ldpconf.json` is used to connect to the LDP database.  The output
-looks something like:
+The file `ldpconf.json` is used to connect to the LDP database.  The
+output looks something like:
 
 ----
 Begin migration process? y
@@ -579,23 +584,26 @@ metadb: migrating: folio_circulation.loan__: 1600346 records written
 # (etc.)
 ----
 
-Note that only records that LDP updated before a specific time stamp will be
-imported.  This is because for each LDP table and corresponding Metadb table
-there may be a range of times in which both LDP and Metadb contain historical
-data.  In such cases, the Metadb data are preferred, and the import stops at
-the point after which the two data sets would otherwise overlap.
+Note that only records that LDP updated before a specific time stamp
+will be imported.  This is because for each LDP table and
+corresponding Metadb table there may be a range of times in which both
+LDP and Metadb contain historical data.  In such cases, the Metadb
+data are preferred, and the import stops at the point after which the
+two data sets would otherwise overlap.
 
-Also note that JSON data contained in the imported records are not transformed
-into columns.
+Also note that JSON data contained in the imported records are not
+transformed into columns.
 
-Records imported using this process have their `__origin` column set to the
-value `ldp`, which distinguishes them from other FOLIO data in Metadb.
+Records imported using this process have their `__origin` column set
+to the value `ldp`, which distinguishes them from other FOLIO data in
+Metadb.
 
 ==== Configuring Metadb for FOLIO
 
-When creating a FOLIO data source, use the `module 'folio'` option, and set
-`trimschemaprefix` to remove the tenant from schema names and `addschemaprefix`
-to add a `folio_` prefix to the schema names.  For example:
+When creating a FOLIO data source, use the `module 'folio'` option,
+and set `trimschemaprefix` to remove the tenant from schema names and
+`addschemaprefix` to add a `folio_` prefix to the schema names.  For
+example:
 
 ----
 CREATE DATA SOURCE folio TYPE kafka OPTIONS (
@@ -609,22 +617,24 @@ CREATE DATA SOURCE folio TYPE kafka OPTIONS (
 );
 ----
 
-Specifying `module 'folio'` has multiple effects including how tenants are
-handled, where to find the derived tables, and that MARC transformation is to
-be performed.  We trim the tenant-name prefix from schema names because the
-Metadb database handles only a single tenant.  We add the `folio_` prefix as a
-namespace to allow for other (non-FOLIO) library data to be imported into the
-database as well, in order to support cross-domain analytics.
+Specifying `module 'folio'` has multiple effects including how tenants
+are handled, where to find the derived tables, and that MARC
+transformation is to be performed.  We trim the tenant-name prefix
+from schema names because the Metadb database handles only a single
+tenant.  We add the `folio_` prefix as a namespace to allow for other
+(non-FOLIO) library data to be imported into the database as well, in
+order to support cross-domain analytics.
 
-Note that the `CREATE DATA SOURCE` statement does not control which tenant's
-data are to be streamed.  The tenant is typically selected in the configuration
-of the Debezium connector.
+Note that the `CREATE DATA SOURCE` statement does not control which
+tenant's data are to be streamed.  The tenant is typically selected in
+the configuration of the Debezium connector.
 
-It is recommended to use a separate Kafka cluster, rather than the FOLIO Kafka
-instance, until one has experience with administration of Kafka.
+It is recommended to use a separate Kafka cluster, rather than the
+FOLIO Kafka instance, until one has experience with administration of
+Kafka.
 
-In the Debezium PostgreSQL connector configuration, the following exclusions
-are suggested:
+In the Debezium PostgreSQL connector configuration, the following
+exclusions are suggested:
 
 ----
 "schema.exclude.list": "public,.*_mod_login,.*_mod_pubsub,.*pubsub_config,supertenant_mod_.*,.*_mod_kb_ebsco_java,.*_mod_data_export_spring"
@@ -633,41 +643,44 @@ are suggested:
 "table.exclude.list": ".*__system,.*_mod_agreements.alternate_resource_name,.*_mod_service_interaction.dashboard_access,.*_mod_agreements.availability_constraint,.*_mod_agreements\\.package_description_url,.*_mod_agreements\\.content_type,.*_mod_agreements\\.entitlement_tag,.*_mod_agreements\\.erm_resource_tag,.*_mod_agreements\\.string_template,.*_mod_agreements\\.string_template_scopes,.*_mod_agreements\\.templated_url,.*_mod_oai_pmh\\.instances,.*_mod_remote_storage\\.original_locations,.*_mod_remote_storage\\.item_notes,.*app_setting,.*alternate_name,.*databasechangelog,.*databasechangeloglock,.*directory_entry_tag,.*license_document_attachment,.*license_supp_doc,.*license_tag,.*log_entry_additional_info,.*subscription_agreement_supp_doc,.*subscription_agreement_document_attachment,.*subscription_agreement_ext_lic_doc,.*subscription_agreement_tag,.*tenant_changelog,.*tenant_changelog_lock,.*marc_indexers.*,.*rmb_internal.*,.*rmb_job.*,.*_mod_agreements\\.match_key,.*system_changelog"
 ----
 
-Tables can be excluded for various reasons.  Most of the tables filtered above
-are excluded because they are not of interest for analytics (e.g. pubsub
-state), but data from some modules, e.g. `mod_login`, are omitted for security
-reasons.  It is up to individual libraries to tailor this exclusion list to
-their requirements.
+Tables can be excluded for various reasons.  Most of the tables
+filtered above are excluded because they are not of interest for
+analytics (e.g. pubsub state), but data from some modules,
+e.g. `mod_login`, are omitted for security reasons.  It is up to
+individual libraries to tailor this exclusion list to their
+requirements.
 
 === ReShare
 
-When configured for ReShare, a Metadb instance typically manages data for a
-consortium using a single data source.  ReShare "tenants" are not separated
-from each other in the usual sense; they each represent a consortium member and
-together form a single consortial tenant.  For this reason, all of the ReShare
-tenants are streamed to a single Metadb instance, unlike FOLIO where a Metadb
-instance only handles a single FOLIO tenant.
+When configured for ReShare, a Metadb instance typically manages data
+for a consortium using a single data source.  ReShare "tenants" are
+not separated from each other in the usual sense; they each represent
+a consortium member and together form a single consortial tenant.  For
+this reason, all of the ReShare tenants are streamed to a single
+Metadb instance, unlike FOLIO where a Metadb instance only handles a
+single FOLIO tenant.
 
-The data from consortium members are combined into aggregated tables, with the
-`__origin` column set to the name of the ReShare tenant (i.e. consortium
-member).  The `CREATE DATA ORIGIN` command defines the set of known origins,
-and schema names in the source database are assumed to begin with a prefix that
-identifies the origin (because this is how FOLIO and ReShare store tenant
-data).  For example `west_mod_rs.table1` has the prefix `west` which is taken
-to be the origin if previously defined by `CREATE DATA ORIGIN`.
+The data from consortium members are combined into aggregated tables,
+with the `__origin` column set to the name of the ReShare tenant
+(i.e. consortium member).  The `CREATE DATA ORIGIN` command defines
+the set of known origins, and schema names in the source database are
+assumed to begin with a prefix that identifies the origin (because
+this is how FOLIO and ReShare store tenant data).  For example
+`west_mod_rs.table1` has the prefix `west` which is taken to be the
+origin if previously defined by `CREATE DATA ORIGIN`.
 
 ==== Derived tables
 
-ReShare "derived tables" are automatically updated once per day, usually at
-about 3:00 UTC by default.
+ReShare "derived tables" are automatically updated once per day,
+usually at about 3:00 UTC by default.
 
-Note that the derived tables are based on a periodic snapshot of data, and for
-this reason they are generally not up-to-date.
+Note that the derived tables are based on a periodic snapshot of data,
+and for this reason they are generally not up-to-date.
 
 ==== Configuring Metadb for ReShare
 
-Before defining a ReShare data source, create a data origin for each ReShare
-tenant (i.e. each member of the consortium).  For example:
+Before defining a ReShare data source, create a data origin for each
+ReShare tenant (i.e. each member of the consortium).  For example:
 
 ----
 CREATE DATA ORIGIN tenant1;
@@ -684,8 +697,9 @@ CREATE DATA ORIGIN currently requires restarting the server before it
 will take effect.
 ****
 
-Then use the `module 'reshare'` option when creating the data source, and set
-`addschemaprefix` to add a `reshare_` prefix to the schema names:
+Then use the `module 'reshare'` option when creating the data source,
+and set `addschemaprefix` to add a `reshare_` prefix to the schema
+names:
 
 ----
 CREATE DATA SOURCE reshare TYPE kafka OPTIONS (
@@ -698,26 +712,28 @@ CREATE DATA SOURCE reshare TYPE kafka OPTIONS (
 );
 ----
 
-Note that unlike with FOLIO, here we do not use `trimschemaprefix`, because the
-"reshare" module uses the tenant name in the prefix to choose a configured data
-origin, as described above.
+Note that unlike with FOLIO, here we do not use `trimschemaprefix`,
+because the "reshare" module uses the tenant name in the prefix to
+choose a configured data origin, as described above.
 
-Note that the order of commands is important:  The initial set of data origins
-should be created before the data source is created so that schema names of
-incoming data will be processed correctly.  Later, whenever a new consortial
-tenant is to be added, it should be defined in Metadb using `CREATE DATA
-ORIGIN` (and the server restarted) before the tenant is added to ReShare.
+Note that the order of commands is important: The initial set of data
+origins should be created before the data source is created so that
+schema names of incoming data will be processed correctly.  Later,
+whenever a new consortial tenant is to be added, it should be defined
+in Metadb using `CREATE DATA ORIGIN` (and the server restarted) before
+the tenant is added to ReShare.
 
-In the Debezium PostgreSQL connector configuration, it is suggested that
-credentials (`.+mod_login`), the public schema, the Okapi supertenant
-(`supertenant_mod_.+`), and mod-pubsub data (`pubsub_config,.+_mod_pubsub`) be
-excluded using the `schema.exclude.list` setting.
+In the Debezium PostgreSQL connector configuration, it is suggested
+that credentials (`.+mod_login`), the public schema, the Okapi
+supertenant (`supertenant_mod_.+`), and mod-pubsub data
+(`pubsub_config,.+_mod_pubsub`) be excluded using the
+`schema.exclude.list` setting.
 
 === MARC transform for LDP/LDLite
 
-The MARC transform (currently included in Metadb) can also be used with LDP and
-LDLite.  A command-line tool called `marct` is provided which is a drop-in
-replacement for `ldpmarc`.
+The MARC transform (currently included in Metadb) can also be used
+with LDP and LDLite.  A command-line tool called `marct` is provided
+which is a drop-in replacement for `ldpmarc`.
 
 The system requirements are a subset of those for Metadb:
 
@@ -733,15 +749,16 @@ To build `marct`:
 mkdir -p bin && go build -o bin ./cmd/marct
 ----
 
-which creates a `bin/` subdirectory and builds the `marct` executable there:
+which creates a `bin/` subdirectory and builds the `marct` executable
+there:
 
 ----
 ./bin/marct -h
 ----
 
 In LDP, MARC data are read from the tables `public.srs_marc` and
-`public.srs_records`, and the transformed output is written to the table
-`public.srs_marctab`.
+`public.srs_records`, and the transformed output is written to the
+table `public.srs_marctab`.
 
 Typical usage is:
 
@@ -750,8 +767,8 @@ Typical usage is:
 ----
 
 where `datadir` is a LDP data directory containing `ldpconf.json`, and
-`ldp1_user` is a LDP user to be granted `SELECT` privileges on the output
-table.
+`ldp1_user` is a LDP user to be granted `SELECT` privileges on the
+output table.
 
 For example:
 
@@ -759,9 +776,9 @@ For example:
 ./bin/marct -D data -u ldp
 ----
 
-Note that `marct` only grants privileges for a single user.  If individual user
-accounts are configured for LDP, a shell script can be used to grant privileges
-to the users, for example:
+Note that `marct` only grants privileges for a single user.  If
+individual user accounts are configured for LDP, a shell script can be
+used to grant privileges to the users, for example:
 
 ----
 users=/path/to/list/of/users.txt
@@ -770,15 +787,17 @@ for u in $( cat $users ); do
 done
 ----
 
-The first time `marct` runs, it will perform a "full update" of all of the MARC
-records.  In subsequent runs, it will attempt to use "incremental update" to
-update only records that have changed since the previous run, which can
-dramatically reduce the running time if the number of changes is small.
+The first time `marct` runs, it will perform a "full update" of all of
+the MARC records.  In subsequent runs, it will attempt to use
+"incremental update" to update only records that have changed since
+the previous run, which can dramatically reduce the running time if
+the number of changes is small.
 
-However, if very many records have changed, it is possible that incremental
-update may take longer than full update.  If it appears that an incremental
-update will never finish, it should be canceled, and a full update should be
-run once before resuming incremental updates.  This can be done by using the
-`-f` command-line option, which disables incremental update and requires
-`marct` to do a full update.
+However, if very many records have changed, it is possible that
+incremental update may take longer than full update.  If it appears
+that an incremental update will never finish, it should be canceled,
+and a full update should be run once before resuming incremental
+updates.  This can be done by using the `-f` command-line option,
+which disables incremental update and requires `marct` to do a full
+update.
 
