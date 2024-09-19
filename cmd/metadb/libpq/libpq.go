@@ -96,7 +96,6 @@ func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, sources *[]*sys
 			_ = err
 			return
 		}
-		log.Trace("*** %#v", msg)
 
 		switch m := msg.(type) {
 		case *pgproto3.Parse:
@@ -181,7 +180,6 @@ func processParse(conn net.Conn, backend *pgproto3.Backend, parse *pgproto3.Pars
 		if err != nil {
 			return fmt.Errorf("unexpected message in extended query: %w", err)
 		}
-		log.Trace("*** %#v", msg)
 
 		_ = stmt
 		switch m := msg.(type) {
@@ -409,11 +407,22 @@ func list(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.Sou
 			"            WHEN (tables='.*' AND dbupdated) THEN 'authorized'"+
 			"            ELSE 'not authorized'"+
 			"       END note"+
-			"    FROM metadb.auth", nil, dc)
+			"    FROM metadb.auth"+
+			"    ORDER BY username", nil, dc)
 	case "data_mappings":
-		return proxySelect(conn, "SELECT 'json' AS mapping_type, schema_name||'.'||table_name AS table_name, column_name, path AS object_path, map AS target_identifier FROM metadb.transform_json", nil, dc)
+		return proxySelect(conn, ""+
+			"SELECT 'json' mapping_type,"+
+			"       schema_name||'.'||table_name table_name,"+
+			"       column_name,"+
+			"       path object_path,"+
+			"       map target_identifier"+
+			"    FROM metadb.transform_json"+
+			"    ORDER BY mapping_type, table_name, column_name, path", nil, dc)
 	case "data_origins":
-		return proxySelect(conn, "SELECT name FROM metadb.origin", nil, dc)
+		return proxySelect(conn, ""+
+			"SELECT name"+
+			"    FROM metadb.origin"+
+			"    ORDER BY name", nil, dc)
 	case "data_sources":
 		return proxySelect(conn, ""+
 			"SELECT name,"+
@@ -427,7 +436,8 @@ func list(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.Sou
 			"       trimschemaprefix,"+
 			"       addschemaprefix,"+
 			"       module"+
-			"    FROM metadb.source", nil, dc)
+			"    FROM metadb.source"+
+			"    ORDER BY name", nil, dc)
 	case "status":
 		return listStatus(conn, sources)
 	default:
@@ -571,8 +581,8 @@ func createDataMapping(conn net.Conn, node *ast.CreateDataMappingStmt, dc *pgx.C
 	q := "INSERT INTO metadb.transform_json (schema_name, table_name, column_name, path, map) VALUES ($1, $2, $3, $4, $5)"
 	if _, err = dc.Exec(context.TODO(), q, table.Schema, table.Table, node.ColumnName, node.Path, node.TargetIdentifier); err != nil {
 		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-			return fmt.Errorf("mapping already exists from table %q, column %q, path %q",
-				node.TableName, node.ColumnName, node.Path)
+			return fmt.Errorf("JSON mapping from (table %q, column %q, path %q) to (%q) conflicts with an existing mapping",
+				node.TableName, node.ColumnName, node.Path, node.TargetIdentifier)
 		}
 		return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
 	}

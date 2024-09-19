@@ -30,8 +30,6 @@ func RewriteJSON(cat *catalog.Catalog, cmd *command.Command, column *command.Com
 	if !ok {
 		return nil
 	}
-	objectLevel := 1
-	arrayLevel := 0
 	table := cmd.TableName + "__" + tmap
 	rootkey := command.PrimaryKeyColumns(cmd.Column)
 	for i := range rootkey {
@@ -39,7 +37,7 @@ func RewriteJSON(cat *catalog.Catalog, cmd *command.Command, column *command.Com
 	}
 	quasikey := make([]command.CommandColumn, 0)
 	deletions := make(map[string]struct{})
-	if err := rewriteExtendedObject(cat, cmd, objectLevel, arrayLevel, "", obj, table, rootkey, quasikey, path, deletions); err != nil {
+	if err := rewriteExtendedObject(cat, cmd, obj, table, rootkey, quasikey, path, deletions); err != nil {
 		return fmt.Errorf("rewrite json: %s", err)
 	}
 	return nil
@@ -52,10 +50,10 @@ func RewriteJSON(cat *catalog.Catalog, cmd *command.Command, column *command.Com
 // indices are added in a column named with the prefix "__ord__".  Primary key
 // columns of the root command are included with the prefix "__root__" added to
 // the column names.
-func rewriteExtendedObject(cat *catalog.Catalog, cmd *command.Command, objectLevel, arrayLevel int, attrPrefix string, obj map[string]any, table string, rootkey, quasikey []command.CommandColumn, path config.JSONPath, deletions map[string]struct{}) error {
+func rewriteExtendedObject(cat *catalog.Catalog, cmd *command.Command, obj map[string]any, table string, rootkey, quasikey []command.CommandColumn, path config.JSONPath, deletions map[string]struct{}) error {
 	cols := make([]command.CommandColumn, 0)
 	cols = append(cols, rootkey...)
-	if err := rewriteObject(cat, cmd, objectLevel, arrayLevel, attrPrefix, obj, table, &cols, rootkey, quasikey, path, deletions); err != nil {
+	if err := rewriteObject(cat, cmd, "", obj, table, &cols, rootkey, quasikey, path, deletions); err != nil {
 		return fmt.Errorf("rewrite json object: %s", err)
 	}
 	newcmd := &command.Command{
@@ -72,8 +70,8 @@ func rewriteExtendedObject(cat *catalog.Catalog, cmd *command.Command, objectLev
 	return nil
 }
 
-func rewriteObject(cat *catalog.Catalog, cmd *command.Command, objectLevel, arrayLevel int, attrPrefix string, obj map[string]any, table string, cols *[]command.CommandColumn, rootkey, quasikey []command.CommandColumn, path config.JSONPath, deletions map[string]struct{}) error {
-	if objectLevel > 5 {
+func rewriteObject(cat *catalog.Catalog, cmd *command.Command, attrPrefix string, obj map[string]any, table string, cols *[]command.CommandColumn, rootkey, quasikey []command.CommandColumn, path config.JSONPath, deletions map[string]struct{}) error {
+	if path.Path[len(path.Path)-1] != "" {
 		return nil
 	}
 	qkey := slices.Clone(quasikey)
@@ -112,10 +110,7 @@ func rewriteObject(cat *catalog.Catalog, cmd *command.Command, objectLevel, arra
 			if t == "" {
 				continue
 			}
-			if arrayLevel > 0 {
-				t = attrPrefix + t
-			}
-			if err := rewriteArray(cat, cmd, objectLevel, arrayLevel+1, t, v, cmd.TableName+"__"+t, rootkey, qkey, path.Append(name), deletions); err != nil {
+			if err := rewriteArray(cat, cmd, t, v, cmd.TableName+"__"+t, rootkey, qkey, p, deletions); err != nil {
 				return err
 			}
 		case map[string]any:
@@ -124,7 +119,7 @@ func rewriteObject(cat *catalog.Catalog, cmd *command.Command, objectLevel, arra
 			if t == "" {
 				continue
 			}
-			if err := rewriteObject(cat, cmd, objectLevel+1, arrayLevel, attrPrefix+t+"__", v, table, cols, rootkey, qkey, p, deletions); err != nil {
+			if err := rewriteObject(cat, cmd, t+"__", v, table, cols, rootkey, qkey, p, deletions); err != nil {
 				return err
 			}
 		}
@@ -132,8 +127,8 @@ func rewriteObject(cat *catalog.Catalog, cmd *command.Command, objectLevel, arra
 	return nil
 }
 
-func rewriteArray(cat *catalog.Catalog, cmd *command.Command, objectLevel, arrayLevel int, aname string, adata []any, table string, rootkey, quasikey []command.CommandColumn, path config.JSONPath, deletions map[string]struct{}) error {
-	if arrayLevel > 3 {
+func rewriteArray(cat *catalog.Catalog, cmd *command.Command, aname string, adata []any, table string, rootkey, quasikey []command.CommandColumn, path config.JSONPath, deletions map[string]struct{}) error {
+	if path.Path[len(path.Path)-1] != "" {
 		return nil
 	}
 	_, ok := deletions[table]
@@ -190,7 +185,7 @@ func rewriteArray(cat *catalog.Catalog, cmd *command.Command, objectLevel, array
 		case []any: // Not supported
 			continue
 		case map[string]any:
-			if err := rewriteObject(cat, cmd, objectLevel+1, arrayLevel, aname+"__", v, table, &cols, rootkey, qkey, path, deletions); err != nil {
+			if err := rewriteObject(cat, cmd, "", v, table, &cols, rootkey, qkey, path, deletions); err != nil {
 				return fmt.Errorf("rewrite json: %s", err)
 			}
 		}

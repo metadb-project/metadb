@@ -490,9 +490,9 @@ of a mapping is written to a new column or table based on the specified target
 identifier.
 
 In JSON mapping, the specified path identifies a JSON object or array to
-transform.  For example, the path `'$.a.b'` means an object or array named `b`
-contained within an object or array named `a`.  The path `'$'` means the
-outermost enclosing object.  Note that an object or array will not be
+transform.  For example, the path `'$.a.b'` is used to refer to an object or
+array named `b` contained within an object or array named `a`.  The path `'$'`
+means the outermost enclosing object.  Note that an object or array will not be
 transformed unless all of its parents are also transformed; for example, a
 mapping from path `'$.a.b'` will only take effect if mappings are also defined
 for both the paths `'$.a'` and `'$'` within the same table and column.
@@ -522,7 +522,9 @@ take effect.
 |Path to a JSON object or array.
 
 |`'*_target_identifier_*'`
-|A short identifier to be used in naming the transformed data.
+|A short identifier to be used in naming the transformed data.  It must be
+ unique for the transformed object; in other words, no two paths should be
+ mapped to the same target identifier.
 |===
 
 [discrete]
