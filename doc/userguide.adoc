@@ -182,10 +182,10 @@ they match the original table names in the data source.
 
 === Transformed tables
 
-Metadb applies transformations to some kinds of data, which results in
-additional tables being created.  One category of data that are transformed in
-this way is JSON objects.  Suppose that our `patrongroup` current table
-contains the `groupname` and `description` data in JSON fields, for example:
+Metadb can apply transformations to data, which results in additional tables
+being created.  One category of data that can be transformed in this way is
+JSON objects.  Suppose that our `patrongroup` current table contains the
+`groupname` and `description` data in JSON fields, for example:
 
 [source]
 ----
@@ -256,9 +256,20 @@ SELECT __id,
     FROM library.patrongroup;
 ----
 
-However, Metadb also generates a *transformed table* called `patrongroup__t`.
-Transformed tables based on JSON objects contain JSON fields extracted into
-columns, which allows for simpler queries.
+Metadb can be configured to generate a *transformed table*, for example called
+`patrongroup__t`.  Transformed tables based on JSON objects contain JSON fields
+extracted into columns, which allows for simpler queries.
+
+In order to enable the transformation, the Metadb system administrator would
+use this command:
+
+----
+CREATE DATA MAPPING FOR json
+    FROM TABLE library.patrongroup__ COLUMN jsondata PATH '$'
+    TO 't';
+----
+
+The query can now be written as:
 
 [source]
 ----
@@ -298,11 +309,7 @@ SELECT __id, __start, id, groupname, description FROM library.patrongroup__t;
 |Staff Member
 |===
 
-In the current version of Metadb, only top-level, scalar JSON fields are
-extracted into transformed tables.  Therefore array fields are not presently
-extracted, but their values can be accessed using a lateral join.
-
-Main tables are also transformed in the same way.  In this case the main
+The corresponding main table is also transformed.  In this case the main
 transformed table would be called `+patrongroup__t__+`.
 
 Note that JSON data are treated as "schemaless," and fields are inferred from
@@ -329,14 +336,18 @@ To summarize the types of tables that we have covered:
 |Current table (base table)
 |Current records only
 
-|patrongroup__t__
+|patrongroup__{X}__
 |Main transformed table
 |Transformed versions of the records in `patrongroup__`
 
-|patrongroup__t
+|patrongroup__{X}
 |Current transformed table
 |Transformed versions of the records in `patrongroup`
 |===
+
+where _{X}_ is some identifier configured by the Metadb system administrator.
+In the previous example, it was simply `t`.  There can be more than one
+transformed table, with different identifiers.
 
 In addition to these table types, some partition tables have names that begin
 with `zzz___`.  It is recommended that these tables not be used directly in

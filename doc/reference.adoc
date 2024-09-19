@@ -494,7 +494,7 @@ transform.  For example, the path `'$.a.b'` is used to refer to an object or
 array named `b` contained within an object or array named `a`.  The path `'$'`
 means the outermost enclosing object.  Note that an object or array will not be
 transformed unless all of its parents are also transformed; for example, a
-mapping from path `'$.a.b'` will only take effect if mappings are also defined
+mapping from path `'$.a.b'` will be applied only if mappings are also defined
 for both the paths `'$.a'` and `'$'` within the same table and column.
 
 .Note
@@ -523,24 +523,33 @@ take effect.
 
 |`'*_target_identifier_*'`
 |A short identifier to be used in naming the transformed data.  It must be
- unique for the transformed object; in other words, no two paths should be
- mapped to the same target identifier.
+ unique for the transformed column; in other words, no two paths can be mapped
+ to the same target identifier.
 |===
 
 [discrete]
 ===== Examples
 
-Create mappings to transform a nested "metadata" object:
+Create mappings to transform a "metadata" object and an "identifiers" array:
 
 ----
 CREATE DATA MAPPING FOR json
-    FROM TABLE users.groups__ COLUMN jsonb PATH '$'
+    FROM TABLE library.inventory__ COLUMN jsonb PATH '$'
     TO 't';
 
 CREATE DATA MAPPING FOR json
-    FROM TABLE users.groups__ COLUMN jsonb PATH '$.metadata'
-    TO 'md';
+    FROM TABLE library.inventory__ COLUMN jsonb PATH '$.metadata'
+    TO 'metadata';
+
+CREATE DATA MAPPING FOR json
+    FROM TABLE library.inventory__ COLUMN jsonb PATH '$.identifiers'
+    TO 'identifier';
 ----
+
+When the JSON data are next updated, this will produce a table
+`library.inventory\__t\__` which includes the metadata columns, using
+`metadata\__` as a prefix in column names, and another table
+`library.inventory__identifier__` which contains the identifiers array data.
 
 
 ==== CREATE DATA ORIGIN
