@@ -298,7 +298,8 @@ func createTableJSON(tx pgx.Tx) error {
 		"column_name varchar(63) NOT NULL, " +
 		"path text NOT NULL, " +
 		"PRIMARY KEY (schema_name, table_name, column_name, path), " +
-		"map text NOT NULL)"
+		"map text NOT NULL, " +
+		"UNIQUE (schema_name, table_name, column_name, map))"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".transform_json: %w", err)
 	}

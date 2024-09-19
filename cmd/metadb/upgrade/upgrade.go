@@ -1699,7 +1699,8 @@ func updb25(opt *dbopt) error {
 		"column_name varchar(63) NOT NULL, " +
 		"path text NOT NULL, " +
 		"PRIMARY KEY (schema_name, table_name, column_name, path), " +
-		"map text NOT NULL)"
+		"map text NOT NULL, " +
+		"UNIQUE (schema_name, table_name, column_name, map))"
 	_, err = tx.Exec(context.TODO(), q)
 	if err != nil {
 		return fmt.Errorf("creating table metadb.transform_json: %w", err)
