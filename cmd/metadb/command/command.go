@@ -633,10 +633,6 @@ func NewCommand(dedup *log.MessageSet, ce *change.Event, schemaPassFilter, schem
 		if trimSchemaPrefix != "" {
 			schema = strings.TrimPrefix(schema, trimSchemaPrefix)
 		}
-		schema = strings.TrimPrefix(schema, "uchicago_")
-		schema = strings.TrimPrefix(schema, "lu_")
-		schema = strings.TrimPrefix(schema, "dbz_")
-		schema = strings.TrimPrefix(schema, "reports_dev_")
 		schema = strings.TrimPrefix(schema, "mod_")
 		schema = strings.TrimSuffix(schema, "_storage")
 		schema = strings.Replace(schema, "_mod_", "_", 1)
