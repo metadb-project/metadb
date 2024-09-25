@@ -276,7 +276,16 @@ CREATE DATA MAPPING FOR json
     TO 't';
 ----
 
-The transformation will take effect when the JSON data are next
+.Note
+****
+[.text-center]
+In Metadb versions previous to 1.4, transformation of the top
+(outermost) level of JSON objects is defined automatically.  See
+*Reference > Statements > CREATE DATA MAPPING* for more information on
+defining transformations in Metadb versions 1.4 or later.
+****
+
+The new transformation will take effect when the JSON data are next
 updated.  Then the query can be written as:
 
 [source]
