@@ -551,6 +551,10 @@ CREATE DATA MAPPING FOR json
     TO 'metadata';
 
 CREATE DATA MAPPING FOR json
+    FROM TABLE library.inventory__ COLUMN jsonb PATH '$.tags'
+    TO 'tags';
+
+CREATE DATA MAPPING FOR json
     FROM TABLE library.inventory__ COLUMN jsonb PATH '$.tags.tagList'
     TO 'taglist';
 ----
