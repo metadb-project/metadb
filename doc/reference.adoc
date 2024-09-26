@@ -405,6 +405,13 @@ ALTER TABLE `*_table_name_*`
 ALTER TABLE changes the definition of a table that is extracted from a
 data source.
 
+.Note
+****
+[.text-center]
+ALTER TABLE currently requires restarting the server before it will
+take effect.
+****
+
 [discrete]
 ===== Parameters
 
@@ -530,9 +537,9 @@ will take effect.
 |Path to a JSON object or array.
 
 |`'*_target_identifier_*'`
-|A short identifier to be used in naming the transformed data.  It
- must be unique for the transformed column; in other words, no two
- paths can be mapped to the same target identifier.
+|A short, lowercase identifier to be used in naming the transformed
+ data.  It must be unique for the transformed column; in other words,
+ no two paths can be mapped to the same target identifier.
 |===
 
 [discrete]
@@ -767,6 +774,12 @@ DROP DATA SOURCE `*_source_name_*`
 
 DROP DATA SOURCE removes a data source configuration.
 
+.Note
+****
+[.text-center]
+DROP DATA SOURCE currently requires restarting the server before it
+will take effect.
+****
 [discrete]
 ===== Parameters
 

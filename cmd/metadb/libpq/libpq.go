@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 	"syscall"
 
@@ -548,6 +549,8 @@ func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Con
 	})
 }
 
+var identifierRegexp = regexp.MustCompile(`^[a-z][0-9a-z]*$`)
+
 func createDataMapping(conn net.Conn, node *ast.CreateDataMappingStmt, dc *pgx.Conn) error {
 	// The only mapping type currently supported is json.
 	if node.TypeName != "json" {
@@ -555,18 +558,19 @@ func createDataMapping(conn net.Conn, node *ast.CreateDataMappingStmt, dc *pgx.C
 	}
 
 	// Validate path.
-	var invalidPath bool
 	p := strings.Split(node.Path, ".")
 	if len(p) < 1 || p[0] != "$" {
-		invalidPath = true
+		return fmt.Errorf("path %q is invalid", node.Path)
 	}
 	for i := 1; i < len(p); i++ {
-		if p[i] == "" || strings.Contains(p[i], " ") || strings.Contains(p[i], "__") || strings.HasPrefix(p[i], "_") || strings.HasSuffix(p[i], "_") {
-			invalidPath = true
+		if p[i] == "" {
+			return fmt.Errorf("path %q is invalid", node.Path)
 		}
 	}
-	if invalidPath {
-		return fmt.Errorf("path %q is invalid", node.Path)
+
+	// Validate target identifier.
+	if node.TargetIdentifier == "" || !identifierRegexp.MatchString(node.TargetIdentifier) {
+		return fmt.Errorf("target identifier %q is invalid", node.TargetIdentifier)
 	}
 
 	// Ensure the table name is a main table, and parse it.
@@ -577,6 +581,15 @@ func createDataMapping(conn net.Conn, node *ast.CreateDataMappingStmt, dc *pgx.C
 	if err != nil {
 		return fmt.Errorf("%q is not a valid table name", node.TableName)
 	}
+	// Validate table name.
+	if len(table.Schema) > 63 || len(table.Table) > 63 {
+		return fmt.Errorf("%q is not a valid table name", node.TableName)
+	}
+
+	// Validate column name.
+	if len(node.ColumnName) > 63 {
+		return fmt.Errorf("%q is not a valid column name", node.ColumnName)
+	}
 
 	q := "INSERT INTO metadb.transform_json (schema_name, table_name, column_name, path, map) VALUES ($1, $2, $3, $4, $5)"
 	if _, err = dc.Exec(context.TODO(), q, table.Schema, table.Table, node.ColumnName, node.Path, node.TargetIdentifier); err != nil {
@@ -586,6 +599,10 @@ func createDataMapping(conn net.Conn, node *ast.CreateDataMappingStmt, dc *pgx.C
 		}
 		return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
 	}
+
+	_ = writeEncoded(conn, []pgproto3.Message{
+		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server for data mapping changes to take effect"},
+	})
 
 	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("CREATE DATA MAPPING")},
@@ -653,6 +670,9 @@ func alterTable(conn net.Conn, node *ast.AlterTableStmt, dc *pgx.Conn) error {
 			return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
 		}
 	}
+	_ = writeEncoded(conn, []pgproto3.Message{
+		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server for table changes to take full effect"},
+	})
 	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("ALTER TABLE")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
@@ -697,6 +717,9 @@ func dropDataSource(conn net.Conn, node *ast.DropDataSourceStmt, dc *pgx.Conn) e
 	if err != nil {
 		return fmt.Errorf("deleting data source %q", node.DataSourceName)
 	}
+	_ = writeEncoded(conn, []pgproto3.Message{
+		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server for data source changes to take effect"},
+	})
 	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("DROP DATA SOURCE")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
