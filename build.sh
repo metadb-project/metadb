@@ -23,7 +23,7 @@ usage() {
     # echo '    go install golang.org/x/tools/cmd/deadcode@latest'
     echo '    go install github.com/kisielk/errcheck@latest'
     echo '-v  Enable verbose output'
-    # echo '-D  Enable "-tags dynamic" compiler option'
+    echo '-D  Enable "-tags dynamic" compiler option'
     # echo '-X  Build with experimental code included'
 }
 
@@ -63,17 +63,9 @@ fi
 
 tags=''
 
-# Check which operating system is running.
-case "$(uname -s)" in
-    Linux*)     tags='' ;;
-    # Darwin*)    tags='-tags dynamic' ;;
-    Darwin*)    tags='' ;;
-    *)          tags='' ;;
-esac
-
-# if $tagsdynamic; then
-#     tags='-tags dynamic'
-# fi
+if $tagsdynamic; then
+    tags='dynamic'
+fi
 
 if $experiment; then
     # echo "The \"build with experimental code\" option (-X) has been selected."
