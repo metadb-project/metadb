@@ -485,6 +485,7 @@ func isCurrentIdenticalMatch(ctx context.Context, cmd *command.Command, tx *pgxp
 	b.WriteString(" LIMIT 1")
 	rows, err := tx.Query(ctx, b.String())
 	if err != nil {
+		log.Detail("%s", b.String())
 		return false, 0, fmt.Errorf("querying for matching current row: %w", err)
 	}
 	defer rows.Close()
