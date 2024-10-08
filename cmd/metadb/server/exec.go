@@ -485,7 +485,21 @@ func isCurrentIdenticalMatch(ctx context.Context, cmd *command.Command, tx *pgxp
 	b.WriteString(" LIMIT 1")
 	rows, err := tx.Query(ctx, b.String())
 	if err != nil {
-		log.Detail("%s", b.String())
+		var d strings.Builder
+		fmt.Fprintf(&d, "matching: %s.%s:", table.Schema, table.Table)
+		fmt.Fprintf(&d, " __origin='%s'", cmd.Origin)
+		for i := range columns {
+			if columns[i].Unavailable {
+				continue
+			}
+			fmt.Fprintf(&d, " %s=", columns[i].Name)
+			if columns[i].Data == nil {
+				d.WriteString("null")
+			} else {
+				encodeSQLData(&d, columns[i].SQLData, columns[i].DType)
+			}
+		}
+		log.Detail("%s", d.String())
 		return false, 0, fmt.Errorf("querying for matching current row: %w", err)
 	}
 	defer rows.Close()
