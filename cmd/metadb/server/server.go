@@ -291,7 +291,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 		for {
 			tries++
 			url := "https://github.com/folio-org/folio-analytics.git"
-			ref := "refs/tags/v1.7.8"
+			ref := "refs/tags/v1.7.9"
 			if util.FolioVersion != "" {
 				ref = util.FolioVersion
 			}
