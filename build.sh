@@ -15,28 +15,28 @@ usage() {
     echo 'Builds the "metadb" executable in the bin directory'
     echo ''
     echo 'Flags:'
-    echo '-f  Fast build (do not remove executable before compiling)'
-    echo '-h  Help'
-    echo '-t  Run tests'
-    echo '-T  Run tests and other checks; requires'
+    echo '-T  Run tests'
+    echo '-t  Run tests and other checks; requires'
     echo '    go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest'
     # echo '    go install golang.org/x/tools/cmd/deadcode@latest'
     echo '    go install github.com/kisielk/errcheck@latest'
     echo '-v  Enable verbose output'
-    echo '-D  Enable "-tags dynamic" compiler option'
+    echo '-f  Fast build (do not remove executable before compiling)'
+    echo '-d  Compile with dynamic tags'
     # echo '-X  Build with experimental code included'
+    echo '-h  Help'
 }
 
-while getopts 'fhJtvTD' flag; do
+while getopts 'fhJtvTd' flag; do
     case "${flag}" in
-        t) runtests='true' ;;
-        T) runalltests='true' ;;
+        T) runtests='true' ;;
+        t) runalltests='true' ;;
         f) fast='true' ;;
         J) echo "build.sh: -J option is deprecated" 1>&2 ;;
         h) usage
             exit 1 ;;
         v) verbose='true' ;;
-        D) tagsdynamic='true' ;;
+        d) tagsdynamic='true' ;;
         *) usage
             exit 1 ;;
     esac
