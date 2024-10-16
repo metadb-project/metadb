@@ -26,7 +26,7 @@ jobs:
     - name: install ragel
       run: sudo apt install ragel
     - name: build metadb
-      run: PATH=$HOME/go/bin:/usr/local/mdb/go/bin:$PATH ./build.sh
+      run: PATH=$HOME/go/bin:/usr/local/mdb/go/bin:$PATH ./build
     - name: run metadb
       run: ./bin/metadb help
     - name: build marct
