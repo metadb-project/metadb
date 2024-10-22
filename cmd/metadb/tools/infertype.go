@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 )
@@ -16,7 +17,9 @@ func RefreshInferredColumnTypes(dq dbx.Queryable, progress func(string)) error {
         JOIN pg_namespace AS ns ON m.schema_name = ns.nspname AND t.relnamespace = ns.oid
         JOIN pg_attribute AS a ON t.oid = a.attrelid
         JOIN pg_type AS y ON a.atttypid = y.oid
-    WHERE t.relkind IN ('r', 'p') AND a.attnum > 0 AND y.typname = 'text' AND left(attname, 2) <> '__'
+    WHERE t.relkind IN ('r', 'p') AND a.attnum > 0 AND y.typname = 'text' AND
+        attname NOT IN ('__id', '__start', '__end', '__current', '__origin') AND
+        left(attname, 7) <> '__ord__'
     ORDER BY ns.nspname, t.relname, a.attnum`
 	var rows pgx.Rows
 	var err error

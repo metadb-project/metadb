@@ -72,7 +72,7 @@ joined AS (
 )
 SELECT table_schema, table_name, column_name
     FROM joined
-    WHERE has_index AND left(column_name, 2) <> '__'`
+    WHERE has_index AND column_name NOT IN ('__id', '__start', '__end', '__current', '__origin')`
 	rows, err := c.dp.Query(context.TODO(), q)
 	if err != nil {
 		return fmt.Errorf("selecting indexes: %w", err)
