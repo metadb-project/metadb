@@ -552,19 +552,19 @@ image::create_data_mapping.png[]
 
 ----
 CREATE DATA MAPPING FOR json
-    FROM TABLE library.inventory__ COLUMN jsonb PATH '$'
+    FROM TABLE library.inventory__ COLUMN jsondata PATH '$'
     TO 't';
 
 CREATE DATA MAPPING FOR json
-    FROM TABLE library.inventory__ COLUMN jsonb PATH '$.metadata'
+    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.metadata'
     TO 'metadata';
 
 CREATE DATA MAPPING FOR json
-    FROM TABLE library.inventory__ COLUMN jsonb PATH '$.tags'
+    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.tags'
     TO 'tags';
 
 CREATE DATA MAPPING FOR json
-    FROM TABLE library.inventory__ COLUMN jsonb PATH '$.tags.tagList'
+    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.tags.tagList'
     TO 'taglist';
 ----
 
