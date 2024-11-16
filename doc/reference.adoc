@@ -548,6 +548,8 @@ will take effect.
 Create JSON mappings to transform an object at `$.metadata` and an
 array at `$.tags.tagList`:
 
+image::create_data_mapping.png[]
+
 ----
 CREATE DATA MAPPING FOR json
     FROM TABLE library.inventory__ COLUMN jsonb PATH '$'
