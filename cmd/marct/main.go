@@ -58,7 +58,7 @@ func main() {
 	if *verboseFlag {
 		verbose = 2
 	}
-	t := &marct.MARCTransform{
+	t := &libmarct.MARCTransform{
 		FullUpdate: *fullUpdateFlag,
 		Datadir:    *datadirFlag,
 		Users:      users,

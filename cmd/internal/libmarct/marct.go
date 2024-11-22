@@ -1,4 +1,4 @@
-package marct
+package libmarct
 
 import (
 	"context"
