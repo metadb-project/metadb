@@ -56,11 +56,11 @@ and for this reason they are generally not up-to-date.
 
 FOLIO modules do not in general provide documentation for their
 internal data models, which Metadb tables are based on, but they do
-have some https://dev.folio.org/reference/api/[documentation for
-"storage module" WSAPIs] which are roughly equivalent.  The names of
-most storage modules end in `-storage`, but some modules use a
-different convention; for instance, the storage module for users is
-`mod-users`.  (All module names begin with `mod-`.)
+have some https://dev.folio.org/reference/api/[documentation for "storage module" WSAPIs] which are
+roughly equivalent.  The names of most storage modules end in
+`-storage`, but some modules use a different convention; for instance,
+the storage module for users is `mod-users`.  (All module names begin
+with `mod-`.)
 
 ==== Migrating from LDP
 
