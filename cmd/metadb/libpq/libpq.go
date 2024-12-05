@@ -413,7 +413,7 @@ func list(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.Sou
 	case "data_mappings":
 		return proxySelect(conn, ""+
 			"SELECT 'json' mapping_type,"+
-			"       schema_name||'.'||table_name table_name,"+
+			"       schema_name||'.'||table_name||'__' table_name,"+
 			"       column_name,"+
 			"       path object_path,"+
 			"       map target_identifier"+
