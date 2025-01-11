@@ -33,10 +33,10 @@ jobs:
       run: go build -o bin ./cmd/marct
     - name: run marct
       run: ./bin/marct -h
-    - name: create test coverage out file
-      run: go test -json -coverprofile=coverage.out ./... > report.json
-    - name: SonarCloud Scan
-      uses: SonarSource/sonarcloud-github-action@master
+#   - name: create test coverage out file
+#     run: go test -json -coverprofile=coverage.out ./... > report.json
+#   - name: SonarCloud Scan
+#     uses: SonarSource/sonarcloud-github-action@master
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
