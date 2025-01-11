@@ -98,8 +98,6 @@ mkdir -p $bindir
 
 version=`git describe --tags --always`
 
-go generate $v ./...
-
 go build -o $bindir $v $tags -ldflags "-X github.com/metadb-project/metadb/cmd/metadb/util.MetadbVersion=$version -X github.com/metadb-project/metadb/cmd/metadb/util.FolioVersion=$METADB_FOLIO $json" ./cmd/metadb
 
 if $runtests || $runalltests; then

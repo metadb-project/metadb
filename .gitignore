@@ -1,5 +1,3 @@
-cmd/metadb/parser/gram.go
-cmd/metadb/parser/scan.go
 cmd/metadb/parser/y.output
 bin
 *~
