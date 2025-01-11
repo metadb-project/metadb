@@ -91,7 +91,7 @@ fi
 bindir=bin
 
 if ! $fast; then
-    rm -f ./$bindir/metadb ./cmd/metadb/parser/gram.go ./cmd/metadb/parser/scan.go ./cmd/metadb/parser/y.output
+    rm -f ./$bindir/metadb
 fi
 
 mkdir -p $bindir
