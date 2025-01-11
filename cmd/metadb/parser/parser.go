@@ -9,7 +9,7 @@ import (
 )
 
 //go:generate ragel -Z -G2 -o scan.go scan.rl
-//go:generate goyacc -l -o gram.go gram.y
+//go:generate go tool goyacc -l -o gram.go gram.y
 
 func WriteErrorContext(query string, position int) string {
 	var b strings.Builder
