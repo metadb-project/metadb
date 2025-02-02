@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"regexp"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -115,9 +114,6 @@ func loggingServer(svr *server) error {
 }
 
 func runServer(svr *server, cat *catalog.Catalog) error {
-	if svr.db.DBName != "metadb" && !strings.HasPrefix(svr.db.DBName, "metadb_") {
-		log.Info("database has nonstandard name %q", svr.db.DBName)
-	}
 	setMemoryLimit(svr.opt.MemoryLimit)
 	if svr.opt.NoTLS {
 		log.Warning("TLS disabled for all client connections")
@@ -179,13 +175,28 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 
 	//go listenAndServe(svr)
 
-	go goCreateFunctions(*(svr.db))
+	// Create database functions.
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func(db dbx.DB) {
+		defer wg.Done()
+		goCreateFunctions(db)
+	}(*(svr.db))
+	if svr.opt.Script {
+		wg.Wait()
+	}
 
-	go libpq.Listen(svr.opt.Listen, svr.opt.Port, svr.db, &svr.state.sources)
+	if !svr.opt.Script {
+		go libpq.Listen(svr.opt.Listen, svr.opt.Port, svr.db, &svr.state.sources)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go goPollLoop(ctx, cat, svr)
+	if !svr.opt.Script {
+		go goPollLoop(ctx, cat, svr)
+	} else {
+		goPollLoop(ctx, cat, svr)
+	}
 
 	/*	folio, err := isFolioModulePresent(svr.db)
 		if err != nil {
@@ -202,11 +213,13 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 		go goMaintenance(svr.opt.Datadir, *(svr.db), cat, source, folio, reshare)
 	*/
 
-	for {
-		if process.Stop() {
-			break
+	if !svr.opt.Script {
+		for {
+			if process.Stop() {
+				break
+			}
+			time.Sleep(5 * time.Second)
 		}
-		time.Sleep(5 * time.Second)
 	}
 
 	return nil

@@ -16,7 +16,7 @@ import (
 const DatabaseVersion = 25
 
 // MetadbVersion is defined at build time via -ldflags.
-var MetadbVersion = "(unknown version)"
+var MetadbVersion = ""
 
 var FolioVersion = ""
 

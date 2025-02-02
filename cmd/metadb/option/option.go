@@ -1,5 +1,7 @@
 package option
 
+import "github.com/metadb-project/metadb/cmd/metadb/command"
+
 // temporary definitions
 //var GeneralUser = "metadb"
 
@@ -32,6 +34,12 @@ type Server struct {
 	NoTLS         bool
 	MemoryLimit   float64
 	UUOpt         bool
+	Script        bool
+	ScriptOpts    ScriptOptions
+}
+
+type ScriptOptions struct {
+	CmdGraph *command.CommandGraph
 }
 
 type Stop struct {
@@ -41,9 +49,10 @@ type Stop struct {
 
 type Sync struct {
 	Global
-	Datadir string
-	Source  string
-	Force   bool
+	Datadir  string
+	Source   string
+	Force    bool
+	ForceAll bool
 }
 
 type Verify struct {
@@ -53,9 +62,10 @@ type Verify struct {
 
 type EndSync struct {
 	Global
-	Datadir string
-	Source  string
-	Force   bool
+	Datadir  string
+	Source   string
+	Force    bool
+	ForceAll bool
 }
 
 type Migrate struct {

@@ -74,14 +74,18 @@ func Sync(opt *option.Sync) error {
 		fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
 		fmt.Fprintf(os.Stderr, "WARNING: Synchronization in progress for data source %q.\n", opt.Source)
 		fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
-		fmt.Fprintf(os.Stderr, "Interrupt and restart synchronization with new snapshot? ")
-		var confirm string
-		_, err = fmt.Scanln(&confirm)
-		if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
-			return nil
+		if opt.ForceAll {
+			fmt.Fprintf(os.Stderr, "restarting synchronization with new snapshot\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "Interrupt and restart synchronization with new snapshot? ")
+			var confirm string
+			_, err = fmt.Scanln(&confirm)
+			if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
+				return nil
+			}
 		}
 	}
-	if !opt.Force {
+	if !opt.Force && !opt.ForceAll {
 		// Ask for confirmation
 		_, _ = fmt.Fprintf(os.Stderr, "Begin synchronization process for data source %q? ", opt.Source)
 		var confirm string

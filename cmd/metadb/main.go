@@ -190,6 +190,7 @@ func run() error {
 	_ = cmdSync.MarkFlagRequired("source")
 	_ = dirFlag(cmdSync, &syncOpt.Datadir)
 	_ = forceFlag(cmdSync, &syncOpt.Force)
+	// _ = forceAllFlag(cmdSync, &syncOpt.ForceAll)
 	_ = verboseFlag(cmdSync, &eout.EnableVerbose)
 	_ = traceFlag(cmdSync, &eout.EnableTrace)
 
@@ -212,6 +213,7 @@ func run() error {
 	_ = cmdEndSync.MarkFlagRequired("source")
 	_ = dirFlag(cmdEndSync, &endSyncOpt.Datadir)
 	_ = forceFlag(cmdEndSync, &endSyncOpt.Force)
+	// _ = forceAllFlag(cmdEndSync, &endSyncOpt.ForceAll)
 	_ = verboseFlag(cmdEndSync, &eout.EnableVerbose)
 	_ = traceFlag(cmdEndSync, &eout.EnableTrace)
 
@@ -275,7 +277,7 @@ var helpStart = "Start server\n"
 var helpStop = "Shutdown server\n"
 var helpInit = "Initialize new Metadb instance\n"
 var helpUpgrade = "Upgrade Metadb instance to current version\n"
-var helpSync = "begin synchronization with a data source\n"
+var helpSync = "Begin synchronization with a data source\n"
 var helpEndSync = "End synchronization and remove leftover data\n"
 var helpMigrate = "Migrate historical data from LDP\n"
 var helpVersion = "Print metadb version\n"
@@ -284,7 +286,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 	_ = commandLine
 	switch cmd.Use {
 	case "metadb":
-		fmt.Printf("" +
+		fmt.Print("" +
 			"Metadb server\n" +
 			"\n" +
 			"Usage:  metadb <command> <arguments>\n" +
@@ -301,7 +303,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"\n" +
 			"Use \"metadb help <command>\" for more information about a command.\n")
 	case "start":
-		fmt.Printf("" +
+		fmt.Print("" +
 			helpStart +
 			"\n" +
 			"Usage:  metadb start <options>\n" +
@@ -323,7 +325,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			memoryLimitFlag(nil, nil) +
 			"")
 	case "stop":
-		fmt.Printf("" +
+		fmt.Print("" +
 			helpStop +
 			"\n" +
 			"Usage:  metadb stop <options>\n" +
@@ -334,7 +336,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			traceFlag(nil, nil) +
 			"")
 	case "init":
-		fmt.Printf("" +
+		fmt.Print("" +
 			helpInit +
 			"\n" +
 			"Usage:  metadb init <options>\n" +
@@ -346,7 +348,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			traceFlag(nil, nil) +
 			"")
 	case "upgrade":
-		fmt.Printf("" +
+		fmt.Print("" +
 			helpUpgrade +
 			"\n" +
 			"Usage:  metadb upgrade <options>\n" +
@@ -358,7 +360,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			traceFlag(nil, nil) +
 			"")
 	case "sync":
-		fmt.Printf("" +
+		fmt.Print("" +
 			helpSync +
 			"\n" +
 			"Usage:  metadb sync <options>\n" +
@@ -367,11 +369,12 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"      --source <s>            - Data source to synchronize\n" +
 			dirFlag(nil, nil) +
 			forceFlag(nil, nil) +
+			// forceAllFlag(nil, nil) +
 			verboseFlag(nil, nil) +
 			traceFlag(nil, nil) +
 			"")
 	case "endsync":
-		fmt.Printf("" +
+		fmt.Print("" +
 			helpEndSync +
 			"\n" +
 			"Usage:  metadb endsync <options>\n" +
@@ -380,11 +383,12 @@ func help(cmd *cobra.Command, commandLine []string) {
 			"      --source <s>            - Data source to finish synchronizing\n" +
 			dirFlag(nil, nil) +
 			forceFlag(nil, nil) +
+			// forceAllFlag(nil, nil) +
 			verboseFlag(nil, nil) +
 			traceFlag(nil, nil) +
 			"")
 	case "migrate":
-		fmt.Printf("" +
+		fmt.Print("" +
 			helpMigrate +
 			"\n" +
 			"Usage:  metadb migrate <options>\n" +
@@ -396,7 +400,7 @@ func help(cmd *cobra.Command, commandLine []string) {
 			traceFlag(nil, nil) +
 			"")
 	case "version":
-		fmt.Printf("" +
+		fmt.Print("" +
 			helpVersion +
 			"\n" +
 			"Usage:  metadb version\n")
@@ -445,6 +449,15 @@ func forceFlag(cmd *cobra.Command, force *bool) string {
 	}
 	return "" +
 		"      --force                 - Do not prompt for confirmation\n"
+}
+
+func forceAllFlag(cmd *cobra.Command, forceAll *bool) string {
+	if cmd != nil {
+		cmd.Flags().BoolVar(forceAll, "forceall", false, "")
+	}
+	return "" +
+		"      --forceall              - Never prompt, even for warnings and safety\n" +
+		"                                checks\n"
 }
 
 func noKafkaCommitFlag(cmd *cobra.Command, noKafkaCommit *bool) string {

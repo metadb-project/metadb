@@ -129,14 +129,16 @@ func EndSync(opt *option.EndSync) error {
 			fmt.Fprintf(os.Stderr, "%.0f%% of current records have not been confirmed by the new snapshot.\n", percent)
 			fmt.Fprintf(os.Stderr, "The unconfirmed records will be marked as deleted.\n")
 			fmt.Fprintf(os.Stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
-			fmt.Fprintf(os.Stderr, "Do you want to continue? ")
-			var confirm string
-			_, err = fmt.Scanln(&confirm)
-			if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
-				return nil
+			if !opt.ForceAll {
+				fmt.Fprintf(os.Stderr, "Do you want to continue? ")
+				var confirm string
+				_, err = fmt.Scanln(&confirm)
+				if err != nil || (confirm != "y" && confirm != "Y" && strings.ToUpper(confirm) != "YES") {
+					return nil
+				}
 			}
 		}
-		if !opt.Force {
+		if !opt.Force && !opt.ForceAll {
 			// Ask for confirmation
 			_, _ = fmt.Fprintf(os.Stderr, "Finalize synchronization for data source %q? ", opt.Source)
 			var confirm string

@@ -29,8 +29,10 @@ func goPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server) {
 	if svr.opt.NoKafkaCommit {
 		log.Info("Kafka commits disabled")
 	}
+	var spr *sproc
+	var err error
 	// For now, we support only one source
-	spr, err := waitForConfig(svr)
+	spr, err = waitForConfig(svr)
 	if err != nil {
 		log.Fatal("%s", err)
 		os.Exit(1)
@@ -50,7 +52,9 @@ func goPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server) {
 	if err != nil {
 		log.Error("checking for reshare module: %v", err)
 	}
-	go goMaintenance(svr.opt.Datadir, *(svr.db), svr.dp, cat, spr.source.Name, folio, reshare)
+	if !svr.opt.Script {
+		go goMaintenance(svr.opt.Datadir, *(svr.db), svr.dp, cat, spr.source.Name, folio, reshare)
+	}
 
 	for {
 		err := launchPollLoop(ctx, cat, svr, spr)
@@ -58,7 +62,11 @@ func goPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server) {
 			break
 		}
 		spr.source.Status.Stream.Error()
-		time.Sleep(24 * time.Hour)
+		if !svr.opt.Script {
+			time.Sleep(24 * time.Hour)
+		} else {
+			time.Sleep(1 * time.Hour)
+		}
 	}
 }
 
@@ -219,6 +227,15 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	if err != nil {
 		return err
 	}
+	if spr.svr.opt.Script {
+		var errString string
+		processStream(0, nil, ctx, cat, spr, syncMode, dedup, nil, nil, &errString)
+		if errString != "" {
+			spr.source.Status.Stream.Error()
+			return errors.New(errString)
+		}
+		return nil
+	}
 	var brokers = spr.source.Brokers
 	var topics = spr.source.Topics
 	var group = spr.source.Group
@@ -304,7 +321,11 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 				return errors.New(errStrings[i])
 			}
 		}
+		if spr.svr.opt.Script {
+			break
+		}
 	}
+	return nil
 }
 
 func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, cat *catalog.Catalog, spr *sproc, syncMode dsync.Mode, dedup *log.MessageSet, rebalanceFlag *int32, firstEvent *int32, errString *string) {
@@ -313,17 +334,24 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 	for { // Stream processing main loop
 		cmdgraph := command.NewCommandGraph()
 
+		var eventReadCount int
+		var err error
 		// Parse
-		eventReadCount, err := parseChangeEvents(cat, dedup, consumer, cmdgraph, spr.schemaPassFilter,
-			spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
-			spr.source.AddSchemaPrefix, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
-		if err != nil {
-			*errString = fmt.Sprintf("parser: %v", err)
-			return
-		}
-		if atomic.LoadInt32(firstEvent) == 1 {
-			atomic.StoreInt32(firstEvent, int32(0))
-			log.Debug("receiving data from source %q", spr.source.Name)
+		if !spr.svr.opt.Script {
+			eventReadCount, err = parseChangeEvents(cat, dedup, consumer, cmdgraph, spr.schemaPassFilter,
+				spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
+				spr.source.AddSchemaPrefix, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
+			if err != nil {
+				*errString = fmt.Sprintf("parser: %v", err)
+				return
+			}
+			if atomic.LoadInt32(firstEvent) == 1 {
+				atomic.StoreInt32(firstEvent, int32(0))
+				log.Debug("receiving data from source %q", spr.source.Name)
+			}
+		} else {
+			cmdgraph = spr.svr.opt.ScriptOpts.CmdGraph
+			eventReadCount = cmdgraph.Commands.Len()
 		}
 
 		// Rewrite
@@ -338,19 +366,22 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 			return
 		}
 
-		if eventReadCount > 0 && !spr.svr.opt.NoKafkaCommit {
-			_, err = consumer.Commit()
-			if err != nil {
-				e := err.(kafka.Error)
-				if e.IsFatal() {
-					//return fmt.Errorf("Kafka commit: %v", e)
-					log.Warning("Kafka commit: %v", e)
-				} else {
-					switch e.Code() {
-					case kafka.ErrNoOffset:
-						log.Debug("Kafka commit: %v", e)
-					default:
-						log.Info("Kafka commit: %v", e)
+		if !spr.svr.opt.Script {
+			// Commit Kafka consumer
+			if eventReadCount > 0 && !spr.svr.opt.NoKafkaCommit {
+				_, err = consumer.Commit()
+				if err != nil {
+					e := err.(kafka.Error)
+					if e.IsFatal() {
+						//return fmt.Errorf("Kafka commit: %v", e)
+						log.Warning("Kafka commit: %v", e)
+					} else {
+						switch e.Code() {
+						case kafka.ErrNoOffset:
+							log.Debug("Kafka commit: %v", e)
+						default:
+							log.Info("Kafka commit: %v", e)
+						}
 					}
 				}
 			}
@@ -374,8 +405,14 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 			}
 		}
 
-		if atomic.LoadInt32(rebalanceFlag) == 1 { // Exit thread on rebalance
-			log.Trace("[%d] rebalance", thread)
+		if !spr.svr.opt.Script {
+			if atomic.LoadInt32(rebalanceFlag) == 1 { // Exit thread on rebalance
+				log.Trace("[%d] rebalance", thread)
+				break
+			}
+		}
+
+		if spr.svr.opt.Script {
 			break
 		}
 	}

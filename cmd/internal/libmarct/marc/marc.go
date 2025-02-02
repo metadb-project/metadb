@@ -109,7 +109,7 @@ func Transform(marcjson *string, state string) ([]Marc, string, error) {
 					return nil, "", fmt.Errorf("parsing: %s", err)
 				}
 			default:
-				return nil, "", fmt.Errorf("parsing: unknown data type in field \"" + t + "\"")
+				return nil, "", fmt.Errorf("parsing: unknown data type in field %q", t)
 			}
 
 		}
