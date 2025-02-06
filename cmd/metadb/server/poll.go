@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -22,7 +23,6 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/status"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
-	"golang.org/x/net/context"
 )
 
 func goPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server) {
