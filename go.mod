@@ -1,6 +1,6 @@
 module github.com/metadb-project/metadb
 
-go 1.24rc3
+go 1.24
 
 require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.4.0
@@ -33,6 +33,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
+	github.com/kisielk/errcheck v1.8.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
@@ -50,16 +51,23 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
-	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/crypto v0.33.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
-	golang.org/x/mod v0.22.0 // indirect
-	golang.org/x/net v0.34.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
-	golang.org/x/tools v0.29.1-0.20250110220912-8f9869c7f0a3 // indirect
+	golang.org/x/mod v0.23.0 // indirect
+	golang.org/x/net v0.35.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/telemetry v0.0.0-20240522233618-39ace7a40ae7 // indirect
+	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/tools v0.30.0 // indirect
+	golang.org/x/vuln v1.1.4 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-tool golang.org/x/tools/cmd/goyacc
+tool (
+	github.com/kisielk/errcheck
+	golang.org/x/tools/cmd/goyacc
+	golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow
+	golang.org/x/vuln/cmd/govulncheck
+)

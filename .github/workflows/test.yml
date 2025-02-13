@@ -8,9 +8,9 @@ jobs:
       with:
         fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
     - name: download go
-      run: curl -O https://dl.google.com/go/go1.24rc3.linux-amd64.tar.gz
+      run: curl -O https://dl.google.com/go/go1.24.linux-amd64.tar.gz
     - name: unpack go
-      run: tar xf go1.24rc3.linux-amd64.tar.gz
+      run: tar xf go1.24.linux-amd64.tar.gz
     - name: install go
       run: sudo mkdir -p /usr/local/mdb && sudo mv go /usr/local/mdb/
     - name: install goyacc
