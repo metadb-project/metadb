@@ -71,6 +71,14 @@ type AuthorizeStmt struct {
 func (*AuthorizeStmt) node()     {}
 func (*AuthorizeStmt) stmtNode() {}
 
+type DeauthorizeStmt struct {
+	DataSourceName string
+	RoleName       string
+}
+
+func (*DeauthorizeStmt) node()     {}
+func (*DeauthorizeStmt) stmtNode() {}
+
 type CreateUserStmt struct {
 	UserName string
 	Options  []Option
@@ -78,6 +86,13 @@ type CreateUserStmt struct {
 
 func (*CreateUserStmt) node()     {}
 func (*CreateUserStmt) stmtNode() {}
+
+type DropUserStmt struct {
+	UserName string
+}
+
+func (*DropUserStmt) node()     {}
+func (*DropUserStmt) stmtNode() {}
 
 type ListStmt struct {
 	Name string

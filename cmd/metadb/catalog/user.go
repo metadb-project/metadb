@@ -33,6 +33,12 @@ func AllUsers(dc *pgx.Conn) ([]string, error) {
 	return users, nil
 }
 
+func (c *Catalog) ReinitUsers() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.initUsers()
+}
+
 func (c *Catalog) initUsers() error {
 	// read users
 	users, err := sysdb.UserRead(c.dp)

@@ -35,13 +35,7 @@ CREATE FUNCTION public.mdblog(v interval default interval '24 hours') RETURNS TA
     LANGUAGE SQL`},
 }
 
-func CreateAllFunctions(dcsuper, dc *pgx.Conn, systemuser string) error {
-	q := "GRANT CREATE, USAGE ON SCHEMA public TO " + systemuser
-	_, err := dcsuper.Exec(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("granting systemuser access to public schema: %w", err)
-	}
-
+func CreateAllFunctions(dcsuper, dc *pgx.Conn) error {
 	users, err := AllUsers(dc)
 	if err != nil {
 		return fmt.Errorf("accessing user list: %w", err)
@@ -52,11 +46,6 @@ func CreateAllFunctions(dcsuper, dc *pgx.Conn, systemuser string) error {
 		if err != nil {
 			return fmt.Errorf("creating %q: %v", f[0], err)
 		}
-	}
-
-	for _, u := range users {
-		q := "GRANT USAGE ON SCHEMA public TO " + u
-		_, _ = dcsuper.Exec(context.TODO(), q)
 	}
 
 	log.Trace("created database functions")

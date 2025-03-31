@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
@@ -167,10 +166,10 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	if err != nil {
 		return err
 	}
-	dcsuper, err := spr.svr.db.ConnectSuper()
-	if err != nil {
-		return err
-	}
+	// dcsuper, err := spr.svr.db.ConnectSuper()
+	// if err != nil {
+	// 	return err
+	// }
 	//////////////////////////////////////////////////////////////////////////////
 	//spr.db = append(spr.db, db)
 	// Cache tracking
@@ -183,18 +182,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			return fmt.Errorf("caching schema: %s", err)
 		}
 	*/
-	// Update user permissions in database
-	var waitUserPerms sync.WaitGroup
-	waitUserPerms.Add(1)
-	go func(trackedTables []dbx.Table) {
-		defer waitUserPerms.Done()
-		var dc2 *pgx.Conn
-		dc2, err = spr.svr.db.Connect()
-		if err != nil {
-			log.Error("%v", err)
-		}
-		sysdb.GoUpdateUserPerms(dc2, dcsuper, trackedTables)
-	}(cat.AllTables(spr.source.Name))
+
 	// Cache users
 	/*	users, err := cache.NewUsers(db)
 		if err != nil {
@@ -293,8 +281,6 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	}
 
 	spr.source.Status.Stream.Active()
-
-	waitUserPerms.Wait()
 
 	// One thread (goroutine) per consumer runs a stream processor in a loop.
 	// When a rebalance occurs, we synchronize the threads to prevent out-of-order database writes.

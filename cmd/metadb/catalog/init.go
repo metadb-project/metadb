@@ -45,6 +45,9 @@ func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
 		if err = RevokeCreateOnSchemaPublic(db); err != nil {
 			return nil, err
 		}
+		if err = grantCreateOnPublic(db); err != nil {
+			return nil, err
+		}
 	} else {
 		// Check that database version is compatible.
 		if err = CheckDatabaseCompatible(dp); err != nil {
@@ -335,6 +338,19 @@ func RevokeCreateOnSchemaPublic(db *dbx.DB) error {
 	defer dbx.Close(dcsuper)
 	if _, err := dcsuper.Exec(context.TODO(), "REVOKE CREATE ON SCHEMA public FROM public"); err != nil {
 		return err
+	}
+	return nil
+}
+
+func grantCreateOnPublic(db *dbx.DB) error {
+	dcsuper, err := db.ConnectSuper()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dcsuper)
+	q := "GRANT CREATE, USAGE ON SCHEMA public TO \"" + db.User + "\""
+	if _, err := dcsuper.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("granting systemuser access to public schema: %w", err)
 	}
 	return nil
 }

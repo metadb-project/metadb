@@ -118,10 +118,9 @@ func (c *Catalog) AllTables(source string) []dbx.Table {
 	defer c.mu.Unlock()
 	all := make([]dbx.Table, 0)
 	for t, e := range c.tableDir {
-		if e.source != source {
-			continue
+		if source == "" || source == e.source {
+			all = append(all, t)
 		}
-		all = append(all, t)
 	}
 	return all
 }

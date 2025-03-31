@@ -2,6 +2,7 @@ package sysdb
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -11,63 +12,57 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func GoUpdateUserPerms(dc, dcsuper *pgx.Conn, trackedTables []dbx.Table) {
-	//adb, err := sqlx.Open("postgresql", &dsn)
-	//if err != nil {
-	//	log.Error("updating user permissions: opening database connection: %v", err)
-	//	return
-	//}
-	//defer adb.Close()
+func GoUpdateUserPerms(db *dbx.DB, trackedTables []dbx.Table) error {
+	dc, err := db.Connect()
+	if err != nil {
+		return fmt.Errorf("updating user permissions: connecting to database: %v", err)
+	}
+	defer dbx.Close(dc)
+	dcsuper, err := db.ConnectSuper()
+	if err != nil {
+		return fmt.Errorf("updating user permissions: connecting to database as superuser: %v", err)
+	}
+	defer dbx.Close(dcsuper)
+
 	users, err := userRead(dc, true)
 	if err != nil {
-		log.Error("updating user permissions: reading users: %v", err)
-		return
+		return fmt.Errorf("updating user permissions: reading users: %v", err)
 	}
 	tables := make([]dbx.Table, len(trackedTables))
 	copy(tables, trackedTables)
 	for _, t := range trackedTables {
 		tables = append(tables, t.Main())
 	}
-	tables = append(tables, dbx.Table{Schema: "metadb", Table: "log"})
-	tables = append(tables, dbx.Table{Schema: "metadb", Table: "table_update"})
-	tables = append(tables, dbx.Table{Schema: "metadb", Table: "base_table"})
-	tables = append(tables, dbx.Table{Schema: "folio_source_record", Table: "marc__t"})
+	batch := pgx.Batch{}
 	for u, re := range users {
 		for _, t := range tables {
-			//t := sqlx.Table{Schema: oldt.Schema, Table: oldt.Table}
 			if re.String == "" {
-				// Revoke
-				//_, _ = dcsuper.Exec(context.TODO(), "REVOKE USAGE ON SCHEMA \""+t.Schema+"\" FROM "+u)
-				_, _ = dcsuper.Exec(context.TODO(), "REVOKE SELECT ON "+t.SQL()+" FROM "+u)
-				_, _ = dcsuper.Exec(context.TODO(), "REVOKE SELECT ON "+t.MainSQL()+" FROM "+u)
-				//_, _ = adb.Exec(nil, "REVOKE SELECT ON "+adb.HistoryTableSQL(&t)+" FROM "+u)
+				batch.Queue("REVOKE SELECT ON " + t.SQL() + " FROM " + u)
 			} else {
-				// Grant if regex matches
 				if util.UserPerm(re, &t) {
-					_, _ = dcsuper.Exec(context.TODO(), "GRANT USAGE ON SCHEMA "+t.Schema+" TO "+u)
-					_, _ = dcsuper.Exec(context.TODO(), "GRANT SELECT ON "+t.SQL()+" TO "+u)
-					_, _ = dcsuper.Exec(context.TODO(), "GRANT SELECT ON "+t.MainSQL()+" TO "+u)
-					//_, _ = adb.Exec(nil, "GRANT SELECT ON "+adb.HistoryTableSQL(&t)+" TO "+u)
+					batch.Queue("GRANT USAGE ON SCHEMA " + t.Schema + " TO " + u)
+					batch.Queue("GRANT SELECT ON " + t.SQL() + " TO " + u)
 				} else {
-					_, _ = dcsuper.Exec(context.TODO(), "REVOKE SELECT ON "+t.SQL()+" FROM "+u)
-					_, _ = dcsuper.Exec(context.TODO(), "REVOKE SELECT ON "+t.MainSQL()+" FROM "+u)
-					//_, _ = adb.Exec(nil, "REVOKE SELECT ON "+adb.HistoryTableSQL(&t)+" FROM "+u)
+					batch.Queue("REVOKE SELECT ON " + t.SQL() + " FROM " + u)
 				}
 			}
 
 		}
-		////////
+	}
+	if err := dcsuper.SendBatch(context.TODO(), &batch).Close(); err != nil {
+		return fmt.Errorf("updating user privileges: %w", err)
+	}
+	for u, re := range users {
 		if re.String == "" {
+			_, _ = dcsuper.Exec(context.TODO(), "REVOKE SELECT ON folio_source_record.marc__t FROM "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "REVOKE USAGE ON SCHEMA report FROM "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA report FROM "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "REVOKE USAGE ON SCHEMA folio_derived FROM "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "REVOKE SELECT ON ALL TABLES IN SCHEMA folio_derived FROM "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "REVOKE USAGE ON SCHEMA reshare_derived FROM "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "REVOKE SELECT ON ALL TABLES IN SCHEMA reshare_derived FROM "+u)
-			_, _ = dcsuper.Exec(context.TODO(), "REVOKE EXECUTE ON FUNCTION public.metadb_version FROM "+u)
-			_, _ = dcsuper.Exec(context.TODO(), "REVOKE EXECUTE ON FUNCTION public.ps FROM "+u)
-			_, _ = dcsuper.Exec(context.TODO(), "REVOKE USAGE ON SCHEMA public FROM "+u)
 		} else {
+			_, _ = dcsuper.Exec(context.TODO(), "GRANT SELECT ON folio_source_record.marc__t TO "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "GRANT USAGE ON SCHEMA report TO "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA report TO "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "GRANT USAGE ON SCHEMA folio_derived TO "+u)
@@ -75,17 +70,16 @@ func GoUpdateUserPerms(dc, dcsuper *pgx.Conn, trackedTables []dbx.Table) {
 			_, _ = dcsuper.Exec(context.TODO(), "GRANT USAGE ON SCHEMA reshare_derived TO "+u)
 			_, _ = dcsuper.Exec(context.TODO(), "GRANT SELECT ON ALL TABLES IN SCHEMA reshare_derived TO "+u)
 		}
-		////////
 	}
-	if _, err := dc.Exec(context.TODO(), "UPDATE metadb.auth SET dbupdated=TRUE"); err != nil {
-		log.Error("updating user authorizations: %v", err)
-		return
-	}
-	if _, err := dc.Exec(context.TODO(), "DELETE FROM metadb.auth WHERE tables=''"); err != nil {
-		log.Error("cleaning up user authorizations: %v", err)
-		return
+
+	batch = pgx.Batch{}
+	batch.Queue("UPDATE metadb.auth SET dbupdated=TRUE")
+	batch.Queue("DELETE FROM metadb.auth WHERE tables=''")
+	if err := dc.SendBatch(context.TODO(), &batch).Close(); err != nil {
+		return fmt.Errorf("updating user authorizations: %w", err)
 	}
 	log.Trace("updated user permissions")
+	return nil
 }
 
 /*

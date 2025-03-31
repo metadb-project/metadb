@@ -16,7 +16,8 @@ import (
 
 %type <node> top_level_stmt stmt
 %type <node> select_stmt
-%type <node> create_data_source_stmt alter_data_source_stmt drop_data_source_stmt authorize_stmt create_user_stmt
+%type <node> create_data_source_stmt alter_data_source_stmt drop_data_source_stmt authorize_stmt deauthorize_stmt
+%type <node> create_user_stmt drop_user_stmt
 %type <node> create_data_mapping_stmt create_data_origin_stmt list_stmt
 %type <node> refresh_inferred_column_types_stmt
 %type <node> alter_table_stmt alter_table_cmd
@@ -31,7 +32,7 @@ import (
 %token SELECT
 %token CONSISTENCY
 %token CREATE ALTER DATA SOURCE ORIGIN OPTIONS USER
-%token AUTHORIZE ON ALL TABLE TABLES IN TO WITH MAPPING LIST
+%token AUTHORIZE DEAUTHORIZE ON ALL TABLE TABLES IN TO WITH MAPPING LIST
 %token REFRESH INFERRED COLUMN TYPES
 %token TYPE
 %token TRUE FALSE
@@ -78,6 +79,10 @@ stmt:
 		{
 			$$ = $1
 		}
+	| drop_user_stmt
+		{
+			$$ = $1
+		}
 	| CREATE
 		{
 			yylex.(*lexer).pass = true
@@ -106,6 +111,10 @@ stmt:
 			// $$ = nil
 		}
 	| authorize_stmt
+		{
+			$$ = $1
+		}
+	| deauthorize_stmt
 		{
 			$$ = $1
 		}
@@ -165,6 +174,12 @@ create_user_stmt:
 	| CREATE USER MAPPING
 		{
 			yylex.(*lexer).pass = true
+		}
+
+drop_user_stmt:
+	DROP USER name ';'
+		{
+			$$ = &ast.DropUserStmt{UserName: $3}
 		}
 
 alter_table_stmt:
@@ -263,6 +278,12 @@ authorize_stmt:
     AUTHORIZE SELECT ON ALL TABLES IN DATA SOURCE name TO name ';'
 		{
 			$$ = &ast.AuthorizeStmt{DataSourceName: $9, RoleName: $11}
+		}
+
+deauthorize_stmt:
+    DEAUTHORIZE SELECT ON ALL TABLES IN DATA SOURCE name FROM name ';'
+		{
+			$$ = &ast.DeauthorizeStmt{DataSourceName: $9, RoleName: $11}
 		}
 
 list_stmt:

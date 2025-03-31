@@ -762,6 +762,51 @@ Create a user `wegg`:
 CREATE USER wegg WITH PASSWORD 'LZn2DCajcNHpGR3ZXWHD', COMMENT 'Silas Wegg';
 ----
 
+==== DEAUTHORIZE
+
+[.aqua-background]#Metadb 1.4#
+Disable access to tables generated from an external data source
+
+[source,subs="verbatim,quotes"]
+----
+DEAUTHORIZE SELECT
+    ON ALL TABLES IN DATA SOURCE `*_source_name_*`
+    FROM `*_role_specification_*`
+----
+
+[discrete]
+===== Description
+
+The DEAUTHORIZE command revokes access to tables.
+
+.Note
+****
+[.text-center]
+DEAUTHORIZE currently requires restarting the server before it will
+take effect.
+****
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_source_name_*`
+|The name of an existing data source.
+
+|`*_role_specification_*`
+|An existing role which will have its authorization revoked.
+|===
+
+[discrete]
+===== Examples
+
+----
+DEAUTHORIZE SELECT
+    ON ALL TABLES IN DATA SOURCE sensor
+    FROM beatrice;
+----
+
 ==== DROP DATA SOURCE
 
 Remove a data source configuration
@@ -798,6 +843,39 @@ Drop a data source `sensor`:
 
 ----
 DROP DATA SOURCE sensor;
+----
+
+==== DROP USER
+
+[.aqua-background]#Metadb 1.4#
+Remove a database user
+
+[source,subs="verbatim,quotes"]
+----
+DROP USER `*_user_name_*`
+----
+
+[discrete]
+===== Description
+
+DROP USER removes a database user that is managed by Metadb.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_user_name_*`
+|The name of the user to be removed.
+|===
+
+[discrete]
+===== Examples
+
+Remove a user `wegg`:
+
+----
+DROP USER wegg;
 ----
 
 ==== LIST

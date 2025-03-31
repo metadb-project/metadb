@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/tools"
 
 	"github.com/jackc/pgx/v5"
@@ -281,10 +282,14 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 		err = alterDataSource(conn, n, dbconn)
 	case *ast.CreateUserStmt:
 		err = createUser(conn, n, db, dbconn)
+	case *ast.DropUserStmt:
+		err = dropUser(conn, n, db)
 	case *ast.DropDataSourceStmt:
 		err = dropDataSource(conn, n, dbconn)
 	case *ast.AuthorizeStmt:
 		err = authorize(conn, n, dbconn)
+	case *ast.DeauthorizeStmt:
+		err = deauthorize(conn, n, dbconn)
 	case *ast.CreateDataOriginStmt:
 		err = createDataOrigin(conn, n, dbconn)
 	case *ast.ListStmt:
@@ -920,15 +925,99 @@ func createUser(conn net.Conn /*query string,*/, node *ast.CreateUserStmt, db *d
 		return fmt.Errorf("creating schema %s: %s", node.UserName, err)
 	}
 	q = "GRANT CREATE ON SCHEMA " + node.UserName + " TO " + node.UserName
-	if _, err = dc.Exec(context.TODO(), q); err != nil {
+	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("granting create privilege on schema %q to role %q: %s", node.UserName, node.UserName, err)
 	}
 	q = "GRANT USAGE ON SCHEMA " + node.UserName + " TO " + node.UserName + " WITH GRANT OPTION"
-	if _, err = dc.Exec(context.TODO(), q); err != nil {
+	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("granting usage privilege on schema %q to role %q: %s", node.UserName, node.UserName, err)
+	}
+	q = "GRANT USAGE ON SCHEMA metadb TO \"" + node.UserName + "\""
+	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("granting usage privilege on schema metadb to role %q: %s", node.UserName, err)
+	}
+	q = "GRANT SELECT ON metadb.log, metadb.table_update, metadb.base_table TO \"" + node.UserName + "\""
+	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("granting select privilege on tables in schema \"metadb\" to role %q: %s", node.UserName, err)
+	}
+	q = "GRANT USAGE ON SCHEMA public TO \"" + node.UserName + "\""
+	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("granting usage privilege on schema public to role %q: %s", node.UserName, err)
 	}
 	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("CREATE ROLE")},
+		&pgproto3.ReadyForQuery{TxStatus: 'I'},
+	})
+}
+
+func dropUser(conn net.Conn, node *ast.DropUserStmt, db *dbx.DB) error {
+	dp, err := dbx.NewPool(context.TODO(), db.ConnString(db.User, db.Password))
+	if err != nil {
+		return fmt.Errorf("creating database connection pool: %w", err)
+	}
+	defer dp.Close()
+	dcsuper, err := db.ConnectSuper()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dcsuper)
+
+	exists, err := userExists(dcsuper, node.UserName)
+	if err != nil {
+		return fmt.Errorf("selecting role: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("role %q does not exist", node.UserName)
+	}
+
+	// Revoke privileges from schemas.
+	cat, err := catalog.Initialize(db, dp)
+	if err != nil {
+		return err
+	}
+	tables := cat.AllTables("")
+	schemas := make(map[string]struct{})
+	for i := range tables {
+		_, ok := schemas[tables[i].Schema]
+		if !ok {
+			schemas[tables[i].Schema] = struct{}{}
+		}
+	}
+	for s := range schemas {
+		q := "REVOKE USAGE ON SCHEMA \"" + s + "\" FROM \"" + node.UserName + "\""
+		if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+			return err
+		}
+	}
+	cat = nil
+	q := "REVOKE SELECT ON ALL TABLES IN SCHEMA metadb FROM \"" + node.UserName + "\""
+	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "REVOKE USAGE ON SCHEMA metadb FROM \"" + node.UserName + "\""
+	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM \"" + node.UserName + "\""
+	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "REVOKE USAGE ON SCHEMA public FROM \"" + node.UserName + "\""
+	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "REVOKE CREATE, USAGE ON SCHEMA \"" + node.UserName + "\" FROM \"" + node.UserName + "\""
+	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+
+	q = "DROP USER \"" + node.UserName + "\""
+	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+
+	return writeEncoded(conn, []pgproto3.Message{
+		&pgproto3.CommandComplete{CommandTag: []byte("DROP ROLE")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
 }
@@ -991,6 +1080,39 @@ func authorize(conn net.Conn, node *ast.AuthorizeStmt, dc *pgx.Conn) error {
 
 	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("AUTHORIZE")},
+		&pgproto3.ReadyForQuery{TxStatus: 'I'},
+	})
+}
+
+func deauthorize(conn net.Conn, node *ast.DeauthorizeStmt, dc *pgx.Conn) error {
+	exists, err := sourceExists(dc, node.DataSourceName)
+	if err != nil {
+		return fmt.Errorf("selecting data source: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("data source %q does not exist", node.DataSourceName)
+	}
+
+	exists, err = userExists(dc, node.RoleName)
+	if err != nil {
+		return fmt.Errorf("selecting role: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("role %q does not exist", node.RoleName)
+	}
+
+	q := "UPDATE metadb.auth SET tables='',dbupdated=FALSE WHERE username=$1"
+	_, err = dc.Exec(context.TODO(), q, node.RoleName)
+	if err != nil {
+		return fmt.Errorf("writing authorization: %w", err)
+	}
+
+	_ = writeEncoded(conn, []pgproto3.Message{
+		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server to update all permissions"},
+	})
+
+	return writeEncoded(conn, []pgproto3.Message{
+		&pgproto3.CommandComplete{CommandTag: []byte("DEAUTHORIZE")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
 }

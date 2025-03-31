@@ -175,6 +175,14 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 
 	//go listenAndServe(svr)
 
+	// Update user permissions in database
+	if err := sysdb.GoUpdateUserPerms(svr.db, cat.AllTables("")); err != nil {
+		return err
+	}
+	if err := cat.ReinitUsers(); err != nil {
+		return err
+	}
+
 	// Create database functions.
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -423,7 +431,7 @@ func goCreateFunctions(db dbx.DB) {
 	}
 	defer dbx.Close(dcsuper)
 
-	err = catalog.CreateAllFunctions(dcsuper, dc, db.User)
+	err = catalog.CreateAllFunctions(dcsuper, dc)
 	if err != nil {
 		log.Error("updating functions: %v", err)
 		return
