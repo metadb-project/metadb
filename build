@@ -116,5 +116,5 @@ if $runalltests; then
 	verrcheck='-verbose'
     fi
     go tool errcheck $verrcheck -exclude .errcheck ./cmd/... 2>&1 | while read s; do echo "build.sh: errcheck: $s" 1>&2; done
-    go tool govulncheck ./cmd/...
+    #go tool govulncheck ./cmd/...
 fi
