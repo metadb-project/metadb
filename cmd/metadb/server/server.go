@@ -105,7 +105,7 @@ func loggingServer(svr *server) error {
 	log.SetDatabase(svr.dp)
 	defer log.SetDatabase(nil)
 
-	log.Info("starting Metadb %s", util.MetadbVersion)
+	log.Info("starting Metadb %s", util.GetMetadbVersion())
 	if err := runServer(svr, cat); err != nil {
 		log.Fatal("%s", err)
 		return err
@@ -312,10 +312,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 		for {
 			tries++
 			url := "https://github.com/folio-org/folio-analytics.git"
-			ref := "refs/tags/v1.7.8"
-			if util.FolioVersion != "" {
-				ref = util.FolioVersion
-			}
+			ref := util.GetFolioVersion()
 			path := "sql_metadb/derived_tables"
 			schema := "folio_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, ref, path, schema, source); err != nil {
@@ -329,13 +326,12 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 			break
 		}
 	}
-	reshareRef := "refs/tags/20230912004531"
 	if reshare && syncMode == dsync.NoSync {
 		tries := 0
 		for {
 			tries++
 			url := "https://github.com/openlibraryenvironment/reshare-analytics.git"
-			ref := reshareRef
+			ref := util.GetReshareVersion()
 			path := "reports"
 			schema := "report"
 			if err = sqlfunc.SQLFunc(datadir, cat, db, url, ref, path, schema, source); err != nil {
@@ -354,7 +350,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 		for {
 			tries++
 			url := "https://github.com/openlibraryenvironment/reshare-analytics.git"
-			ref := reshareRef
+			ref := util.GetReshareVersion()
 			path := "sql/derived_tables"
 			schema := "reshare_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, ref, path, schema, source); err != nil {

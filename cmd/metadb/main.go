@@ -242,7 +242,7 @@ func run() error {
 	var cmdVersion = &cobra.Command{
 		Use: "version",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Printf("metadb version %s\n", util.MetadbVersion)
+			fmt.Printf("metadb version %s\n", util.GetMetadbVersion())
 			return nil
 		},
 	}
