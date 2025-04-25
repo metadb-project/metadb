@@ -22,6 +22,7 @@ import (
 %type <node> refresh_inferred_column_types_stmt
 %type <node> alter_table_stmt alter_table_cmd
 %type <node> verify_consistency_stmt
+%type <node> create_schema_for_user_stmt
 %type <optlist> options_clause alter_options_clause option_list alter_option_list option alter_option
 %type <str> option_name option_val
 %type <str> name unreserved_keyword
@@ -37,6 +38,7 @@ import (
 %token TYPE
 %token TRUE FALSE
 %token VERIFY FOR FROM PATH
+%token SCHEMA
 %token <str> VERSION
 %token <str> ADD SET DROP
 %token <str> IDENT NUMBER
@@ -80,6 +82,10 @@ stmt:
 			$$ = $1
 		}
 	| drop_user_stmt
+		{
+			$$ = $1
+		}
+	| create_schema_for_user_stmt
 		{
 			$$ = $1
 		}
@@ -180,6 +186,12 @@ drop_user_stmt:
 	DROP USER name ';'
 		{
 			$$ = &ast.DropUserStmt{UserName: $3}
+		}
+
+create_schema_for_user_stmt:
+	CREATE SCHEMA FOR USER name ';'
+		{
+			$$ = &ast.CreateSchemaForUserStmt{UserName: $5}
 		}
 
 alter_table_stmt:

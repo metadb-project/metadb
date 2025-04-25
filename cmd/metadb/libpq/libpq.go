@@ -298,6 +298,8 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 		err = refreshInferredColumnTypesStmt(conn, dbconn)
 	case *ast.VerifyConsistencyStmt:
 		err = verifyConsistencyStmt(conn, dbconn)
+	case *ast.CreateSchemaForUserStmt:
+		err = createSchemaForUser(conn, n, db, dbconn)
 	//case *ast.SelectStmt:
 	//	if n.Fn == "version" {
 	//		return version(conn, query)
@@ -896,58 +898,117 @@ func createUser(conn net.Conn /*query string,*/, node *ast.CreateUserStmt, db *d
 	}
 	defer dbx.Close(dcsuper)
 
-	exists, err := userExists(dcsuper, node.UserName)
+	exists, err := userExists(dc, node.UserName)
 	if err != nil {
 		return fmt.Errorf("selecting role: %w", err)
 	}
 	if exists {
-		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
-			Message: fmt.Sprintf("role %q already exists, skipping", node.UserName)},
-		})
-	} else {
-		q := "CREATE USER " + node.UserName + " PASSWORD '" + opt.Password + "'"
-		if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-			return err
-		}
+		return fmt.Errorf("role %q already exists", node.UserName)
+	}
 
+	q := "CREATE USER " + node.UserName + " PASSWORD '" + opt.Password + "'"
+	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
+		return err
 	}
 
 	// Add comment on role.
 	if opt.Comment != "" {
-		q := "COMMENT ON ROLE " + node.UserName + " IS '" + opt.Comment + "'"
+		q = "COMMENT ON ROLE " + node.UserName + " IS '" + opt.Comment + "'"
 		if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-			return fmt.Errorf("adding comment on role %s: %s", node.UserName, err)
+			_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
+				Message: fmt.Sprintf("unable to add comment on role %q", node.UserName)},
+			})
 		}
 	}
 
-	q := "CREATE SCHEMA IF NOT EXISTS " + node.UserName
-	if _, err = dc.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating schema %s: %s", node.UserName, err)
+	if err = createUserSchema(dc, node.UserName); err != nil {
+		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
+			Message: err.Error()},
+		})
 	}
-	q = "GRANT CREATE ON SCHEMA " + node.UserName + " TO " + node.UserName
-	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("granting create privilege on schema %q to role %q: %s", node.UserName, node.UserName, err)
+	if err = grantCreateOnUserSchema(dc, node.UserName); err != nil {
+		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
+			Message: err.Error()},
+		})
 	}
-	q = "GRANT USAGE ON SCHEMA " + node.UserName + " TO " + node.UserName + " WITH GRANT OPTION"
-	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("granting usage privilege on schema %q to role %q: %s", node.UserName, node.UserName, err)
+	if err = grantUsageOnUserSchema(dc, node.UserName); err != nil {
+		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
+			Message: err.Error()},
+		})
 	}
+
 	q = "GRANT USAGE ON SCHEMA metadb TO \"" + node.UserName + "\""
 	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("granting usage privilege on schema metadb to role %q: %s", node.UserName, err)
+		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
+			Message: fmt.Sprintf("unable to grant usage on schema metadb")},
+		})
 	}
 	q = "GRANT SELECT ON metadb.log, metadb.table_update, metadb.base_table TO \"" + node.UserName + "\""
 	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("granting select privilege on tables in schema \"metadb\" to role %q: %s", node.UserName, err)
+		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
+			Message: fmt.Sprintf("unable to grant select on metadb tables to %q", node.UserName)},
+		})
 	}
 	q = "GRANT USAGE ON SCHEMA public TO \"" + node.UserName + "\""
 	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("granting usage privilege on schema public to role %q: %s", node.UserName, err)
+		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
+			Message: fmt.Sprintf("unable to grant usage on schema public")},
+		})
 	}
+
 	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("CREATE ROLE")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
+}
+
+func createSchemaForUser(conn net.Conn, node *ast.CreateSchemaForUserStmt, db *dbx.DB, dc *pgx.Conn) error {
+	exists, err := userExists(dc, node.UserName)
+	if err != nil {
+		return fmt.Errorf("selecting role: %v", err)
+	}
+	if !exists {
+		return fmt.Errorf("role %q does not exist", node.UserName)
+	}
+
+	if err := createUserSchema(dc, node.UserName); err != nil {
+		return err
+	}
+	if err := grantCreateOnUserSchema(dc, node.UserName); err != nil {
+		return err
+	}
+	if err := grantUsageOnUserSchema(dc, node.UserName); err != nil {
+		return err
+	}
+
+	return writeEncoded(conn, []pgproto3.Message{
+		&pgproto3.CommandComplete{CommandTag: []byte("CREATE SCHEMA")},
+		&pgproto3.ReadyForQuery{TxStatus: 'I'},
+	})
+}
+
+func createUserSchema(dc *pgx.Conn, user string) error {
+	q := "CREATE SCHEMA " + user
+	if _, err := dc.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("creating schema %q: %s", user, err)
+	}
+	return nil
+}
+
+func grantCreateOnUserSchema(dc *pgx.Conn, user string) error {
+	q := "GRANT CREATE ON SCHEMA " + user + " TO " + user
+	if _, err := dc.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("granting create privilege on schema %q to role %q: %s", user, user, err)
+	}
+	return nil
+}
+
+func grantUsageOnUserSchema(dc *pgx.Conn, user string) error {
+	q := "GRANT USAGE ON SCHEMA " + user + " TO " + user + " WITH GRANT OPTION"
+	if _, err := dc.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("granting usage privilege on schema %q to role %q: %s", user, user, err)
+	}
+	return nil
 }
 
 func dropUser(conn net.Conn, node *ast.DropUserStmt, db *dbx.DB) error {
@@ -1007,9 +1068,7 @@ func dropUser(conn net.Conn, node *ast.DropUserStmt, db *dbx.DB) error {
 		return err
 	}
 	q = "REVOKE CREATE, USAGE ON SCHEMA \"" + node.UserName + "\" FROM \"" + node.UserName + "\""
-	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		return err
-	}
+	_, _ = dcsuper.Exec(context.TODO(), q)
 
 	q = "DROP USER \"" + node.UserName + "\""
 	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {

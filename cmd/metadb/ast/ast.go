@@ -127,3 +127,10 @@ type VerifyConsistencyStmt struct {
 
 func (*VerifyConsistencyStmt) node()     {}
 func (*VerifyConsistencyStmt) stmtNode() {}
+
+type CreateSchemaForUserStmt struct {
+	UserName string
+}
+
+func (*CreateSchemaForUserStmt) node()     {}
+func (*CreateSchemaForUserStmt) stmtNode() {}
