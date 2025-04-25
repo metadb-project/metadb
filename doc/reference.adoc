@@ -710,6 +710,49 @@ CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
 );
 ----
 
+==== CREATE SCHEMA
+
+[.aqua-background]#Metadb 1.4#
+
+Define a new schema
+
+[source,subs="verbatim,quotes"]
+----
+CREATE SCHEMA FOR USER `*_user_name_*`
+----
+
+[discrete]
+===== Description
+
+CREATE SCHEMA defines a new schema.  At present this command only
+supports creating a user schema, which serves as a workspace for a
+user.
+
+[discrete]
+====== User schemas
+
+Typically user schemas are created automatically by CREATE USER.
+However, if a user already exists but does not have a user schema,
+CREATE SCHEMA can be used to create it.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_user_name_*`
+|The name of the user, which will also be the name of the new schema.
+|===
+
+[discrete]
+===== Examples
+
+Create a schema for an existing user `jane`:
+
+----
+CREATE SCHEMA FOR USER jane;
+----
+
 ==== CREATE USER
 
 Define a new database user

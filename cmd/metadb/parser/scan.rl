@@ -77,6 +77,7 @@ func (lex *lexer) Lex(out *yySymType) int {
 			'types'i => { tok = TYPES; fbreak; };
 			'version'i => { out.str = "version"; tok = VERSION; fbreak; };
 			'verify'i => { tok = VERIFY; fbreak; };
+			'schema'i => { tok = SCHEMA; fbreak; };
 			'for'i => { tok = FOR; fbreak; };
 			'from'i => { tok = FROM; fbreak; };
 			'path'i => { tok = PATH; fbreak; };
