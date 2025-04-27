@@ -3,6 +3,7 @@ package marctab
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/metadb-project/metadb/cmd/internal/libmarct"
@@ -38,7 +39,8 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 		SRSMarcAttr: "",
 		Metadb:      true,
 		PrintErr: func(format string, v ...any) {
-			log.Warning("marc__t: %s\n", fmt.Sprintf(format, v...))
+			e := strings.ReplaceAll(fmt.Sprintf(format, v...), "ERROR: ", "")
+			log.Info("marc__t: %s\n", e)
 		},
 	}
 	if err = t.Transform(); err != nil {
