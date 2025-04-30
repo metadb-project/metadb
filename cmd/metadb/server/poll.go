@@ -187,7 +187,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		if err != nil {
 			log.Error("%v", err)
 		}
-		sysdb.GoUpdateUserPerms(dc2, dcsuper, trackedTables)
+		sysdb.GoUpdateUserPerms(spr.svr.db, dc2, dcsuper, trackedTables)
 	}(cat.AllTables(spr.source.Name))
 	// Cache users
 	/*	users, err := cache.NewUsers(db)

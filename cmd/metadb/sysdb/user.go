@@ -11,7 +11,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-func GoUpdateUserPerms(dc, dcsuper *pgx.Conn, trackedTables []dbx.Table) {
+func GoUpdateUserPerms(db *dbx.DB, dc, dcsuper *pgx.Conn, trackedTables []dbx.Table) {
 	//adb, err := sqlx.Open("postgresql", &dsn)
 	//if err != nil {
 	//	log.Error("updating user permissions: opening database connection: %v", err)
@@ -85,6 +85,16 @@ func GoUpdateUserPerms(dc, dcsuper *pgx.Conn, trackedTables []dbx.Table) {
 		log.Error("cleaning up user authorizations: %v", err)
 		return
 	}
+
+	allUsers, err := userRead(dc, false)
+	if err != nil {
+		log.Error("updating user permissions: reading all users: %v", err)
+		return
+	}
+	for u := range allUsers {
+		_, _ = dcsuper.Exec(context.TODO(), "GRANT CREATE, CONNECT, TEMPORARY ON DATABASE "+db.DBName+" TO "+u)
+	}
+
 	log.Trace("updated user permissions")
 }
 
