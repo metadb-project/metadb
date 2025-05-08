@@ -78,19 +78,22 @@ func grantAccessOnAll(conn net.Conn, node *ast.GrantAccessOnAllStmt, dc *pgx.Con
 			})
 		}
 	}
-	for i := range extraManagedTables {
-		t := strings.Split(extraManagedTables[i], ".")
-		acls = append(acls, acl.ACLItem{
-			SchemaName: t[0],
-			ObjectName: t[1],
-			ObjectType: acl.Table,
-			Privilege:  acl.Access,
-			UserName:   node.UserName,
-		})
-	}
 
 	if err = acl.Grant(dc, acls); err != nil {
 		return err
+	}
+
+	for i := range extraManagedTables {
+		t := strings.Split(extraManagedTables[i], ".")
+		_ = acl.Grant(dc, []acl.ACLItem{
+			{
+				SchemaName: t[0],
+				ObjectName: t[1],
+				ObjectType: acl.Table,
+				Privilege:  acl.Access,
+				UserName:   node.UserName,
+			},
+		})
 	}
 
 	return writeEncoded(conn, []pgproto3.Message{
