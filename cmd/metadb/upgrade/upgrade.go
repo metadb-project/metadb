@@ -415,6 +415,7 @@ var updbList = []updbFunc{
 	updb24,
 	updb25,
 	updb26,
+	updb27,
 }
 
 func updb8(opt *dbopt) error {
@@ -1871,6 +1872,69 @@ func updb26GrantAccessOnAll(tx pgx.Tx, user string) error {
 
 	if err = acl.Grant(tx, acls); err != nil {
 		return err
+	}
+	return nil
+}
+
+func updb27(opt *dbopt) error {
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	q := "SELECT username FROM metadb.auth"
+	rows, err := dc.Query(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("selecting user list: %w", util.PGErr(err))
+	}
+	defer rows.Close()
+	users := make([]string, 0)
+	for rows.Next() {
+		var u string
+		err = rows.Scan(&u)
+		if err != nil {
+			return fmt.Errorf("reading user list: %w", util.PGErr(err))
+		}
+		users = append(users, u)
+	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("reading user list: %w", util.PGErr(err))
+	}
+	rows.Close()
+
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return util.PGErr(err)
+	}
+	defer dbx.Rollback(tx)
+
+	acls := make([]acl.ACLItem, 0)
+	syst := []dbx.Table{
+		{Schema: "metadb", Table: "base_table"},
+		{Schema: "metadb", Table: "log"},
+		{Schema: "metadb", Table: "table_update"},
+	}
+	for i := range users {
+		for j := range syst {
+			acls = append(acls, acl.ACLItem{
+				SchemaName: syst[j].Schema,
+				ObjectName: syst[j].Table,
+				ObjectType: acl.Table,
+				Privilege:  acl.Access,
+				UserName:   users[i],
+			})
+		}
+	}
+	if err = acl.Grant(tx, acls); err != nil {
+		return err
+	}
+
+	if err = metadata.WriteDatabaseVersion(tx, 27); err != nil {
+		return util.PGErr(err)
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
+		return util.PGErr(err)
 	}
 	return nil
 }
