@@ -1832,7 +1832,7 @@ func updb26GrantAccessOnAll(tx pgx.Tx, user string) error {
 		})
 	}
 
-	functions := catalog.FunctionNames()
+	functions := []string{"mdblog(interval)", "mdbversion()", "ps()"}
 	for i := range functions {
 		acls = append(acls, acl.ACLItem{
 			SchemaName: "public",
