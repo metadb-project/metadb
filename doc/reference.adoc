@@ -886,7 +886,13 @@ DROP USER `*_user_name_*`
 [discrete]
 ===== Description
 
-DROP USER removes a database user that is managed by Metadb.
+DROP USER removes a database user.  Before doing so, it attempts to
+find and revoke most authorizations held by the user that would
+typically prevent it from being removed.
+
+If a user is registered in more than one Metadb instance, DROP USER
+will not be able to remove all authorizations.  In that case, use
+DEREGISTER USER in each of the instances, and then issue DROP USER.
 
 [discrete]
 ===== Parameters
@@ -937,6 +943,9 @@ Metadb-managed tables and functions.
 |===
 |`*_table_name_*`
 |An existing table.
+
+|`*_function_name_*`
+|An existing function.
 
 |`*_user_name_*`
 |An existing user to be granted access.
@@ -1072,6 +1081,9 @@ The REVOKE command revokes access to tables.
 |===
 |`*_table_name_*`
 |An existing table.
+
+|`*_function_name_*`
+|An existing function.
 
 |`*_user_name_*`
 |An existing user that will have access removed.
