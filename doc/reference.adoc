@@ -164,6 +164,13 @@ Types also can be set manually via the `ALTER TABLE` command.
 |Returns recent log messages during the specified interval, or during
  the past 24 hours if no interval is given
 
+|`mdbusers()`
+[.aqua-background]#Metadb 1.4#
+|table (
+    username text
+)
+|Returns a list of registered users
+
 |`mdbversion()`
 |text
 |Returns the Metadb version
@@ -355,12 +362,8 @@ ALTER DATA SOURCE `*_source_name_*`
 
 ALTER DATA SOURCE changes connection settings for a data source.
 
-.Note
-****
-[.text-center]
-ALTER DATA SOURCE currently requires restarting the server before it
-will take effect.
-****
+NOTE: ALTER DATA SOURCE currently requires restarting the server
+before it will take effect.
 
 [discrete]
 ===== Parameters
@@ -405,12 +408,8 @@ ALTER TABLE `*_table_name_*`
 ALTER TABLE changes the definition of a table that is extracted from a
 data source.
 
-.Note
-****
-[.text-center]
-ALTER TABLE currently requires restarting the server before it will
-take effect.
-****
+NOTE: ALTER TABLE currently requires restarting the server before it
+will take effect.
 
 [discrete]
 ===== Parameters
@@ -445,22 +444,19 @@ Enable access to tables generated from an external data source
 ----
 AUTHORIZE SELECT
     ON ALL TABLES IN DATA SOURCE `*_source_name_*`
-    TO `*_role_specification_*`
+    TO `*_user_name_*`
 ----
 
 [discrete]
 ===== Description
 
-The AUTHORIZE command grants access to tables.  It differs from GRANT
-in that the authorization will also apply to tables created at a later
-time in the data source.
+The AUTHORIZE command grants access to tables.
 
-.Note
-****
-[.text-center]
-AUTHORIZE currently requires restarting the server before it will take
+NOTE: Beginning with Metadb 1.4, the AUTHORIZE command is no longer
+supported.  The new GRANT command can be used instead.
+
+NOTE: AUTHORIZE requires restarting the server before it will take
 effect.
-****
 
 [discrete]
 ===== Parameters
@@ -470,8 +466,8 @@ effect.
 |`*_source_name_*`
 |The name of an existing data source.
 
-|`*_role_specification_*`
-|An existing role to be granted the authorization.
+|`*_user_name_*`
+|An existing user to be granted the authorization.
 |===
 
 [discrete]
@@ -486,6 +482,7 @@ AUTHORIZE SELECT
 ==== CREATE DATA MAPPING
 
 [.aqua-background]#Metadb 1.4#
+
 Define a new mapping for data transformation
 
 [source,subs="verbatim,quotes"]
@@ -511,12 +508,8 @@ are also transformed; for example, a mapping from path `'$.a.b'` will
 be applied only if mappings are also defined for both the paths
 `'$.a'` and `'$'` within the same table and column.
 
-.Note
-****
-[.text-center]
-CREATE DATA MAPPING currently requires restarting the server before it
-will take effect.
-****
+NOTE: CREATE DATA MAPPING currently requires restarting the server
+before it will take effect.
 
 [discrete]
 ===== Parameters
@@ -588,12 +581,8 @@ independently of data sources.  This can be useful because data
 sources may be dictated by how the data are collected,
 e.g. geographically in a sensor network.
 
-.Note
-****
-[.text-center]
-CREATE DATA ORIGIN currently requires restarting the server before it
-will take effect.
-****
+NOTE: CREATE DATA ORIGIN currently requires restarting the server
+before it will take effect.
 
 [discrete]
 ===== Parameters
@@ -732,8 +721,8 @@ user.
 ====== User schemas
 
 Typically user schemas are created automatically by CREATE USER.
-However, if a user already exists but does not have a user schema,
-CREATE SCHEMA can be used to create it.
+However, if a user already exists and is registered, but does not have
+a user schema, CREATE SCHEMA can be used to create it.
 
 [discrete]
 ===== Parameters
@@ -747,9 +736,11 @@ CREATE SCHEMA can be used to create it.
 [discrete]
 ===== Examples
 
-Create a schema for an existing user `jane`:
+Register an existing user `jane` and create its user schema:
 
 ----
+REGISTER USER jane;
+
 CREATE SCHEMA FOR USER jane;
 ----
 
@@ -765,10 +756,16 @@ CREATE USER `*_user_name_*` WITH *_option_* '*_value_*' [, ... ]
 [discrete]
 ===== Description
 
-CREATE USER defines a new database user that will be managed by
-Metadb.  It also creates a schema having the same name as the user, if
-the schema does not exist, and grants the user privileges on the
-schema.  The schema is intended as a workspace for the user.
+CREATE USER defines a new database user and registers it with the
+Metadb instance, which allows it to receive access privileges.  In
+addition, CREATE USER creates a schema having the same name as the
+user, if the schema does not exist, and grants the user privileges on
+the schema.  The schema is intended as a workspace for the user.
+
+If a user already exists but is not registered or does not have a user
+schema, CREATE USER cannot be used to complete the process.  Instead,
+REGISTER USER and CREATE SCHEMA FOR USER are provided for this
+purpose.
 
 [discrete]
 ===== Parameters
@@ -788,66 +785,56 @@ schema.  The schema is intended as a workspace for the user.
 [frame=none,grid=none,cols="1,3"]
 |===
 |`password`
-|Sets the user's password.  (Required)
+|Sets the user's password.
 
 |`comment`
 |Stores a comment about the user, e.g. the user's real name.  The
- comment can be viewed in psql using the `\du+` command, or in other
- user interfaces.
+comment can be viewed in psql using the `\du+` command, or in other
+user interfaces.
 |===
 
 [discrete]
 ===== Examples
 
-Create a user `wegg`:
+Create a user `wegg` and add it to this Metadb instance:
 
 ----
 CREATE USER wegg WITH PASSWORD 'LZn2DCajcNHpGR3ZXWHD', COMMENT 'Silas Wegg';
 ----
 
-==== DEAUTHORIZE
+==== DEREGISTER USER
 
 [.aqua-background]#Metadb 1.4#
-Disable access to tables generated from an external data source
+
+Deregister a user from having database privileges
 
 [source,subs="verbatim,quotes"]
 ----
-DEAUTHORIZE SELECT
-    ON ALL TABLES IN DATA SOURCE `*_source_name_*`
-    FROM `*_role_specification_*`
+DEREGISTER USER `*_user_name_*`
 ----
 
 [discrete]
 ===== Description
 
-The DEAUTHORIZE command revokes access to tables.
-
-.Note
-****
-[.text-center]
-DEAUTHORIZE currently requires restarting the server before it will
-take effect.
-****
+DEREGISTER USER removes the ability to have database privileges from a
+user that was previously added with REGISTER USER.  It automatically
+executes REVOKE ACCESS ON ALL and also prevents subsequent GRANT
+commands.
 
 [discrete]
 ===== Parameters
 
 [frame=none,grid=none,cols="1,2"]
 |===
-|`*_source_name_*`
-|The name of an existing data source.
-
-|`*_role_specification_*`
-|An existing role which will have its authorization revoked.
+|`*_user_name_*`
+|The name of the user to deregister.
 |===
 
 [discrete]
 ===== Examples
 
 ----
-DEAUTHORIZE SELECT
-    ON ALL TABLES IN DATA SOURCE sensor
-    FROM beatrice;
+DEREGISTER USER wegg;
 ----
 
 ==== DROP DATA SOURCE
@@ -864,12 +851,9 @@ DROP DATA SOURCE `*_source_name_*`
 
 DROP DATA SOURCE removes a data source configuration.
 
-.Note
-****
-[.text-center]
-DROP DATA SOURCE currently requires restarting the server before it
-will take effect.
-****
+NOTE: DROP DATA SOURCE currently requires restarting the server before
+it will take effect.
+
 [discrete]
 ===== Parameters
 
@@ -891,6 +875,7 @@ DROP DATA SOURCE sensor;
 ==== DROP USER
 
 [.aqua-background]#Metadb 1.4#
+
 Remove a database user
 
 [source,subs="verbatim,quotes"]
@@ -921,6 +906,60 @@ Remove a user `wegg`:
 DROP USER wegg;
 ----
 
+==== GRANT
+
+[.aqua-background]#Metadb 1.4#
+
+Enable access to data
+
+[source,subs="verbatim,quotes"]
+----
+GRANT ACCESS
+    ON { TABLE `*_table_name_*` | FUNCTION `*_function_name_*` | ALL }
+    TO `*_user_name_*`
+----
+
+[discrete]
+===== Description
+
+The GRANT command grants a user access privileges to Metadb-managed
+tables and functions.  It differs from a SQL GRANT command in that the
+privileges continue to be valid if a table or function is dropped and
+recreated.
+
+WARNING: The command GRANT ACCESS ON ALL allows a user to access all
+Metadb-managed tables and functions.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_table_name_*`
+|An existing table.
+
+|`*_user_name_*`
+|An existing user to be granted access.
+|===
+
+[discrete]
+===== Examples
+
+To grant a user `anna` access to a single table:
+
+----
+GRANT ACCESS ON TABLE library.patrongroup TO anna;
+----
+
+To grant a user `bob` access only to a single table and to nothing
+else:
+
+----
+REVOKE ACCESS ON ALL FROM bob;
+
+GRANT ACCESS ON TABLE library.patrongroup TO bob;
+----
+
 ==== LIST
 
 Show the value of a system variable
@@ -946,10 +985,6 @@ other variables.
 |
 
 |
-|`authorizations`
-|Authorized users.
-
-|
 |`data_mappings`
 |Configured data mappings.
 
@@ -973,3 +1008,80 @@ other variables.
 LIST status;
 ----
 
+==== REGISTER USER
+
+[.aqua-background]#Metadb 1.4#
+
+Register an existing user to receive database privileges
+
+[source,subs="verbatim,quotes"]
+----
+REGISTER USER `*_user_name_*`
+----
+
+[discrete]
+===== Description
+
+REGISTER USER associates an existing user with the Metadb instance.
+This has the effect of allowing the user to be granted privileges in
+the database via the GRANT command.
+
+Normally there is no need to issue REGISTER USER, because CREATE USER
+executes it automatically.  However, if an existing user was created
+in some other way, REGISTER USER can enable it for the Metadb
+instance.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_user_name_*`
+|The name of the user to register.
+|===
+
+[discrete]
+===== Examples
+
+----
+REGISTER USER beatrice;
+----
+
+==== REVOKE
+
+[.aqua-background]#Metadb 1.4#
+
+Disable access to data
+
+[source,subs="verbatim,quotes"]
+----
+REVOKE ACCESS
+    ON { TABLE `*_table_name_*` | FUNCTION `*_function_name_*` | ALL }
+    FROM `*_user_name_*`
+----
+
+[discrete]
+===== Description
+
+The REVOKE command revokes access to tables.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_table_name_*`
+|An existing table.
+
+|`*_user_name_*`
+|An existing user that will have access removed.
+|===
+
+[discrete]
+===== Examples
+
+To disable access by a user `bob` to a table:
+
+----
+REVOKE ACCESS ON TABLE library.patrongroup FROM bob;
+----

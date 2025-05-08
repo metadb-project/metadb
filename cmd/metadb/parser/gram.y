@@ -9,13 +9,17 @@ import (
 
 %union{
 	str string
+	funcparamtypelist []string
 	optlist []ast.Option
 	node ast.Node
 	pass bool
 }
 
+%type <node> deregister_user_stmt
+%type <node> register_user_stmt
 %type <node> top_level_stmt stmt
 %type <node> select_stmt
+%type <node> grant_stmt revoke_stmt
 %type <node> create_data_source_stmt alter_data_source_stmt drop_data_source_stmt authorize_stmt deauthorize_stmt
 %type <node> create_user_stmt drop_user_stmt
 %type <node> create_data_mapping_stmt create_data_origin_stmt list_stmt
@@ -23,6 +27,8 @@ import (
 %type <node> alter_table_stmt alter_table_cmd
 %type <node> verify_consistency_stmt
 %type <node> create_schema_for_user_stmt
+%type <funcparamtypelist> parameter_type
+%type <funcparamtypelist> parameter_type_list
 %type <optlist> options_clause alter_options_clause option_list alter_option_list option alter_option
 %type <str> option_name option_val
 %type <str> name unreserved_keyword
@@ -30,10 +36,14 @@ import (
 %type <str> boolean
 */
 
+%token DEREGISTER
+%token FUNCTION
+%token REGISTER
 %token SELECT
+%token TABLE
 %token CONSISTENCY
-%token CREATE ALTER DATA SOURCE ORIGIN OPTIONS USER
-%token AUTHORIZE DEAUTHORIZE ON ALL TABLE TABLES IN TO WITH MAPPING LIST
+%token CREATE GRANT REVOKE ACCESS ALTER DATA SOURCE ORIGIN OPTIONS USER
+%token AUTHORIZE DEAUTHORIZE ON ALL TABLES IN TO WITH MAPPING LIST
 %token REFRESH INFERRED COLUMN TYPES
 %token TYPE
 %token TRUE FALSE
@@ -124,6 +134,22 @@ stmt:
 		{
 			$$ = $1
 		}
+	| register_user_stmt
+		{
+			$$ = $1
+		}
+	| deregister_user_stmt
+		{
+			$$ = $1
+		}
+	| grant_stmt
+		{
+			$$ = $1
+		}
+	| revoke_stmt
+		{
+			$$ = $1
+		}
 	| list_stmt
 		{
 			$$ = $1
@@ -180,6 +206,70 @@ create_user_stmt:
 	| CREATE USER MAPPING
 		{
 			yylex.(*lexer).pass = true
+		}
+
+grant_stmt:
+	GRANT ACCESS ON ALL TO name ';'
+		{
+			$$ = &ast.GrantAccessOnAllStmt{UserName: $6}
+		}
+	| GRANT ACCESS ON TABLE name TO name ';'
+		{
+			$$ = &ast.GrantAccessOnTableStmt{TableName: $5, UserName: $7}
+		}
+	| GRANT ACCESS ON FUNCTION name '(' ')' TO name ';'
+		{
+			$$ = &ast.GrantAccessOnFunctionStmt{FunctionName: $5, UserName: $9}
+		}
+	| GRANT ACCESS ON FUNCTION name '(' parameter_type_list ')' TO name ';'
+		{
+			$$ = &ast.GrantAccessOnFunctionStmt{FunctionName: $5, FunctionParameterTypes: $7, UserName: $10}
+		}
+
+parameter_type_list:
+	parameter_type
+		{
+			$$ = $1
+		}
+	| parameter_type_list ',' parameter_type
+		{
+			$$ = append($1, $3...)
+		}
+
+parameter_type:
+	name
+		{
+			$$ = []string{$1}
+		}
+
+revoke_stmt:
+	REVOKE ACCESS ON ALL FROM name ';'
+		{
+			$$ = &ast.RevokeAccessOnAllStmt{UserName: $6}
+		}
+	| REVOKE ACCESS ON TABLE name FROM name ';'
+		{
+			$$ = &ast.RevokeAccessOnTableStmt{TableName: $5, UserName: $7}
+		}
+	| REVOKE ACCESS ON FUNCTION name '(' ')' FROM name ';'
+		{
+			$$ = &ast.RevokeAccessOnFunctionStmt{FunctionName: $5, UserName: $9}
+		}
+	| REVOKE ACCESS ON FUNCTION name '(' parameter_type_list ')' FROM name ';'
+		{
+			$$ = &ast.RevokeAccessOnFunctionStmt{FunctionName: $5, FunctionParameterTypes: $7, UserName: $10}
+		}
+
+deregister_user_stmt:
+	DEREGISTER USER name ';'
+		{
+			$$ = &ast.DeregisterUserStmt{UserName: $3}
+		}
+
+register_user_stmt:
+	REGISTER USER name ';'
+		{
+			$$ = &ast.RegisterUserStmt{UserName: $3}
 		}
 
 drop_user_stmt:

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/metadb-project/metadb/cmd/metadb/acl"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/eout"
@@ -413,6 +414,7 @@ var updbList = []updbFunc{
 	updb23,
 	updb24,
 	updb25,
+	updb26,
 }
 
 func updb8(opt *dbopt) error {
@@ -1716,6 +1718,158 @@ func updb25(opt *dbopt) error {
 		return err
 	}
 	if err = tx.Commit(context.TODO()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb26(opt *dbopt) error {
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	q := "SELECT username FROM metadb.auth"
+	rows, err := dc.Query(context.TODO(), q)
+	if err != nil {
+		return fmt.Errorf("selecting user list: %w", util.PGErr(err))
+	}
+	defer rows.Close()
+	users := make([]string, 0)
+	for rows.Next() {
+		var u string
+		err = rows.Scan(&u)
+		if err != nil {
+			return fmt.Errorf("reading user list: %w", util.PGErr(err))
+		}
+		users = append(users, u)
+	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("reading user list: %w", util.PGErr(err))
+	}
+	rows.Close()
+
+	dcsuper, err := opt.DB.ConnectSuper()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dcsuper)
+	if _, err = dcsuper.Exec(context.TODO(),
+		"ALTER USER "+opt.DB.User+" CREATEROLE"); err != nil {
+		return fmt.Errorf("setting createrole: %w", util.PGErr(err))
+	}
+
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return util.PGErr(err)
+	}
+	defer dbx.Rollback(tx)
+
+	q = "REVOKE CONNECT ON DATABASE " + opt.DB.DBName + " FROM public"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("revoking connect: %w", util.PGErr(err))
+	}
+
+	q = "ALTER TABLE metadb.auth DROP COLUMN tables"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("modifying metadb.auth (tables): %w", util.PGErr(err))
+	}
+	q = "ALTER TABLE metadb.auth DROP COLUMN dbupdated"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("modifying metadb.auth (dbupdated): %w", util.PGErr(err))
+	}
+
+	q = "CREATE TABLE metadb.acl (" +
+		"schema_name text NOT NULL, " +
+		"object_name text NOT NULL, " +
+		"object_type char NOT NULL CHECK (object_type IN ('f', 't')), " +
+		"privilege char NOT NULL CHECK (privilege IN ('a')), " +
+		"user_name text NOT NULL, " +
+		"PRIMARY KEY (schema_name, object_name, object_type, privilege, user_name))"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("creating table metadb.acl: %w", util.PGErr(err))
+	}
+
+	for i := range users {
+		eout.Info("upgrading user %q", users[i])
+		q = "GRANT CREATE, CONNECT, TEMPORARY ON DATABASE " + opt.DB.DBName + " TO " + users[i]
+		if _, err = tx.Exec(context.TODO(), q); err != nil {
+			return fmt.Errorf("enabling connect privileges for user %q: %w", users[i], util.PGErr(err))
+		}
+		if err = updb26GrantAccessOnAll(tx, users[i]); err != nil {
+			return fmt.Errorf("upgrading privileges for user %q: %w", users[i], util.PGErr(err))
+		}
+	}
+
+	if err = metadata.WriteDatabaseVersion(tx, 26); err != nil {
+		return util.PGErr(err)
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
+		return util.PGErr(err)
+	}
+	return nil
+}
+
+var updb26ExtraManagedSchemas = []string{"folio_derived", "reshare_derived"}
+var updb26ExtraManagedTables = []string{"folio_source_record.marc__t"}
+
+func updb26GrantAccessOnAll(tx pgx.Tx, user string) error {
+	acls := make([]acl.ACLItem, 0)
+
+	tables, err := catalog.ReadDataTableNames(tx)
+	if err != nil {
+		return err
+	}
+	for i := range tables {
+		acls = append(acls, acl.ACLItem{
+			SchemaName: tables[i].Schema,
+			ObjectName: tables[i].Table,
+			ObjectType: acl.Table,
+			Privilege:  acl.Access,
+			UserName:   user,
+		})
+	}
+
+	functions := catalog.FunctionNames()
+	for i := range functions {
+		acls = append(acls, acl.ACLItem{
+			SchemaName: "public",
+			ObjectName: functions[i],
+			ObjectType: acl.Function,
+			Privilege:  acl.Access,
+			UserName:   user,
+		})
+	}
+
+	for _, s := range updb26ExtraManagedSchemas {
+		var tables []string
+		tables, err = catalog.ReadTablesInSchema(tx, s)
+		if err != nil {
+			return err
+		}
+		for i := range tables {
+			acls = append(acls, acl.ACLItem{
+				SchemaName: s,
+				ObjectName: tables[i],
+				ObjectType: acl.Table,
+				Privilege:  acl.Access,
+				UserName:   user,
+			})
+		}
+	}
+	for i := range updb26ExtraManagedTables {
+		t := strings.Split(updb26ExtraManagedTables[i], ".")
+		acls = append(acls, acl.ACLItem{
+			SchemaName: t[0],
+			ObjectName: t[1],
+			ObjectType: acl.Table,
+			Privilege:  acl.Access,
+			UserName:   user,
+		})
+	}
+
+	if err = acl.Grant(tx, acls); err != nil {
 		return err
 	}
 	return nil

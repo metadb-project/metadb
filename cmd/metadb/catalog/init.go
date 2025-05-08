@@ -23,7 +23,6 @@ type Catalog struct {
 	mu                 sync.Mutex
 	tableDir           map[dbx.Table]tableEntry
 	partYears          map[string]map[int]struct{}
-	users              map[string]*util.RegexList
 	columns            map[dbx.Column]string
 	indexes            map[dbx.Column]struct{}
 	jsonTransform      map[config.JSONPath]string
@@ -60,9 +59,6 @@ func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
 		return nil, err
 	}
 	if err := c.initPartYears(); err != nil {
-		return nil, err
-	}
-	if err := c.initUsers(); err != nil {
 		return nil, err
 	}
 	if err := c.initSchema(); err != nil {
@@ -138,6 +134,7 @@ type systemTableDef struct {
 }
 
 var systemTables = []systemTableDef{
+	{table: dbx.Table{Schema: catalogSchema, Table: "acl"}, create: createTableACL},
 	{table: dbx.Table{Schema: catalogSchema, Table: "auth"}, create: createTableAuth},
 	{table: dbx.Table{Schema: catalogSchema, Table: "init"}, create: createTableInit},
 	{table: dbx.Table{Schema: catalogSchema, Table: "log"}, create: createTableLog},
@@ -147,6 +144,29 @@ var systemTables = []systemTableDef{
 	{table: dbx.Table{Schema: catalogSchema, Table: "table_update"}, create: createTableUpdate},
 	{table: dbx.Table{Schema: catalogSchema, Table: "base_table"}, create: createTableBaseTable},
 	{table: dbx.Table{Schema: catalogSchema, Table: "transform_json"}, create: createTableJSON},
+}
+
+func PublicSystemTables() []dbx.Table {
+	return []dbx.Table{
+		{Schema: catalogSchema, Table: "base_table"},
+		{Schema: catalogSchema, Table: "log"},
+		{Schema: catalogSchema, Table: "table_update"},
+	}
+}
+
+func IsPublicSystemTable(schema, table string) bool {
+	switch schema {
+	case catalogSchema:
+		switch table {
+		case "base_table":
+			return true
+		case "log":
+			return true
+		case "table_update":
+			return true
+		}
+	}
+	return false
 }
 
 //func SystemTables() []dbx.Table {
@@ -184,11 +204,23 @@ func createCatalogSchema(dp *pgxpool.Pool) error {
 	return nil
 }
 
+func createTableACL(tx pgx.Tx) error {
+	q := "CREATE TABLE " + catalogSchema + ".acl (" +
+		"schema_name text NOT NULL, " +
+		"object_name text NOT NULL, " +
+		"object_type char NOT NULL CHECK (object_type IN ('f', 't')), " +
+		"privilege char NOT NULL CHECK (privilege IN ('a')), " +
+		"user_name text NOT NULL, " +
+		"PRIMARY KEY (schema_name, object_name, object_type, privilege, user_name))"
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("creating table "+catalogSchema+".acl: %w", err)
+	}
+	return nil
+}
+
 func createTableAuth(tx pgx.Tx) error {
 	q := "CREATE TABLE " + catalogSchema + ".auth (" +
-		"username text PRIMARY KEY, " +
-		"tables text NOT NULL, " +
-		"dbupdated boolean NOT NULL)"
+		"username text PRIMARY KEY)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating table "+catalogSchema+".auth: %w", err)
 	}

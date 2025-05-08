@@ -105,7 +105,6 @@ func loggingServer(svr *server) error {
 	log.SetDatabase(svr.dp)
 	defer log.SetDatabase(nil)
 
-	log.Info("starting Metadb %s", util.GetMetadbVersion())
 	if err := runServer(svr, cat); err != nil {
 		log.Fatal("%s", err)
 		return err
@@ -118,7 +117,7 @@ func runServer(svr *server, cat *catalog.Catalog) error {
 	if svr.opt.NoTLS {
 		log.Warning("TLS disabled for all client connections")
 	}
-	if err := launchServer(svr, cat); err != nil {
+	if err := mainServer(svr, cat); err != nil {
 		return err
 	}
 	//log.Info("server is shut down")
@@ -128,10 +127,6 @@ func runServer(svr *server, cat *catalog.Catalog) error {
 func setMemoryLimit(limit float64) {
 	// limit is specified in GiB.
 	debug.SetMemoryLimit(int64(math.Min(math.Max(0.122, limit), 16.0) * 1073741824))
-}
-
-func launchServer(svr *server, cat *catalog.Catalog) error {
-	return mainServer(svr, cat)
 }
 
 func mainServer(svr *server, cat *catalog.Catalog) error {
@@ -145,42 +140,10 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 	}()
 	// TODO also need to catch signals and call RemovePIDFile
 
-	//svr.dc, err = svr.db.Connect()
-	//if err != nil {
-	//	return err
-	//}
-	//defer dbx.Close(svr.dc)
-	//
-	//svr.dcsuper, err = svr.db.ConnectSuper()
-	//if err != nil {
-	//	return err
-	//}
-	//defer dbx.Close(svr.dcsuper)
+	log.Info("starting Metadb %s", util.GetMetadbVersion())
 
-	// Check that database version is compatible
-	// err = sysdb.ValidateSysdbVersion(svr.db)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// if svr.conn, err = pgxpool.Connect(context.TODO(), svr.connString); err != nil {
-	// 	return err
-	// }
-
-	// spr, err := waitForConfig(svr)
-	// if err != nil {
-	// 	log.Fatal("%s", err)
-	// 	os.Exit(1)
-	// }
-
-	//go listenAndServe(svr)
-
-	// Update user permissions in database
-	if err := sysdb.GoUpdateUserPerms(svr.db, cat.AllTables("")); err != nil {
-		return err
-	}
-	if err := cat.ReinitUsers(); err != nil {
-		return err
+	if !svr.opt.Script {
+		go libpq.Listen(svr.opt.Listen, svr.opt.Port, svr.db, &svr.state.sources)
 	}
 
 	// Create database functions.
@@ -192,10 +155,6 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 	}(*(svr.db))
 	if svr.opt.Script {
 		wg.Wait()
-	}
-
-	if !svr.opt.Script {
-		go libpq.Listen(svr.opt.Listen, svr.opt.Port, svr.db, &svr.state.sources)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

@@ -1,12 +1,12 @@
 package marctab
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/metadb-project/metadb/cmd/internal/libmarct"
+	"github.com/metadb-project/metadb/cmd/metadb/acl"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
@@ -51,12 +51,8 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 		return fmt.Errorf("writing table updated time: %w", err)
 	}
 	_ = cat.RemoveTableUpdated(dbx.Table{Schema: "folio_source_record", Table: "marctab"})
-	users, err = catalog.AllUsers(dc)
-	if err != nil {
+	if err := acl.RestorePrivileges(dc, "folio_source_record", "marc__t", acl.Table); err != nil {
 		return err
-	}
-	for _, u := range users {
-		_, _ = dc.Exec(context.TODO(), "GRANT SELECT ON folio_source_record.marc__t TO "+u)
 	}
 	log.Debug("marc__t: updated table folio_source_record.marc__t")
 	return nil

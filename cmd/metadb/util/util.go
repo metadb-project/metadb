@@ -1,6 +1,7 @@
 package util
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,7 +14,7 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-const DatabaseVersion = 25
+const DatabaseVersion = 26
 
 // MetadbVersion is defined at build time via -ldflags.
 var MetadbVersion = ""
@@ -79,6 +80,10 @@ func SysdbFileName(datadir string) string {
 // func SystemConfigFileName(datadir string) string {
 // 	return filepath.Join(SystemDirName(datadir), "system.conf")
 // }
+
+func PGErr(err error) error {
+	return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
+}
 
 func MatchRegexps(res []*regexp.Regexp, s string) bool {
 	var re *regexp.Regexp

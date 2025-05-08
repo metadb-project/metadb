@@ -24,7 +24,7 @@ func SQLFunc(datadir string, cat *catalog.Catalog, db dbx.DB, url, ref, path, sc
 		return err
 	}
 	defer dbx.Close(dc)
-	users, err := catalog.AllUsers(dc)
+	users, err := catalog.Users(dc)
 	if err != nil {
 		return err
 	}

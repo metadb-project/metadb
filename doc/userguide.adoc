@@ -120,15 +120,11 @@ SELECT id, groupname, description FROM library.patrongroup;
 A current table reflects the current state of each row in the data
 source, as of the last time the row was updated.
 
-.Note
-****
-[.text-center]
-In a few database client applications, current tables do not appear by
-default in the list of tables.  This is because main tables and
-current tables have a parent-child relationship, and database user
+NOTE: In a few database client applications, current tables do not
+appear by default in the list of tables.  This is because main tables
+and current tables have a parent-child relationship, and database user
 interfaces may show the current table as subsumed under the main
 table.
-****
 
 To take another example:
 

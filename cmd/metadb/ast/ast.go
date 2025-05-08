@@ -134,3 +134,65 @@ type CreateSchemaForUserStmt struct {
 
 func (*CreateSchemaForUserStmt) node()     {}
 func (*CreateSchemaForUserStmt) stmtNode() {}
+
+type GrantAccessOnAllStmt struct {
+	UserName string
+}
+
+func (*GrantAccessOnAllStmt) node()     {}
+func (*GrantAccessOnAllStmt) stmtNode() {}
+
+type GrantAccessOnTableStmt struct {
+	TableName string
+	UserName  string
+}
+
+func (*GrantAccessOnTableStmt) node()     {}
+func (*GrantAccessOnTableStmt) stmtNode() {}
+
+type GrantAccessOnFunctionStmt struct {
+	FunctionName           string
+	FunctionParameterTypes []string
+	UserName               string
+}
+
+func (*GrantAccessOnFunctionStmt) node()     {}
+func (*GrantAccessOnFunctionStmt) stmtNode() {}
+
+type RevokeAccessOnAllStmt struct {
+	UserName string
+}
+
+func (*RevokeAccessOnAllStmt) node()     {}
+func (*RevokeAccessOnAllStmt) stmtNode() {}
+
+type RevokeAccessOnTableStmt struct {
+	TableName string
+	UserName  string
+}
+
+func (*RevokeAccessOnTableStmt) node()     {}
+func (*RevokeAccessOnTableStmt) stmtNode() {}
+
+type RevokeAccessOnFunctionStmt struct {
+	FunctionName           string
+	FunctionParameterTypes []string
+	UserName               string
+}
+
+func (*RevokeAccessOnFunctionStmt) node()     {}
+func (*RevokeAccessOnFunctionStmt) stmtNode() {}
+
+type DeregisterUserStmt struct {
+	UserName string
+}
+
+func (*DeregisterUserStmt) node()     {}
+func (*DeregisterUserStmt) stmtNode() {}
+
+type RegisterUserStmt struct {
+	UserName string
+}
+
+func (*RegisterUserStmt) node()     {}
+func (*RegisterUserStmt) stmtNode() {}

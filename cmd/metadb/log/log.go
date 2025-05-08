@@ -164,26 +164,35 @@ func printf(c *fcolor.Color, logToDatabase bool, level string, format string, ar
 		//	printf(c, false, "ERROR", "logging to database: %v", err)
 		//	return
 		//}
-		year := n.Year()
-		yearStr := strconv.Itoa(year)
-		nextYearStr := strconv.Itoa(year + 1)
-		_, ok := partitionsCreated[year]
-		if !ok {
-			q := "CREATE TABLE IF NOT EXISTS metadb.zzz___log___" + strconv.Itoa(year) +
-				" PARTITION OF metadb.log " +
-				" FOR VALUES FROM ('" + yearStr + "-01-01') TO ('" + nextYearStr + "-01-01')"
-			if _, err := std.dcpool.Exec(context.TODO(), q); err != nil {
-				printf(c, false, "ERROR", "logging to database: creating partition: %s: %v", yearStr, err)
-				return
-			}
-			partitionsCreated[year] = struct{}{}
+
+		if err := createPartition(n); err != nil {
+			printf(nil, false, "ERROR", "%v", err)
+			return
 		}
+
 		q := "INSERT INTO metadb.log VALUES($1,$2,$3)"
 		if _, err := std.dcpool.Exec(context.TODO(), q, n, level, msg); err != nil {
-			printf(c, false, "ERROR", "logging to database: %v", err)
+			printf(nil, false, "ERROR", "logging to database: %v", err)
 			return
 		}
 	}
+}
+
+func createPartition(now time.Time) error {
+	year := now.Year()
+	yearStr := strconv.Itoa(year)
+	nextYearStr := strconv.Itoa(year + 1)
+	_, ok := partitionsCreated[year]
+	if !ok {
+		q := "CREATE TABLE IF NOT EXISTS metadb.zzz___log___" + strconv.Itoa(year) +
+			" PARTITION OF metadb.log " +
+			" FOR VALUES FROM ('" + yearStr + "-01-01') TO ('" + nextYearStr + "-01-01')"
+		if _, err := std.dcpool.Exec(context.TODO(), q); err != nil {
+			return fmt.Errorf("logging to database: creating partition: %s: %v", yearStr, err)
+		}
+		partitionsCreated[year] = struct{}{}
+	}
+	return nil
 }
 
 // Source log

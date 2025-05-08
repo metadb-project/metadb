@@ -9,20 +9,22 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/metadb-project/metadb/cmd/metadb/catalog"
-	"github.com/metadb-project/metadb/cmd/metadb/tools"
-
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/metadb-project/metadb/cmd/metadb/ast"
+	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dberr"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/parser"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
+	"github.com/metadb-project/metadb/cmd/metadb/tools"
 )
+
+var extraManagedSchemas = []string{"folio_derived", "reshare_derived"}
+var extraManagedTables = []string{"folio_source_record.marc__t"}
 
 func Listen(host string, port string, db *dbx.DB, sources *[]*sysdb.SourceConnector) {
 	// var h string
@@ -62,16 +64,10 @@ func Listen(host string, port string, db *dbx.DB, sources *[]*sysdb.SourceConnec
 }
 
 func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, sources *[]*sysdb.SourceConnector) {
-	dbconn, err := db.Connect()
-	if err != nil {
-		// TODO handle error
-		log.Info("%v", err)
-		return
-	}
-	defer dbx.Close(dbconn)
 	//log.Trace("connected to database")
 	// TODO Close
 
+	var err error
 	if err = startup(conn, backend); err != nil {
 		// errw := write(conn, encode(nil, []pgproto3.Message{
 		// 	&pgproto3.ErrorResponse{Message: err.Error()},
@@ -102,13 +98,13 @@ func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, sources *[]*sys
 		switch m := msg.(type) {
 		case *pgproto3.Parse:
 			// Extended query
-			if err = processParse(conn, backend, m, db, dbconn, sources); err != nil {
+			if err = processParse(conn, backend, m, db, sources); err != nil {
 				log.Info("%v", err)
 				return
 			}
 			//log.Info("*pgproto3.Parse: not yet implemented")
 		case *pgproto3.Query:
-			if err = processQuery(conn, m.String, nil, db, dbconn, sources); err != nil {
+			if err = processQuery(conn, m.String, nil, db, sources); err != nil {
 				log.Info("%v", err)
 				return
 			}
@@ -151,9 +147,15 @@ func startup(conn net.Conn, backend *pgproto3.Backend) error {
 	}
 }
 
-func processParse(conn net.Conn, backend *pgproto3.Backend, parse *pgproto3.Parse, db *dbx.DB, dc *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
+func processParse(conn net.Conn, backend *pgproto3.Backend, parse *pgproto3.Parse, db *dbx.DB, sources *[]*sysdb.SourceConnector) error {
 	query := parse.Query
 	log.Trace("prepared statement: %s", query)
+
+	dc, err := db.Connect()
+	if err != nil {
+		return fmt.Errorf("connecting to database: %w", err)
+	}
+	defer dbx.Close(dc)
 
 	// Prepare the query.
 	stmt, err := dc.Prepare(context.TODO(), parse.Name, query)
@@ -201,8 +203,8 @@ func processParse(conn net.Conn, backend *pgproto3.Backend, parse *pgproto3.Pars
 			//}
 
 		case *pgproto3.Execute:
-			//func processQuery(conn net.Conn, query string, db *dbx.DB, dbconn *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
-			err := processQuery(conn, query, args, db, dc, sources)
+			//func processQuery(conn net.Conn, query string, db *dbx.DB, dc *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
+			err := processQuery(conn, query, args, db, sources)
 			//err := proxySelect(conn, query, args, dc)
 			if err != nil {
 				return fmt.Errorf("executing prepared statement: %w", err)
@@ -240,7 +242,13 @@ func processParse(conn net.Conn, backend *pgproto3.Backend, parse *pgproto3.Pars
 	}
 }
 
-func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
+func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, sources *[]*sysdb.SourceConnector) error {
+	dc, err := db.Connect()
+	if err != nil {
+		return fmt.Errorf("connecting to database: %w", err)
+	}
+	defer dbx.Close(dc)
+
 	var e string
 	node, err, pass := parser.Parse(query)
 	if err != nil {
@@ -248,7 +256,7 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 	}
 	log.Trace("query received: query=%q node=%#v err=%q pass=%v\n", query, node, e, pass)
 	if pass {
-		err = proxyQuery(conn, query, args, node, dbconn)
+		err = proxyQuery(conn, query, args, node, dc)
 		if err != nil {
 			buffer, erre := encode(nil, []pgproto3.Message{
 				&pgproto3.ErrorResponse{Message: "ERROR:  " + err.Error()},
@@ -272,34 +280,50 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 		return write(conn, buffer)
 	}
 	switch n := node.(type) {
+	case *ast.DeregisterUserStmt:
+		err = deregisterUser(conn, n, db, dc)
+	case *ast.RegisterUserStmt:
+		err = registerUser(conn, n, db, dc)
 	case *ast.CreateDataSourceStmt:
-		err = createDataSource(conn, n, dbconn)
+		err = createDataSource(conn, n, dc)
 	case *ast.CreateDataMappingStmt:
-		err = createDataMapping(conn, n, dbconn)
+		err = createDataMapping(conn, n, dc)
 	case *ast.AlterTableStmt:
-		err = alterTable(conn, n, dbconn)
+		err = alterTable(conn, n, dc)
 	case *ast.AlterDataSourceStmt:
-		err = alterDataSource(conn, n, dbconn)
+		err = alterDataSource(conn, n, dc)
 	case *ast.CreateUserStmt:
-		err = createUser(conn, n, db, dbconn)
+		err = createUser(conn, n, db, dc)
 	case *ast.DropUserStmt:
-		err = dropUser(conn, n, db)
+		err = dropUser(conn, n, db, dc)
 	case *ast.DropDataSourceStmt:
-		err = dropDataSource(conn, n, dbconn)
+		err = dropDataSource(conn, n, dc)
 	case *ast.AuthorizeStmt:
-		err = authorize(conn, n, dbconn)
+		err = fmt.Errorf("AUTHORIZE is no longer supported")
 	case *ast.DeauthorizeStmt:
-		err = deauthorize(conn, n, dbconn)
+		err = fmt.Errorf("DEAUTHORIZE is no longer supported")
+	case *ast.GrantAccessOnAllStmt:
+		err = grantAccessOnAll(conn, n, dc)
+	case *ast.GrantAccessOnFunctionStmt:
+		err = grantAccessOnFunction(conn, n, dc)
+	case *ast.GrantAccessOnTableStmt:
+		err = grantAccessOnTable(conn, n, dc)
+	case *ast.RevokeAccessOnAllStmt:
+		err = revokeAccessOnAll(conn, n, dc)
+	case *ast.RevokeAccessOnFunctionStmt:
+		err = revokeAccessOnFunction(conn, n, dc)
+	case *ast.RevokeAccessOnTableStmt:
+		err = revokeAccessOnTable(conn, n, dc)
 	case *ast.CreateDataOriginStmt:
-		err = createDataOrigin(conn, n, dbconn)
+		err = createDataOrigin(conn, n, dc)
 	case *ast.ListStmt:
-		err = list(conn, n, dbconn, sources)
+		err = list(conn, n, dc, sources)
 	case *ast.RefreshInferredColumnTypesStmt:
-		err = refreshInferredColumnTypesStmt(conn, dbconn)
+		err = refreshInferredColumnTypesStmt(conn, dc)
 	case *ast.VerifyConsistencyStmt:
-		err = verifyConsistencyStmt(conn, dbconn)
+		err = verifyConsistencyStmt(conn, dc)
 	case *ast.CreateSchemaForUserStmt:
-		err = createSchemaForUser(conn, n, db, dbconn)
+		err = createSchemaForUser(conn, n, db, dc)
 	//case *ast.SelectStmt:
 	//	if n.Fn == "version" {
 	//		return version(conn, query)
@@ -319,7 +343,6 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, dbconn *p
 		return write(conn, buffer)
 	}
 	if err != nil {
-		//log.Error("%v: %s", err, query)
 		hint := ""
 		errs, ok := err.(*dberr.Error)
 		if ok {
@@ -880,95 +903,13 @@ func checkOptionDuplicates(options []ast.Option) error {
 	return nil
 }
 
-func createUser(conn net.Conn /*query string,*/, node *ast.CreateUserStmt, db *dbx.DB, dc *pgx.Conn) error {
-	if node.Options == nil {
-		// return to client
-	}
-	opt, err := createUserOptions(node.Options)
-	if err != nil {
-		return err
-	}
-	if opt.Password == "" {
-		return fmt.Errorf("option \"password\" is required")
-	}
-
-	dcsuper, err := db.ConnectSuper()
-	if err != nil {
-		return err
-	}
-	defer dbx.Close(dcsuper)
-
-	exists, err := userExists(dc, node.UserName)
-	if err != nil {
-		return fmt.Errorf("selecting role: %w", err)
-	}
-	if exists {
-		return fmt.Errorf("role %q already exists", node.UserName)
-	}
-
-	q := "CREATE USER " + node.UserName + " PASSWORD '" + opt.Password + "'"
-	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		return err
-	}
-
-	// Add comment on role.
-	if opt.Comment != "" {
-		q = "COMMENT ON ROLE " + node.UserName + " IS '" + opt.Comment + "'"
-		if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-			_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
-				Message: fmt.Sprintf("unable to add comment on role %q", node.UserName)},
-			})
-		}
-	}
-
-	if err = createUserSchema(dc, node.UserName); err != nil {
-		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
-			Message: err.Error()},
-		})
-	}
-	if err = grantCreateOnUserSchema(dc, node.UserName); err != nil {
-		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
-			Message: err.Error()},
-		})
-	}
-	if err = grantUsageOnUserSchema(dc, node.UserName); err != nil {
-		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
-			Message: err.Error()},
-		})
-	}
-
-	q = "GRANT USAGE ON SCHEMA metadb TO \"" + node.UserName + "\""
-	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
-			Message: fmt.Sprintf("unable to grant usage on schema metadb")},
-		})
-	}
-	q = "GRANT SELECT ON metadb.log, metadb.table_update, metadb.base_table TO \"" + node.UserName + "\""
-	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
-			Message: fmt.Sprintf("unable to grant select on metadb tables to %q", node.UserName)},
-		})
-	}
-	q = "GRANT USAGE ON SCHEMA public TO \"" + node.UserName + "\""
-	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		_ = writeEncoded(conn, []pgproto3.Message{&pgproto3.NoticeResponse{Severity: "NOTICE",
-			Message: fmt.Sprintf("unable to grant usage on schema public")},
-		})
-	}
-
-	return writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.CommandComplete{CommandTag: []byte("CREATE ROLE")},
-		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	})
-}
-
 func createSchemaForUser(conn net.Conn, node *ast.CreateSchemaForUserStmt, db *dbx.DB, dc *pgx.Conn) error {
-	exists, err := userExists(dc, node.UserName)
+	reg, err := catalog.UserRegistered(dc, node.UserName)
 	if err != nil {
-		return fmt.Errorf("selecting role: %v", err)
+		return fmt.Errorf("selecting user: %v", err)
 	}
-	if !exists {
-		return fmt.Errorf("role %q does not exist", node.UserName)
+	if !reg {
+		return fmt.Errorf("%q is not a registered user", node.UserName)
 	}
 
 	if err := createUserSchema(dc, node.UserName); err != nil {
@@ -987,214 +928,10 @@ func createSchemaForUser(conn net.Conn, node *ast.CreateSchemaForUserStmt, db *d
 	})
 }
 
-func createUserSchema(dc *pgx.Conn, user string) error {
-	q := "CREATE SCHEMA " + user
-	if _, err := dc.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating schema %q: %s", user, err)
-	}
-	return nil
-}
-
-func grantCreateOnUserSchema(dc *pgx.Conn, user string) error {
-	q := "GRANT CREATE ON SCHEMA " + user + " TO " + user
-	if _, err := dc.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("granting create privilege on schema %q to role %q: %s", user, user, err)
-	}
-	return nil
-}
-
-func grantUsageOnUserSchema(dc *pgx.Conn, user string) error {
-	q := "GRANT USAGE ON SCHEMA " + user + " TO " + user + " WITH GRANT OPTION"
-	if _, err := dc.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("granting usage privilege on schema %q to role %q: %s", user, user, err)
-	}
-	return nil
-}
-
-func dropUser(conn net.Conn, node *ast.DropUserStmt, db *dbx.DB) error {
-	dp, err := dbx.NewPool(context.TODO(), db.ConnString(db.User, db.Password))
-	if err != nil {
-		return fmt.Errorf("creating database connection pool: %w", err)
-	}
-	defer dp.Close()
-	dcsuper, err := db.ConnectSuper()
-	if err != nil {
-		return err
-	}
-	defer dbx.Close(dcsuper)
-
-	exists, err := userExists(dcsuper, node.UserName)
-	if err != nil {
-		return fmt.Errorf("selecting role: %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("role %q does not exist", node.UserName)
-	}
-
-	// Revoke privileges from schemas.
-	cat, err := catalog.Initialize(db, dp)
-	if err != nil {
-		return err
-	}
-	tables := cat.AllTables("")
-	schemas := make(map[string]struct{})
-	for i := range tables {
-		_, ok := schemas[tables[i].Schema]
-		if !ok {
-			schemas[tables[i].Schema] = struct{}{}
-		}
-	}
-	for s := range schemas {
-		q := "REVOKE USAGE ON SCHEMA \"" + s + "\" FROM \"" + node.UserName + "\""
-		if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-			return err
-		}
-	}
-	cat = nil
-	q := "REVOKE SELECT ON ALL TABLES IN SCHEMA metadb FROM \"" + node.UserName + "\""
-	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		return err
-	}
-	q = "REVOKE USAGE ON SCHEMA metadb FROM \"" + node.UserName + "\""
-	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		return err
-	}
-	q = "REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM \"" + node.UserName + "\""
-	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		return err
-	}
-	q = "REVOKE USAGE ON SCHEMA public FROM \"" + node.UserName + "\""
-	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		return err
-	}
-	q = "REVOKE CREATE, USAGE ON SCHEMA \"" + node.UserName + "\" FROM \"" + node.UserName + "\""
-	_, _ = dcsuper.Exec(context.TODO(), q)
-
-	q = "DROP USER \"" + node.UserName + "\""
-	if _, err = dcsuper.Exec(context.TODO(), q); err != nil {
-		return err
-	}
-
-	return writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.CommandComplete{CommandTag: []byte("DROP ROLE")},
-		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	})
-}
-
-func createUserOptions(options []ast.Option) (*userOptions, error) {
-	err := checkOptionDuplicates(options)
-	if err != nil {
-		return nil, err
-	}
-	o := &userOptions{
-		// Set default values
-	}
-	for _, opt := range options {
-		switch strings.ToLower(opt.Name) {
-		case "password":
-			o.Password = opt.Val
-		case "comment":
-			o.Comment = opt.Val
-		default:
-			return nil, &dberr.Error{
-				Err:  fmt.Errorf("invalid option %q", opt.Name),
-				Hint: "Valid options in this context are: password, comment",
-			}
-		}
-	}
-	return o, nil
-}
-
-type userOptions struct {
-	Password string
-	Comment  string
-}
-
-func authorize(conn net.Conn, node *ast.AuthorizeStmt, dc *pgx.Conn) error {
-	exists, err := sourceExists(dc, node.DataSourceName)
-	if err != nil {
-		return fmt.Errorf("selecting data source: %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("data source %q does not exist", node.DataSourceName)
-	}
-
-	exists, err = userExists(dc, node.RoleName)
-	if err != nil {
-		return fmt.Errorf("selecting role: %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("role %q does not exist", node.RoleName)
-	}
-
-	q := "INSERT INTO metadb.auth(username,tables,dbupdated) VALUES ('" + node.RoleName + "','.*',FALSE) ON CONFLICT (username) DO UPDATE SET tables='.*',dbupdated=FALSE;"
-	_, err = dc.Exec(context.TODO(), q)
-	if err != nil {
-		return fmt.Errorf("writing authorization: %w", err)
-	}
-
-	_ = writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server to update all permissions"},
-	})
-
-	return writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.CommandComplete{CommandTag: []byte("AUTHORIZE")},
-		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	})
-}
-
-func deauthorize(conn net.Conn, node *ast.DeauthorizeStmt, dc *pgx.Conn) error {
-	exists, err := sourceExists(dc, node.DataSourceName)
-	if err != nil {
-		return fmt.Errorf("selecting data source: %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("data source %q does not exist", node.DataSourceName)
-	}
-
-	exists, err = userExists(dc, node.RoleName)
-	if err != nil {
-		return fmt.Errorf("selecting role: %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("role %q does not exist", node.RoleName)
-	}
-
-	q := "UPDATE metadb.auth SET tables='',dbupdated=FALSE WHERE username=$1"
-	_, err = dc.Exec(context.TODO(), q, node.RoleName)
-	if err != nil {
-		return fmt.Errorf("writing authorization: %w", err)
-	}
-
-	_ = writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server to update all permissions"},
-	})
-
-	return writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.CommandComplete{CommandTag: []byte("DEAUTHORIZE")},
-		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	})
-}
-
 func sourceExists(dc *pgx.Conn, sourceName string) (bool, error) {
 	q := "SELECT 1 FROM metadb.source WHERE name=$1"
 	var i int64
 	err := dc.QueryRow(context.TODO(), q, sourceName).Scan(&i)
-	switch {
-	case err == pgx.ErrNoRows:
-		return false, nil
-	case err != nil:
-		return false, err
-	default:
-		return true, nil
-	}
-}
-
-// TODO move to catalog package
-func userExists(dc *pgx.Conn, username string) (bool, error) {
-	q := "SELECT 1 FROM pg_catalog.pg_user WHERE usename=$1"
-	var i int64
-	err := dc.QueryRow(context.TODO(), q, username).Scan(&i)
 	switch {
 	case err == pgx.ErrNoRows:
 		return false, nil

@@ -6,96 +6,55 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
-// TODO Change to instance method and use cache
-func AllUsers(dc *pgx.Conn) ([]string, error) {
+func UserRegistered(dq dbx.Queryable, user string) (bool, error) {
+	q := "SELECT 1 FROM metadb.auth WHERE username=$1"
+	var i int64
+	err := dq.QueryRow(context.TODO(), q, user).Scan(&i)
+	switch {
+	case err == pgx.ErrNoRows:
+		return false, nil
+	case err != nil:
+		return false, util.PGErr(err)
+	default:
+		return true, nil
+	}
+}
+
+func Users(dq dbx.Queryable) ([]string, error) {
 	q := "SELECT username FROM metadb.auth"
-	rows, err := dc.Query(context.TODO(), q)
+	rows, err := dq.Query(context.TODO(), q)
 	if err != nil {
-		return nil, fmt.Errorf("selecting user list: %w", err)
+		return nil, fmt.Errorf("selecting user list: %w", util.PGErr(err))
 	}
 	defer rows.Close()
 	users := make([]string, 0)
 	for rows.Next() {
-		var username string
-		err := rows.Scan(&username)
+		var u string
+		err := rows.Scan(&u)
 		if err != nil {
-			return nil, fmt.Errorf("reading user list: %w", err)
+			return nil, fmt.Errorf("reading user list: %w", util.PGErr(err))
 		}
-		users = append(users, username)
+		users = append(users, u)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("reading user list: %w", err)
+		return nil, fmt.Errorf("reading user list: %w", util.PGErr(err))
 	}
 	return users, nil
 }
 
-func (c *Catalog) ReinitUsers() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.initUsers()
-}
-
-func (c *Catalog) initUsers() error {
-	// read users
-	users, err := sysdb.UserRead(c.dp)
-	if err != nil {
-		return fmt.Errorf("reading user permissions: %w", err)
+func DatabaseUserExists(dq dbx.Queryable, user string) (bool, error) {
+	q := "SELECT 1 FROM pg_catalog.pg_user WHERE usename=$1"
+	var i int64
+	err := dq.QueryRow(context.TODO(), q, user).Scan(&i)
+	switch {
+	case err == pgx.ErrNoRows:
+		return false, nil
+	case err != nil:
+		return false, err
+	default:
+		return true, nil
 	}
-	c.users = users
-	return nil
 }
-
-//func (c *Catalog) UsersWithPerm(table *sqlx.Table) []string {
-//	c.mu.Lock()
-//	defer c.mu.Unlock()
-//	return usersWithPerm(c, table)
-//}
-
-func usersWithPerm(cat *Catalog, table *dbx.Table) []string {
-	var users []string
-	for user, relist := range cat.users {
-		if util.UserPerm(relist, table) {
-			users = append(users, user)
-		}
-	}
-	return users
-}
-
-//func (u *Users) Perm(username string, schema, table string) bool {
-//        reList := u.Get(username)
-//        if reList == nil {
-//                return false
-//        }
-//        return UserPerm(reList, schema, table)
-//}
-
-func (c *Catalog) GetUserRegexList(username string) *util.RegexList {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	rl := c.users[username]
-	return rl
-}
-
-/*// func (c *Catalog) Update(username, tables string) error {
-func (c *Catalog) UpdateUser(username, tables string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	var regex []*regexp.Regexp
-	str := strings.Split(tables, ",")
-	for _, s := range str {
-		re, err := regexp.Compile(s)
-		if err != nil {
-			return fmt.Errorf("invalid regular expression for user: %s: %s", username, s)
-		}
-		regex = append(regex, re)
-	}
-	c.users[username] = &util.RegexList{String: tables, Regex: regex}
-	if err := sysdb.UserWrite(username, tables); err != nil {
-		return fmt.Errorf("writing user permissions: %s: %s", username, tables)
-	}
-	return nil
-}*/

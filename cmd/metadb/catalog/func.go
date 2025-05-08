@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/metadb-project/metadb/cmd/metadb/acl"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
@@ -15,6 +16,12 @@ var functionDefs = [][]string{
 CREATE FUNCTION public.mdbversion() RETURNS text
     AS $$ SELECT 'Metadb ` + util.MetadbVersion + `' $$
     LANGUAGE SQL`},
+	{"mdbusers()", `
+    CREATE FUNCTION public.mdbusers() RETURNS TABLE(username text)
+    AS $$
+       SELECT username FROM metadb.auth ORDER BY username
+       $$
+	LANGUAGE SQL`},
 	{"ps()", `
 CREATE FUNCTION public.ps() RETURNS TABLE(dbname text, username text, state text, realtime text, query text)
     AS $$
@@ -35,16 +42,31 @@ CREATE FUNCTION public.mdblog(v interval default interval '24 hours') RETURNS TA
     LANGUAGE SQL`},
 }
 
-func CreateAllFunctions(dcsuper, dc *pgx.Conn) error {
-	users, err := AllUsers(dc)
-	if err != nil {
-		return fmt.Errorf("accessing user list: %w", err)
+func FunctionNames() []string {
+	f := make([]string, 0)
+	for i := range functionDefs {
+		f = append(f, functionDefs[i][0])
 	}
+	return f
+}
 
-	for _, f := range functionDefs {
-		err := createFunction(dc, f[0], f[1], users)
+func IsFunction(functionSignature string) bool {
+	for i := range functionDefs {
+		if functionDefs[i][0] == functionSignature {
+			return true
+		}
+	}
+	return false
+}
+
+func CreateAllFunctions(dcsuper, dc *pgx.Conn) error {
+	for i := range functionDefs {
+		err := createFunction(dc, functionDefs[i][0], functionDefs[i][1])
 		if err != nil {
-			return fmt.Errorf("creating %q: %v", f[0], err)
+			return fmt.Errorf("creating %q: %v", functionDefs[i][0], err)
+		}
+		if err := acl.RestorePrivileges(dc, "public", functionDefs[i][0], acl.Function); err != nil {
+			return err
 		}
 	}
 
@@ -52,7 +74,7 @@ func CreateAllFunctions(dcsuper, dc *pgx.Conn) error {
 	return nil
 }
 
-func createFunction(dc *pgx.Conn, fname, fdef string, users []string) error {
+func createFunction(dc *pgx.Conn, fname, fdef string) error {
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
 		return fmt.Errorf("starting transaction for function: %w", err)
@@ -70,14 +92,8 @@ func createFunction(dc *pgx.Conn, fname, fdef string, users []string) error {
 		return fmt.Errorf("creating function: %w", err)
 	}
 
-	err = tx.Commit(context.TODO())
-	if err != nil {
+	if err = tx.Commit(context.TODO()); err != nil {
 		return err
-	}
-
-	for _, u := range users {
-		q := "GRANT EXECUTE ON FUNCTION public." + fname + " TO " + u
-		_, _ = dc.Exec(context.TODO(), q)
 	}
 
 	return nil

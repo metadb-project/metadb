@@ -12,6 +12,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/jackc/pgx/v5"
+	"github.com/metadb-project/metadb/cmd/metadb/acl"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
@@ -25,19 +26,9 @@ func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, ref, path, sch
 		return err
 	}
 	defer dbx.Close(dc)
-	users, err := catalog.AllUsers(dc)
-	if err != nil {
-		return err
-	}
 	q := "CREATE SCHEMA IF NOT EXISTS " + schema
 	if _, err = dc.Exec(context.TODO(), q); err != nil {
 		return err
-	}
-	for _, u := range users {
-		q = "GRANT USAGE ON SCHEMA " + schema + " TO " + u
-		if _, err = dc.Exec(context.TODO(), q); err != nil {
-			return err
-		}
 	}
 	q = "SET search_path = " + schema
 	if _, err = dc.Exec(context.TODO(), q); err != nil {
@@ -80,12 +71,6 @@ func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, ref, path, sch
 		if err = runFile(cat, url, ref, fullpath, dc, schema, file, source); err != nil {
 			log.Warning("runsql: %v: repository=%s ref=%s path=%s", err, url, ref, fullpath)
 		}
-		for _, u := range users {
-			q = "GRANT SELECT ON ALL TABLES IN SCHEMA " + schema + " TO " + u
-			if _, err = dc.Exec(context.TODO(), q); err != nil {
-				return err
-			}
-		}
 	}
 	if err := os.RemoveAll(rdir); err != nil {
 		return err
@@ -123,6 +108,9 @@ func runFile(cat *catalog.Catalog, url, ref, fullpath string, dc *pgx.Conn, sche
 		return err
 	}
 	if table != "" {
+		if err = acl.RestorePrivileges(dc, schema, table, acl.Table); err != nil {
+			return err
+		}
 		if err = cat.TableUpdatedNow(dbx.Table{Schema: schema, Table: table}, elapsed); err != nil {
 			return fmt.Errorf("writing table updated time: %w", err)
 		}

@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/metadb-project/metadb/cmd/metadb/acl"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
-	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
 type tableEntry struct {
@@ -182,12 +184,6 @@ func createSchemaIfNotExists(c *Catalog, table *dbx.Table) error {
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating schema %q: %v", table.Schema, err)
 	}
-	for _, u := range usersWithPerm(c, table) {
-		q = "GRANT USAGE ON SCHEMA \"" + table.Schema + "\" TO " + u
-		if _, err := c.dp.Exec(context.TODO(), q); err != nil {
-			log.Warning("granting privileges on schema %q to %q: %v", table.Schema, u, err)
-		}
-	}
 	return nil
 }
 
@@ -230,14 +226,8 @@ func createMainTableIfNotExists(c *Catalog, table *dbx.Table) error {
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("creating partition %q: %v", table.Schema+"."+partition, err)
 	}
-	// Grant permissions on new tables.
-	for _, u := range usersWithPerm(c, table) {
-		if _, err := c.dp.Exec(context.TODO(), "GRANT SELECT ON "+table.MainSQL()+" TO "+u+""); err != nil {
-			return fmt.Errorf("granting select privilege on %q to %q: %v", table.Main(), u, err)
-		}
-		if _, err := c.dp.Exec(context.TODO(), "GRANT SELECT ON "+table.SQL()+" TO "+u+""); err != nil {
-			return fmt.Errorf("granting select privilege on %q to %q: %v", table, u, err)
-		}
+	if err := acl.RestorePrivileges(c.dp, table.Schema, table.Table, acl.Table); err != nil {
+		return err
 	}
 	q = "CREATE INDEX ON " + table.MainSQL() + " (__id)"
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
@@ -257,4 +247,62 @@ func SyncTable(table *dbx.Table) *dbx.Table {
 		Schema: table.Schema,
 		Table:  "zzz___" + table.Table + "___sync",
 	}
+}
+
+func ReadDataTableNames(dq dbx.Queryable) ([]dbx.Table, error) {
+	rows, err := dq.Query(context.TODO(),
+		"SELECT schema_name,table_name FROM metadb.base_table")
+	if err != nil {
+		return nil, fmt.Errorf("selecting table list: %w", util.PGErr(err))
+	}
+	defer rows.Close()
+	tables := make([]dbx.Table, 0)
+	for rows.Next() {
+		var s, t string
+		if err = rows.Scan(&s, &t); err != nil {
+			return nil, fmt.Errorf("reading table list: %w", util.PGErr(err))
+		}
+		tables = append(tables, dbx.Table{Schema: s, Table: t}, dbx.Table{Schema: s, Table: t + "__"})
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("reading table list: %w", util.PGErr(err))
+	}
+	return tables, err
+}
+
+func ReadTablesInSchema(dq dbx.Queryable, schema string) ([]string, error) {
+	rows, err := dq.Query(context.TODO(),
+		"SELECT c.relname FROM pg_class c JOIN pg_namespace n ON c.relnamespace=n.oid WHERE c.relkind='r' AND n.nspname=$1",
+		schema)
+	if err != nil {
+		return nil, fmt.Errorf("selecting table list: %w", util.PGErr(err))
+	}
+	defer rows.Close()
+	tables := make([]string, 0)
+	for rows.Next() {
+		var t string
+		if err = rows.Scan(&t); err != nil {
+			return nil, fmt.Errorf("reading table list: %w", util.PGErr(err))
+		}
+		tables = append(tables, t)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("reading table list: %w", util.PGErr(err))
+	}
+	return tables, err
+}
+
+func IsDataTable(dq dbx.Queryable, schema, table string) (bool, error) {
+	q := "SELECT 1 FROM metadb.base_table WHERE schema_name=$1 AND table_name=$2"
+	var i int64
+	err := dq.QueryRow(context.TODO(), q, schema, table).Scan(&i)
+	switch {
+	case err == pgx.ErrNoRows:
+		return false, nil
+	case err != nil:
+		return false, fmt.Errorf("selecting table \"%s.%s\": %w", schema, table, util.PGErr(err))
+	default:
+		return true, nil
+	}
+
 }
