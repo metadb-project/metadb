@@ -23,53 +23,14 @@ func dropUser(conn net.Conn, node *ast.DropUserStmt, db *dbx.DB, dc *pgx.Conn) e
 		return fmt.Errorf("user %q does not exist", node.UserName)
 	}
 
-	if err = deregister(db, dc, node.UserName, db.DBName); err != nil {
-		return err
-	}
-
-	var schemas []string
-	schemas, err = schemasWithUserPrivileges(dc, node.UserName)
-	if err != nil {
-		return fmt.Errorf("reading schemas for user %q: %w", node.UserName, err)
-	}
-	batch := pgx.Batch{}
-	for i := range schemas {
-		batch.Queue("REVOKE ALL ON SCHEMA " + schemas[i] + " FROM " + node.UserName)
-	}
-	if err = dc.SendBatch(context.TODO(), &batch).Close(); err != nil {
-		return fmt.Errorf("removing schema privleges for user %q: %w", node.UserName, err)
-	}
-
 	dcsuper, err := db.ConnectSuper()
 	if err != nil {
 		return fmt.Errorf("connecting to database: %w", err)
 	}
 	defer dbx.Close(dcsuper)
 
-	var tables []dbx.Table
-	tables, err = tablesOwnedByUser(dc, node.UserName)
-	if err != nil {
-		return fmt.Errorf("reading tables for user %q: %w", node.UserName, err)
-	}
-	batch = pgx.Batch{}
-	for i := range tables {
-		batch.Queue("ALTER TABLE " + tables[i].Schema + "." + tables[i].Table + " OWNER TO " + db.User)
-	}
-	if err = dcsuper.SendBatch(context.TODO(), &batch).Close(); err != nil {
-		return fmt.Errorf("removing table ownership for user %q: %w", node.UserName, err)
-	}
-
-	var functions []dbx.Function
-	functions, err = functionsOwnedByUser(dc, node.UserName)
-	if err != nil {
-		return fmt.Errorf("reading functions for user %q: %w", node.UserName, err)
-	}
-	batch = pgx.Batch{}
-	for i := range functions {
-		batch.Queue("ALTER FUNCTION " + functions[i].Schema + "." + functions[i].Function + " OWNER TO " + db.User)
-	}
-	if err = dcsuper.SendBatch(context.TODO(), &batch).Close(); err != nil {
-		return fmt.Errorf("removing function ownership for user %q: %w", node.UserName, err)
+	if err = deregister(db, dc, dcsuper, node.UserName, db.DBName); err != nil {
+		return err
 	}
 
 	q := "DROP USER " + node.UserName
