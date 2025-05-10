@@ -38,6 +38,9 @@ func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
 	}
 	if !exists {
 		log.Info("initializing database")
+		if err = setCreateRole(db); err != nil {
+			return nil, err
+		}
 		if err = createCatalogSchema(dp); err != nil {
 			return nil, err
 		}
@@ -169,13 +172,18 @@ func IsPublicSystemTable(schema, table string) bool {
 	return false
 }
 
-//func SystemTables() []dbx.Table {
-//	var tables []dbx.Table
-//	for _, t := range systemTables {
-//		tables = append(tables, t.table)
-//	}
-//	return tables
-//}
+func setCreateRole(db *dbx.DB) error {
+	dcsuper, err := db.ConnectSuper()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dcsuper)
+	if _, err = dcsuper.Exec(context.TODO(),
+		"ALTER USER "+db.User+" CREATEROLE"); err != nil {
+		return fmt.Errorf("setting createrole: %w", util.PGErr(err))
+	}
+	return nil
+}
 
 func createCatalogSchema(dp *pgxpool.Pool) error {
 	tx, err := dp.Begin(context.TODO())
