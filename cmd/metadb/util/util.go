@@ -77,10 +77,6 @@ func SysdbFileName(datadir string) string {
 	return filepath.Join(SystemDirName(datadir), "systemdb")
 }
 
-// func SystemConfigFileName(datadir string) string {
-// 	return filepath.Join(SystemDirName(datadir), "system.conf")
-// }
-
 func PGErr(err error) error {
 	return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
 }

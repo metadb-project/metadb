@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"regexp"
 	"strings"
 	"syscall"
 
@@ -26,7 +25,7 @@ import (
 var extraManagedSchemas = []string{"folio_derived", "reshare_derived"}
 var extraManagedTables = []string{"folio_source_record.marc__t"}
 
-func Listen(host string, port string, db *dbx.DB, sources *[]*sysdb.SourceConnector) {
+func Listen(cat *catalog.Catalog, host string, port string, db *dbx.DB, sources *[]*sysdb.SourceConnector) {
 	// var h string
 	// if host == "" {
 	// 	h = "127.0.0.1"
@@ -59,11 +58,11 @@ func Listen(host string, port string, db *dbx.DB, sources *[]*sysdb.SourceConnec
 		backend = pgproto3.NewBackend(conn, conn)
 		//log.Trace("connection received: %s", conn.RemoteAddr().String())
 		log.Trace("connection received") // domain socket
-		go serve(conn, backend, db, sources)
+		go serve(cat, conn, backend, db, sources)
 	}
 }
 
-func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, sources *[]*sysdb.SourceConnector) {
+func serve(cat *catalog.Catalog, conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, sources *[]*sysdb.SourceConnector) {
 	//log.Trace("connected to database")
 	// TODO Close
 
@@ -98,13 +97,13 @@ func serve(conn net.Conn, backend *pgproto3.Backend, db *dbx.DB, sources *[]*sys
 		switch m := msg.(type) {
 		case *pgproto3.Parse:
 			// Extended query
-			if err = processParse(conn, backend, m, db, sources); err != nil {
+			if err = processParse(cat, conn, backend, m, db, sources); err != nil {
 				log.Info("%v", err)
 				return
 			}
 			//log.Info("*pgproto3.Parse: not yet implemented")
 		case *pgproto3.Query:
-			if err = processQuery(conn, m.String, nil, db, sources); err != nil {
+			if err = processQuery(cat, conn, m.String, nil, db, sources); err != nil {
 				log.Info("%v", err)
 				return
 			}
@@ -147,7 +146,7 @@ func startup(conn net.Conn, backend *pgproto3.Backend) error {
 	}
 }
 
-func processParse(conn net.Conn, backend *pgproto3.Backend, parse *pgproto3.Parse, db *dbx.DB, sources *[]*sysdb.SourceConnector) error {
+func processParse(cat *catalog.Catalog, conn net.Conn, backend *pgproto3.Backend, parse *pgproto3.Parse, db *dbx.DB, sources *[]*sysdb.SourceConnector) error {
 	query := parse.Query
 	log.Trace("prepared statement: %s", query)
 
@@ -204,7 +203,7 @@ func processParse(conn net.Conn, backend *pgproto3.Backend, parse *pgproto3.Pars
 
 		case *pgproto3.Execute:
 			//func processQuery(conn net.Conn, query string, db *dbx.DB, dc *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
-			err := processQuery(conn, query, args, db, sources)
+			err := processQuery(cat, conn, query, args, db, sources)
 			//err := proxySelect(conn, query, args, dc)
 			if err != nil {
 				return fmt.Errorf("executing prepared statement: %w", err)
@@ -242,7 +241,7 @@ func processParse(conn net.Conn, backend *pgproto3.Backend, parse *pgproto3.Pars
 	}
 }
 
-func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, sources *[]*sysdb.SourceConnector) error {
+func processQuery(cat *catalog.Catalog, conn net.Conn, query string, args []any, db *dbx.DB, sources *[]*sysdb.SourceConnector) error {
 	dc, err := db.Connect()
 	if err != nil {
 		return fmt.Errorf("connecting to database: %w", err)
@@ -287,7 +286,7 @@ func processQuery(conn net.Conn, query string, args []any, db *dbx.DB, sources *
 	case *ast.CreateDataSourceStmt:
 		err = createDataSource(conn, n, dc)
 	case *ast.CreateDataMappingStmt:
-		err = createDataMapping(conn, n, dc)
+		err = createDataMapping(conn, n, dc, cat)
 	case *ast.AlterTableStmt:
 		err = alterTable(conn, n, dc)
 	case *ast.AlterDataSourceStmt:
@@ -575,67 +574,6 @@ func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Con
 	}
 	return writeEncoded(conn, []pgproto3.Message{
 		&pgproto3.CommandComplete{CommandTag: []byte("CREATE DATA SOURCE")},
-		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	})
-}
-
-var identifierRegexp = regexp.MustCompile(`^[a-z][0-9a-z]*$`)
-
-func createDataMapping(conn net.Conn, node *ast.CreateDataMappingStmt, dc *pgx.Conn) error {
-	// The only mapping type currently supported is json.
-	if node.TypeName != "json" {
-		return fmt.Errorf("mapping type %q not supported", node.TypeName)
-	}
-
-	// Validate path.
-	p := strings.Split(node.Path, ".")
-	if len(p) < 1 || p[0] != "$" {
-		return fmt.Errorf("path %q is invalid", node.Path)
-	}
-	for i := 1; i < len(p); i++ {
-		if p[i] == "" {
-			return fmt.Errorf("path %q is invalid", node.Path)
-		}
-	}
-
-	// Validate target identifier.
-	if node.TargetIdentifier == "" || !identifierRegexp.MatchString(node.TargetIdentifier) {
-		return fmt.Errorf("target identifier %q is invalid", node.TargetIdentifier)
-	}
-
-	// Ensure the table name is a main table, and parse it.
-	if !strings.HasSuffix(node.TableName, "__") {
-		return fmt.Errorf("%q is not a main table name", node.TableName)
-	}
-	table, err := dbx.ParseTable(node.TableName[0 : len(node.TableName)-2])
-	if err != nil {
-		return fmt.Errorf("%q is not a valid table name", node.TableName)
-	}
-	// Validate table name.
-	if len(table.Schema) > 63 || len(table.Table) > 63 {
-		return fmt.Errorf("%q is not a valid table name", node.TableName)
-	}
-
-	// Validate column name.
-	if len(node.ColumnName) > 63 {
-		return fmt.Errorf("%q is not a valid column name", node.ColumnName)
-	}
-
-	q := "INSERT INTO metadb.transform_json (schema_name, table_name, column_name, path, map) VALUES ($1, $2, $3, $4, $5)"
-	if _, err = dc.Exec(context.TODO(), q, table.Schema, table.Table, node.ColumnName, node.Path, node.TargetIdentifier); err != nil {
-		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-			return fmt.Errorf("JSON mapping from (table %q, column %q, path %q) to (%q) conflicts with an existing mapping",
-				node.TableName, node.ColumnName, node.Path, node.TargetIdentifier)
-		}
-		return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
-	}
-
-	_ = writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server for data mapping changes to take effect"},
-	})
-
-	return writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.CommandComplete{CommandTag: []byte("CREATE DATA MAPPING")},
 		&pgproto3.ReadyForQuery{TxStatus: 'I'},
 	})
 }

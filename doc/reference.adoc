@@ -508,9 +508,6 @@ are also transformed; for example, a mapping from path `'$.a.b'` will
 be applied only if mappings are also defined for both the paths
 `'$.a'` and `'$'` within the same table and column.
 
-NOTE: CREATE DATA MAPPING currently requires restarting the server
-before it will take effect.
-
 [discrete]
 ===== Parameters
 
