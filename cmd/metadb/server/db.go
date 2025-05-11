@@ -9,6 +9,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
+	"github.com/metadb-project/metadb/cmd/metadb/types"
 )
 
 func addPartition(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command) error {
@@ -174,8 +175,8 @@ func alterColumnToVarchar(table *sqlx.Table, column string, typesize int64, db s
 */
 
 // Change column type to a specified new type, optionally casting data to the new type
-func alterColumnType(dq dbx.Queryable, cat *catalog.Catalog, table *dbx.Table, column string, datatype command.DataType, typesize int64, cast bool) error {
-	sqltype := command.DataTypeToSQL(datatype, typesize)
+func alterColumnType(dq dbx.Queryable, cat *catalog.Catalog, table *dbx.Table, column string, datatype types.DataType, typesize int64, cast bool) error {
+	sqltype := types.DataTypeToSQL(datatype, typesize)
 	var caststr string
 	if cast {
 		caststr = " USING \"" + column + "\"::" + sqltype
@@ -254,7 +255,7 @@ func selectTableSchema(cat *catalog.Catalog, table *dbx.Table) (*sysdb.TableSche
 	ts := new(sysdb.TableSchema)
 	for k, v := range m {
 		name := k
-		dtype, dtypesize := command.MakeDataType(v)
+		dtype, dtypesize := types.MakeDataType(v)
 		cs := sysdb.ColumnSchema{Name: name, DType: dtype, DTypeSize: dtypesize}
 		ts.Column = append(ts.Column, cs)
 	}

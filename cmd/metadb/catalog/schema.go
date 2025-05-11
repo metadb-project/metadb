@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
+	"github.com/metadb-project/metadb/cmd/metadb/types"
 )
 
 /*
@@ -128,20 +128,20 @@ func (c *Catalog) Column(column *dbx.Column) *string {
 	return nil
 }
 
-func (c *Catalog) AddColumn(table *dbx.Table, columnName string, newType command.DataType, newTypeSize int64) error {
+func (c *Catalog) AddColumn(table *dbx.Table, columnName string, newType types.DataType, newTypeSize int64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// Alter table schema in database.
-	dataTypeSQL := command.DataTypeToSQL(newType, newTypeSize)
+	dataTypeSQL := types.DataTypeToSQL(newType, newTypeSize)
 	q := "ALTER TABLE " + table.MainSQL() + " ADD COLUMN \"" + columnName + "\" " + dataTypeSQL
-	if c.lz4 && (newType == command.TextType || newType == command.JSONType) {
+	if c.lz4 && (newType == types.TextType || newType == types.JSONType) {
 		q = q + " COMPRESSION lz4"
 	}
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("adding column %q in table %q: alter table: %v", columnName, table, err)
 	}
 	// Create index if type is uuid.
-	if newType == command.UUIDType {
+	if newType == types.UUIDType {
 		column := &dbx.Column{Schema: table.Schema, Table: table.Table, Column: columnName}
 		if !c.indexExists(column) {
 			if err := c.addIndex(column); err != nil {

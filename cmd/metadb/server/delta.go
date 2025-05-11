@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/sysdb"
+	"github.com/metadb-project/metadb/cmd/metadb/types"
 )
 
 func tableSchemaFromCommand(c *command.Command) *sysdb.TableSchema {
@@ -61,8 +62,8 @@ func findDeltaColumnSchema(column1 *sysdb.ColumnSchema, column2 *sysdb.ColumnSch
 type deltaColumnSchema struct {
 	newColumn   bool
 	name        string
-	oldType     command.DataType
-	newType     command.DataType
+	oldType     types.DataType
+	newType     types.DataType
 	oldTypeSize int64
 	newTypeSize int64
 	newData     any

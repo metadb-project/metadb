@@ -12,9 +12,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
-	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/types"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -194,7 +194,7 @@ func checkForDirectives(cat *catalog.Catalog, url, ref, fullpath string, input s
 			if t == "text" || strings.HasPrefix(t, "varchar") {
 				t = "text"
 			}
-			dtype, dtypesize := command.MakeDataType(t)
+			dtype, dtypesize := types.MakeDataType(t)
 			if err := cat.AddColumn(requireTable, requireColumn, dtype, dtypesize); err != nil {
 				return fmt.Errorf("creating new column: %s.%s: %v", requireTable, requireColumn, err)
 			}

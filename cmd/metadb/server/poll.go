@@ -114,21 +114,6 @@ func outerPollLoop(ctx context.Context, cat *catalog.Catalog, svr *server, spr *
 		}
 	}
 
-	//// TMP
-	// set command.FolioTenant
-	/*	var folioTenant string
-		if folioTenant, err = catalog.FolioTenant(svr.db); err != nil {
-			return err
-		}
-		command.FolioTenant = folioTenant
-	*/
-	// set command.ReshareTenants
-	command.ReshareTenants, err = catalog.Origins(svr.db)
-	if err != nil {
-		return err
-	}
-	////
-
 	log.Debug("starting stream processor")
 	if err = pollLoop(ctx, cat, spr); err != nil {
 		//log.Error("%s", err)
@@ -445,7 +430,7 @@ func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *ka
 			ce = nil
 		}
 
-		c, snap, err := command.NewCommand(dedup, ce, schemaPassFilter, schemaStopFilter, tableStopFilter,
+		c, snap, err := command.NewCommand(cat, dedup, ce, schemaPassFilter, schemaStopFilter, tableStopFilter,
 			trimSchemaPrefix, addSchemaPrefix)
 		if err != nil {
 			log.Debug("%v", *ce)

@@ -14,6 +14,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/dsync"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/types"
 )
 
 func execCommandGraph(thread int, ctx context.Context, cat *catalog.Catalog, cmdgraph *command.CommandGraph, dp *pgxpool.Pool, source string, uuopt bool, syncMode dsync.Mode, dedup *log.MessageSet) error {
@@ -161,7 +162,7 @@ func execDeltaSchema(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comman
 	for _, col := range delta.column {
 		// Is this a new column (as opposed to a modification)?
 		if col.newColumn {
-			dtypesql := command.DataTypeToSQL(col.newType, col.newTypeSize)
+			dtypesql := types.DataTypeToSQL(col.newType, col.newTypeSize)
 			log.Trace("table %s.%s: new column: %s %s", table.Schema, table.Table, col.name, dtypesql)
 			if err := ebuf.flush(); err != nil {
 				return fmt.Errorf("delta schema: adding column %q in table %q: %v", col.name, table, err)
@@ -174,7 +175,7 @@ func execDeltaSchema(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comman
 		// If the type is changing from text to another type, keep the type as text and
 		// let the executor cast the data. This is to prevent poorly typed JSON fields
 		// from causing runaway type changes.
-		if col.oldType == command.TextType && col.newType != command.TextType {
+		if col.oldType == types.TextType && col.newType != types.TextType {
 			// Adjust the new data type in the command.
 			var typeSize int64 = -1
 			for j, c := range cmd.Column {
@@ -184,7 +185,7 @@ func execDeltaSchema(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comman
 					} else {
 						typeSize = int64(len(*(cmd.Column[j].SQLData)))
 					}
-					cmd.Column[j].DType = command.TextType
+					cmd.Column[j].DType = types.TextType
 					cmd.Column[j].DTypeSize = typeSize
 					break
 				}
@@ -197,14 +198,14 @@ func execDeltaSchema(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comman
 			}
 			// Change the delta column type as well so that column size can be adjusted below
 			// if needed.
-			col.newType = command.TextType
+			col.newType = types.TextType
 			col.newTypeSize = typeSize
 		}
 
 		// If this is a change from a UUID to text type, it may be that the UUID type was
 		// inferred from a text type in the source.  For this reason we will prefer to
 		// retain the UUID type, unless the new data is not a valid UUID.
-		if col.oldType == command.UUIDType && col.newType == command.TextType {
+		if col.oldType == types.UUIDType && col.newType == types.TextType {
 			if col.newData == nil {
 				continue
 			}
@@ -216,80 +217,80 @@ func execDeltaSchema(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comman
 
 		// If both the old and new types are IntegerType, change the column type to
 		// handle the larger size.
-		if col.oldType == command.IntegerType && col.newType == command.IntegerType {
+		if col.oldType == types.IntegerType && col.newType == types.IntegerType {
 			if err := ebuf.flush(); err != nil {
-				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.IntegerType, err)
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, types.IntegerType, err)
 			}
-			if err := alterColumnType(ebuf.dp, cat, table, col.name, command.IntegerType, col.newTypeSize, false); err != nil {
-				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.IntegerType, err)
+			if err := alterColumnType(ebuf.dp, cat, table, col.name, types.IntegerType, col.newTypeSize, false); err != nil {
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, types.IntegerType, err)
 			}
 			continue
 		}
 
 		// If both the old and new types are FloatType, change the column type to handle
 		// the larger size.
-		if col.oldType == command.FloatType && col.newType == command.FloatType {
+		if col.oldType == types.FloatType && col.newType == types.FloatType {
 			if err := ebuf.flush(); err != nil {
-				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, command.FloatType, err)
+				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, types.FloatType, err)
 			}
-			if err := alterColumnType(ebuf.dp, cat, table, col.name, command.FloatType, col.newTypeSize, false); err != nil {
-				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.FloatType, err)
+			if err := alterColumnType(ebuf.dp, cat, table, col.name, types.FloatType, col.newTypeSize, false); err != nil {
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, types.FloatType, err)
 			}
 			continue
 		}
 
 		// If this is a change from an integer to float type, the column type can be
 		// changed using a cast.
-		if col.oldType == command.IntegerType && col.newType == command.FloatType {
+		if col.oldType == types.IntegerType && col.newType == types.FloatType {
 			if err := ebuf.flush(); err != nil {
-				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, command.FloatType, err)
+				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, types.FloatType, err)
 			}
-			if err := alterColumnType(ebuf.dp, cat, table, col.name, command.FloatType, col.newTypeSize, false); err != nil {
-				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.FloatType, err)
+			if err := alterColumnType(ebuf.dp, cat, table, col.name, types.FloatType, col.newTypeSize, false); err != nil {
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, types.FloatType, err)
 			}
 			continue
 		}
 
 		// If this is a change from an integer or float to numeric type, the column type
 		// can be changed using a cast.
-		if (col.oldType == command.IntegerType || col.oldType == command.FloatType) && col.newType == command.NumericType {
+		if (col.oldType == types.IntegerType || col.oldType == types.FloatType) && col.newType == types.NumericType {
 			if err := ebuf.flush(); err != nil {
-				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, command.NumericType, err)
+				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, types.NumericType, err)
 			}
-			if err := alterColumnType(ebuf.dp, cat, table, col.name, command.NumericType, 0, false); err != nil {
-				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.NumericType, err)
+			if err := alterColumnType(ebuf.dp, cat, table, col.name, types.NumericType, 0, false); err != nil {
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, types.NumericType, err)
 			}
 			continue
 		}
 
 		// If this is a change from a float to integer type, cast the column to the
 		// numeric type.
-		if col.oldType == command.FloatType && col.newType == command.IntegerType {
+		if col.oldType == types.FloatType && col.newType == types.IntegerType {
 			if err := ebuf.flush(); err != nil {
-				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, command.NumericType, err)
+				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, types.NumericType, err)
 			}
-			if err := alterColumnType(ebuf.dp, cat, table, col.name, command.NumericType, 0, false); err != nil {
-				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.NumericType, err)
+			if err := alterColumnType(ebuf.dp, cat, table, col.name, types.NumericType, 0, false); err != nil {
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, types.NumericType, err)
 			}
 			continue
 		}
 
 		// Prevent conversion from numeric to integer or float type.
-		if col.oldType == command.NumericType && (col.newType == command.IntegerType || col.newType == command.FloatType) {
+		if col.oldType == types.NumericType && (col.newType == types.IntegerType || col.newType == types.FloatType) {
 			continue
 		}
 
 		// If not a compatible change, adjust new type to text in all cases, unless it is
 		// already text.
-		if col.oldType != command.TextType {
+		if col.oldType != types.TextType {
 			if err := ebuf.flush(); err != nil {
-				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, command.TextType, err)
+				return fmt.Errorf("altering column %q (%q) type to %v: %v", table, col.name, types.TextType, err)
 			}
 			for _, d := range delta.column {
 				log.Trace("COLUMN: %#v", d)
 			}
-			if err := alterColumnType(ebuf.dp, cat, table, col.name, command.TextType, 0, false); err != nil {
-				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, command.TextType, err)
+			if err := alterColumnType(ebuf.dp, cat, table, col.name, types.TextType, 0, false); err != nil {
+				return fmt.Errorf("delta schema: altering column %q (%q) type to %v: %v", table, col.name, types.TextType, err)
 			}
 		}
 	}
@@ -590,7 +591,7 @@ func wherePKDataEqualSQL(columns []command.CommandColumn) string {
 	for _, c := range columns {
 		if c.PrimaryKey != 0 {
 			b.WriteString(" AND")
-			if c.DType == command.JSONType {
+			if c.DType == types.JSONType {
 				b.WriteString(" \"")
 				b.WriteString(c.Name)
 				b.WriteString("\"::text=")
@@ -607,19 +608,19 @@ func wherePKDataEqualSQL(columns []command.CommandColumn) string {
 	return b.String()
 }
 
-func encodeSQLData(b *strings.Builder, sqldata *string, datatype command.DataType) {
+func encodeSQLData(b *strings.Builder, sqldata *string, datatype types.DataType) {
 	if sqldata == nil {
 		b.WriteString("NULL")
 		return
 	}
 	switch datatype {
-	case command.TextType, command.JSONType:
+	case types.TextType, types.JSONType:
 		dbx.EncodeString(b, *sqldata)
-	case command.UUIDType, command.DateType, command.TimeType, command.TimetzType, command.TimestampType, command.TimestamptzType:
+	case types.UUIDType, types.DateType, types.TimeType, types.TimetzType, types.TimestampType, types.TimestamptzType:
 		b.WriteByte('\'')
 		b.WriteString(*sqldata)
 		b.WriteByte('\'')
-	case command.IntegerType, command.FloatType, command.NumericType, command.BooleanType:
+	case types.IntegerType, types.FloatType, types.NumericType, types.BooleanType:
 		b.WriteString(*sqldata)
 	default:
 		log.Error("encoding SQL data: unknown data type: %s", datatype)
