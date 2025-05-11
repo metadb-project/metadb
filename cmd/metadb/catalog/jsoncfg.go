@@ -3,8 +3,10 @@ package catalog
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/metadb-project/metadb/cmd/metadb/config"
+	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
 func (c *Catalog) initJSON() error {
@@ -34,4 +36,27 @@ func (c *Catalog) JSONPathLookup(path config.JSONPath) string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.jsonTransform[path]
+}
+
+func (c *Catalog) DefineJSONMapping(schema, table, column, path, mapping string) error {
+	if err := writeJSONMapping(c, schema, table, column, path, mapping); err != nil {
+		return err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.jsonTransform[config.NewJSONPath(schema, table, column, path)] = mapping
+	return nil
+}
+
+func writeJSONMapping(c *Catalog, schema, table, column, path, mapping string) error {
+	if _, err := c.dp.Exec(context.TODO(),
+		"INSERT INTO metadb.transform_json (schema_name, table_name, column_name, path, map) VALUES ($1, $2, $3, $4, $5)",
+		schema, table, column, path, mapping); err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return fmt.Errorf("JSON mapping from (table \"%s.%s\", column %q, path %q) to (%q) conflicts with an existing mapping",
+				schema, table, column, path, mapping)
+		}
+		return util.PGErr(err)
+	}
+	return nil
 }

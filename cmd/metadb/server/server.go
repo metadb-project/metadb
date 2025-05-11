@@ -143,7 +143,7 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 	log.Info("starting Metadb %s", util.GetMetadbVersion())
 
 	if !svr.opt.Script {
-		go libpq.Listen(svr.opt.Listen, svr.opt.Port, svr.db, &svr.state.sources)
+		go libpq.Listen(cat, svr.opt.Listen, svr.opt.Port, svr.db, &svr.state.sources)
 	}
 
 	// Create database functions.
