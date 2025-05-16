@@ -248,7 +248,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	if syncMode == dsync.NoSync {
 		consumersN = 1
 	} else {
-		consumersN = 32
+		consumersN = 8
 	}
 	// First create the consumers.
 	consumers := make([]*kafka.Consumer, consumersN)
