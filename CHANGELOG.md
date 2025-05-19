@@ -1,3 +1,9 @@
+# v1.4.0-pre2
+
+* Kafka reader concurrency has been temporarily disabled.
+
+* The folio-analytics tag has been updated to v1.7.15.
+
 # v1.4.0-pre1
 
 * JSON transformation has been extended to include objects and arrays,
