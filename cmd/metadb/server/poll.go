@@ -241,14 +241,13 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		"partition.assignment.strategy": "roundrobin",
 		"security.protocol":             spr.source.Security,
 	}
-	// During normal operation, we run single-threaded to give priority to user queries.
-	// During a sync process, we enable concurrency.
-	// This could be made configurable.
 	var consumersN int // Number of concurrent consumers
 	if syncMode == dsync.NoSync {
+		// During normal operation, we run single-threaded to give priority to user queries.
 		consumersN = 1
 	} else {
-		consumersN = 8
+		// During a sync process, we can optionally enable concurrency.
+		consumersN = 1 // Default to 1 until well tested
 	}
 	// First create the consumers.
 	consumers := make([]*kafka.Consumer, consumersN)
