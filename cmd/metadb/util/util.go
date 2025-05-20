@@ -19,7 +19,7 @@ const DatabaseVersion = 27
 // MetadbVersion is defined at build time via -ldflags.
 var MetadbVersion = ""
 
-var DefaultFolioVersion = "refs/tags/v1.7.15"
+var DefaultFolioVersion = "refs/tags/v1.8.0"
 var FolioVersion = ""
 var DefaultReshareVersion = "refs/tags/20230912004531"
 
