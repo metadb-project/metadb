@@ -578,9 +578,6 @@ independently of data sources.  This can be useful because data
 sources may be dictated by how the data are collected,
 e.g. geographically in a sensor network.
 
-NOTE: CREATE DATA ORIGIN currently requires restarting the server
-before it will take effect.
-
 [discrete]
 ===== Parameters
 

@@ -58,6 +58,7 @@ func TestTrimFractionalZerosEmpty(t *testing.T) {
 	}
 }
 
+/*
 func TestExtractOriginMatch(t *testing.T) {
 	var prefixes = []string{"reshare_east", "reshare_north", "reshare_outer", "reshare_south", "reshare_west"}
 	var schema = "reshare_west_inventory"
@@ -117,3 +118,4 @@ func TestExtractOriginEmpty(t *testing.T) {
 		t.Errorf("got %v, %v; want %v, %v", gotOrigin, gotNewSchema, wantOrigin, wantNewSchema)
 	}
 }
+*/

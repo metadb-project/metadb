@@ -12,9 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/change"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/types"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"github.com/shopspring/decimal"
 )
@@ -35,142 +37,6 @@ func (o Operation) String() string {
 		return "delete"
 	case TruncateOp:
 		return "truncate"
-	default:
-		return "(unknown)"
-	}
-}
-
-type DataType int
-
-const (
-	UnknownType     = 0
-	BooleanType     = 1
-	DateType        = 2
-	FloatType       = 3
-	IntegerType     = 4
-	JSONType        = 5
-	NumericType     = 6
-	TimeType        = 7
-	TimestampType   = 8
-	TimestamptzType = 9
-	TimetzType      = 10
-	UUIDType        = 11
-	TextType        = 12
-)
-
-func (d DataType) String() string {
-	switch d {
-	case BooleanType:
-		return "BooleanType"
-	case DateType:
-		return "DateType"
-	case FloatType:
-		return "FloatType"
-	case IntegerType:
-		return "IntegerType"
-	case JSONType:
-		return "JSONType"
-	case NumericType:
-		return "NumericType"
-	case TimeType:
-		return "TimeType"
-	case TimestampType:
-		return "TimestampType"
-	case TimestamptzType:
-		return "TimestamptzType"
-	case TimetzType:
-		return "TimetzType"
-	case UUIDType:
-		return "UUIDType"
-	case TextType:
-		return "TextType"
-	default:
-		log.Error("data type to string: unknown data type: %d", d)
-		return "(unknown type)"
-	}
-}
-
-func MakeDataType(dataType string) (DataType, int64) {
-	switch strings.ToLower(dataType) {
-	case "text", "varchar", "character varying":
-		return TextType, 0
-	case "smallint":
-		return IntegerType, 2
-	case "integer":
-		return IntegerType, 4
-	case "bigint":
-		return IntegerType, 8
-	case "real":
-		return FloatType, 4
-	case "double precision":
-		return FloatType, 8
-	case "numeric":
-		return NumericType, 0
-	case "boolean":
-		return BooleanType, 0
-	case "date":
-		return DateType, 0
-	case "time without time zone", "time":
-		return TimeType, 0
-	case "time with time zone", "timetz":
-		return TimetzType, 0
-	case "timestamp without time zone", "timestamp":
-		return TimestampType, 0
-	case "timestamp with time zone", "timestamptz":
-		return TimestamptzType, 0
-	case "uuid":
-		return UUIDType, 0
-	case "jsonb":
-		return JSONType, 0
-	default:
-		log.Error("make data type new: unknown data type: %s", dataType)
-		return UnknownType, 0
-	}
-}
-
-// DataTypeToSQL convert a data type and type size to a database type.
-func DataTypeToSQL(dtype DataType, typeSize int64) string {
-	switch dtype {
-	case TextType:
-		return "text"
-	case IntegerType:
-		switch typeSize {
-		case 2:
-			return "smallint"
-		case 4:
-			return "integer"
-		case 8:
-			return "bigint"
-		default:
-			return "(unknown)"
-		}
-	case FloatType:
-		switch typeSize {
-		case 4:
-			return "real"
-		case 8:
-			return "double precision"
-		default:
-			return "(unknown)"
-		}
-	case NumericType:
-		return "numeric"
-	case BooleanType:
-		return "boolean"
-	case DateType:
-		return "date"
-	case TimeType:
-		return "time without time zone"
-	case TimetzType:
-		return "time with time zone"
-	case TimestampType:
-		return "timestamp without time zone"
-	case TimestamptzType:
-		return "timestamp with time zone"
-	case UUIDType:
-		return "uuid"
-	case JSONType:
-		return "jsonb"
 	default:
 		return "(unknown)"
 	}
@@ -214,7 +80,7 @@ func (c *Command) String() string {
 
 type CommandColumn struct {
 	Name        string
-	DType       DataType
+	DType       types.DataType
 	DTypeSize   int64
 	Data        interface{}
 	SQLData     *string
@@ -239,9 +105,9 @@ type CommandColumn struct {
 }
 */
 
-func convertTypeSize(coltype string, datatype DataType) (int64, error) {
+func convertTypeSize(coltype string, datatype types.DataType) (int64, error) {
 	switch datatype {
-	case IntegerType:
+	case types.IntegerType:
 		switch coltype {
 		case "int8":
 			return 1, nil
@@ -254,9 +120,9 @@ func convertTypeSize(coltype string, datatype DataType) (int64, error) {
 		default:
 			return 0, fmt.Errorf("internal error: unexpected integer type %q", coltype)
 		}
-	case TextType:
+	case types.TextType:
 		return 0, nil
-	case FloatType:
+	case types.FloatType:
 		switch coltype {
 		case "float", "float32":
 			return 4, nil
@@ -265,23 +131,23 @@ func convertTypeSize(coltype string, datatype DataType) (int64, error) {
 		default:
 			return 0, fmt.Errorf("internal error: unexpected float type %q", coltype)
 		}
-	case NumericType:
+	case types.NumericType:
 		return 0, nil
-	case BooleanType:
+	case types.BooleanType:
 		return 0, nil
-	case DateType:
+	case types.DateType:
 		return 0, nil
-	case TimeType:
+	case types.TimeType:
 		return 0, nil
-	case TimetzType:
+	case types.TimetzType:
 		return 0, nil
-	case TimestampType:
+	case types.TimestampType:
 		return 0, nil
-	case TimestamptzType:
+	case types.TimestamptzType:
 		return 0, nil
-	case UUIDType:
+	case types.UUIDType:
 		return 0, nil
-	case JSONType:
+	case types.JSONType:
 		return 0, nil
 	default:
 		return 0, fmt.Errorf("convert type size: unknown data type: %s", datatype)
@@ -405,7 +271,7 @@ func extractColumns(dedup *log.MessageSet, ce *change.Event) ([]CommandColumn, e
 			return nil, fmt.Errorf("value: $.schema.fields: \"type\": %s", err)
 		}
 		col.Data = fieldData[field]
-		if (col.DType == TextType || col.DType == JSONType) && col.Data != nil {
+		if (col.DType == types.TextType || col.DType == types.JSONType) && col.Data != nil {
 			// Large values (typically above 8 kB) in PostgreSQL that have been stored using
 			// the "TOAST" method are not included in an UPDATE change event where those
 			// values were not modified.
@@ -414,7 +280,7 @@ func extractColumns(dedup *log.MessageSet, ce *change.Event) ([]CommandColumn, e
 				col.Unavailable = true
 			}
 		}
-		if col.DType == NumericType && col.Data != nil {
+		if col.DType == types.NumericType && col.Data != nil {
 			if col.Data, err = decodeNumericBytes(m, col.Data, semtype); err != nil {
 				return nil, fmt.Errorf("decoding numeric bytes: %w", err)
 			}
@@ -563,23 +429,7 @@ func structScale(data any) (int32, string, error) {
 	return scale, valuestr, nil
 }
 
-// func indentJSON(data string) (string, error) {
-// 	var err error
-// 	var j map[string]interface{}
-// 	if err = json.Unmarshal([]byte(data), &j); err != nil {
-// 		return "", err
-// 	}
-// 	var jb []byte
-// 	if jb, err = json.MarshalIndent(j, "", "    "); err != nil {
-// 		return "", err
-// 	}
-// 	return string(jb), nil
-// }
-
-// var FolioTenant string
-var ReshareTenants []string
-
-func NewCommand(dedup *log.MessageSet, ce *change.Event, schemaPassFilter, schemaStopFilter,
+func NewCommand(cat *catalog.Catalog, dedup *log.MessageSet, ce *change.Event, schemaPassFilter, schemaStopFilter,
 	tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string) (*Command, bool, error) {
 	snapshot := false
 	// Note: this function returns nil, nil in some cases.
@@ -642,7 +492,7 @@ func NewCommand(dedup *log.MessageSet, ce *change.Event, schemaPassFilter, schem
 		schema = strings.TrimSuffix(schema, "_storage")
 		schema = strings.Replace(schema, "_mod_", "_", 1)
 		var origin string
-		origin, schema = extractOrigin(ReshareTenants, schema)
+		origin, schema = cat.ExtractOrigin(schema)
 		c.Origin = origin
 		schema = addSchemaPrefix + schema
 		c.SchemaName = schema
@@ -692,26 +542,12 @@ func NewCommand(dedup *log.MessageSet, ce *change.Event, schemaPassFilter, schem
 			if !ok {
 				return nil, false, fmt.Errorf("delete: unexpected type: key schema type: %v", m["type"])
 			}
-			var dtype DataType
+			var dtype types.DataType
 			dtype, err = convertDataType(dt, semtype)
 			if err != nil {
 				return nil, false, fmt.Errorf("delete: unknown key schema type: %v", m["type"])
 			}
-			// var scale int32
-			// if dtype == NumericType {
-			// 	scale, err = parameterScale(m)
-			// 	if err != nil {
-			// 		return nil, fmt.Errorf("reading numeric scale: %w", err)
-			// 	}
-			// }
 			data := payload[attr]
-			// if dtype == JSONType {
-			// 	var d string
-			// 	d, err = indentJSON(data.(string))
-			// 	if err == nil {
-			// 		data = d
-			// 	}
-			// }
 			var edata *string
 			edata, err = DataToSQLData(data, dtype, semtype)
 			if err != nil {
@@ -753,70 +589,57 @@ func primaryKeyNotDefined(dedup *log.MessageSet, topicPtr *string) {
 	}
 }
 
-func extractOrigin(prefixes []string, schema string) (string, string) {
-	if prefixes != nil {
-		var g string
-		for _, g = range prefixes {
-			var gu = g + "_"
-			if strings.HasPrefix(schema, gu) {
-				return g, strings.TrimPrefix(schema, gu)
-			}
-		}
-	}
-	return "", schema
-}
-
 // convertDataType converts a literal type and semantic type (provided by a
 // change event) to a DataType.
-func convertDataType(coltype, semtype string) (DataType, error) {
+func convertDataType(coltype, semtype string) (types.DataType, error) {
 	switch coltype {
 	case "boolean":
-		return BooleanType, nil
+		return types.BooleanType, nil
 	case "int8", "int16":
-		return IntegerType, nil
+		return types.IntegerType, nil
 	case "int32":
 		if strings.HasSuffix(semtype, ".time.Date") {
-			return DateType, nil
+			return types.DateType, nil
 		}
 		if strings.HasSuffix(semtype, ".time.Time") {
-			return TimeType, nil
+			return types.TimeType, nil
 		}
-		return IntegerType, nil
+		return types.IntegerType, nil
 	case "int64":
 		if strings.HasSuffix(semtype, ".time.MicroTime") {
-			return TimeType, nil
+			return types.TimeType, nil
 		}
 		if strings.HasSuffix(semtype, ".time.Timestamp") || strings.HasSuffix(semtype, ".time.MicroTimestamp") {
-			return TimestampType, nil
+			return types.TimestampType, nil
 		}
-		return IntegerType, nil
+		return types.IntegerType, nil
 	case "float", "double", "float32", "float64":
-		return FloatType, nil
+		return types.FloatType, nil
 	case "string":
 		if strings.HasSuffix(semtype, ".data.Uuid") {
-			return UUIDType, nil
+			return types.UUIDType, nil
 		}
 		if strings.HasSuffix(semtype, ".data.Json") {
-			return JSONType, nil
+			return types.JSONType, nil
 		}
 		if strings.HasSuffix(semtype, ".time.ZonedTime") {
-			return TimetzType, nil
+			return types.TimetzType, nil
 		}
 		if strings.HasSuffix(semtype, ".time.ZonedTimestamp") {
-			return TimestamptzType, nil
+			return types.TimestamptzType, nil
 		}
-		return TextType, nil
+		return types.TextType, nil
 	case "bytes":
 		// if strings.HasSuffix(semtype, ".data.Bits") {
 		// 	return , nil
 		// }
 		if semtype == "org.apache.kafka.connect.data.Decimal" {
-			return NumericType, nil
+			return types.NumericType, nil
 		}
 		return 0, fmt.Errorf("convert data type: unhandled type: type=%s, semtype=%s", coltype, semtype)
 	case "struct":
 		if semtype == "io.debezium.data.VariableScaleDecimal" {
-			return NumericType, nil
+			return types.NumericType, nil
 		}
 		return 0, fmt.Errorf("convert data type: unhandled type: type=%s, semtype=%s", coltype, semtype)
 	default:
@@ -825,12 +648,12 @@ func convertDataType(coltype, semtype string) (DataType, error) {
 }
 
 // DataToSQLData converts data to a string ready for encoding to SQL.
-func DataToSQLData(data any, datatype DataType, semtype string) (*string, error) {
+func DataToSQLData(data any, datatype types.DataType, semtype string) (*string, error) {
 	if data == nil {
 		return nil, nil
 	}
 	switch datatype {
-	case BooleanType:
+	case types.BooleanType:
 		v, ok := data.(bool)
 		if !ok {
 			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
@@ -841,7 +664,7 @@ func DataToSQLData(data any, datatype DataType, semtype string) (*string, error)
 		}
 		s := "false"
 		return &s, nil
-	case IntegerType:
+	case types.IntegerType:
 		v, ok := data.(float64)
 		if !ok {
 			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
@@ -849,21 +672,21 @@ func DataToSQLData(data any, datatype DataType, semtype string) (*string, error)
 		i := int64(v)
 		s := strconv.FormatInt(i, 10)
 		return &s, nil
-	case FloatType:
+	case types.FloatType:
 		v, ok := data.(float64)
 		if !ok {
 			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
 		}
 		s := fmt.Sprintf("%g", v)
 		return &s, nil
-	case DateType:
+	case types.DateType:
 		v, ok := data.(float64)
 		if !ok {
 			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
 		}
 		s := time.Unix(int64(v*86400), int64(0)).UTC().Format("2006-01-02") + "T00:00:00Z"
 		return &s, nil
-	case TimeType:
+	case types.TimeType:
 		v, ok := data.(float64)
 		if !ok {
 			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
@@ -880,7 +703,7 @@ func DataToSQLData(data any, datatype DataType, semtype string) (*string, error)
 			s := fixupSQLTime(t)
 			return &s, nil
 		}
-	case TimestampType:
+	case types.TimestampType:
 		v, ok := data.(float64)
 		if !ok {
 			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
@@ -897,7 +720,7 @@ func DataToSQLData(data any, datatype DataType, semtype string) (*string, error)
 			s := fixupSQLTime(t)
 			return &s, nil
 		}
-	case TextType, NumericType, UUIDType, JSONType, TimetzType, TimestamptzType:
+	case types.TextType, types.NumericType, types.UUIDType, types.JSONType, types.TimetzType, types.TimestamptzType:
 		s, ok := data.(string)
 		if !ok {
 			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
@@ -959,14 +782,14 @@ func PrimaryKeyColumns(columns []CommandColumn) []CommandColumn {
 	return pkey
 }
 
-func InferTypeFromString(data string) DataType {
+func InferTypeFromString(data string) types.DataType {
 	switch {
 	case timestamptzRegexp.MatchString(data):
-		return TimestamptzType
+		return types.TimestamptzType
 	case timestampRegexp.MatchString(data):
-		return TimestampType
+		return types.TimestampType
 	default:
-		return TextType
+		return types.TextType
 	}
 }
 

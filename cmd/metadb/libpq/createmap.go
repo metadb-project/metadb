@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/metadb-project/metadb/cmd/metadb/ast"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
@@ -15,7 +14,7 @@ import (
 
 var identifierRegexp = regexp.MustCompile(`^[a-z][0-9a-z]*$`)
 
-func createDataMapping(conn net.Conn, node *ast.CreateDataMappingStmt, dc *pgx.Conn, cat *catalog.Catalog) error {
+func createDataMapping(conn net.Conn, node *ast.CreateDataMappingStmt, cat *catalog.Catalog) error {
 	// The only mapping type currently supported is json.
 	if node.TypeName != "json" {
 		return fmt.Errorf("mapping type %q not supported", node.TypeName)

@@ -1,8 +1,6 @@
 package sysdb
 
-import (
-	"github.com/metadb-project/metadb/cmd/metadb/command"
-)
+import "github.com/metadb-project/metadb/cmd/metadb/types"
 
 type TableSchema struct {
 	Column []ColumnSchema
@@ -10,7 +8,7 @@ type TableSchema struct {
 
 type ColumnSchema struct {
 	Name       string
-	DType      command.DataType
+	DType      types.DataType
 	DTypeSize  int64
 	PrimaryKey int
 	Data       any

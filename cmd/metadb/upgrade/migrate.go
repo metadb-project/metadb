@@ -19,11 +19,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/metadb-project/metadb/cmd/internal/uuid"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
-	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/option"
 	"github.com/metadb-project/metadb/cmd/metadb/process"
+	"github.com/metadb-project/metadb/cmd/metadb/types"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 	"github.com/spf13/viper"
 )
@@ -134,13 +134,13 @@ func runMigration(dp *pgxpool.Pool, cat *catalog.Catalog, dpLDP *pgxpool.Pool, s
 		}
 		c := &dbx.Column{Schema: table.Schema, Table: table.Table, Column: "id"}
 		if cat.Column(c) == nil {
-			if err = cat.AddColumn(&table, "id", command.UUIDType, 0); err != nil {
+			if err = cat.AddColumn(&table, "id", types.UUIDType, 0); err != nil {
 				return fmt.Errorf("adding column \"id\" in table \"%s__\": %v", table, err)
 			}
 		}
 		c = &dbx.Column{Schema: table.Schema, Table: table.Table, Column: m.jsonColumn}
 		if cat.Column(c) == nil {
-			if err = cat.AddColumn(&table, m.jsonColumn, command.JSONType, 0); err != nil {
+			if err = cat.AddColumn(&table, m.jsonColumn, types.JSONType, 0); err != nil {
 				return fmt.Errorf("adding column %q in table \"%s__\": %v", m.jsonColumn, table, err)
 			}
 		}

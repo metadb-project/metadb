@@ -25,6 +25,7 @@ type Catalog struct {
 	partYears          map[string]map[int]struct{}
 	columns            map[dbx.Column]string
 	indexes            map[dbx.Column]struct{}
+	origins            []string
 	jsonTransform      map[config.JSONPath]string
 	lastSnapshotRecord time.Time
 	dp                 *pgxpool.Pool
@@ -68,6 +69,9 @@ func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
 		return nil, err
 	}
 	if err := c.initIndexes(); err != nil {
+		return nil, err
+	}
+	if err := c.initOrigins(); err != nil {
 		return nil, err
 	}
 	if err := c.initJSON(); err != nil {

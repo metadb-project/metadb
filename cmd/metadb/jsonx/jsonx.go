@@ -10,6 +10,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/command"
 	"github.com/metadb-project/metadb/cmd/metadb/config"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
+	"github.com/metadb-project/metadb/cmd/metadb/types"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -160,7 +161,7 @@ func rewriteArray(cat *catalog.Catalog, cmd *command.Command, aname string, adat
 		ord := strconv.Itoa(i + 1)
 		ordcol := command.CommandColumn{
 			Name:       "__ord__" + aname,
-			DType:      command.IntegerType,
+			DType:      types.IntegerType,
 			DTypeSize:  4,
 			Data:       i + 1,
 			SQLData:    &ord,
@@ -206,13 +207,13 @@ func rewriteArray(cat *catalog.Catalog, cmd *command.Command, aname string, adat
 
 func rewriteNumber(name string, data float64, cols *[]command.CommandColumn) error {
 	s := strconv.FormatFloat(data, 'E', -1, 64)
-	sqldata, err := command.DataToSQLData(s, command.NumericType, "")
+	sqldata, err := command.DataToSQLData(s, types.NumericType, "")
 	if err != nil {
 		return err
 	}
 	c := command.CommandColumn{
 		Name:       name,
-		DType:      command.NumericType,
+		DType:      types.NumericType,
 		DTypeSize:  0,
 		Data:       data,
 		SQLData:    sqldata,
@@ -223,7 +224,7 @@ func rewriteNumber(name string, data float64, cols *[]command.CommandColumn) err
 }
 
 func rewriteString(name string, data string, cols *[]command.CommandColumn) error {
-	sqldata, err := command.DataToSQLData(data, command.TextType, "")
+	sqldata, err := command.DataToSQLData(data, types.TextType, "")
 	if err != nil {
 		return err
 	}
@@ -241,13 +242,13 @@ func rewriteString(name string, data string, cols *[]command.CommandColumn) erro
 }
 
 func rewriteBoolean(name string, data bool, cols *[]command.CommandColumn) error {
-	sqldata, err := command.DataToSQLData(data, command.BooleanType, "")
+	sqldata, err := command.DataToSQLData(data, types.BooleanType, "")
 	if err != nil {
 		return err
 	}
 	c := command.CommandColumn{
 		Name:       name,
-		DType:      command.BooleanType,
+		DType:      types.BooleanType,
 		DTypeSize:  0,
 		Data:       data,
 		SQLData:    sqldata,

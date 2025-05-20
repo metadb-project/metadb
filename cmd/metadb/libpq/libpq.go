@@ -54,8 +54,7 @@ func Listen(cat *catalog.Catalog, host string, port string, db *dbx.DB, sources 
 			// TODO handle error
 			_ = err
 		}
-		var backend *pgproto3.Backend
-		backend = pgproto3.NewBackend(conn, conn)
+		backend := pgproto3.NewBackend(conn, conn)
 		//log.Trace("connection received: %s", conn.RemoteAddr().String())
 		log.Trace("connection received") // domain socket
 		go serve(cat, conn, backend, db, sources)
@@ -286,7 +285,7 @@ func processQuery(cat *catalog.Catalog, conn net.Conn, query string, args []any,
 	case *ast.CreateDataSourceStmt:
 		err = createDataSource(conn, n, dc)
 	case *ast.CreateDataMappingStmt:
-		err = createDataMapping(conn, n, dc, cat)
+		err = createDataMapping(conn, n, cat)
 	case *ast.AlterTableStmt:
 		err = alterTable(conn, n, dc)
 	case *ast.AlterDataSourceStmt:
@@ -314,7 +313,7 @@ func processQuery(cat *catalog.Catalog, conn net.Conn, query string, args []any,
 	case *ast.RevokeAccessOnTableStmt:
 		err = revokeAccessOnTable(conn, n, dc)
 	case *ast.CreateDataOriginStmt:
-		err = createDataOrigin(conn, n, dc)
+		err = createDataOrigin(conn, n, dc, cat)
 	case *ast.ListStmt:
 		err = list(conn, n, dc, sources)
 	case *ast.RefreshInferredColumnTypesStmt:
@@ -322,7 +321,7 @@ func processQuery(cat *catalog.Catalog, conn net.Conn, query string, args []any,
 	case *ast.VerifyConsistencyStmt:
 		err = verifyConsistencyStmt(conn, dc)
 	case *ast.CreateSchemaForUserStmt:
-		err = createSchemaForUser(conn, n, db, dc)
+		err = createSchemaForUser(conn, n, dc)
 	//case *ast.SelectStmt:
 	//	if n.Fn == "version" {
 	//		return version(conn, query)
@@ -841,7 +840,7 @@ func checkOptionDuplicates(options []ast.Option) error {
 	return nil
 }
 
-func createSchemaForUser(conn net.Conn, node *ast.CreateSchemaForUserStmt, db *dbx.DB, dc *pgx.Conn) error {
+func createSchemaForUser(conn net.Conn, node *ast.CreateSchemaForUserStmt, dc *pgx.Conn) error {
 	reg, err := catalog.UserRegistered(dc, node.UserName)
 	if err != nil {
 		return fmt.Errorf("selecting user: %v", err)
@@ -870,49 +869,6 @@ func sourceExists(dc *pgx.Conn, sourceName string) (bool, error) {
 	q := "SELECT 1 FROM metadb.source WHERE name=$1"
 	var i int64
 	err := dc.QueryRow(context.TODO(), q, sourceName).Scan(&i)
-	switch {
-	case err == pgx.ErrNoRows:
-		return false, nil
-	case err != nil:
-		return false, err
-	default:
-		return true, nil
-	}
-}
-
-func createDataOrigin(conn net.Conn, node *ast.CreateDataOriginStmt, dc *pgx.Conn) error {
-	if len(node.OriginName) > 63 {
-		return fmt.Errorf("data origin name %q too long", node.OriginName)
-	}
-
-	exists, err := originExists(dc, node.OriginName)
-	if err != nil {
-		return fmt.Errorf("selecting data origin: %w", err)
-	}
-	if exists {
-		return fmt.Errorf("data origin %q already exists", node.OriginName)
-	}
-
-	q := "INSERT INTO metadb.origin(name)VALUES($1)"
-	_, err = dc.Exec(context.TODO(), q, node.OriginName)
-	if err != nil {
-		return fmt.Errorf("writing origin configuration: %w", err)
-	}
-
-	_ = writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server for new origin to take effect"},
-	})
-
-	return writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.CommandComplete{CommandTag: []byte("CREATE DATA ORIGIN")},
-		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	})
-}
-
-func originExists(dc *pgx.Conn, originName string) (bool, error) {
-	q := "SELECT 1 FROM metadb.origin WHERE name=$1"
-	var i int64
-	err := dc.QueryRow(context.TODO(), q, originName).Scan(&i)
 	switch {
 	case err == pgx.ErrNoRows:
 		return false, nil
@@ -988,7 +944,7 @@ func writeEncoded(conn net.Conn, messages []pgproto3.Message) error {
 }
 
 func encode(buffer []byte, messages []pgproto3.Message) ([]byte, error) {
-	if messages == nil || len(messages) == 0 {
+	if len(messages) == 0 {
 		return make([]byte, 0), nil
 	}
 	var m pgproto3.Message
@@ -1003,7 +959,7 @@ func encode(buffer []byte, messages []pgproto3.Message) ([]byte, error) {
 }
 
 func write(conn net.Conn, buffer []byte) error {
-	if buffer == nil || len(buffer) == 0 {
+	if len(buffer) == 0 {
 		return nil
 	}
 	if _, err := conn.Write(buffer); err != nil {
