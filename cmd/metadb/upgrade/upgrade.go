@@ -1761,6 +1761,21 @@ func updb26(opt *dbopt) error {
 		return fmt.Errorf("setting createrole: %w", util.PGErr(err))
 	}
 
+	for i := range users {
+		for j := range updb26ExtraManagedTables {
+			t := strings.Split(updb26ExtraManagedTables[j], ".")
+			_ = acl.Grant(dc, []acl.ACLItem{
+				{
+					SchemaName: t[0],
+					ObjectName: t[1],
+					ObjectType: acl.Table,
+					Privilege:  acl.Access,
+					UserName:   users[i],
+				},
+			})
+		}
+	}
+
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
 		return util.PGErr(err)
@@ -1812,9 +1827,6 @@ func updb26(opt *dbopt) error {
 	return nil
 }
 
-var updb26ExtraManagedSchemas = []string{"folio_derived", "reshare_derived"}
-var updb26ExtraManagedTables = []string{"folio_source_record.marc__t"}
-
 func updb26GrantAccessOnAll(tx pgx.Tx, user string) error {
 	acls := make([]acl.ACLItem, 0)
 
@@ -1859,22 +1871,16 @@ func updb26GrantAccessOnAll(tx pgx.Tx, user string) error {
 			})
 		}
 	}
-	for i := range updb26ExtraManagedTables {
-		t := strings.Split(updb26ExtraManagedTables[i], ".")
-		acls = append(acls, acl.ACLItem{
-			SchemaName: t[0],
-			ObjectName: t[1],
-			ObjectType: acl.Table,
-			Privilege:  acl.Access,
-			UserName:   user,
-		})
-	}
 
 	if err = acl.Grant(tx, acls); err != nil {
 		return err
 	}
+
 	return nil
 }
+
+var updb26ExtraManagedSchemas = []string{"folio_derived", "reshare_derived"}
+var updb26ExtraManagedTables = []string{"folio_source_record.marc__t"}
 
 func updb27(opt *dbopt) error {
 	dc, err := opt.DB.Connect()
