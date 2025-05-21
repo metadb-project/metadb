@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/metadb-project/metadb/cmd/metadb/color"
-	"github.com/metadb-project/metadb/cmd/metadb/config"
 	"github.com/metadb-project/metadb/cmd/metadb/dsync"
 	"github.com/metadb-project/metadb/cmd/metadb/eout"
 	"github.com/metadb-project/metadb/cmd/metadb/initsys"
@@ -36,9 +35,6 @@ func main() {
 func metadbMain() {
 	// Initialize error output
 	eout.Init(program)
-	if config.Experimental {
-		eout.Info("experimental mode")
-	}
 	// Run
 	var err error
 	if err = run(); err != nil {

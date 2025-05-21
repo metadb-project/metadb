@@ -6,7 +6,6 @@ json=''
 runtests='false'
 runalltests='false'
 verbose='false'
-experiment='false'
 tagsdynamic='false'
 
 usage() {
@@ -21,7 +20,6 @@ usage() {
     echo '-v  Enable verbose output'
     echo '-f  Fast build (do not remove executable before compiling)'
     echo '-d  Compile with dynamic tags'
-    # echo '-X  Build with experimental code included'
     echo '-h  Help'
 }
 
@@ -63,23 +61,6 @@ tags=''
 
 if $tagsdynamic; then
     tags='dynamic'
-fi
-
-if $experiment; then
-    # echo "The \"build with experimental code\" option (-X) has been selected."
-    # read -p "This may prevent later upgrades.  Are you sure? " yn
-    # case $yn in
-    #     [Yy] ) break ;;
-    #     [Yy][Ee][Ss] ) break ;;
-    #     * ) echo "Exiting" 1>&2
-    #         exit 1 ;;
-    # esac
-    # json='-X main.rewriteJSON=1'
-    if [ -n "$tags" ]; then
-        tags="${tags},"
-    fi
-    tags="${tags}experimental"
-    echo "build.sh: building with experimental code" 1>&2
 fi
 
 if [ -n "$tags" ]; then
