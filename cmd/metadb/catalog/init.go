@@ -11,9 +11,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/metadb-project/metadb/cmd/metadb/config"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
+	"github.com/metadb-project/metadb/cmd/metadb/types"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -26,7 +26,7 @@ type Catalog struct {
 	columns            map[dbx.Column]string
 	indexes            map[dbx.Column]struct{}
 	origins            []string
-	jsonTransform      map[config.JSONPath]string
+	jsonTransform      map[types.JSONPath]string
 	lastSnapshotRecord time.Time
 	dp                 *pgxpool.Pool
 	lz4                bool

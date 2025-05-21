@@ -8,7 +8,6 @@ import (
 
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
-	"github.com/metadb-project/metadb/cmd/metadb/config"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/types"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
@@ -16,7 +15,7 @@ import (
 
 // RewriteJSON transforms a JSON object stored in a specified column within a
 // command.
-func RewriteJSON(cat *catalog.Catalog, cmd *command.Command, column *command.CommandColumn, path config.JSONPath, tmap string) error {
+func RewriteJSON(cat *catalog.Catalog, cmd *command.Command, column *command.CommandColumn, path types.JSONPath, tmap string) error {
 	if column.Data == nil {
 		return nil
 	}
@@ -51,7 +50,7 @@ func RewriteJSON(cat *catalog.Catalog, cmd *command.Command, column *command.Com
 // indices are added in a column named with the prefix "__ord__".  Primary key
 // columns of the root command are included with the prefix "__root__" added to
 // the column names.
-func rewriteExtendedObject(cat *catalog.Catalog, cmd *command.Command, obj map[string]any, table string, rootkey, quasikey []command.CommandColumn, path config.JSONPath, deletions map[string]struct{}) error {
+func rewriteExtendedObject(cat *catalog.Catalog, cmd *command.Command, obj map[string]any, table string, rootkey, quasikey []command.CommandColumn, path types.JSONPath, deletions map[string]struct{}) error {
 	cols := make([]command.CommandColumn, 0)
 	cols = append(cols, rootkey...)
 	if err := rewriteObject(cat, cmd, "", obj, table, &cols, rootkey, quasikey, path, deletions); err != nil {
@@ -71,7 +70,7 @@ func rewriteExtendedObject(cat *catalog.Catalog, cmd *command.Command, obj map[s
 	return nil
 }
 
-func rewriteObject(cat *catalog.Catalog, cmd *command.Command, attrPrefix string, obj map[string]any, table string, cols *[]command.CommandColumn, rootkey, quasikey []command.CommandColumn, path config.JSONPath, deletions map[string]struct{}) error {
+func rewriteObject(cat *catalog.Catalog, cmd *command.Command, attrPrefix string, obj map[string]any, table string, cols *[]command.CommandColumn, rootkey, quasikey []command.CommandColumn, path types.JSONPath, deletions map[string]struct{}) error {
 	if path.Path[len(path.Path)-1] != "" {
 		return nil
 	}
@@ -128,7 +127,7 @@ func rewriteObject(cat *catalog.Catalog, cmd *command.Command, attrPrefix string
 	return nil
 }
 
-func rewriteArray(cat *catalog.Catalog, cmd *command.Command, aname string, adata []any, table string, rootkey, quasikey []command.CommandColumn, path config.JSONPath, deletions map[string]struct{}) error {
+func rewriteArray(cat *catalog.Catalog, cmd *command.Command, aname string, adata []any, table string, rootkey, quasikey []command.CommandColumn, path types.JSONPath, deletions map[string]struct{}) error {
 	if path.Path[len(path.Path)-1] != "" {
 		return nil
 	}

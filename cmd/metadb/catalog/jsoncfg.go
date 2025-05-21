@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/metadb-project/metadb/cmd/metadb/config"
+	"github.com/metadb-project/metadb/cmd/metadb/types"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
@@ -16,14 +16,14 @@ func (c *Catalog) initJSON() error {
 		return fmt.Errorf("selecting json configuration: %w", err)
 	}
 	defer rows.Close()
-	t := make(map[config.JSONPath]string)
+	t := make(map[types.JSONPath]string)
 	for rows.Next() {
 		var schema, table, column, path, tmap string
 		err := rows.Scan(&schema, &table, &column, &path, &tmap)
 		if err != nil {
 			return fmt.Errorf("reading json configuration: %w", err)
 		}
-		t[config.NewJSONPath(schema, table, column, path)] = tmap
+		t[types.NewJSONPath(schema, table, column, path)] = tmap
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("reading json configuration: %w", err)
@@ -32,7 +32,7 @@ func (c *Catalog) initJSON() error {
 	return nil
 }
 
-func (c *Catalog) JSONPathLookup(path config.JSONPath) string {
+func (c *Catalog) JSONPathLookup(path types.JSONPath) string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.jsonTransform[path]
@@ -44,7 +44,7 @@ func (c *Catalog) DefineJSONMapping(schema, table, column, path, mapping string)
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.jsonTransform[config.NewJSONPath(schema, table, column, path)] = mapping
+	c.jsonTransform[types.NewJSONPath(schema, table, column, path)] = mapping
 	return nil
 }
 

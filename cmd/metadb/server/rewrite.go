@@ -6,7 +6,6 @@ import (
 
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
-	"github.com/metadb-project/metadb/cmd/metadb/config"
 	"github.com/metadb-project/metadb/cmd/metadb/jsonx"
 	"github.com/metadb-project/metadb/cmd/metadb/log"
 	"github.com/metadb-project/metadb/cmd/metadb/types"
@@ -41,7 +40,7 @@ func rewriteCommand(cat *catalog.Catalog, cmde *list.Element) error {
 		// Check if this is a JSON column.
 		if cmd.Column[i].DType == types.JSONType {
 			// Check if this column is configured for transformation.
-			path := config.NewJSONPath(cmd.SchemaName, cmd.TableName, cmd.Column[i].Name, "$")
+			path := types.NewJSONPath(cmd.SchemaName, cmd.TableName, cmd.Column[i].Name, "$")
 			t := cat.JSONPathLookup(path)
 			if t == "" {
 				continue
