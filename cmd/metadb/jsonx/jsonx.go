@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/command"
@@ -70,6 +71,16 @@ func rewriteExtendedObject(cat *catalog.Catalog, cmd *command.Command, obj map[s
 	return nil
 }
 
+func decodeJSONFieldName(field string) (string, error) {
+	f1 := strings.TrimPrefix(field, "#")
+	f2 := strings.TrimPrefix(f1, "@")
+	f3, err := util.DecodeCamelCase(f2)
+	if err != nil {
+		return "", fmt.Errorf("decoding field %q: %w", field, err)
+	}
+	return f3, nil
+}
+
 func rewriteObject(cat *catalog.Catalog, cmd *command.Command, attrPrefix string, obj map[string]any, table string, cols *[]command.CommandColumn, rootkey, quasikey []command.CommandColumn, path types.JSONPath, deletions map[string]struct{}) error {
 	if path.Path[len(path.Path)-1] != "" {
 		return nil
@@ -79,11 +90,11 @@ func rewriteObject(cat *catalog.Catalog, cmd *command.Command, attrPrefix string
 		if value == nil {
 			continue
 		}
-		decodedName, err := util.DecodeCamelCase(name)
+		decoded, err := decodeJSONFieldName(name)
 		if err != nil {
-			return fmt.Errorf("converting from camel case: %s: %v", err, obj)
+			return err
 		}
-		n := attrPrefix + decodedName
+		n := attrPrefix + decoded
 		switch v := value.(type) {
 		case float64:
 			if err := rewriteNumber(n, v, cols); err != nil {
