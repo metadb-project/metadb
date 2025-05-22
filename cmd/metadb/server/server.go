@@ -271,7 +271,14 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 		for {
 			tries++
 			url := "https://github.com/folio-org/folio-analytics.git"
-			ref := util.GetFolioVersion()
+			var ref string
+			ref, err = cat.GetConfig("external_sql_folio")
+			if err != nil {
+				return fmt.Errorf("reading external_sql_folio: %w", err)
+			}
+			if ref == "" {
+				break
+			}
 			path := "sql_metadb/derived_tables"
 			schema := "folio_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, ref, path, schema, source); err != nil {
@@ -290,7 +297,14 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 		for {
 			tries++
 			url := "https://github.com/openlibraryenvironment/reshare-analytics.git"
-			ref := util.GetReshareVersion()
+			var ref string
+			ref, err = cat.GetConfig("external_sql_reshare")
+			if err != nil {
+				return fmt.Errorf("reading external_sql_reshare: %w", err)
+			}
+			if ref == "" {
+				break
+			}
 			path := "reports"
 			schema := "report"
 			if err = sqlfunc.SQLFunc(datadir, cat, db, url, ref, path, schema, source); err != nil {
@@ -309,7 +323,14 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 		for {
 			tries++
 			url := "https://github.com/openlibraryenvironment/reshare-analytics.git"
-			ref := util.GetReshareVersion()
+			var ref string
+			ref, err = cat.GetConfig("external_sql_reshare")
+			if err != nil {
+				return fmt.Errorf("reading external_sql_reshare: %w", err)
+			}
+			if ref == "" {
+				break
+			}
 			path := "sql/derived_tables"
 			schema := "reshare_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, ref, path, schema, source); err != nil {

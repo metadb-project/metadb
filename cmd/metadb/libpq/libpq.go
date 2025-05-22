@@ -278,6 +278,8 @@ func processQuery(cat *catalog.Catalog, conn net.Conn, query string, args []any,
 		return write(conn, buffer)
 	}
 	switch n := node.(type) {
+	case *ast.AlterSystemStmt:
+		err = alterSystem(conn, n, cat)
 	case *ast.DeregisterUserStmt:
 		err = deregisterUser(conn, n, db, dc)
 	case *ast.RegisterUserStmt:
@@ -427,108 +429,6 @@ func encodeRow(buffer []byte, rows pgx.Rows, cols []pgconn.FieldDescription) ([]
 	return row.Encode(buffer)
 }
 
-func list(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.SourceConnector) error {
-	switch strings.ToLower(node.Name) {
-	case "authorizations":
-		return proxySelect(conn, ""+
-			"SELECT username,"+
-			"       CASE WHEN (NOT dbupdated) THEN 'pending restart'"+
-			"            WHEN (tables='.*' AND dbupdated) THEN 'authorized'"+
-			"            ELSE 'not authorized'"+
-			"       END note"+
-			"    FROM metadb.auth"+
-			"    ORDER BY username", nil, dc)
-	case "data_mappings":
-		return proxySelect(conn, ""+
-			"SELECT 'json' mapping_type,"+
-			"       schema_name||'.'||table_name||'__' table_name,"+
-			"       column_name,"+
-			"       path object_path,"+
-			"       map target_identifier"+
-			"    FROM metadb.transform_json"+
-			"    ORDER BY mapping_type, table_name, column_name, path", nil, dc)
-	case "data_origins":
-		return proxySelect(conn, ""+
-			"SELECT name"+
-			"    FROM metadb.origin"+
-			"    ORDER BY name", nil, dc)
-	case "data_sources":
-		return proxySelect(conn, ""+
-			"SELECT name,"+
-			"       brokers,"+
-			"       security,"+
-			"       topics,"+
-			"       consumergroup,"+
-			"       schemapassfilter,"+
-			"       schemastopfilter,"+
-			"       tablestopfilter,"+
-			"       trimschemaprefix,"+
-			"       addschemaprefix,"+
-			"       module"+
-			"    FROM metadb.source"+
-			"    ORDER BY name", nil, dc)
-	case "status":
-		return listStatus(conn, sources)
-	default:
-		return fmt.Errorf("unrecognized parameter %q", node.Name)
-	}
-}
-
-func listStatus(conn net.Conn, sources *[]*sysdb.SourceConnector) error {
-	m := []pgproto3.Message{
-		&pgproto3.RowDescription{Fields: []pgproto3.FieldDescription{
-			{
-				Name:                 []byte("type"),
-				TableOID:             0,
-				TableAttributeNumber: 0,
-				DataTypeOID:          25,
-				DataTypeSize:         -1,
-				TypeModifier:         -1,
-				Format:               0,
-			},
-			{
-				Name:                 []byte("name"),
-				TableOID:             0,
-				TableAttributeNumber: 0,
-				DataTypeOID:          25,
-				DataTypeSize:         -1,
-				TypeModifier:         -1,
-				Format:               0,
-			},
-			{
-				Name:                 []byte("source_stream"),
-				TableOID:             0,
-				TableAttributeNumber: 0,
-				DataTypeOID:          25,
-				DataTypeSize:         -1,
-				TypeModifier:         -1,
-				Format:               0,
-			},
-			{
-				Name:                 []byte("source_sync"),
-				TableOID:             0,
-				TableAttributeNumber: 0,
-				DataTypeOID:          25,
-				DataTypeSize:         -1,
-				TypeModifier:         -1,
-				Format:               0,
-			},
-		}},
-	}
-	for _, s := range *sources {
-		m = append(m, &pgproto3.DataRow{Values: [][]byte{
-			[]byte("data_source"),
-			[]byte(s.Name),
-			[]byte(s.Status.Stream.GetString()),
-			[]byte(s.Status.Sync.GetString()),
-		}})
-	}
-	ctag := fmt.Sprintf("SELECT %d", len(*sources))
-	m = append(m, &pgproto3.CommandComplete{CommandTag: []byte(ctag)})
-	m = append(m, &pgproto3.ReadyForQuery{TxStatus: 'I'})
-	return writeEncoded(conn, m)
-}
-
 func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Conn) error {
 	exists, err := sourceExists(dc, node.DataSourceName)
 	if err != nil {
@@ -561,13 +461,13 @@ func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Con
 	}
 
 	q = "INSERT INTO metadb.source" +
-		"(name,brokers,security,topics,consumergroup,schemapassfilter,schemastopfilter,tablestopfilter,trimschemaprefix,addschemaprefix,module,enable)" +
-		"VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)"
+		"(name,brokers,security,topics,consumergroup,schemapassfilter,schemastopfilter,tablestopfilter,trimschemaprefix,addschemaprefix,map_public_schema,module,enable)" +
+		"VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)"
 	_, err = dc.Exec(context.TODO(), q,
 		name, src.Brokers, src.Security, strings.Join(src.Topics, ","), src.Group,
 		strings.Join(src.SchemaPassFilter, ","), strings.Join(src.SchemaStopFilter, ","),
-		strings.Join(src.TableStopFilter, ","), src.TrimSchemaPrefix, src.AddSchemaPrefix, src.Module,
-		src.Enable)
+		strings.Join(src.TableStopFilter, ","), src.TrimSchemaPrefix, src.AddSchemaPrefix,
+		src.MapPublicSchema, src.Module, src.Enable)
 	if err != nil {
 		return fmt.Errorf("writing source configuration: %w", err)
 	}
@@ -714,13 +614,15 @@ func alterSourceOptions(dc *pgx.Conn, node *ast.AlterDataSourceStmt) error {
 			fallthrough
 		case "addschemaprefix":
 			fallthrough
+		case "map_public_schema":
+			fallthrough
 		case "module":
 			// NOP
 		default:
 			return &dberr.Error{
 				Err: fmt.Errorf("invalid option %q", opt.Name),
 				Hint: "Valid options in this context are: " +
-					"brokers, security, topics, consumergroup, schemapassfilter, schemastopfilter, tablestopfilter, trimschemaprefix, addschemaprefix, module",
+					"brokers, security, topics, consumergroup, schemapassfilter, schemastopfilter, tablestopfilter, trimschemaprefix, addschemaprefix, map_public_schema, module",
 			}
 		}
 		isnull, err := isSourceOptionNull(dc, node.DataSourceName, opt.Name)
@@ -813,6 +715,8 @@ func createSourceOptions(options []ast.Option) (*sysdb.SourceConnector, error) {
 			s.TrimSchemaPrefix = opt.Val
 		case "addschemaprefix":
 			s.AddSchemaPrefix = opt.Val
+		case "map_public_schema":
+			s.MapPublicSchema = opt.Val
 		//case "enable":
 		//	s.Enable = (strings.ToLower(opt.Val) == "true")
 		case "module":
@@ -821,7 +725,7 @@ func createSourceOptions(options []ast.Option) (*sysdb.SourceConnector, error) {
 			return nil, &dberr.Error{
 				Err: fmt.Errorf("invalid option %q", opt.Name),
 				Hint: "Valid options in this context are: " +
-					"brokers, security, topics, consumergroup, schemapassfilter, schemastopfilter, tablestopfilter, trimschemaprefix, addschemaprefix, module",
+					"brokers, security, topics, consumergroup, schemapassfilter, schemastopfilter, tablestopfilter, trimschemaprefix, addschemaprefix, map_public_schema, module",
 			}
 		}
 	}

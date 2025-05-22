@@ -22,7 +22,7 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 		"SELECT name,enable,coalesce(brokers,''),coalesce(security,''),coalesce(topics,''),"+
 		"coalesce(consumergroup,''),coalesce(schemapassfilter,''),coalesce(schemastopfilter,''),"+
 		"coalesce(tablestopfilter,''),coalesce(trimschemaprefix,''),coalesce(addschemaprefix,''),"+
-		"coalesce(module,'') FROM metadb.source")
+		"coalesce(map_public_schema,''),coalesce(module,'') FROM metadb.source")
 	if err != nil {
 		return nil, err
 	}
@@ -38,9 +38,10 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 		var tablestopfilter string
 		var trimschemaprefix string
 		var addschemaprefix string
+		var mapPublicSchema string
 		var module string
 		if err := rows.Scan(&name, &enable, &brokers, &security, &topics, &consumergroup, &schemapassfilter,
-			&schemastopfilter, &tablestopfilter, &trimschemaprefix, &addschemaprefix,
+			&schemastopfilter, &tablestopfilter, &trimschemaprefix, &addschemaprefix, &mapPublicSchema,
 			&module); err != nil {
 			return nil, err
 		}
@@ -59,6 +60,7 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 			TableStopFilter:  util.SplitList(tablestopfilter),
 			TrimSchemaPrefix: trimschemaprefix,
 			AddSchemaPrefix:  addschemaprefix,
+			MapPublicSchema:  mapPublicSchema,
 			Module:           module,
 		})
 	}

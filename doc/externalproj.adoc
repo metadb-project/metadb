@@ -49,6 +49,14 @@ FOLIO "derived tables" are helper tables that provide commonly used
 table joins, etc.  They are automatically updated once per day,
 usually at about 3:00 UTC by default.
 
+To enable these tables, set the server configuration parameter
+`external_sql_folio` to the desired Git reference in the
+folio-analytics repository.  For example:
+
+----
+ALTER SYSTEM SET external_sql_folio = 'refs/tags/v1.8.0';
+----
+
 Note that the derived tables are based on a periodic snapshot of data,
 and for this reason they are generally not up-to-date.
 
@@ -673,6 +681,14 @@ origin if previously defined by `CREATE DATA ORIGIN`.
 
 ReShare "derived tables" are automatically updated once per day,
 usually at about 3:00 UTC by default.
+
+To enable these tables, set the server configuration parameter
+`external_sql_reshare` to the desired Git reference in the
+reshare-analytics repository.  For example:
+
+----
+ALTER SYSTEM SET external_sql_reshare = 'refs/tags/20230912004531';
+----
 
 Note that the derived tables are based on a periodic snapshot of data,
 and for this reason they are generally not up-to-date.

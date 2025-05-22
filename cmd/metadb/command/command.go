@@ -430,7 +430,7 @@ func structScale(data any) (int32, string, error) {
 }
 
 func NewCommand(cat *catalog.Catalog, dedup *log.MessageSet, ce *change.Event, schemaPassFilter, schemaStopFilter,
-	tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string) (*Command, bool, error) {
+	tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix, mapPublicSchema string) (*Command, bool, error) {
 	snapshot := false
 	// Note: this function returns nil, nil in some cases.
 	if ce == nil {
@@ -485,17 +485,21 @@ func NewCommand(cat *catalog.Catalog, dedup *log.MessageSet, ce *change.Event, s
 			return nil, false, nil
 		}
 		// Rewrite schema name
-		if trimSchemaPrefix != "" {
-			schema = strings.TrimPrefix(schema, trimSchemaPrefix)
+		if schema == "public" && mapPublicSchema != "" {
+			c.SchemaName = mapPublicSchema
+		} else {
+			if trimSchemaPrefix != "" {
+				schema = strings.TrimPrefix(schema, trimSchemaPrefix)
+			}
+			schema = strings.TrimPrefix(schema, "mod_")
+			schema = strings.TrimSuffix(schema, "_storage")
+			schema = strings.Replace(schema, "_mod_", "_", 1)
+			var origin string
+			origin, schema = cat.ExtractOrigin(schema)
+			c.Origin = origin
+			schema = addSchemaPrefix + schema
+			c.SchemaName = schema
 		}
-		schema = strings.TrimPrefix(schema, "mod_")
-		schema = strings.TrimSuffix(schema, "_storage")
-		schema = strings.Replace(schema, "_mod_", "_", 1)
-		var origin string
-		origin, schema = cat.ExtractOrigin(schema)
-		c.Origin = origin
-		schema = addSchemaPrefix + schema
-		c.SchemaName = schema
 	}
 	if ce.Value.Payload.Source.Table != nil {
 		table := *ce.Value.Payload.Source.Table

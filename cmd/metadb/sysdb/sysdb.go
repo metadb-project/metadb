@@ -34,6 +34,7 @@ type SourceConnector struct {
 	TableStopFilter  []string
 	TrimSchemaPrefix string
 	AddSchemaPrefix  string
+	MapPublicSchema  string
 	Module           string
 	Status           status.Source
 }

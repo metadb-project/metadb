@@ -196,3 +196,11 @@ type RegisterUserStmt struct {
 
 func (*RegisterUserStmt) node()     {}
 func (*RegisterUserStmt) stmtNode() {}
+
+type AlterSystemStmt struct {
+	ConfigParameter string
+	Value           string
+}
+
+func (*AlterSystemStmt) node()     {}
+func (*AlterSystemStmt) stmtNode() {}

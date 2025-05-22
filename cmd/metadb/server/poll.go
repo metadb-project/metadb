@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -232,7 +233,21 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		consumersN = 1
 	} else {
 		// During a sync process, we can optionally enable concurrency.
-		consumersN = 1 // Default to 1 until well tested
+		var kafkaConcurrency string
+		kafkaConcurrency, err = cat.GetConfig("kafka_sync_concurrency")
+		if err != nil {
+			return fmt.Errorf("reading kafka_sync_concurrency: %w", err)
+		}
+		consumersN, err = strconv.Atoi(kafkaConcurrency)
+		if err != nil {
+			return fmt.Errorf("reading kafka_sync_concurrency value %q: %w", kafkaConcurrency, err)
+		}
+		if consumersN < 1 {
+			consumersN = 1
+		}
+		if consumersN > 32 {
+			consumersN = 32
+		}
 	}
 	// First create the consumers.
 	consumers := make([]*kafka.Consumer, consumersN)
@@ -310,7 +325,8 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 		if !spr.svr.opt.Script {
 			eventReadCount, err = parseChangeEvents(cat, dedup, consumer, cmdgraph, spr.schemaPassFilter,
 				spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
-				spr.source.AddSchemaPrefix, spr.sourceLog, spr.svr.db.CheckpointSegmentSize)
+				spr.source.AddSchemaPrefix, spr.source.MapPublicSchema, spr.sourceLog,
+				spr.svr.db.CheckpointSegmentSize)
 			if err != nil {
 				*errString = fmt.Sprintf("parser: %v", err)
 				return
@@ -389,7 +405,7 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 
 }
 
-func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *kafka.Consumer, cmdgraph *command.CommandGraph, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix string, sourceLog *log.SourceLog, checkpointSegmentSize int) (int, error) {
+func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *kafka.Consumer, cmdgraph *command.CommandGraph, schemaPassFilter, schemaStopFilter, tableStopFilter []*regexp.Regexp, trimSchemaPrefix, addSchemaPrefix, mapPublicSchema string, sourceLog *log.SourceLog, checkpointSegmentSize int) (int, error) {
 	kafkaPollTimeout := 100     // Poll timeout in milliseconds.
 	pollTimeoutCountLimit := 20 // Maximum allowable number of consecutive poll timeouts.
 	pollLoopTimeout := 120.0    // Overall pool loop timeout in seconds.
@@ -430,7 +446,7 @@ func parseChangeEvents(cat *catalog.Catalog, dedup *log.MessageSet, consumer *ka
 		}
 
 		c, snap, err := command.NewCommand(cat, dedup, ce, schemaPassFilter, schemaStopFilter, tableStopFilter,
-			trimSchemaPrefix, addSchemaPrefix)
+			trimSchemaPrefix, addSchemaPrefix, mapPublicSchema)
 		if err != nil {
 			log.Debug("%v", *ce)
 			return 0, fmt.Errorf("parsing command: %w", err)
