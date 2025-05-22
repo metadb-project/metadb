@@ -23,7 +23,7 @@ func (c *Catalog) initOrigins() error {
 		origins = append(origins, name)
 	}
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("last error check: %w", util.PGErr(err))
+		return fmt.Errorf("reading origin: %w", util.PGErr(err))
 	}
 	c.origins = origins
 	return nil

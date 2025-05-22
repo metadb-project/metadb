@@ -26,6 +26,7 @@ type Catalog struct {
 	columns            map[dbx.Column]string
 	indexes            map[dbx.Column]struct{}
 	origins            []string
+	config             map[string]string
 	jsonTransform      map[types.JSONPath]string
 	lastSnapshotRecord time.Time
 	dp                 *pgxpool.Pool
@@ -72,6 +73,9 @@ func Initialize(db *dbx.DB, dp *pgxpool.Pool) (*Catalog, error) {
 		return nil, err
 	}
 	if err := c.initOrigins(); err != nil {
+		return nil, err
+	}
+	if err := c.initConfig(); err != nil {
 		return nil, err
 	}
 	if err := c.initJSON(); err != nil {
@@ -143,6 +147,7 @@ type systemTableDef struct {
 var systemTables = []systemTableDef{
 	{table: dbx.Table{Schema: catalogSchema, Table: "acl"}, create: createTableACL},
 	{table: dbx.Table{Schema: catalogSchema, Table: "auth"}, create: createTableAuth},
+	{table: dbx.Table{Schema: catalogSchema, Table: "config"}, create: createTableConfig},
 	{table: dbx.Table{Schema: catalogSchema, Table: "init"}, create: createTableInit},
 	{table: dbx.Table{Schema: catalogSchema, Table: "log"}, create: createTableLog},
 	{table: dbx.Table{Schema: catalogSchema, Table: "maintenance"}, create: createTableMaintenance},
@@ -239,6 +244,23 @@ func createTableAuth(tx pgx.Tx) error {
 	return nil
 }
 
+func createTableConfig(tx pgx.Tx) error {
+	q := "CREATE TABLE " + catalogSchema + ".config (" +
+		"parameter text PRIMARY KEY, " +
+		"value text NOT NULL)"
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("creating table "+catalogSchema+".config: %w", err)
+	}
+	q = "INSERT INTO " + catalogSchema + ".config (parameter, value) VALUES " +
+		"('external_sql_folio', 'refs/tags/v1.8.0'), " +
+		"('external_sql_reshare', 'refs/tags/20230912004531'), " +
+		"('kafka_sync_concurrency', '1');"
+	if _, err := tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("writing to table "+catalogSchema+".config: %w", err)
+	}
+	return nil
+}
+
 func createTableInit(tx pgx.Tx) error {
 	q := "CREATE TABLE " + catalogSchema + ".init (" +
 		"dbversion integer NOT NULL)"
@@ -302,6 +324,7 @@ func createTableSource(tx pgx.Tx) error {
 		"tablestopfilter text, " +
 		"trimschemaprefix text, " +
 		"addschemaprefix text, " +
+		"map_public_schema text, " +
 		"module text, " +
 		"sync smallint NOT NULL DEFAULT 1)"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {

@@ -14,14 +14,10 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-const DatabaseVersion = 27
+const DatabaseVersion = 28
 
 // MetadbVersion is defined at build time via -ldflags.
 var MetadbVersion = ""
-
-var DefaultFolioVersion = "refs/tags/v1.8.0"
-var FolioVersion = ""
-var DefaultReshareVersion = "refs/tags/20230912004531"
 
 const MaximumTypeSizeIndex = 2500
 
@@ -45,20 +41,8 @@ func UserPerm(relist *RegexList, table *dbx.Table) bool {
 	return false
 }
 
-func GetFolioVersion() string {
-	if FolioVersion == "" {
-		return DefaultFolioVersion
-	} else {
-		return FolioVersion
-	}
-}
-
-func GetReshareVersion() string {
-	return DefaultReshareVersion
-}
-
 func GetMetadbVersion() string {
-	return MetadbVersion + " (folio=" + GetFolioVersion() + " reshare=" + GetReshareVersion() + ")"
+	return MetadbVersion
 }
 
 func ConfigFileName(datadir string) string {

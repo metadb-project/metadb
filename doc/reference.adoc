@@ -295,6 +295,34 @@ of certain tables.
 |Wall-clock time in seconds of the last completed update process
 |===
 
+=== Configuration parameters
+
+[.aqua-background]#Metadb 1.4#
+
+==== external_sql_folio
+
+The `external_sql_folio` parameter sets the Git reference in the
+folio-analytics repository to be used for running external SQL.
+
+For example:
+
+----
+ALTER SYSTEM SET external_sql_folio = 'refs/tags/v1.8.0';
+----
+
+==== external_sql_reshare
+
+The `external_sql_reshare` parameter sets the Git reference in the
+folio-reshare repository to be used for running external SQL.
+
+==== kafka_sync_concurrency
+
+The `kafka_sync_concurrency` parameter sets the number of concurrent
+Kafka consumers that will run simultaneously during data source
+synchronization.  The default is 1.  At present the recommended value
+is 1.  This parameter requires restarting the server before it will
+take effect.
+
 === External SQL directives
 
 Metadb allows scheduling external SQL files to run on a regular basis.
@@ -390,6 +418,44 @@ Change the consumer group:
 
 ----
 ALTER DATA SOURCE sensor OPTIONS (SET consumergroup 'metadb_sensor_1');
+----
+
+==== ALTER SYSTEM
+
+[.aqua-background]#Metadb 1.4#
+
+Change a server configuration parameter
+
+[source,subs="verbatim,quotes"]
+----
+ALTER SYSTEM SET `*_configuration_parameter_*` = `*_value_*`
+----
+
+[discrete]
+===== Description
+
+`ALTER SYSTEM` changes a server configuration parameter setting.  Some
+parameters require restarting the server before they will take effect.
+See *Reference > Configuration parameters* for documentation of
+available parameters.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_configuration_parameter_*`
+|Name of a configuration parameter.
+
+|`*_value_*`
+|New value of the parameter.  This is always a string constant.
+|===
+
+[discrete]
+===== Examples
+
+----
+ALTER SYSTEM SET kafka_sync_concurrency = '1';
 ----
 
 ==== ALTER TABLE
@@ -673,6 +739,11 @@ has completed, the Metadb server can be started again.
 
 |`addschemaprefix`
 |Prefix to add to schema names.
+
+|`map_public_schema`
+|Set a new target schema for tables originating in the `public`
+schema.  If this is set, `addschemaprefix` will not be added to the
+target schema.
 
 |`module`
 |Name of pre-defined configuration.
@@ -986,6 +1057,10 @@ other variables.
 |`*_name_*`
 |
 |
+
+|
+|`config`
+|Server configuration parameter settings.
 
 |
 |`data_mappings`

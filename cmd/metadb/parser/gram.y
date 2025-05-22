@@ -15,6 +15,7 @@ import (
 	pass bool
 }
 
+%type <node> alter_system_stmt
 %type <node> deregister_user_stmt
 %type <node> register_user_stmt
 %type <node> top_level_stmt stmt
@@ -40,6 +41,7 @@ import (
 %token FUNCTION
 %token REGISTER
 %token SELECT
+%token SYSTEM
 %token TABLE
 %token CONSISTENCY
 %token CREATE GRANT REVOKE ACCESS ALTER DATA SOURCE ORIGIN OPTIONS USER
@@ -72,6 +74,10 @@ top_level_stmt:
 
 stmt:
 	select_stmt
+		{
+			$$ = $1
+		}
+	| alter_system_stmt
 		{
 			$$ = $1
 		}
@@ -178,6 +184,12 @@ select_stmt:
 		{
 			yylex.(*lexer).pass = true
 			$$ = &ast.SelectStmt{}
+		}
+
+alter_system_stmt:
+	ALTER SYSTEM SET name '=' SLITERAL ';'
+		{
+			$$ = &ast.AlterSystemStmt{ConfigParameter: $4, Value: $6}
 		}
 
 create_data_source_stmt:
