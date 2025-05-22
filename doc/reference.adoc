@@ -742,8 +742,8 @@ has completed, the Metadb server can be started again.
 
 |`map_public_schema`
 |Set a new target schema for tables originating in the `public`
-schema.  If this is set, `addschemaprefix` will not be added to the
-target schema.
+schema.  For these tables, `addschemaprefix` will not be added to the
+target schema if `map_public_schema` is set.
 
 |`module`
 |Name of pre-defined configuration.
