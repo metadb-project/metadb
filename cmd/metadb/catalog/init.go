@@ -318,12 +318,12 @@ func createTableSource(tx pgx.Tx) error {
 		"brokers text, " +
 		"security text, " +
 		"topics text, " +
-		"consumergroup text, " +
-		"schemapassfilter text, " +
-		"schemastopfilter text, " +
-		"tablestopfilter text, " +
-		"trimschemaprefix text, " +
-		"addschemaprefix text, " +
+		"consumer_group text, " +
+		"schema_pass_filter text, " +
+		"schema_stop_filter text, " +
+		"table_stop_filter text, " +
+		"trim_schema_prefix text, " +
+		"add_schema_prefix text, " +
 		"map_public_schema text, " +
 		"module text, " +
 		"sync smallint NOT NULL DEFAULT 1)"

@@ -429,54 +429,6 @@ func encodeRow(buffer []byte, rows pgx.Rows, cols []pgconn.FieldDescription) ([]
 	return row.Encode(buffer)
 }
 
-func createDataSource(conn net.Conn, node *ast.CreateDataSourceStmt, dc *pgx.Conn) error {
-	exists, err := sourceExists(dc, node.DataSourceName)
-	if err != nil {
-		return fmt.Errorf("selecting data source: %w", err)
-	}
-	if exists {
-		return fmt.Errorf("data source %q already exists", node.DataSourceName)
-	}
-
-	var count int64
-	q := "SELECT count(*) FROM metadb.source"
-	err = dc.QueryRow(context.TODO(), q).Scan(&count)
-	if err != nil {
-		return fmt.Errorf("checking number of configured sources: %w", err)
-	}
-	if count > 0 {
-		return fmt.Errorf("multiple sources not currently supported")
-	}
-
-	name := node.DataSourceName
-	if node.TypeName != "kafka" {
-		return fmt.Errorf("invalid data source type %q", node.TypeName)
-	}
-	if node.Options == nil {
-		// return to client
-	}
-	src, err := createSourceOptions(node.Options)
-	if err != nil {
-		return err
-	}
-
-	q = "INSERT INTO metadb.source" +
-		"(name,brokers,security,topics,consumergroup,schemapassfilter,schemastopfilter,tablestopfilter,trimschemaprefix,addschemaprefix,map_public_schema,module,enable)" +
-		"VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)"
-	_, err = dc.Exec(context.TODO(), q,
-		name, src.Brokers, src.Security, strings.Join(src.Topics, ","), src.Group,
-		strings.Join(src.SchemaPassFilter, ","), strings.Join(src.SchemaStopFilter, ","),
-		strings.Join(src.TableStopFilter, ","), src.TrimSchemaPrefix, src.AddSchemaPrefix,
-		src.MapPublicSchema, src.Module, src.Enable)
-	if err != nil {
-		return fmt.Errorf("writing source configuration: %w", err)
-	}
-	return writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.CommandComplete{CommandTag: []byte("CREATE DATA SOURCE")},
-		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	})
-}
-
 func alterTable(conn net.Conn, node *ast.AlterTableStmt, dc *pgx.Conn) error {
 	// The only type currently supported is uuid.
 	columnType := strings.ToLower(node.Cmd.ColumnType)
@@ -546,30 +498,6 @@ func alterTable(conn net.Conn, node *ast.AlterTableStmt, dc *pgx.Conn) error {
 	})
 }
 
-func alterDataSource(conn net.Conn, node *ast.AlterDataSourceStmt, dc *pgx.Conn) error {
-	exists, err := sourceExists(dc, node.DataSourceName)
-	if err != nil {
-		return fmt.Errorf("selecting data source: %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("data source %q does not exist", node.DataSourceName)
-	}
-
-	err = alterSourceOptions(dc, node)
-	if err != nil {
-		return err
-	}
-
-	_ = writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server for data source changes to take effect"},
-	})
-
-	return writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.CommandComplete{CommandTag: []byte("ALTER DATA SOURCE")},
-		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	})
-}
-
 func dropDataSource(conn net.Conn, node *ast.DropDataSourceStmt, dc *pgx.Conn) error {
 	exists, err := sourceExists(dc, node.DataSourceName)
 	if err != nil {
@@ -593,143 +521,10 @@ func dropDataSource(conn net.Conn, node *ast.DropDataSourceStmt, dc *pgx.Conn) e
 	})
 }
 
-func alterSourceOptions(dc *pgx.Conn, node *ast.AlterDataSourceStmt) error {
-	for _, opt := range node.Options {
-		switch opt.Name {
-		case "brokers":
-			fallthrough
-		case "security":
-			fallthrough
-		case "topics":
-			fallthrough
-		case "consumergroup":
-			fallthrough
-		case "schemapassfilter":
-			fallthrough
-		case "schemastopfilter":
-			fallthrough
-		case "tablestopfilter":
-			fallthrough
-		case "trimschemaprefix":
-			fallthrough
-		case "addschemaprefix":
-			fallthrough
-		case "map_public_schema":
-			fallthrough
-		case "module":
-			// NOP
-		default:
-			return &dberr.Error{
-				Err: fmt.Errorf("invalid option %q", opt.Name),
-				Hint: "Valid options in this context are: " +
-					"brokers, security, topics, consumergroup, schemapassfilter, schemastopfilter, tablestopfilter, trimschemaprefix, addschemaprefix, map_public_schema, module",
-			}
-		}
-		isnull, err := isSourceOptionNull(dc, node.DataSourceName, opt.Name)
-		if err != nil {
-			return fmt.Errorf("reading source option: %w", err)
-		}
-		if opt.Action == "DROP" {
-			if isnull {
-				return fmt.Errorf("option %q not found", opt.Name)
-			}
-			err := updateSource(dc, node.DataSourceName, opt.Name, "NULL")
-			if err != nil {
-				return fmt.Errorf("unable to drop option %q", opt.Name)
-			}
-		}
-		if opt.Action == "SET" {
-			if isnull {
-				return fmt.Errorf("option %q not found", opt.Name)
-			}
-			err := updateSource(dc, node.DataSourceName, opt.Name, "'"+opt.Val+"'")
-			if err != nil {
-				return fmt.Errorf("unable to set option %q", opt.Name)
-			}
-		}
-		if opt.Action == "ADD" {
-			if !isnull {
-				return fmt.Errorf("option %q provided more than once", opt.Name)
-			}
-			err := updateSource(dc, node.DataSourceName, opt.Name, "'"+opt.Val+"'")
-			if err != nil {
-				return fmt.Errorf("unable to add option %q", opt.Name)
-			}
-		}
-	}
-
-	return nil
-}
-
-func isSourceOptionNull(dc *pgx.Conn, sourceName, optionName string) (bool, error) {
-	var val *string
-	q := "SELECT " + optionName + " FROM metadb.source WHERE name='" + sourceName + "'"
-	err := dc.QueryRow(context.TODO(), q).Scan(&val)
-	switch {
-	case err == pgx.ErrNoRows:
-		return false, fmt.Errorf("data source %q does not exist", sourceName)
-	case err != nil:
-		return false, fmt.Errorf("reading data source: %w", err)
-	default:
-		return val == nil, nil
-	}
-}
-
 func updateSource(dc *pgx.Conn, sourceName, optionName, valueText string) error {
 	q := "UPDATE metadb.source SET " + optionName + "=" + valueText + " WHERE name='" + sourceName + "'"
 	_, err := dc.Exec(context.TODO(), q)
 	return err
-}
-
-func createSourceOptions(options []ast.Option) (*sysdb.SourceConnector, error) {
-	err := checkOptionDuplicates(options)
-	if err != nil {
-		return nil, err
-	}
-	s := &sysdb.SourceConnector{
-		// Set default values
-		Enable:           true,
-		Security:         "ssl",
-		Topics:           []string{},
-		SchemaPassFilter: []string{},
-		SchemaStopFilter: []string{},
-		TableStopFilter:  []string{},
-	}
-	for _, opt := range options {
-		switch strings.ToLower(opt.Name) {
-		case "brokers":
-			s.Brokers = opt.Val
-		case "security":
-			s.Security = opt.Val
-		case "topics":
-			s.Topics = strings.Split(opt.Val, ",")
-		case "consumergroup":
-			s.Group = opt.Val
-		case "schemapassfilter":
-			s.SchemaPassFilter = strings.Split(opt.Val, ",")
-		case "schemastopfilter":
-			s.SchemaStopFilter = strings.Split(opt.Val, ",")
-		case "tablestopfilter":
-			s.TableStopFilter = strings.Split(opt.Val, ",")
-		case "trimschemaprefix":
-			s.TrimSchemaPrefix = opt.Val
-		case "addschemaprefix":
-			s.AddSchemaPrefix = opt.Val
-		case "map_public_schema":
-			s.MapPublicSchema = opt.Val
-		//case "enable":
-		//	s.Enable = (strings.ToLower(opt.Val) == "true")
-		case "module":
-			s.Module = opt.Val
-		default:
-			return nil, &dberr.Error{
-				Err: fmt.Errorf("invalid option %q", opt.Name),
-				Hint: "Valid options in this context are: " +
-					"brokers, security, topics, consumergroup, schemapassfilter, schemastopfilter, tablestopfilter, trimschemaprefix, addschemaprefix, map_public_schema, module",
-			}
-		}
-	}
-	return s, nil
 }
 
 func checkOptionDuplicates(options []ast.Option) error {

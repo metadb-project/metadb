@@ -45,12 +45,12 @@ func list(conn net.Conn, node *ast.ListStmt, dc *pgx.Conn, sources *[]*sysdb.Sou
 			"       brokers,"+
 			"       security,"+
 			"       topics,"+
-			"       consumergroup,"+
-			"       schemapassfilter,"+
-			"       schemastopfilter,"+
-			"       tablestopfilter,"+
-			"       trimschemaprefix,"+
-			"       addschemaprefix,"+
+			"       consumer_group,"+
+			"       schema_pass_filter,"+
+			"       schema_stop_filter,"+
+			"       table_stop_filter,"+
+			"       trim_schema_prefix,"+
+			"       add_schema_prefix,"+
 			"       map_public_schema,"+
 			"       module"+
 			"    FROM metadb.source"+
