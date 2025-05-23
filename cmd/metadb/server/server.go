@@ -282,7 +282,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 			path := "sql_metadb/derived_tables"
 			schema := "folio_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, ref, path, schema, source); err != nil {
-				log.Warning("runsql: %v: repository=%s ref=%s path=%s", err, url, ref, path)
+				log.Info("runsql: %v: repository=%s ref=%s path=%s", err, url, ref, path)
 				if tries >= 12 {
 					break
 				}
@@ -308,7 +308,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 			path := "reports"
 			schema := "report"
 			if err = sqlfunc.SQLFunc(datadir, cat, db, url, ref, path, schema, source); err != nil {
-				log.Warning("sqlfunc: %v: repository=%s ref=%s path=%s", err, url, ref, path)
+				log.Info("sqlfunc: %v: repository=%s ref=%s path=%s", err, url, ref, path)
 				if tries >= 12 {
 					break
 				}
@@ -334,7 +334,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 			path := "sql/derived_tables"
 			schema := "reshare_derived"
 			if err = runsql.RunSQL(datadir, cat, db, url, ref, path, schema, source); err != nil {
-				log.Warning("runsql: %v: repository=%s ref=%s path=%s", err, url, ref, path)
+				log.Info("runsql: %v: repository=%s ref=%s path=%s", err, url, ref, path)
 				if tries >= 12 {
 					break
 				}
