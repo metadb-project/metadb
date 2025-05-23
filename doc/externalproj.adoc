@@ -564,7 +564,7 @@ Support for transforming subfields and arrays is planned in Metadb.
 
 ===== Migrating historical data from LDP
 
-[.aqua-background]#Metadb 1.3#
+[.aqua-background]#Metadb 1.3# +
 Metadb can import legacy historical data from LDP.  The Metadb server
 must be stopped while this process runs.  As an example:
 

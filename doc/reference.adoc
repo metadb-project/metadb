@@ -164,7 +164,7 @@ Types also can be set manually via the `ALTER TABLE` command.
 |Returns recent log messages during the specified interval, or during
  the past 24 hours if no interval is given
 
-|`mdbusers()`
+|`mdbusers()` +
 [.aqua-background]#Metadb 1.4#
 |table (
     username text
@@ -438,6 +438,8 @@ ALTER SYSTEM SET `*_configuration_parameter_*` = `*_value_*`
 parameters require restarting the server before they will take effect.
 See *Reference > Configuration parameters* for documentation of
 available parameters.
+
+Configuration values can be displayed via the `LIST config` command.
 
 [discrete]
 ===== Parameters
@@ -740,10 +742,11 @@ has completed, the Metadb server can be started again.
 |`addschemaprefix`
 |Prefix to add to schema names.
 
-|`map_public_schema`
+|`map_public_schema` +
+[.aqua-background]#Metadb 1.4#
 |Set a new target schema for tables originating in the `public`
-schema.  For these tables, `addschemaprefix` will not be added to the
-target schema if `map_public_schema` is set.
+ schema.  For these tables, `addschemaprefix` will not be added to the
+ target schema if `map_public_schema` is set.
 
 |`module`
 |Name of pre-defined configuration.

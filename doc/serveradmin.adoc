@@ -477,7 +477,7 @@ Metadb detects when snapshot data are no longer being received, and
 then writes "source snapshot complete (deadline exceeded)" to the log.
 This generally means it is a good time to run "endsync".
 +
-[.aqua-background]#Metadb 1.4#
+[.aqua-background]#Metadb 1.4# +
 The snapshot status is also available via the `LIST status` command.
 
 5. Start the server.
