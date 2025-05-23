@@ -417,7 +417,7 @@ See CREATE DATA SOURCE
 Change the consumer group:
 
 ----
-ALTER DATA SOURCE sensor OPTIONS (SET consumergroup 'metadb_sensor_1');
+ALTER DATA SOURCE sensor OPTIONS (SET consumer_group 'metadb_sensor_1');
 ----
 
 ==== ALTER SYSTEM
@@ -721,32 +721,32 @@ has completed, the Metadb server can be started again.
 |Regular expressions matching Kafka topics to read (comma-separated
  list).
 
-|`consumergroup`
+|`consumer_group`
 |Kafka consumer group ID.
 
-|`schemapassfilter`
+|`schema_pass_filter`
 |Regular expressions matching schema names to accept (comma-separated
  list).
 
-|`schemastopfilter`
+|`schema_stop_filter`
 |Regular expressions matching schema names to ignore (comma-separated
  list).
 
-|`tablestopfilter`
+|`table_stop_filter`
 |Regular expressions matching table names to ignore (comma-separated
  list).
 
-|`trimschemaprefix`
+|`trim_schema_prefix`
 |Prefix to remove from schema names.
 
-|`addschemaprefix`
+|`add_schema_prefix`
 |Prefix to add to schema names.
 
 |`map_public_schema` +
 [.aqua-background]#Metadb 1.4#
 |Set a new target schema for tables originating in the `public`
- schema.  For these tables, `addschemaprefix` will not be added to the
- target schema if `map_public_schema` is set.
+ schema.  For these tables, `add_schema_prefix` will not be added to
+ the target schema if `map_public_schema` is set.
 
 |`module`
 |Name of pre-defined configuration.
@@ -761,9 +761,9 @@ Create `sensor` as a `kafka` data source:
 CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
     brokers 'kafka:29092',
     topics '^metadb_sensor_1\.',
-    consumergroup 'metadb_sensor_1_1',
-    addschemaprefix 'sensor_',
-    tablestopfilter '^testing\.air_temp$,^testing\.air_temp_avg$'
+    consumer_group 'metadb_sensor_1_1',
+    add_schema_prefix 'sensor_',
+    table_stop_filter '^testing\.air_temp$,^testing\.air_temp_avg$'
 );
 ----
 

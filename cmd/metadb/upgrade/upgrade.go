@@ -417,6 +417,7 @@ var updbList = []updbFunc{
 	updb26,
 	updb27,
 	updb28,
+	updb29,
 }
 
 func updb8(opt *dbopt) error {
@@ -1979,6 +1980,53 @@ func updb28(opt *dbopt) error {
 	}
 
 	if err = metadata.WriteDatabaseVersion(tx, 28); err != nil {
+		return util.PGErr(err)
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
+		return util.PGErr(err)
+	}
+	return nil
+}
+
+func updb29(opt *dbopt) error {
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return util.PGErr(err)
+	}
+	defer dbx.Rollback(tx)
+
+	q := "ALTER TABLE metadb.source RENAME COLUMN consumergroup TO consumer_group"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "ALTER TABLE metadb.source RENAME COLUMN schemapassfilter TO schema_pass_filter"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "ALTER TABLE metadb.source RENAME COLUMN schemastopfilter TO schema_stop_filter"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "ALTER TABLE metadb.source RENAME COLUMN tablestopfilter TO table_stop_filter"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "ALTER TABLE metadb.source RENAME COLUMN trimschemaprefix TO trim_schema_prefix"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+	q = "ALTER TABLE metadb.source RENAME COLUMN addschemaprefix TO add_schema_prefix"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return err
+	}
+
+	if err = metadata.WriteDatabaseVersion(tx, 29); err != nil {
 		return util.PGErr(err)
 	}
 	if err = tx.Commit(context.TODO()); err != nil {

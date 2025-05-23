@@ -325,8 +325,8 @@ It is recommended to use the connector configuration settings
 `heartbeat.interval.ms` and `heartbeat.action.query` as above to avoid
 spikes in disk space consumption within the source database.  (See the
 Debezium PostgreSQL connector documentation for more details.)  The
-`schemastopfilter` option of the `CREATE DATA SOURCE` command is used
-to filter out the heartbeat table.
+`schema_stop_filter` option of the `CREATE DATA SOURCE` command is
+used to filter out the heartbeat table.
 
 In the source database:
 
@@ -379,9 +379,9 @@ statement, for example:
 CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
     brokers 'kafka:29092',
     topics '^metadb_sensor_1\.',
-    consumergroup 'metadb_sensor_1_1',
-    addschemaprefix 'sensor_',
-    schemastopfilter 'admin'
+    consumer_group 'metadb_sensor_1_1',
+    add_schema_prefix 'sensor_',
+    schema_stop_filter 'admin'
 );
 ----
 
@@ -435,13 +435,13 @@ be slower than usual, and there temporarily may be missing records
 the source database).  Also, periodic transforms and external SQL are
 paused during synchronization.
 
-1. Update the `topics` and `consumergroup` configuration settings for
+1. Update the `topics` and `consumer_group` configuration settings for
    the new data stream.
 +
 [source]
 ----
 ALTER DATA SOURCE sensor OPTIONS
-    (SET topics '^metadb_sensor_2\.', SET consumergroup 'metadb_sensor_2_1');
+    (SET topics '^metadb_sensor_2\.', SET consumer_group 'metadb_sensor_2_1');
 ----
 +
 *Do not restart the Metadb server but continue directly to Step 2.*
@@ -539,7 +539,7 @@ not started until the changes have been reversed.
 
 2. Any new database objects should be created in a new schema that
 will not coincide with a schema that may be created by Metadb.  This
-can be ensured by always setting `addschemaprefix` in data source
+can be ensured by always setting `add_schema_prefix` in data source
 configurations and avoiding names with those prefixes when creating a
 new schema.
 

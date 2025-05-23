@@ -20,8 +20,8 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 	var rows pgx.Rows
 	rows, err = dbc.Query(context.TODO(), ""+
 		"SELECT name,enable,coalesce(brokers,''),coalesce(security,''),coalesce(topics,''),"+
-		"coalesce(consumergroup,''),coalesce(schemapassfilter,''),coalesce(schemastopfilter,''),"+
-		"coalesce(tablestopfilter,''),coalesce(trimschemaprefix,''),coalesce(addschemaprefix,''),"+
+		"coalesce(consumer_group,''),coalesce(schema_pass_filter,''),coalesce(schema_stop_filter,''),"+
+		"coalesce(table_stop_filter,''),coalesce(trim_schema_prefix,''),coalesce(add_schema_prefix,''),"+
 		"coalesce(map_public_schema,''),coalesce(module,'') FROM metadb.source")
 	if err != nil {
 		return nil, err
@@ -32,16 +32,16 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 		var name, brokers, security string
 		var enable bool
 		var topics string
-		var consumergroup string
-		var schemapassfilter string
-		var schemastopfilter string
-		var tablestopfilter string
-		var trimschemaprefix string
-		var addschemaprefix string
+		var consumerGroup string
+		var schemaPassFilter string
+		var schemaStopFilter string
+		var tableStopFilter string
+		var trimSchemaPrefix string
+		var addSchemaPrefix string
 		var mapPublicSchema string
 		var module string
-		if err := rows.Scan(&name, &enable, &brokers, &security, &topics, &consumergroup, &schemapassfilter,
-			&schemastopfilter, &tablestopfilter, &trimschemaprefix, &addschemaprefix, &mapPublicSchema,
+		if err := rows.Scan(&name, &enable, &brokers, &security, &topics, &consumerGroup, &schemaPassFilter,
+			&schemaStopFilter, &tableStopFilter, &trimSchemaPrefix, &addSchemaPrefix, &mapPublicSchema,
 			&module); err != nil {
 			return nil, err
 		}
@@ -54,12 +54,12 @@ func ReadSourceConnectors(db *dbx.DB) ([]*SourceConnector, error) {
 			Brokers:          brokers,
 			Security:         security,
 			Topics:           strings.Split(topics, ","),
-			Group:            consumergroup,
-			SchemaPassFilter: util.SplitList(schemapassfilter),
-			SchemaStopFilter: util.SplitList(schemastopfilter),
-			TableStopFilter:  util.SplitList(tablestopfilter),
-			TrimSchemaPrefix: trimschemaprefix,
-			AddSchemaPrefix:  addschemaprefix,
+			Group:            consumerGroup,
+			SchemaPassFilter: util.SplitList(schemaPassFilter),
+			SchemaStopFilter: util.SplitList(schemaStopFilter),
+			TableStopFilter:  util.SplitList(tableStopFilter),
+			TrimSchemaPrefix: trimSchemaPrefix,
+			AddSchemaPrefix:  addSchemaPrefix,
 			MapPublicSchema:  mapPublicSchema,
 			Module:           module,
 		})
