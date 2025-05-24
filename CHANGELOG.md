@@ -1,10 +1,4 @@
-# v1.4.0-pre2
-
-* Kafka reader concurrency has been temporarily disabled.
-
-* The folio-analytics tag has been updated to v1.7.15.
-
-# v1.4.0-pre1
+# v1.4.0
 
 * JSON transformation has been extended to include objects and arrays,
   and it is now disabled by default in new installations.  The `CREATE
@@ -15,6 +9,11 @@
 * New commands `GRANT` and `REVOKE` improve support for managing user
   privileges.
 
+* A new command `DROP USER` supports removing users.
+
+* New commands `ALTER SYSTEM` and `LIST config` support defining and
+  viewing server configuration parameters.
+
 * A new command `CREATE SCHEMA` supports creating a user schema for an
   existing user.
 
@@ -23,20 +22,15 @@
 
 * A new function `mdbusers()` lists registered users.
 
-* A new command `DROP USER` supports removing users.
+* A new data source option `map_public_schema` supports changing the
+  schema name of tables that originate in the `public` schema.
 
-* The `METADB_FOLIO` environment variable can now be defined when
-  building Metadb to override the default folio reference, for
-  example:
-
-  ```
-  METADB_FOLIO="refs/tags/v1.7.7" ./build
-  ```
-
-* The command `CREATE DATA MAPPING` no longer requires restarting the
-  server before it takes effect.
+* The commands `CREATE DATA MAPPING` and `CREATE DATA ORIGIN` no
+  longer require restarting the server before they take effect.
 
 * The compilation script `build.sh` has been renamed to `build`.
+
+* The folio-analytics tag has been updated to v1.8.0.
 
 * Go 1.24 is now required to build Metadb.
 
