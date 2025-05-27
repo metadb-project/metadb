@@ -1,4 +1,4 @@
-# v1.4.0
+# v1.4.0-rc1
 
 * JSON transformation has been extended to include objects and arrays,
   and it is now disabled by default in new installations.  The `CREATE
