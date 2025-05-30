@@ -2,28 +2,17 @@
 
 === System requirements
 
-These are minimum system requirements.  They are based on the systems
-that Metadb has been tested with recently or is believed to work with.
-
 ==== Hardware requirements
 
-* Metadb:
-** Architecture: x86-64 (AMD64)
-** CPU: 2 cores
-** Memory: 1 GB
-** Local storage: 500 GB SSD
-* PostgreSQL:
-** CPU: 4 cores
-** Memory: 32 GB
-** Storage: 2 TB SSD
+* Architecture: x86-64 (AMD64)
+* Memory: 1 GB
 
 ==== Software requirements
 
-* Operating system: https://www.debian.org/[Debian] Linux
+* Operating system: Linux
 * Database system: https://www.postgresql.org/[PostgreSQL] 15 or later
 * To build from source:
-** https://go.dev/[Go] 1.24
-** https://pkg.go.dev/golang.org/x/tools/cmd/goyacc[goyacc] (see installation instructions below)
+** https://go.dev/[Go] 1.24 or later
 ** https://www.colm.net/open-source/ragel/[Ragel] 6
 ** https://gcc.gnu.org/[GCC C compiler] 9 or later
 ** https://www.gnu.org/software/bash/[bash]
@@ -60,19 +49,24 @@ specify a path that can serve as the build workspace for Go, e.g.:
 export GOPATH=$HOME/go
 ----
 
-Then install goyacc:
+Clone the repository and check out the `latest` tag, which retrieves
+the latest stable version:
 
-[source,bash]
 ----
-go install golang.org/x/tools/cmd/goyacc@master
-
-export PATH=$PATH:$GOPATH/bin
+git clone https://github.com/metadb-project/metadb.git -b latest
 ----
 
-Then to build the server:
+Or alternatively specify a desired version, for example:
 
-[source,bash]
 ----
+git clone https://github.com/metadb-project/metadb.git -b v1.4.0
+----
+
+Then build the server:
+
+----
+cd metadb
+
 ./build
 ----
 
