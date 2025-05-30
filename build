@@ -74,7 +74,7 @@ fi
 
 mkdir -p $bindir
 
-version=`git describe --tags --always`
+version=`git describe --always`
 
 go build -o $bindir $v $tags -ldflags "-X github.com/metadb-project/metadb/cmd/metadb/util.MetadbVersion=$version" ./cmd/metadb
 
