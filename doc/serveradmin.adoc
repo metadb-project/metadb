@@ -4,25 +4,19 @@
 
 ==== Hardware requirements
 
-* Metadb software:
-** Architecture: x86-64 (AMD64)
-** CPU: 2 cores
-** Memory: 1 GB
-** Local storage: 500 GB SSD
-* PostgreSQL database:
-** CPU: 4 cores
-** Memory: 32 GB
-** Storage: 2 TB SSD
+* Architecture: x86-64 (AMD64)
+* Memory: 1 GB
 
 ==== Software requirements
 
-* Operating system: https://www.debian.org[Debian] 12 or later
-* https://www.postgresql.org/[PostgreSQL] 15 or later
-* Required to build from source:
-** https://golang.org/[Go] 1.21 or later
-** goyacc (installation instructions below)
-** https://www.colm.net/open-source/ragel/[Ragel] 6.10 or later
-** https://gcc.gnu.org/[GCC C compiler] 9.3.0 or later
+* Operating system: Linux
+* Database system: https://www.postgresql.org/[PostgreSQL] 15 or later
+* To build from source, these may have to be installed:
+** https://go.dev/[Go] 1.24 or later
+** https://www.colm.net/open-source/ragel/[Ragel] 6
+** https://gcc.gnu.org/[GCC C compiler] 9 or later
+** https://pkg.go.dev/golang.org/x/tools/cmd/goyacc[goyacc] (required
+   for Metadb 1.3 or earlier; see installation instructions below)
 
 ==== PostgreSQL configuration
 
@@ -45,54 +39,91 @@
 
 === Building the software
 
-First set the `GOPATH` environment variable to specify a path that can serve as
-the build workspace for Go, e.g.:
+It is suggested that a `metadb` user be created and the server run by
+that user, for example, in `/home/metadb`.
+
+To build Metadb, first set the `GOPATH` environment variable to
+specify a path that can serve as the build workspace for Go, e.g.:
 
 [source,bash]
 ----
 export GOPATH=$HOME/go
 ----
 
-Then install goyacc:
+For Metadb 1.3 or earlier, install goyacc:
 
-[source,bash]
 ----
 go install golang.org/x/tools/cmd/goyacc@master
 
 export PATH=$PATH:$GOPATH/bin
 ----
 
-Then to build the server:
+Now we can clone the Metadb source code repository and check out the
+`latest` tag, which retrieves the latest stable version:
 
-[source,bash]
 ----
+git clone https://github.com/metadb-project/metadb.git -b latest
+----
+
+Or alternatively specify a desired version, for example:
+
+----
+git clone https://github.com/metadb-project/metadb.git -b v1.4.0
+----
+
+Then compile the server by running the build script:
+
+----
+cd metadb
+
 ./build.sh
 ----
 
-The `build.sh` script creates a `bin/` subdirectory and builds the `metadb`
-executable there:
+NOTE: In Metadb 1.4, `build.sh` has been renamed to `build`.
+
+The build script creates a `bin/` subdirectory and creates the
+`metadb` executable there:
 
 [source,bash]
 ----
 ./bin/metadb help
 ----
 
-It is suggested that a `metadb` user be created and the server run by that
-user, for example, in `/home/metadb`.
+In general running `metadb` takes the form:
+
+----
+metadb <command> <arguments>
+----
+
+Some typical commands are:
+
+* `init` initializes a new Metadb instance
+* `start` starts the server
+* `stop` shuts down the server
+* `upgrade` upgrades a Metadb instance to the current version
+* `sync` begins synchronization with a data source
+* `endsync` ends synchronization and cleans up stale data
+* `version` prints the Metadb version
+
+For more infomation about a specific command:
+
+----
+metadb help <command>
+----
 
 === Server configuration
 
-Metadb makes use of local storage in a *data directory* which is created using
-`metadb` with the `init` command.  In this example we will create the data
-directory as `data/`:
+Metadb makes use of local storage in a *data directory* which is
+created using `metadb` with the `init` command.  In this example we
+will create the data directory as `data/`:
 
 [source,bash]
 ----
 metadb init -D data
 ----
 
-This will also create a file `metadb.conf` in the data directory with the
-following structure:
+This will also create a file `metadb.conf` in the data directory with
+the following structure:
 
 [source,subs="verbatim,quotes"]
 ----
@@ -107,10 +138,11 @@ systemuser_password = _password of systemuser_
 sslmode = _should be set to "require" or stronger option_
 ----
 
-Metadb expects the database name to be `metadb` or to begin with `metadb_`;
-otherwise it logs a warning message.
+Metadb expects the database name to be `metadb` or to begin with
+`metadb_`; otherwise it logs a warning message.
 
-This file should be edited to add database connection parameters, for example:
+This file should be edited to add database connection parameters, for
+example:
 
 [source,subs="verbatim,quotes"]
 ----
@@ -125,30 +157,35 @@ systemuser_password = ZHivGie5juxGJZmTObHU
 sslmode = require
 ----
 
-Metadb will assume that the database, superuser, and systemuser defined here
-already exist; so they should be created before continuing.
+Metadb will assume that the database, superuser, and systemuser
+defined here already exist; so they should be created before
+continuing.
 
 === Backups
 
-*It is essential to make regular backups of Metadb and to test the backups.*
+IMPORTANT: It is essential to make regular backups and to test the
+backups.
 
-In general persistent data are stored in the database, and so the database
+Most persistent data are stored in the database, and so the database
 should be backed up often.
 
-The data directory contains the `metadb.conf` configuration file and is also
-used for temporary storage.  The `metadb.conf` file should be backed up.
+The data directory contains the `metadb.conf` configuration file and
+is also used for temporary storage.  The `metadb.conf` file should be
+backed up.
 
 === Upgrading from a previous version
 
-To upgrade from any previous version of Metadb, stop the server (if running),
-and then run the upgrade process in case changes are required:
+To upgrade from any previous version of Metadb, stop the server (if
+running), and then run the upgrade process in case changes are
+required:
 
 ----
 metadb upgrade -D data
 ----
 
-The upgrade process may, in some instances, take a significant amount of time
-to run.  The database generally remains available to users during this period.
+The upgrade process may, in some instances, take a significant amount
+of time to run.  The database generally remains available to users
+during this period.
 
 If no changes are needed, the process outputs:
 
@@ -165,16 +202,16 @@ To start the server:
 nohup metadb start -D data -l metadb.log &
 ----
 
-The `--memlimit` option can be used to set a soft memory limit (in GiB) if
-needed, for example:
+The `--memlimit` option can be used to set a soft memory limit (in
+GiB) if needed, for example:
 
 [source,bash]
 ----
 nohup metadb start -D data -l metadb.log --memlimit 2 &
 ----
 
-The server listens on port 8550 by default, but this can be set using the
-`--port` option.  The `--debug` option enables verbose logging.
+The server listens on port 8550 by default, but this can be set using
+the `--port` option.  The `--debug` option enables verbose logging.
 
 To stop the server:
 
@@ -183,8 +220,8 @@ To stop the server:
 metadb stop -D data
 ----
 
-Note that stopping or restarting the server may delay scheduled data updates or
-cause them to restart.
+Note that stopping or restarting the server may delay scheduled data
+updates or cause them to restart.
 
 The server can be set up to run with systemd via a file such as
 `/etc/systemd/system/metadb.service`, for example:
@@ -215,8 +252,9 @@ systemctl start metadb
 
 === Connecting to the server
 
-The PostgreSQL terminal-based client, `psql`, is used to connect to a Metadb
-server that runs on the same host and listens on a specified port:
+The PostgreSQL terminal-based client, `psql`, is used to connect to a
+Metadb server that runs on the same host and listens on a specified
+port:
 
 ----
 psql -X -h localhost -d metadb -p <port>
@@ -228,16 +266,22 @@ For example:
 psql -X -h localhost -d metadb -p 8550
 ----
 
-See *Reference > Statements* for commands that can be issued via `psql`.
+See *Reference > Statements* for commands that can be issued via
+`psql`.
+
+Note that the Metadb server is not a database system, but only
+implements part of the PostgreSQL communication protocol sufficient to
+allow `psql` to be used as a client.
 
 === Configuring a Kafka data source
 
 ==== Overview
 
-Metadb currently supports reading Kafka messages in the format produced by the
-Debezium PostgreSQL connector for Kafka Connect.  Configuration of Kafka, Kafka
-Connect, Debezium, and PostgreSQL logical decoding is beyond the scope of this
-documentation, but a few notes are included here.
+Metadb currently supports reading Kafka messages in the format
+produced by the Debezium PostgreSQL connector for Kafka Connect.
+Configuration of Kafka, Kafka Connect, Debezium, and PostgreSQL
+logical decoding is beyond the scope of this documentation, but a few
+notes are included here.
 
 Data flow in this direction:
 
@@ -249,14 +293,14 @@ Data flow in this direction:
 
 ==== Creating a connector
 
-To allow capturing data changes in the source PostgreSQL database, logical
-decoding has to be enabled, in particular by setting `wal_level = logical` in
-`postgresql.conf`.
+To allow capturing data changes in the source PostgreSQL database,
+logical decoding has to be enabled, in particular by setting
+`wal_level = logical` in `postgresql.conf` for the source database.
 
 Note that timeout settings in the source database such as
-`idle_in_transaction_session_timeout` can cause the connector to fail, if a
-timeout occurs while the connector is taking an initial snapshot of the
-database.
+`idle_in_transaction_session_timeout` can cause the connector to fail,
+if a timeout occurs while the connector is taking an initial snapshot
+of the database.
 
 Next we create a connector configuration file for Kafka Connect:
 
@@ -283,11 +327,11 @@ Next we create a connector configuration file for Kafka Connect:
 ----
 
 It is recommended to use the connector configuration settings
-`heartbeat.interval.ms` and `heartbeat.action.query` as above to avoid spikes
-in disk space consumption within the source database.  (See the Debezium
-PostgreSQL connector documentation for more details.)  The `schemastopfilter`
-option of the `CREATE DATA SOURCE` command is used to filter out the heartbeat
-table.
+`heartbeat.interval.ms` and `heartbeat.action.query` as above to avoid
+spikes in disk space consumption within the source database.  (See the
+Debezium PostgreSQL connector documentation for more details.)  The
+`schema_stop_filter` option of the `CREATE DATA SOURCE` command is
+used to filter out the heartbeat table.
 
 In the source database:
 
@@ -306,55 +350,56 @@ curl -X POST -i -H "Accept: application/json" -H "Content-Type: application/json
      -d @connector.json https://kafka.connect.server/connectors
 ----
 
-Note the `1` included in `name` and `database.server.name` in the connector
-configuration.  This is suggested as a version number, which can be incremented
-if the data stream needs to be resynchronized with a new connector.
+Note the `1` included in `name` and `database.server.name` in the
+connector configuration.  This is suggested as a version number, which
+can be incremented if the data stream needs to be resynchronized with
+a new connector.
 
-Metadb requires all streamed tables to have a primary key defined.  Tables that
-do not meet this requirement should be filtered out in the Debezium PostgreSQL
-connector configuration by setting `schema.exclude.list` or
-`table.exclude.list`.  Otherwise they will generate error messages in the
-Metadb log.
+Metadb requires all streamed tables to have a primary key defined.
+Tables that do not meet this requirement should be filtered out in the
+Debezium PostgreSQL connector configuration by setting
+`schema.exclude.list` or `table.exclude.list`.  Otherwise they will
+generate error messages in the Metadb log.
 
 ==== Monitoring replication
 
-*The replication slot disk usage must be monitored, because under certain error
-conditions it can grow too large and possibly fill up the disk.* To show the
-disk usage (in the source database):
+*The replication slot disk usage must be monitored, because under
+certain error conditions it can grow too large and possibly fill up
+the disk.* To show the disk usage (in the source database):
 
 ----
 select slot_name, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(),
     restart_lsn)) as replicationSlotLag, active from pg_replication_slots;
 ----
 
-*It is recommended to allocate plenty of extra disk space in the source
-database.*
+*It is recommended to allocate plenty of extra disk space in the
+source database.*
 
 ==== Creating the data source
 
-In Metadb, a data source is defined using the `CREATE DATA SOURCE` statement,
-for example:
+In Metadb, a data source is defined using the `CREATE DATA SOURCE`
+statement, for example:
 
 ----
 CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
     brokers 'kafka:29092',
     topics '^metadb_sensor_1\.',
-    consumergroup 'metadb_sensor_1_1',
-    addschemaprefix 'sensor_',
-    schemastopfilter 'admin'
+    consumer_group 'metadb_sensor_1_1',
+    add_schema_prefix 'sensor_',
+    schema_stop_filter 'admin'
 );
 ----
 
 ==== Initial synchronization
 
-[.aqua-background]#Metadb 1.2#
-When a new data source is first configured using `CREATE DATA SOURCE`, Metadb
-automatically puts the database into synchronizing mode, just as if `metadb
-sync` had been run (see *Server administration > Resynchronizing a data
-source*).  This has the effect of pausing periodic transforms and external SQL.
-When the initial snapshot has finished streaming, the message "source snapshot
-complete (deadline exceeded)" will be written to the log.  Then, to complete
-this first synchronization, stop the Metadb server, and after that run `metadb
+When a new data source is first configured using `CREATE DATA SOURCE`,
+Metadb automatically puts the database into synchronizing mode, just
+as if `metadb sync` had been run (see *Server administration >
+Resynchronizing a data source*).  This has the effect of pausing
+periodic transforms and external SQL.  When the initial snapshot has
+finished streaming, the message "source snapshot complete (deadline
+exceeded)" will be written to the log.  Then, to complete this first
+synchronization, stop the Metadb server, and after that run `metadb
 endsync`:
 
 [source,bash]
@@ -368,10 +413,10 @@ Once "endsync" has finished running, start the Metadb server.
 
 ==== Deleting a connection
 
-Sometimes a connection may have to be deleted and recreated (see *Server
-administration > Resynchronizing a data source*).  After deleting a connection,
-the replication slot and publication in the source database should be dropped
-using:
+Sometimes a connection may have to be deleted and recreated (see
+*Server administration > Resynchronizing a data source*).  After
+deleting a connection, the replication slot and publication in the
+source database should be dropped using:
 
 ----
 SELECT pg_drop_replication_slot('debezium');
@@ -381,39 +426,33 @@ DROP PUBLICATION dbz_publication;
 
 === Resynchronizing a data source
 
-If a Kafka data stream fails and cannot be resumed, it may be necessary to
-re-stream a complete snapshot of the data to Metadb.  For example, a source
-database may become unsynchronized with the analytic database, requiring a new
-snapshot of the source database to be streamed.  Metadb can accept re-streamed
-data in order to synchronize with the source, using the following procedure.
+If a Kafka data stream fails and cannot be resumed, it may be
+necessary to re-stream a complete snapshot of the data to Metadb.  For
+example, a source database may become unsynchronized with the analytic
+database, requiring a new snapshot of the source database to be
+streamed.  Metadb can accept re-streamed data in order to synchronize
+with the source, using the following procedure.
 
-Note that during the synchronization process, the analytics database continues
-to be available to users.  However, streaming updates will be slower than
-usual, and there temporarily may be missing records (until they are
-re-streamed) or "extra" records (recently deleted in the source database).
-Also, periodic transforms and external SQL are paused during synchronization.
+Note that during the synchronization process, the analytics database
+continues to be available to users.  However, streaming updates will
+be slower than usual, and there temporarily may be missing records
+(until they are re-streamed) or "extra" records (recently deleted in
+the source database).  Also, periodic transforms and external SQL are
+paused during synchronization.
 
-.Note
-****
-[.text-center]
-The instructions below use the Metadb commands "sync" and "endsync".  In Metadb
-versions before 1.2, these commands were called "reset" and "clean",
-respectively.
-****
-
-1. Update the `topics` and `consumergroup` configuration settings for the new
-   data stream.
+1. Update the `topics` and `consumer_group` configuration settings for
+   the new data stream.
 +
 [source]
 ----
 ALTER DATA SOURCE sensor OPTIONS
-    (SET topics '^metadb_sensor_2\.', SET consumergroup 'metadb_sensor_2_1');
+    (SET topics '^metadb_sensor_2\.', SET consumer_group 'metadb_sensor_2_1');
 ----
 +
 *Do not restart the Metadb server but continue directly to Step 2.*
 
-2. Stop the Metadb server and (before starting it again) run `metadb sync`.
-   This may take some time to run.
+2. Stop the Metadb server and (before starting it again) run `metadb
+   sync`.  This may take some time to run.
 +
 [source,bash]
 ----
@@ -424,31 +463,38 @@ metadb sync -D data --source sensor
 
 3. Start the Metadb server to begin streaming the data.
 
-4. Once the new data have finished (or nearly finished) re-streaming, stop the
-   Metadb server, and run `metadb endsync` to remove any old data that have not
-   been refreshed by the new data stream.
+4. Once the new data have finished (or nearly finished) re-streaming,
+   stop the Metadb server, and run `metadb endsync` to remove any old
+   data that have not been refreshed by the new data stream.
 +
 [source,bash]
 ----
 metadb endsync -D data --source sensor
 ----
 +
-The timing of when "endsync" should be run is up to the admninistrator, but *it
-must be run to complete the synchronization process*.  In most cases it will be
-more convenient for users if "endsync" is run too late (delaying removal of
-deleted records) rather than too early (removing records before they have been
-restreamed).
+The timing of when "endsync" should be run is up to the
+admninistrator, but *it must be run to complete the synchronization
+process*.  In most cases it will be more convenient for users if
+"endsync" is run too late (delaying removal of deleted records) rather
+than too early (removing records before they have been restreamed).
 +
-Metadb detects when snapshot data are no longer being received, and then writes
-"source snapshot complete (deadline exceeded)" to the log.  This generally
-means it is a good time to run "endsync".
+Metadb detects when snapshot data are no longer being received, and
+then writes "source snapshot complete (deadline exceeded)" to the log.
+This generally means it is a good time to run "endsync".
++
+[.aqua-background]#Metadb 1.4# +
+The snapshot status is also available via the `LIST status` command.
 
 5. Start the server.
 +
-Until a failed stream is re-streamed by following the process above, the
-analytic database may continue to be unsynchronized with the source.
+Until a failed stream is re-streamed by following the process above,
+the analytic database may continue to be unsynchronized with the
+source.
 
 === Creating database users
+
+[discrete]
+==== With the CREATE USER command
 
 To create a new database user account:
 
@@ -457,50 +503,52 @@ To create a new database user account:
 CREATE USER wegg WITH PASSWORD 'LZn2DCajcNHpGR3ZXWHD', COMMENT 'Silas Wegg';
 ----
 
-In addition to creating the user, this also creates a schema with the same name
-as the user.  The schema is intended as a workspace for the user.
+In addition to creating the user, this also registers the user with
+the Metadb instance.  It also creates a schema with the same name as
+the user, which is intended as a workspace for the user.
 
 .Recommendations:
-* Each user account should be for an individual user and not shared by more
-  than one person.
+* Each user account should be for an individual user and not shared by
+  more than one person.
 * Prefer user names of 3 to 8 characters in length.
 
-By default the user does not have access to data tables.  To give the user
-access to all tables generated from a data source (including tables not yet
-created):
+[discrete]
+==== Granting access to data
 
-[source]
-----
-AUTHORIZE SELECT ON ALL TABLES IN DATA SOURCE sensor TO wegg;
-----
+A new user has very limited access to data.  To add privileges for
+tables and functions, use the GRANT command (or AUTHORIZE in Metadb
+1.3 and earlier).
 
-.Note
-****
-[.text-center]
-AUTHORIZE currently requires restarting the server before it will take
-effect.
-****
+[discrete]
+==== Registering an existing user and creating a user schema
+
+As an alternative to CREATE USER, if a user already exists in the
+database system, it can be enabled to work with the Metadb database
+via the command REGISTER USER.  A user schema can then be created with
+CREATE SCHEMA FOR USER.
 
 === Administrative database changes
 
-It is possible to make administrative-level changes directly in the underlying
-PostgreSQL database, such as providing additional tables for users.  However,
-the following guidelines should be followed strictly to avoid disrupting the
-operation of Metadb:
+It is possible to make administrative-level changes directly in the
+underlying PostgreSQL database, such as providing additional tables
+for users.  However, the following guidelines should be followed
+strictly to avoid disrupting the operation of Metadb:
 
-1. No changes should be made to any database objects created by Metadb.  If it
-should become necessary to make changes to the database objects at the request
-of the Metadb maintainers, the server should be stopped first to prevent it
-from operating with an out-of-date cache.  If changes are made to the database
-objects inadvertently, the server should be stopped as soon as possible and not
-started until the changes have been reversed.
+1. No changes should be made to any database objects created or
+managed by Metadb.  If it should become necessary to make changes to
+the database objects at the request of the Metadb maintainers, the
+server should be stopped first to prevent it from operating with an
+out-of-date cache.  If changes are made to the database objects
+inadvertently, the server should be stopped as soon as possible and
+not started until the changes have been reversed.
 
-2. Changes generally should be made while logged in as a new database user (not
-a superuser) that is created specifically for that purpose.
+2. Any new database objects should be created in a new schema that
+will not coincide with a schema that may be created by Metadb.  This
+can be ensured by always setting `add_schema_prefix` in data source
+configurations and avoiding names with those prefixes when creating a
+new schema.
 
-3. Any new database objects should be created in a new schema that will not
-coincide with a schema that may be created by Metadb.  This can be ensured by
-always setting `addschemaprefix` in data source configurations and avoiding
-names with those prefixes when creating a new schema.
+3. Database views should not be created in the database.
 
-4. Database views should not be created in the database.
+IMPORTANT: Making changes to Metadb-managed data or schemas may cause
+data corruption.

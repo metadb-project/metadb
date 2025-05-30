@@ -2,9 +2,8 @@
 // To build HTML:
 //     asciidoctor -a docinfo=shared *.adoc
 
-// Text is styled using "pre-wrap" and wrapped at column 79.
-
 = Metadb Documentation
+:icons: font
 :sectnums:
 :sectnumlevels: 4
 :toc: left
@@ -16,7 +15,5 @@ include::userguide.adoc[]
 include::reference.adoc[]
 
 include::serveradmin.adoc[]
-
-// include::transform.adoc[]
 
 include::externalproj.adoc[]

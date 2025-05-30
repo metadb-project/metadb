@@ -2,26 +2,26 @@
 
 === Data type conversion
 
-When reading data from a data source, Metadb will automatically adjust column
-data types in a number of cases:
+When reading data from a data source, Metadb will automatically adjust
+column data types in a number of cases:
 
-* A data type in the source has changed in a way that cannot be applied safely
-  by Metadb without more information.
+* A data type in the source has changed in a way that cannot be
+  applied safely by Metadb without more information.
 
-* A data type in the source has changed to a type that is not supported by
-  Metadb.
+* A data type in the source has changed to a type that is not
+  supported by Metadb.
 
-* A data type in the source can be converted safely to a type that is more
-  performant.
+* A data type in the source can be converted safely to a type that is
+  more performant.
 
-Each type conversion is applied in one of two ways: either by the stream
-processor converting a record-at-a-time, or later by "inferring" types from
-previously updated data.
+Each type conversion is applied in one of two ways: either by the
+stream processor converting a record-at-a-time, or later by
+"inferring" types from previously updated data.
 
 ==== Record-at-a-time
 
-This table summarizes conversions that are performed a record-at-a-time by the
-stream processor:
+This table summarizes conversions that are performed a
+record-at-a-time by the stream processor:
 
 [width=80%]
 [%header,cols="2,^1,^1,^1,^1"]
@@ -161,7 +161,15 @@ Types also can be set manually via the `ALTER TABLE` command.
     error_severity text,
     message text
 )
-|Returns recent log messages during the specified interval, or during the past 24 hours if no interval is given
+|Returns recent log messages during the specified interval, or during
+ the past 24 hours if no interval is given
+
+|`mdbusers()` +
+[.aqua-background]#Metadb 1.4#
+|table (
+    username text
+)
+|Returns a list of registered users
 
 |`mdbversion()`
 |text
@@ -175,7 +183,8 @@ Types also can be set manually via the `ALTER TABLE` command.
     realtime text,
     query text
 )
-|Returns the status and elapsed running time of current query processes
+|Returns the status and elapsed running time of current query
+ processes
 |===
 
 [discrete]
@@ -199,8 +208,6 @@ SELECT mdbversion();
 === System tables
 
 ==== metadb.base_table
-
-[.aqua-background]#Metadb 1.2#
 
 The table `metadb.base_table` stores information about tables that are
 extracted from data sources or are transformed from those tables.
@@ -252,7 +259,8 @@ The table `metadb.log` stores logging information for the system.
 
 |error_severity
 |text
-|Logging level: (from least to most severe) INFO, WARNING, ERROR, FATAL
+|Logging level: (from least to most severe) INFO, WARNING, ERROR,
+ FATAL
 
 |message
 |text
@@ -261,10 +269,8 @@ The table `metadb.log` stores logging information for the system.
 
 ==== metadb.table_update
 
-[.aqua-background]#Metadb 1.2#
-
-The table `metadb.table_update` stores information about the updating of
-certain tables.
+The table `metadb.table_update` stores information about the updating
+of certain tables.
 
 [%header,cols="1,1l,3"]
 |===
@@ -289,18 +295,50 @@ certain tables.
 |Wall-clock time in seconds of the last completed update process
 |===
 
+=== Configuration parameters
+
+[.aqua-background]#Metadb 1.4#
+
+==== external_sql_folio
+
+The `external_sql_folio` parameter sets the Git reference in the
+folio-analytics repository to be used for running external SQL.
+
+For example:
+
+----
+ALTER SYSTEM SET external_sql_folio = 'refs/tags/v1.8.0';
+----
+
+==== external_sql_reshare
+
+The `external_sql_reshare` parameter sets the Git reference in the
+folio-reshare repository to be used for running external SQL.
+
+==== kafka_sync_concurrency
+
+The `kafka_sync_concurrency` parameter sets the number of concurrent
+Kafka consumers that will run simultaneously during data source
+synchronization.  The default is 1.  At present the recommended value
+is 1.  This parameter requires restarting the server before it will
+take effect.
+
 === External SQL directives
 
 Metadb allows scheduling external SQL files to run on a regular basis.
+At present this feature is enabled automatically when the "folio" or
+"reshare" module has been specified in the data source.  Details such
+as the location of the SQL files and when they are run are currently
+hardcoded but will be configurable in the future.
 
-Each SQL statement should be separated from others by an empty line, and any
-tables created should not specify a schema name.
+Each SQL statement should be separated from others by an empty line,
+and any tables created should not specify a schema name.
 
-Comment lines beginning with `--metadb:` are used for special directives; each
-directive should be on a separate line.
+Comment lines beginning with `--metadb:` are used for special
+directives; each directive should be on a separate line.
 
-It is suggested that each SQL file begin with a `--metadb:table` directive,
-followed by an empty line, for example:
+It is suggested that each SQL file begin with a `--metadb:table`
+directive, followed by an empty line, for example:
 
 ----
 --metadb:table library_patrons
@@ -313,9 +351,10 @@ SELECT . . . ;
 
 ==== --metadb:table
 
-The `--metadb:table` directive declares that the SQL file updates a specific
-table.  This allows Metadb to report on the status of the table.  The directive
-takes the form:
+The `--metadb:table` directive declares that the SQL file updates a
+specific table.  This allows Metadb to report on the status of the
+update in the `metadb.table_update` system table.  The directive takes
+the form:
 
 ----
 --metadb:table <table>
@@ -331,9 +370,10 @@ For example:
 
 === Statements
 
-Metadb extends SQL with statements for configuring and administering the
-server.  These statements are only available when connecting to the Metadb
-server (not the database).
+Metadb extends SQL with statements for configuring and administering
+the server.  These statements are only available when connecting to
+the Metadb server (not the PostgreSQL server for the underlying
+database).
 
 ==== ALTER DATA SOURCE
 
@@ -350,12 +390,8 @@ ALTER DATA SOURCE `*_source_name_*`
 
 ALTER DATA SOURCE changes connection settings for a data source.
 
-.Note
-****
-[.text-center]
-ALTER DATA SOURCE currently requires restarting the server before it
-will take effect.
-****
+NOTE: ALTER DATA SOURCE currently requires restarting the server
+before it will take effect.
 
 [discrete]
 ===== Parameters
@@ -366,7 +402,8 @@ will take effect.
 |The name of an existing data source.
 
 |`OPTIONS ( [ ADD \| SET \| DROP ] *_option_* ['*_value_*'] [, ... ] )`
-|Connection settings and other configuration options for the data source.
+|Connection settings and other configuration options for the data
+ source.
 |===
 
 [discrete]
@@ -380,12 +417,50 @@ See CREATE DATA SOURCE
 Change the consumer group:
 
 ----
-ALTER DATA SOURCE sensor OPTIONS (SET consumergroup 'metadb_sensor_1');
+ALTER DATA SOURCE sensor OPTIONS (SET consumer_group 'metadb_sensor_1');
+----
+
+==== ALTER SYSTEM
+
+[.aqua-background]#Metadb 1.4#
+
+Change a server configuration parameter
+
+[source,subs="verbatim,quotes"]
+----
+ALTER SYSTEM SET `*_configuration_parameter_*` = `*_value_*`
+----
+
+[discrete]
+===== Description
+
+`ALTER SYSTEM` changes a server configuration parameter setting.  Some
+parameters require restarting the server before they will take effect.
+See *Reference > Configuration parameters* for documentation of
+available parameters.
+
+Configuration values can be displayed via the `LIST config` command.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_configuration_parameter_*`
+|Name of a configuration parameter.
+
+|`*_value_*`
+|New value of the parameter.  This is always a string constant.
+|===
+
+[discrete]
+===== Examples
+
+----
+ALTER SYSTEM SET kafka_sync_concurrency = '1';
 ----
 
 ==== ALTER TABLE
-
-[.aqua-background]#Metadb 1.2#
 
 Change a table definition
 
@@ -398,8 +473,11 @@ ALTER TABLE `*_table_name_*`
 [discrete]
 ===== Description
 
-ALTER TABLE changes the definition of a table that is extracted from a data
-source.
+ALTER TABLE changes the definition of a table that is extracted from a
+data source.
+
+NOTE: ALTER TABLE currently requires restarting the server before it
+will take effect.
 
 [discrete]
 ===== Parameters
@@ -413,7 +491,8 @@ source.
 |Name of a column to alter.
 
 |`*_data_type_*`
-|The new data type of the column.  The only type currently supported is `uuid`.
+|The new data type of the column.  The only type currently supported
+ is `uuid`.
 |===
 
 [discrete]
@@ -433,22 +512,19 @@ Enable access to tables generated from an external data source
 ----
 AUTHORIZE SELECT
     ON ALL TABLES IN DATA SOURCE `*_source_name_*`
-    TO `*_role_specification_*`
+    TO `*_user_name_*`
 ----
 
 [discrete]
 ===== Description
 
-The AUTHORIZE command grants access to tables.  It differs from GRANT in that
-the authorization will also apply to tables created at a later time in the data
-source.
+The AUTHORIZE command grants access to tables.
 
-.Note
-****
-[.text-center]
-AUTHORIZE currently requires restarting the server before it will take
+NOTE: Beginning with Metadb 1.4, the AUTHORIZE command is no longer
+supported.  The new GRANT command can be used instead.
+
+NOTE: AUTHORIZE requires restarting the server before it will take
 effect.
-****
 
 [discrete]
 ===== Parameters
@@ -458,8 +534,8 @@ effect.
 |`*_source_name_*`
 |The name of an existing data source.
 
-|`*_role_specification_*`
-|An existing role to be granted the authorization.
+|`*_user_name_*`
+|An existing user to be granted the authorization.
 |===
 
 [discrete]
@@ -471,7 +547,85 @@ AUTHORIZE SELECT
     TO beatrice;
 ----
 
+==== CREATE DATA MAPPING
+
+[.aqua-background]#Metadb 1.4#
+
+Define a new mapping for data transformation
+
+[source,subs="verbatim,quotes"]
+----
+CREATE DATA MAPPING FOR *_mapping_type_*
+    FROM TABLE `*_table_name_*` COLUMN `*_column_name_*` PATH '*_object_path_*'
+    TO '*_target_identifier_*'
+----
+
 [discrete]
+===== Description
+
+CREATE DATA MAPPING defines mapping rules for data transformation.
+The output of a mapping is written to a new column or table based on
+the specified target identifier.
+
+In JSON mapping, the specified path identifies a JSON object or array
+to transform.  For example, the path `'$.a.b'` is used to refer to an
+object or array named `b` contained within an object or array named
+`a`.  The path `'$'` means the outermost enclosing object.  Note that
+an object or array will not be transformed unless all of its parents
+are also transformed; for example, a mapping from path `'$.a.b'` will
+be applied only if mappings are also defined for both the paths
+`'$.a'` and `'$'` within the same table and column.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_mapping_type_*`
+|The type of data mapping.  The only type currently supported is
+ `json`.
+
+|`*_table_name_*`
+|The table to transform.
+
+|`*_column_name_*`
+|The column to transform.
+
+|`'*_object_path_*'`
+|Path to a JSON object or array.
+
+|`'*_target_identifier_*'`
+|A short, lowercase identifier to be used in naming the transformed
+ data.  It must be unique for the transformed column; in other words,
+ no two paths can be mapped to the same target identifier.
+|===
+
+[discrete]
+===== Examples
+
+Create JSON mappings to transform an object at `$.metadata` and an
+array at `$.tags.tagList`:
+
+image::create_data_mapping.png[]
+
+----
+CREATE DATA MAPPING FOR json
+    FROM TABLE library.inventory__ COLUMN jsondata PATH '$'
+    TO 't';
+
+CREATE DATA MAPPING FOR json
+    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.metadata'
+    TO 'metadata';
+
+CREATE DATA MAPPING FOR json
+    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.tags'
+    TO 'tags';
+
+CREATE DATA MAPPING FOR json
+    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.tags.tagList'
+    TO 'taglist';
+----
+
 ==== CREATE DATA ORIGIN
 
 Define a new data origin
@@ -484,14 +638,13 @@ CREATE DATA ORIGIN `*_origin_name_*`
 [discrete]
 ===== Description
 
-CREATE DATA ORIGIN defines a new origin.
-
-.Note
-****
-[.text-center]
-CREATE DATA ORIGIN currently requires restarting the server before it will take
-effect.
-****
+CREATE DATA ORIGIN defines a new origin.  An origin name can be stored
+by Metadb in the `__origin` column to tag individual records.  The use
+and meaning of origins are typically defined by the application or by
+a Metadb module, but in general origins allow grouping data
+independently of data sources.  This can be useful because data
+sources may be dictated by how the data are collected,
+e.g. geographically in a sensor network.
 
 [discrete]
 ===== Parameters
@@ -511,7 +664,6 @@ Create a new origin `test_origin`:
 CREATE DATA ORIGIN test_origin;
 ----
 
-
 ==== CREATE DATA SOURCE
 
 Define a new external data source
@@ -525,14 +677,17 @@ CREATE DATA SOURCE `*_source_name_*` TYPE *_source_type_*
 [discrete]
 ===== Description
 
-CREATE DATA SOURCE defines connection settings for an external data source.
+CREATE DATA SOURCE defines connection settings for an external data
+source.
 
-The new data source starts out in synchronizing mode, which pauses periodic
-transforms and running external SQL.  When the initial snapshot has finished
-streaming, the message "source snapshot complete (deadline exceeded)" will be
-written to the log.  To complete the synchronization, the Metadb server should
-be stopped in order to run `metadb endsync`, and after the "endsync" has
-completed, the Metadb server can be started again.
+The new data source starts out in synchronizing mode, which pauses
+periodic transforms and running external SQL.  After no new snapshot
+records have been received for a significant period of time, which
+suggests that the initial snapshot has likely finished streaming, the
+message "source snapshot complete (deadline exceeded)" will be written
+to the log.  To complete the synchronization, the Metadb server should
+be stopped in order to run `metadb endsync`, and after the "endsync"
+has completed, the Metadb server can be started again.
 
 [discrete]
 ===== Parameters
@@ -543,10 +698,12 @@ completed, the Metadb server can be started again.
 |A unique name for the data source to be created.
 
 |`*_source_type_*`
-|The type of data source.  The only type currently supported is `kafka`.
+|The type of data source.  The only type currently supported is
+ `kafka`.
 
 |`OPTIONS ( *_option_* '*_value_*' [, ... ] )`
-|Connection settings and other configuration options for the data source.
+|Connection settings and other configuration options for the data
+ source.
 |===
 
 [discrete]
@@ -561,25 +718,35 @@ completed, the Metadb server can be started again.
 |Security protocol: `'ssl'` or `'plaintext'`.  The default is `'ssl'`.
 
 |`topics`
-|Regular expressions matching Kafka topics to read (comma-separated list).
+|Regular expressions matching Kafka topics to read (comma-separated
+ list).
 
-|`consumergroup`
+|`consumer_group`
 |Kafka consumer group ID.
 
-|`schemapassfilter`
-|Regular expressions matching schema names to accept (comma-separated list).
+|`schema_pass_filter`
+|Regular expressions matching schema names to accept (comma-separated
+ list).
 
-|`schemastopfilter`
-|Regular expressions matching schema names to ignore (comma-separated list).
+|`schema_stop_filter`
+|Regular expressions matching schema names to ignore (comma-separated
+ list).
 
-|`tablestopfilter`
-|Regular expressions matching table names to ignore (comma-separated list).
+|`table_stop_filter`
+|Regular expressions matching table names to ignore (comma-separated
+ list).
 
-|`trimschemaprefix`
+|`trim_schema_prefix`
 |Prefix to remove from schema names.
 
-|`addschemaprefix`
+|`add_schema_prefix`
 |Prefix to add to schema names.
+
+|`map_public_schema` +
+[.aqua-background]#Metadb 1.4#
+|Set a new target schema for tables originating in the `public`
+ schema.  For these tables, `add_schema_prefix` will not be added to
+ the target schema if `map_public_schema` is set.
 
 |`module`
 |Name of pre-defined configuration.
@@ -594,10 +761,55 @@ Create `sensor` as a `kafka` data source:
 CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
     brokers 'kafka:29092',
     topics '^metadb_sensor_1\.',
-    consumergroup 'metadb_sensor_1_1',
-    addschemaprefix 'sensor_',
-    tablestopfilter '^testing\.air_temp$,^testing\.air_temp_avg$'
+    consumer_group 'metadb_sensor_1_1',
+    add_schema_prefix 'sensor_',
+    table_stop_filter '^testing\.air_temp$,^testing\.air_temp_avg$'
 );
+----
+
+==== CREATE SCHEMA
+
+[.aqua-background]#Metadb 1.4#
+
+Define a new schema
+
+[source,subs="verbatim,quotes"]
+----
+CREATE SCHEMA FOR USER `*_user_name_*`
+----
+
+[discrete]
+===== Description
+
+CREATE SCHEMA defines a new schema.  At present this command only
+supports creating a user schema, which serves as a workspace for a
+user.
+
+[discrete]
+====== User schemas
+
+Typically user schemas are created automatically by CREATE USER.
+However, if a user already exists and is registered, but does not have
+a user schema, CREATE SCHEMA can be used to create it.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_user_name_*`
+|The name of the user, which will also be the name of the new schema.
+|===
+
+[discrete]
+===== Examples
+
+Register an existing user `jane` and create its user schema:
+
+----
+REGISTER USER jane;
+
+CREATE SCHEMA FOR USER jane;
 ----
 
 ==== CREATE USER
@@ -612,11 +824,16 @@ CREATE USER `*_user_name_*` WITH *_option_* '*_value_*' [, ... ]
 [discrete]
 ===== Description
 
-CREATE USER defines a new database user that will be managed by Metadb.  It
-also creates a schema having the same name as the user, if the schema does not
-exist, and grants the user privileges on the schema.  The schema is intended as
-a workspace for the user.
+CREATE USER defines a new database user and registers it with the
+Metadb instance, which allows it to receive access privileges.  In
+addition, CREATE USER creates a schema having the same name as the
+user, if the schema does not exist, and grants the user privileges on
+the schema.  The schema is intended as a workspace for the user.
 
+If a user already exists but is not registered or does not have a user
+schema, CREATE USER cannot be used to complete the process.  Instead,
+REGISTER USER and CREATE SCHEMA FOR USER are provided for this
+purpose.
 
 [discrete]
 ===== Parameters
@@ -636,21 +853,57 @@ a workspace for the user.
 [frame=none,grid=none,cols="1,3"]
 |===
 |`password`
-|Sets the user's password.  (Required)
+|Sets the user's password.
 
 |`comment`
-|Stores a comment about the user, e.g. the user's real name.  The comment can be viewed in psql using the `\du+` command, or in other user interfaces.
+|Stores a comment about the user, e.g. the user's real name.  The
+comment can be viewed in psql using the `\du+` command, or in other
+user interfaces.
 |===
 
 [discrete]
 ===== Examples
 
-Create a user `wegg`:
+Create a user `wegg` and add it to this Metadb instance:
 
 ----
 CREATE USER wegg WITH PASSWORD 'LZn2DCajcNHpGR3ZXWHD', COMMENT 'Silas Wegg';
 ----
 
+==== DEREGISTER USER
+
+[.aqua-background]#Metadb 1.4#
+
+Deregister a user from having database privileges
+
+[source,subs="verbatim,quotes"]
+----
+DEREGISTER USER `*_user_name_*`
+----
+
+[discrete]
+===== Description
+
+DEREGISTER USER removes the ability to have database privileges from a
+user that was previously added with REGISTER USER.  It automatically
+executes REVOKE ACCESS ON ALL and also prevents subsequent GRANT
+commands.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_user_name_*`
+|The name of the user to deregister.
+|===
+
+[discrete]
+===== Examples
+
+----
+DEREGISTER USER wegg;
+----
 
 ==== DROP DATA SOURCE
 
@@ -665,6 +918,9 @@ DROP DATA SOURCE `*_source_name_*`
 ===== Description
 
 DROP DATA SOURCE removes a data source configuration.
+
+NOTE: DROP DATA SOURCE currently requires restarting the server before
+it will take effect.
 
 [discrete]
 ===== Parameters
@@ -684,6 +940,103 @@ Drop a data source `sensor`:
 DROP DATA SOURCE sensor;
 ----
 
+==== DROP USER
+
+[.aqua-background]#Metadb 1.4#
+
+Remove a database user
+
+[source,subs="verbatim,quotes"]
+----
+DROP USER `*_user_name_*`
+----
+
+[discrete]
+===== Description
+
+DROP USER removes a database user.  Before doing so, it attempts to
+find and revoke most authorizations held by the user that would
+typically prevent it from being removed.
+
+If a user is registered in more than one Metadb instance, DROP USER
+will not be able to remove all authorizations.  In that case, use
+DEREGISTER USER in each of the instances, and then issue DROP USER.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_user_name_*`
+|The name of the user to be removed.
+|===
+
+[discrete]
+===== Examples
+
+Remove a user `wegg`:
+
+----
+DROP USER wegg;
+----
+
+==== GRANT
+
+[.aqua-background]#Metadb 1.4#
+
+Enable access to data
+
+[source,subs="verbatim,quotes"]
+----
+GRANT ACCESS
+    ON { TABLE `*_table_name_*` | FUNCTION `*_function_name_*` | ALL }
+    TO `*_user_name_*`
+----
+
+[discrete]
+===== Description
+
+The GRANT command grants a user access privileges to Metadb-managed
+tables and functions.  It differs from a SQL GRANT command in that the
+privileges continue to be valid if a table or function is dropped and
+recreated.
+
+WARNING: The command GRANT ACCESS ON ALL allows a user to access all
+Metadb-managed tables and functions.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_table_name_*`
+|An existing table.
+
+|`*_function_name_*`
+|An existing function.
+
+|`*_user_name_*`
+|An existing user to be granted access.
+|===
+
+[discrete]
+===== Examples
+
+To grant a user `anna` access to a single table:
+
+----
+GRANT ACCESS ON TABLE library.patrongroup TO anna;
+----
+
+To grant a user `bob` access only to a single table and to nothing
+else:
+
+----
+REVOKE ACCESS ON ALL FROM bob;
+
+GRANT ACCESS ON TABLE library.patrongroup TO bob;
+----
+
 ==== LIST
 
 Show the value of a system variable
@@ -696,8 +1049,8 @@ LIST `*_name_*`
 [discrete]
 ===== Description
 
-LIST shows the current setting of various system configurations and other
-variables.
+LIST shows the current setting of various system configurations and
+other variables.
 
 [discrete]
 ===== Parameters
@@ -709,8 +1062,12 @@ variables.
 |
 
 |
-|`authorizations`
-|Authorized users.
+|`config`
+|Server configuration parameter settings.
+
+|
+|`data_mappings`
+|Configured data mappings.
 
 |
 |`data_origins`
@@ -732,3 +1089,83 @@ variables.
 LIST status;
 ----
 
+==== REGISTER USER
+
+[.aqua-background]#Metadb 1.4#
+
+Register an existing user to receive database privileges
+
+[source,subs="verbatim,quotes"]
+----
+REGISTER USER `*_user_name_*`
+----
+
+[discrete]
+===== Description
+
+REGISTER USER associates an existing user with the Metadb instance.
+This has the effect of allowing the user to be granted privileges in
+the database via the GRANT command.
+
+Normally there is no need to issue REGISTER USER, because CREATE USER
+executes it automatically.  However, if an existing user was created
+in some other way, REGISTER USER can enable it for the Metadb
+instance.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_user_name_*`
+|The name of the user to register.
+|===
+
+[discrete]
+===== Examples
+
+----
+REGISTER USER beatrice;
+----
+
+==== REVOKE
+
+[.aqua-background]#Metadb 1.4#
+
+Disable access to data
+
+[source,subs="verbatim,quotes"]
+----
+REVOKE ACCESS
+    ON { TABLE `*_table_name_*` | FUNCTION `*_function_name_*` | ALL }
+    FROM `*_user_name_*`
+----
+
+[discrete]
+===== Description
+
+The REVOKE command revokes access to tables.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_table_name_*`
+|An existing table.
+
+|`*_function_name_*`
+|An existing function.
+
+|`*_user_name_*`
+|An existing user that will have access removed.
+|===
+
+[discrete]
+===== Examples
+
+To disable access by a user `bob` to a table:
+
+----
+REVOKE ACCESS ON TABLE library.patrongroup FROM bob;
+----
