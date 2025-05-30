@@ -25,8 +25,8 @@
 * A new data source option `map_public_schema` supports changing the
   schema name of tables that originate in the `public` schema.
 
-* The commands `CREATE DATA MAPPING` and `CREATE DATA ORIGIN` no
-  longer require restarting the server before they take effect.
+* The command `CREATE DATA ORIGIN` no longer requires restarting the
+  server before it takes effect.
 
 * The compilation script `build.sh` has been renamed to `build`.
 
