@@ -82,7 +82,7 @@ if ! $fast; then
     rm -f ./$bindir/metadb ./$bindir/mdb ./cmd/metadb/parser/gram.go ./cmd/metadb/parser/scan.go ./cmd/metadb/parser/y.output
 fi
 
-version=`git describe --tags --always`
+version=`git describe --always`
 
 # Check which operating system is running.
 case "$(uname -s)" in
