@@ -164,8 +164,7 @@ Types also can be set manually via the `ALTER TABLE` command.
 |Returns recent log messages during the specified interval, or during
  the past 24 hours if no interval is given
 
-|`mdbusers()` +
-[.aqua-background]#Metadb 1.4#
+|`mdbusers()`
 |table (
     username text
 )
@@ -297,8 +296,6 @@ of certain tables.
 
 === Configuration parameters
 
-[.aqua-background]#Metadb 1.4#
-
 ==== external_sql_folio
 
 The `external_sql_folio` parameter sets the Git reference in the
@@ -422,8 +419,6 @@ ALTER DATA SOURCE sensor OPTIONS (SET consumer_group 'metadb_sensor_1');
 
 ==== ALTER SYSTEM
 
-[.aqua-background]#Metadb 1.4#
-
 Change a server configuration parameter
 
 [source,subs="verbatim,quotes"]
@@ -504,52 +499,7 @@ Change a column type to `uuid`:
 ALTER TABLE library.patron__ ALTER COLUMN patrongroup_id TYPE uuid;
 ----
 
-==== AUTHORIZE
-
-Enable access to tables generated from an external data source
-
-[source,subs="verbatim,quotes"]
-----
-AUTHORIZE SELECT
-    ON ALL TABLES IN DATA SOURCE `*_source_name_*`
-    TO `*_user_name_*`
-----
-
-[discrete]
-===== Description
-
-The AUTHORIZE command grants access to tables.
-
-NOTE: Beginning with Metadb 1.4, the AUTHORIZE command is no longer
-supported.  The new GRANT command can be used instead.
-
-NOTE: AUTHORIZE requires restarting the server before it will take
-effect.
-
-[discrete]
-===== Parameters
-
-[frame=none,grid=none,cols="1,2"]
-|===
-|`*_source_name_*`
-|The name of an existing data source.
-
-|`*_user_name_*`
-|An existing user to be granted the authorization.
-|===
-
-[discrete]
-===== Examples
-
-----
-AUTHORIZE SELECT
-    ON ALL TABLES IN DATA SOURCE sensor
-    TO beatrice;
-----
-
 ==== CREATE DATA MAPPING
-
-[.aqua-background]#Metadb 1.4#
 
 Define a new mapping for data transformation
 
@@ -742,8 +692,7 @@ has completed, the Metadb server can be started again.
 |`add_schema_prefix`
 |Prefix to add to schema names.
 
-|`map_public_schema` +
-[.aqua-background]#Metadb 1.4#
+|`map_public_schema`
 |Set a new target schema for tables originating in the `public`
  schema.  For these tables, `add_schema_prefix` will not be added to
  the target schema if `map_public_schema` is set.
@@ -768,8 +717,6 @@ CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
 ----
 
 ==== CREATE SCHEMA
-
-[.aqua-background]#Metadb 1.4#
 
 Define a new schema
 
@@ -872,8 +819,6 @@ CREATE USER wegg WITH PASSWORD 'LZn2DCajcNHpGR3ZXWHD', COMMENT 'Silas Wegg';
 
 ==== DEREGISTER USER
 
-[.aqua-background]#Metadb 1.4#
-
 Deregister a user from having database privileges
 
 [source,subs="verbatim,quotes"]
@@ -942,8 +887,6 @@ DROP DATA SOURCE sensor;
 
 ==== DROP USER
 
-[.aqua-background]#Metadb 1.4#
-
 Remove a database user
 
 [source,subs="verbatim,quotes"]
@@ -981,8 +924,6 @@ DROP USER wegg;
 ----
 
 ==== GRANT
-
-[.aqua-background]#Metadb 1.4#
 
 Enable access to data
 
@@ -1091,8 +1032,6 @@ LIST status;
 
 ==== REGISTER USER
 
-[.aqua-background]#Metadb 1.4#
-
 Register an existing user to receive database privileges
 
 [source,subs="verbatim,quotes"]
@@ -1129,8 +1068,6 @@ REGISTER USER beatrice;
 ----
 
 ==== REVOKE
-
-[.aqua-background]#Metadb 1.4#
 
 Disable access to data
 

@@ -15,8 +15,6 @@
 ** https://go.dev/[Go] 1.24 or later
 ** https://www.colm.net/open-source/ragel/[Ragel] 6
 ** https://gcc.gnu.org/[GCC C compiler] 9 or later
-** https://pkg.go.dev/golang.org/x/tools/cmd/goyacc[goyacc] (required
-   for Metadb 1.3 or earlier; see installation instructions below)
 
 ==== PostgreSQL configuration
 
@@ -50,14 +48,6 @@ specify a path that can serve as the build workspace for Go, e.g.:
 export GOPATH=$HOME/go
 ----
 
-For Metadb 1.3 or earlier, install goyacc:
-
-----
-go install golang.org/x/tools/cmd/goyacc@master
-
-export PATH=$PATH:$GOPATH/bin
-----
-
 Now we can clone the Metadb source code repository and check out the
 `latest` tag, which retrieves the latest stable version:
 
@@ -76,10 +66,8 @@ Then compile the server by running the build script:
 ----
 cd metadb
 
-./build.sh
+./build
 ----
-
-NOTE: In Metadb 1.4, `build.sh` has been renamed to `build`.
 
 The build script creates a `bin/` subdirectory and creates the
 `metadb` executable there:
@@ -482,7 +470,6 @@ Metadb detects when snapshot data are no longer being received, and
 then writes "source snapshot complete (deadline exceeded)" to the log.
 This generally means it is a good time to run "endsync".
 +
-[.aqua-background]#Metadb 1.4# +
 The snapshot status is also available via the `LIST status` command.
 
 5. Start the server.
@@ -516,8 +503,7 @@ the user, which is intended as a workspace for the user.
 ==== Granting access to data
 
 A new user has very limited access to data.  To add privileges for
-tables and functions, use the GRANT command (or AUTHORIZE in Metadb
-1.3 and earlier).
+tables and functions, use the GRANT command.
 
 [discrete]
 ==== Registering an existing user and creating a user schema
