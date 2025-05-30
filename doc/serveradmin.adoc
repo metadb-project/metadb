@@ -11,7 +11,7 @@
 
 * Operating system: Linux
 * Database system: https://www.postgresql.org/[PostgreSQL] 15 or later
-* To build from source, these have to be installed:
+* To build from source, these may have to be installed:
 ** https://go.dev/[Go] 1.24 or later
 ** https://www.colm.net/open-source/ragel/[Ragel] 6
 ** https://gcc.gnu.org/[GCC C compiler] 9 or later
