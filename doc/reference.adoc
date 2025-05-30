@@ -164,13 +164,6 @@ Types also can be set manually via the `ALTER TABLE` command.
 |Returns recent log messages during the specified interval, or during
  the past 24 hours if no interval is given
 
-|`mdbusers()` +
-[.aqua-background]#Metadb 1.4#
-|table (
-    username text
-)
-|Returns a list of registered users
-
 |`mdbversion()`
 |text
 |Returns the Metadb version
@@ -295,34 +288,6 @@ of certain tables.
 |Wall-clock time in seconds of the last completed update process
 |===
 
-=== Configuration parameters
-
-[.aqua-background]#Metadb 1.4#
-
-==== external_sql_folio
-
-The `external_sql_folio` parameter sets the Git reference in the
-folio-analytics repository to be used for running external SQL.
-
-For example:
-
-----
-ALTER SYSTEM SET external_sql_folio = 'refs/tags/v1.8.0';
-----
-
-==== external_sql_reshare
-
-The `external_sql_reshare` parameter sets the Git reference in the
-folio-reshare repository to be used for running external SQL.
-
-==== kafka_sync_concurrency
-
-The `kafka_sync_concurrency` parameter sets the number of concurrent
-Kafka consumers that will run simultaneously during data source
-synchronization.  The default is 1.  At present the recommended value
-is 1.  This parameter requires restarting the server before it will
-take effect.
-
 === External SQL directives
 
 Metadb allows scheduling external SQL files to run on a regular basis.
@@ -417,47 +382,7 @@ See CREATE DATA SOURCE
 Change the consumer group:
 
 ----
-ALTER DATA SOURCE sensor OPTIONS (SET consumer_group 'metadb_sensor_1');
-----
-
-==== ALTER SYSTEM
-
-[.aqua-background]#Metadb 1.4#
-
-Change a server configuration parameter
-
-[source,subs="verbatim,quotes"]
-----
-ALTER SYSTEM SET `*_configuration_parameter_*` = `*_value_*`
-----
-
-[discrete]
-===== Description
-
-`ALTER SYSTEM` changes a server configuration parameter setting.  Some
-parameters require restarting the server before they will take effect.
-See *Reference > Configuration parameters* for documentation of
-available parameters.
-
-Configuration values can be displayed via the `LIST config` command.
-
-[discrete]
-===== Parameters
-
-[frame=none,grid=none,cols="1,2"]
-|===
-|`*_configuration_parameter_*`
-|Name of a configuration parameter.
-
-|`*_value_*`
-|New value of the parameter.  This is always a string constant.
-|===
-
-[discrete]
-===== Examples
-
-----
-ALTER SYSTEM SET kafka_sync_concurrency = '1';
+ALTER DATA SOURCE sensor OPTIONS (SET consumergroup 'metadb_sensor_1');
 ----
 
 ==== ALTER TABLE
@@ -520,9 +445,6 @@ AUTHORIZE SELECT
 
 The AUTHORIZE command grants access to tables.
 
-NOTE: Beginning with Metadb 1.4, the AUTHORIZE command is no longer
-supported.  The new GRANT command can be used instead.
-
 NOTE: AUTHORIZE requires restarting the server before it will take
 effect.
 
@@ -547,85 +469,6 @@ AUTHORIZE SELECT
     TO beatrice;
 ----
 
-==== CREATE DATA MAPPING
-
-[.aqua-background]#Metadb 1.4#
-
-Define a new mapping for data transformation
-
-[source,subs="verbatim,quotes"]
-----
-CREATE DATA MAPPING FOR *_mapping_type_*
-    FROM TABLE `*_table_name_*` COLUMN `*_column_name_*` PATH '*_object_path_*'
-    TO '*_target_identifier_*'
-----
-
-[discrete]
-===== Description
-
-CREATE DATA MAPPING defines mapping rules for data transformation.
-The output of a mapping is written to a new column or table based on
-the specified target identifier.
-
-In JSON mapping, the specified path identifies a JSON object or array
-to transform.  For example, the path `'$.a.b'` is used to refer to an
-object or array named `b` contained within an object or array named
-`a`.  The path `'$'` means the outermost enclosing object.  Note that
-an object or array will not be transformed unless all of its parents
-are also transformed; for example, a mapping from path `'$.a.b'` will
-be applied only if mappings are also defined for both the paths
-`'$.a'` and `'$'` within the same table and column.
-
-[discrete]
-===== Parameters
-
-[frame=none,grid=none,cols="1,2"]
-|===
-|`*_mapping_type_*`
-|The type of data mapping.  The only type currently supported is
- `json`.
-
-|`*_table_name_*`
-|The table to transform.
-
-|`*_column_name_*`
-|The column to transform.
-
-|`'*_object_path_*'`
-|Path to a JSON object or array.
-
-|`'*_target_identifier_*'`
-|A short, lowercase identifier to be used in naming the transformed
- data.  It must be unique for the transformed column; in other words,
- no two paths can be mapped to the same target identifier.
-|===
-
-[discrete]
-===== Examples
-
-Create JSON mappings to transform an object at `$.metadata` and an
-array at `$.tags.tagList`:
-
-image::create_data_mapping.png[]
-
-----
-CREATE DATA MAPPING FOR json
-    FROM TABLE library.inventory__ COLUMN jsondata PATH '$'
-    TO 't';
-
-CREATE DATA MAPPING FOR json
-    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.metadata'
-    TO 'metadata';
-
-CREATE DATA MAPPING FOR json
-    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.tags'
-    TO 'tags';
-
-CREATE DATA MAPPING FOR json
-    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.tags.tagList'
-    TO 'taglist';
-----
-
 ==== CREATE DATA ORIGIN
 
 Define a new data origin
@@ -645,6 +488,9 @@ a Metadb module, but in general origins allow grouping data
 independently of data sources.  This can be useful because data
 sources may be dictated by how the data are collected,
 e.g. geographically in a sensor network.
+
+NOTE: CREATE DATA ORIGIN currently requires restarting the server
+before it will take effect.
 
 [discrete]
 ===== Parameters
@@ -721,32 +567,26 @@ has completed, the Metadb server can be started again.
 |Regular expressions matching Kafka topics to read (comma-separated
  list).
 
-|`consumer_group`
+|`consumergroup`
 |Kafka consumer group ID.
 
-|`schema_pass_filter`
+|`schemapassfilter`
 |Regular expressions matching schema names to accept (comma-separated
  list).
 
-|`schema_stop_filter`
+|`schemastopfilter`
 |Regular expressions matching schema names to ignore (comma-separated
  list).
 
-|`table_stop_filter`
+|`tablestopfilter`
 |Regular expressions matching table names to ignore (comma-separated
  list).
 
-|`trim_schema_prefix`
+|`trimschemaprefix`
 |Prefix to remove from schema names.
 
-|`add_schema_prefix`
+|`addschemaprefix`
 |Prefix to add to schema names.
-
-|`map_public_schema` +
-[.aqua-background]#Metadb 1.4#
-|Set a new target schema for tables originating in the `public`
- schema.  For these tables, `add_schema_prefix` will not be added to
- the target schema if `map_public_schema` is set.
 
 |`module`
 |Name of pre-defined configuration.
@@ -761,55 +601,10 @@ Create `sensor` as a `kafka` data source:
 CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
     brokers 'kafka:29092',
     topics '^metadb_sensor_1\.',
-    consumer_group 'metadb_sensor_1_1',
-    add_schema_prefix 'sensor_',
-    table_stop_filter '^testing\.air_temp$,^testing\.air_temp_avg$'
+    consumergroup 'metadb_sensor_1_1',
+    addschemaprefix 'sensor_',
+    tablestopfilter '^testing\.air_temp$,^testing\.air_temp_avg$'
 );
-----
-
-==== CREATE SCHEMA
-
-[.aqua-background]#Metadb 1.4#
-
-Define a new schema
-
-[source,subs="verbatim,quotes"]
-----
-CREATE SCHEMA FOR USER `*_user_name_*`
-----
-
-[discrete]
-===== Description
-
-CREATE SCHEMA defines a new schema.  At present this command only
-supports creating a user schema, which serves as a workspace for a
-user.
-
-[discrete]
-====== User schemas
-
-Typically user schemas are created automatically by CREATE USER.
-However, if a user already exists and is registered, but does not have
-a user schema, CREATE SCHEMA can be used to create it.
-
-[discrete]
-===== Parameters
-
-[frame=none,grid=none,cols="1,2"]
-|===
-|`*_user_name_*`
-|The name of the user, which will also be the name of the new schema.
-|===
-
-[discrete]
-===== Examples
-
-Register an existing user `jane` and create its user schema:
-
-----
-REGISTER USER jane;
-
-CREATE SCHEMA FOR USER jane;
 ----
 
 ==== CREATE USER
@@ -824,16 +619,10 @@ CREATE USER `*_user_name_*` WITH *_option_* '*_value_*' [, ... ]
 [discrete]
 ===== Description
 
-CREATE USER defines a new database user and registers it with the
-Metadb instance, which allows it to receive access privileges.  In
-addition, CREATE USER creates a schema having the same name as the
-user, if the schema does not exist, and grants the user privileges on
-the schema.  The schema is intended as a workspace for the user.
-
-If a user already exists but is not registered or does not have a user
-schema, CREATE USER cannot be used to complete the process.  Instead,
-REGISTER USER and CREATE SCHEMA FOR USER are provided for this
-purpose.
+CREATE USER defines a new database user.  In addition, CREATE USER
+creates a schema having the same name as the user, if the schema does
+not exist, and grants the user privileges on the schema.  The schema
+is intended as a workspace for the user.
 
 [discrete]
 ===== Parameters
@@ -868,41 +657,6 @@ Create a user `wegg` and add it to this Metadb instance:
 
 ----
 CREATE USER wegg WITH PASSWORD 'LZn2DCajcNHpGR3ZXWHD', COMMENT 'Silas Wegg';
-----
-
-==== DEREGISTER USER
-
-[.aqua-background]#Metadb 1.4#
-
-Deregister a user from having database privileges
-
-[source,subs="verbatim,quotes"]
-----
-DEREGISTER USER `*_user_name_*`
-----
-
-[discrete]
-===== Description
-
-DEREGISTER USER removes the ability to have database privileges from a
-user that was previously added with REGISTER USER.  It automatically
-executes REVOKE ACCESS ON ALL and also prevents subsequent GRANT
-commands.
-
-[discrete]
-===== Parameters
-
-[frame=none,grid=none,cols="1,2"]
-|===
-|`*_user_name_*`
-|The name of the user to deregister.
-|===
-
-[discrete]
-===== Examples
-
-----
-DEREGISTER USER wegg;
 ----
 
 ==== DROP DATA SOURCE
@@ -940,103 +694,6 @@ Drop a data source `sensor`:
 DROP DATA SOURCE sensor;
 ----
 
-==== DROP USER
-
-[.aqua-background]#Metadb 1.4#
-
-Remove a database user
-
-[source,subs="verbatim,quotes"]
-----
-DROP USER `*_user_name_*`
-----
-
-[discrete]
-===== Description
-
-DROP USER removes a database user.  Before doing so, it attempts to
-find and revoke most authorizations held by the user that would
-typically prevent it from being removed.
-
-If a user is registered in more than one Metadb instance, DROP USER
-will not be able to remove all authorizations.  In that case, use
-DEREGISTER USER in each of the instances, and then issue DROP USER.
-
-[discrete]
-===== Parameters
-
-[frame=none,grid=none,cols="1,2"]
-|===
-|`*_user_name_*`
-|The name of the user to be removed.
-|===
-
-[discrete]
-===== Examples
-
-Remove a user `wegg`:
-
-----
-DROP USER wegg;
-----
-
-==== GRANT
-
-[.aqua-background]#Metadb 1.4#
-
-Enable access to data
-
-[source,subs="verbatim,quotes"]
-----
-GRANT ACCESS
-    ON { TABLE `*_table_name_*` | FUNCTION `*_function_name_*` | ALL }
-    TO `*_user_name_*`
-----
-
-[discrete]
-===== Description
-
-The GRANT command grants a user access privileges to Metadb-managed
-tables and functions.  It differs from a SQL GRANT command in that the
-privileges continue to be valid if a table or function is dropped and
-recreated.
-
-WARNING: The command GRANT ACCESS ON ALL allows a user to access all
-Metadb-managed tables and functions.
-
-[discrete]
-===== Parameters
-
-[frame=none,grid=none,cols="1,2"]
-|===
-|`*_table_name_*`
-|An existing table.
-
-|`*_function_name_*`
-|An existing function.
-
-|`*_user_name_*`
-|An existing user to be granted access.
-|===
-
-[discrete]
-===== Examples
-
-To grant a user `anna` access to a single table:
-
-----
-GRANT ACCESS ON TABLE library.patrongroup TO anna;
-----
-
-To grant a user `bob` access only to a single table and to nothing
-else:
-
-----
-REVOKE ACCESS ON ALL FROM bob;
-
-GRANT ACCESS ON TABLE library.patrongroup TO bob;
-----
-
 ==== LIST
 
 Show the value of a system variable
@@ -1062,14 +719,6 @@ other variables.
 |
 
 |
-|`config`
-|Server configuration parameter settings.
-
-|
-|`data_mappings`
-|Configured data mappings.
-
-|
 |`data_origins`
 |Configured data origins.
 
@@ -1087,85 +736,4 @@ other variables.
 
 ----
 LIST status;
-----
-
-==== REGISTER USER
-
-[.aqua-background]#Metadb 1.4#
-
-Register an existing user to receive database privileges
-
-[source,subs="verbatim,quotes"]
-----
-REGISTER USER `*_user_name_*`
-----
-
-[discrete]
-===== Description
-
-REGISTER USER associates an existing user with the Metadb instance.
-This has the effect of allowing the user to be granted privileges in
-the database via the GRANT command.
-
-Normally there is no need to issue REGISTER USER, because CREATE USER
-executes it automatically.  However, if an existing user was created
-in some other way, REGISTER USER can enable it for the Metadb
-instance.
-
-[discrete]
-===== Parameters
-
-[frame=none,grid=none,cols="1,2"]
-|===
-|`*_user_name_*`
-|The name of the user to register.
-|===
-
-[discrete]
-===== Examples
-
-----
-REGISTER USER beatrice;
-----
-
-==== REVOKE
-
-[.aqua-background]#Metadb 1.4#
-
-Disable access to data
-
-[source,subs="verbatim,quotes"]
-----
-REVOKE ACCESS
-    ON { TABLE `*_table_name_*` | FUNCTION `*_function_name_*` | ALL }
-    FROM `*_user_name_*`
-----
-
-[discrete]
-===== Description
-
-The REVOKE command revokes access to tables.
-
-[discrete]
-===== Parameters
-
-[frame=none,grid=none,cols="1,2"]
-|===
-|`*_table_name_*`
-|An existing table.
-
-|`*_function_name_*`
-|An existing function.
-
-|`*_user_name_*`
-|An existing user that will have access removed.
-|===
-
-[discrete]
-===== Examples
-
-To disable access by a user `bob` to a table:
-
-----
-REVOKE ACCESS ON TABLE library.patrongroup FROM bob;
 ----

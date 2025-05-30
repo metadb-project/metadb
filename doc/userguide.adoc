@@ -259,21 +259,11 @@ SELECT __id,
     FROM library.patrongroup;
 ----
 
-Metadb can be configured to generate a *transformed table*, which in
-our example will be called `patrongroup__t`.  The JSON transformation
-extracts JSON fields into columns, which allows for simpler queries.
+Metadb also generates a *transformed table*, which in our example will
+be called `patrongroup__t`.  The JSON transformation extracts JSON
+fields into columns, which allows for simpler queries.
 
-To define the transformation, the Metadb system administrator can run
-this command:
-
-----
-CREATE DATA MAPPING FOR json
-    FROM TABLE library.patrongroup__ COLUMN jsondata PATH '$'
-    TO 't';
-----
-
-The new transformation will take effect when the JSON data are next
-updated.  Then the query can be written as:
+The query can then be written as:
 
 [source]
 ----

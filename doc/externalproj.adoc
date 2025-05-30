@@ -49,14 +49,6 @@ FOLIO "derived tables" are helper tables that provide commonly used
 table joins, etc.  They are automatically updated once per day,
 usually at about 3:00 UTC by default.
 
-To enable these tables, set the server configuration parameter
-`external_sql_folio` to the desired Git reference in the
-folio-analytics repository.  For example:
-
-----
-ALTER SYSTEM SET external_sql_folio = 'refs/tags/v1.8.0';
-----
-
 Note that the derived tables are based on a periodic snapshot of data,
 and for this reason they are generally not up-to-date.
 
@@ -564,7 +556,6 @@ Support for transforming subfields and arrays is planned in Metadb.
 
 ===== Migrating historical data from LDP
 
-[.aqua-background]#Metadb 1.3# +
 Metadb can import legacy historical data from LDP.  The Metadb server
 must be stopped while this process runs.  As an example:
 
@@ -616,12 +607,12 @@ For example:
 ----
 CREATE DATA SOURCE folio TYPE kafka OPTIONS (
     module 'folio',
-    trim_schema_prefix 'tenantname_',
-    add_schema_prefix 'folio_',
+    trimschemaprefix 'tenantname_',
+    addschemaprefix 'folio_',
     brokers 'kafka:29092',
     topics '^metadb_folio_1\.',
-    consumer_group 'metadb_folio_1_1',
-    schema_stop_filter 'admin'
+    consumergroup 'metadb_folio_1_1',
+    schemastopfilter 'admin'
 );
 ----
 
@@ -682,14 +673,6 @@ origin if previously defined by `CREATE DATA ORIGIN`.
 ReShare "derived tables" are automatically updated once per day,
 usually at about 3:00 UTC by default.
 
-To enable these tables, set the server configuration parameter
-`external_sql_reshare` to the desired Git reference in the
-reshare-analytics repository.  For example:
-
-----
-ALTER SYSTEM SET external_sql_reshare = 'refs/tags/20230912004531';
-----
-
 Note that the derived tables are based on a periodic snapshot of data,
 and for this reason they are generally not up-to-date.
 
@@ -716,11 +699,11 @@ names:
 ----
 CREATE DATA SOURCE reshare TYPE kafka OPTIONS (
     module 'reshare',
-    add_schema_prefix 'reshare_',
+    addschemaprefix 'reshare_',
     brokers 'kafka:29092',
     topics '^metadb_reshare_1\.',
-    consumer_group 'metadb_reshare_1_1',
-    schema_stop_filter 'admin'
+    consumergroup 'metadb_reshare_1_1',
+    schemastopfilter 'admin'
 );
 ----
 

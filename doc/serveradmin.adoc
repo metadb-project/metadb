@@ -12,11 +12,11 @@
 * Operating system: Linux
 * Database system: https://www.postgresql.org/[PostgreSQL] 15 or later
 * To build from source, these may have to be installed:
-** https://go.dev/[Go] 1.24 or later
+** https://go.dev/[Go] 1.21 or later
 ** https://www.colm.net/open-source/ragel/[Ragel] 6
 ** https://gcc.gnu.org/[GCC C compiler] 9 or later
-** https://pkg.go.dev/golang.org/x/tools/cmd/goyacc[goyacc] (required
-   for Metadb 1.3 or earlier; see installation instructions below)
+** https://pkg.go.dev/golang.org/x/tools/cmd/goyacc[goyacc] (see
+   installation instructions below)
 
 ==== PostgreSQL configuration
 
@@ -50,7 +50,7 @@ specify a path that can serve as the build workspace for Go, e.g.:
 export GOPATH=$HOME/go
 ----
 
-For Metadb 1.3 or earlier, install goyacc:
+Next install goyacc:
 
 ----
 go install golang.org/x/tools/cmd/goyacc@master
@@ -68,7 +68,7 @@ git clone https://github.com/metadb-project/metadb.git -b latest
 Or alternatively specify a desired version, for example:
 
 ----
-git clone https://github.com/metadb-project/metadb.git -b v1.4.0
+git clone https://github.com/metadb-project/metadb.git -b v1.3.8
 ----
 
 Then compile the server by running the build script:
@@ -78,8 +78,6 @@ cd metadb
 
 ./build.sh
 ----
-
-NOTE: In Metadb 1.4, `build.sh` has been renamed to `build`.
 
 The build script creates a `bin/` subdirectory and creates the
 `metadb` executable there:
@@ -330,8 +328,8 @@ It is recommended to use the connector configuration settings
 `heartbeat.interval.ms` and `heartbeat.action.query` as above to avoid
 spikes in disk space consumption within the source database.  (See the
 Debezium PostgreSQL connector documentation for more details.)  The
-`schema_stop_filter` option of the `CREATE DATA SOURCE` command is
-used to filter out the heartbeat table.
+`schemastopfilter` option of the `CREATE DATA SOURCE` command is used
+to filter out the heartbeat table.
 
 In the source database:
 
@@ -384,9 +382,9 @@ statement, for example:
 CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
     brokers 'kafka:29092',
     topics '^metadb_sensor_1\.',
-    consumer_group 'metadb_sensor_1_1',
-    add_schema_prefix 'sensor_',
-    schema_stop_filter 'admin'
+    consumergroup 'metadb_sensor_1_1',
+    addschemaprefix 'sensor_',
+    schemastopfilter 'admin'
 );
 ----
 
@@ -440,13 +438,13 @@ be slower than usual, and there temporarily may be missing records
 the source database).  Also, periodic transforms and external SQL are
 paused during synchronization.
 
-1. Update the `topics` and `consumer_group` configuration settings for
+1. Update the `topics` and `consumergroup` configuration settings for
    the new data stream.
 +
 [source]
 ----
 ALTER DATA SOURCE sensor OPTIONS
-    (SET topics '^metadb_sensor_2\.', SET consumer_group 'metadb_sensor_2_1');
+    (SET topics '^metadb_sensor_2\.', SET consumergroup 'metadb_sensor_2_1');
 ----
 +
 *Do not restart the Metadb server but continue directly to Step 2.*
@@ -481,9 +479,6 @@ than too early (removing records before they have been restreamed).
 Metadb detects when snapshot data are no longer being received, and
 then writes "source snapshot complete (deadline exceeded)" to the log.
 This generally means it is a good time to run "endsync".
-+
-[.aqua-background]#Metadb 1.4# +
-The snapshot status is also available via the `LIST status` command.
 
 5. Start the server.
 +
@@ -503,9 +498,8 @@ To create a new database user account:
 CREATE USER wegg WITH PASSWORD 'LZn2DCajcNHpGR3ZXWHD', COMMENT 'Silas Wegg';
 ----
 
-In addition to creating the user, this also registers the user with
-the Metadb instance.  It also creates a schema with the same name as
-the user, which is intended as a workspace for the user.
+In addition to creating the user, this also creates a schema with the
+same name as the user, which is intended as a workspace for the user.
 
 .Recommendations:
 * Each user account should be for an individual user and not shared by
@@ -516,16 +510,7 @@ the user, which is intended as a workspace for the user.
 ==== Granting access to data
 
 A new user has very limited access to data.  To add privileges for
-tables and functions, use the GRANT command (or AUTHORIZE in Metadb
-1.3 and earlier).
-
-[discrete]
-==== Registering an existing user and creating a user schema
-
-As an alternative to CREATE USER, if a user already exists in the
-database system, it can be enabled to work with the Metadb database
-via the command REGISTER USER.  A user schema can then be created with
-CREATE SCHEMA FOR USER.
+tables and functions, use the AUTHORIZE command.
 
 === Administrative database changes
 
