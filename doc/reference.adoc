@@ -307,10 +307,14 @@ For example:
 ALTER SYSTEM SET external_sql_folio = 'refs/tags/v1.8.0';
 ----
 
+Setting the value to an empty string (`''`) disables running the
+external SQL.
+
 ==== external_sql_reshare
 
 The `external_sql_reshare` parameter sets the Git reference in the
-folio-reshare repository to be used for running external SQL.
+folio-reshare repository to be used for running external SQL.  Setting
+the value to an empty string (`''`) disables running the external SQL.
 
 ==== kafka_sync_concurrency
 
