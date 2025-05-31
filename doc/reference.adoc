@@ -389,9 +389,9 @@ ALTER DATA SOURCE `*_source_name_*`
 [discrete]
 ===== Description
 
-ALTER DATA SOURCE changes connection settings for a data source.
+`ALTER DATA SOURCE` changes connection settings for a data source.
 
-NOTE: ALTER DATA SOURCE currently requires restarting the server
+NOTE: `ALTER DATA SOURCE` currently requires restarting the server
 before it will take effect.
 
 [discrete]
@@ -410,7 +410,7 @@ before it will take effect.
 [discrete]
 ===== Options
 
-See CREATE DATA SOURCE
+See `CREATE DATA SOURCE`.
 
 [discrete]
 ===== Examples
@@ -472,10 +472,10 @@ ALTER TABLE `*_table_name_*`
 [discrete]
 ===== Description
 
-ALTER TABLE changes the definition of a table that is extracted from a
-data source.
+`ALTER TABLE` changes the definition of a table that is extracted from
+a data source.
 
-NOTE: ALTER TABLE currently requires restarting the server before it
+NOTE: `ALTER TABLE` currently requires restarting the server before it
 will take effect.
 
 [discrete]
@@ -517,7 +517,7 @@ CREATE DATA MAPPING FOR *_mapping_type_*
 [discrete]
 ===== Description
 
-CREATE DATA MAPPING defines mapping rules for data transformation.
+`CREATE DATA MAPPING` defines mapping rules for data transformation.
 The output of a mapping is written to a new column or table based on
 the specified target identifier.
 
@@ -592,12 +592,12 @@ CREATE DATA ORIGIN `*_origin_name_*`
 [discrete]
 ===== Description
 
-CREATE DATA ORIGIN defines a new origin.  An origin name can be stored
-by Metadb in the `__origin` column to tag individual records.  The use
-and meaning of origins are typically defined by the application or by
-a Metadb module, but in general origins allow grouping data
-independently of data sources.  This can be useful because data
-sources may be dictated by how the data are collected,
+`CREATE DATA ORIGIN` defines a new origin.  An origin name can be
+stored by Metadb in the `__origin` column to tag individual records.
+The use and meaning of origins are typically defined by the
+application or by a Metadb module, but in general origins allow
+grouping data independently of data sources.  This can be useful
+because data sources may be dictated by how the data are collected,
 e.g. geographically in a sensor network.
 
 [discrete]
@@ -631,7 +631,7 @@ CREATE DATA SOURCE `*_source_name_*` TYPE *_source_type_*
 [discrete]
 ===== Description
 
-CREATE DATA SOURCE defines connection settings for an external data
+`CREATE DATA SOURCE` defines connection settings for an external data
 source.
 
 The new data source starts out in synchronizing mode, which pauses
@@ -732,16 +732,13 @@ CREATE SCHEMA FOR USER `*_user_name_*`
 [discrete]
 ===== Description
 
-CREATE SCHEMA defines a new schema.  At present this command only
+`CREATE SCHEMA` defines a new schema.  At present this command only
 supports creating a user schema, which serves as a workspace for a
 user.
 
-[discrete]
-====== User schemas
-
-Typically user schemas are created automatically by CREATE USER.
+Typically user schemas are created automatically by `CREATE USER`.
 However, if a user already exists and is registered, but does not have
-a user schema, CREATE SCHEMA can be used to create it.
+a user schema, `CREATE SCHEMA` can be used to create it.
 
 [discrete]
 ===== Parameters
@@ -775,16 +772,16 @@ CREATE USER `*_user_name_*` WITH *_option_* '*_value_*' [, ... ]
 [discrete]
 ===== Description
 
-CREATE USER defines a new database user and registers it with the
+`CREATE USER` defines a new database user and registers it with the
 Metadb instance, which allows it to receive access privileges.  In
-addition, CREATE USER creates a schema having the same name as the
+addition, `CREATE USER` creates a schema having the same name as the
 user, if the schema does not exist, and grants the user privileges on
 the schema.  The schema is intended as a workspace for the user.
 
 If a user already exists but is not registered or does not have a user
-schema, CREATE USER cannot be used to complete the process.  Instead,
-REGISTER USER and CREATE SCHEMA FOR USER are provided for this
-purpose.
+schema, `CREATE USER` cannot be used to complete the process.
+Instead, `REGISTER USER` and `CREATE SCHEMA FOR USER` are provided for
+this purpose.
 
 [discrete]
 ===== Parameters
@@ -833,10 +830,10 @@ DEREGISTER USER `*_user_name_*`
 [discrete]
 ===== Description
 
-DEREGISTER USER removes the ability to have database privileges from a
-user that was previously added with REGISTER USER.  It automatically
-executes REVOKE ACCESS ON ALL and also prevents subsequent GRANT
-commands.
+`DEREGISTER USER` removes the ability to have database privileges from
+a user that was previously added with `REGISTER USER`.  It
+automatically executes `REVOKE ACCESS ON ALL` and also prevents
+subsequent `GRANT` commands.
 
 [discrete]
 ===== Parameters
@@ -866,10 +863,10 @@ DROP DATA SOURCE `*_source_name_*`
 [discrete]
 ===== Description
 
-DROP DATA SOURCE removes a data source configuration.
+`DROP DATA SOURCE` removes a data source configuration.
 
-NOTE: DROP DATA SOURCE currently requires restarting the server before
-it will take effect.
+NOTE: `DROP DATA SOURCE` currently requires restarting the server
+before it will take effect.
 
 [discrete]
 ===== Parameters
@@ -901,13 +898,14 @@ DROP USER `*_user_name_*`
 [discrete]
 ===== Description
 
-DROP USER removes a database user.  Before doing so, it attempts to
+`DROP USER` removes a database user.  Before doing so, it attempts to
 find and revoke most authorizations held by the user that would
 typically prevent it from being removed.
 
-If a user is registered in more than one Metadb instance, DROP USER
+If a user is registered in more than one Metadb instance, `DROP USER`
 will not be able to remove all authorizations.  In that case, use
-DEREGISTER USER in each of the instances, and then issue DROP USER.
+`DEREGISTER USER` in each of the instances, and then issue `DROP
+USER`.
 
 [discrete]
 ===== Parameters
@@ -941,13 +939,13 @@ GRANT ACCESS
 [discrete]
 ===== Description
 
-The GRANT command grants a user access privileges to Metadb-managed
+The `GRANT` command grants a user access privileges to Metadb-managed
 tables and functions.  It differs from a SQL GRANT command in that the
 privileges continue to be valid if a table or function is dropped and
 recreated.
 
-WARNING: The command GRANT ACCESS ON ALL allows a user to access all
-Metadb-managed tables and functions.
+WARNING: Issuing the command `GRANT ACCESS ON ALL` allows a user to
+access all Metadb-managed tables and functions.
 
 [discrete]
 ===== Parameters
@@ -994,7 +992,7 @@ LIST `*_name_*`
 [discrete]
 ===== Description
 
-LIST shows the current setting of various system configurations and
+`LIST` shows the current setting of various system configurations and
 other variables.
 
 [discrete]
@@ -1046,14 +1044,14 @@ REGISTER USER `*_user_name_*`
 [discrete]
 ===== Description
 
-REGISTER USER associates an existing user with the Metadb instance.
+`REGISTER USER` associates an existing user with the Metadb instance.
 This has the effect of allowing the user to be granted privileges in
-the database via the GRANT command.
+the database via the `GRANT` command.
 
-Normally there is no need to issue REGISTER USER, because CREATE USER
-executes it automatically.  However, if an existing user was created
-in some other way, REGISTER USER can enable it for the Metadb
-instance.
+Normally there is no need to issue `REGISTER USER`, because `CREATE
+USER` executes it automatically.  However, if an existing user was
+created in some other way, `REGISTER USER` can enable it for the
+Metadb instance.
 
 [discrete]
 ===== Parameters
@@ -1085,7 +1083,7 @@ REVOKE ACCESS
 [discrete]
 ===== Description
 
-The REVOKE command revokes access to tables.
+The `REVOKE` command revokes access to tables.
 
 [discrete]
 ===== Parameters

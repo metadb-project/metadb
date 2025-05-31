@@ -506,15 +506,15 @@ the user, which is intended as a workspace for the user.
 ==== Granting access to data
 
 A new user has very limited access to data.  To add privileges for
-tables and functions, use the GRANT command.
+tables and functions, use the `GRANT` command.
 
 [discrete]
 ==== Registering an existing user and creating a user schema
 
-As an alternative to CREATE USER, if a user already exists in the
+As an alternative to `CREATE USER`, if a user already exists in the
 database system, it can be enabled to work with the Metadb database
-via the command REGISTER USER.  A user schema can then be created with
-CREATE SCHEMA FOR USER.
+via the command `REGISTER USER`.  A user schema can then be created
+with `CREATE SCHEMA FOR USER`.
 
 === Administrative database changes
 
