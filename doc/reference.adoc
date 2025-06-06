@@ -296,6 +296,13 @@ of certain tables.
 
 === Configuration parameters
 
+==== checkpoint_segment_size
+
+The `checkpoint_segment_size` parameter sets the maximum number of
+change events that will be processed before a checkpoint occurs.  The
+default value is `'3000'`.  The server must be restarted for this
+parameter to take effect.
+
 ==== external_sql_folio
 
 The `external_sql_folio` parameter sets the Git reference in the
@@ -307,22 +314,28 @@ For example:
 ALTER SYSTEM SET external_sql_folio = 'refs/tags/v1.8.0';
 ----
 
-Setting the value to an empty string (`''`) disables running the
-external SQL.
+The default value is `''`, which disables running the external SQL.
 
 ==== external_sql_reshare
 
 The `external_sql_reshare` parameter sets the Git reference in the
-folio-reshare repository to be used for running external SQL.  Setting
-the value to an empty string (`''`) disables running the external SQL.
+folio-reshare repository to be used for running external SQL.  The
+default value is `''`, which disables running the external SQL.
 
-==== kafka_sync_concurrency
+// ==== kafka_sync_concurrency
 
-The `kafka_sync_concurrency` parameter sets the number of concurrent
-Kafka consumers that will run simultaneously during data source
-synchronization.  The default is 1.  At present the recommended value
-is 1.  This parameter requires restarting the server before it will
-take effect.
+// The `kafka_sync_concurrency` parameter sets the number of
+// concurrent Kafka consumers that will run simultaneously during data
+// source synchronization.  The default value is '1'.  At present the
+// recommended value is '1'.  The server must be restarted for this
+// parameter to take effect.
+
+==== max_poll_interval
+
+The `max_poll_interval` parameter sets a timeout in milliseconds for
+the interval between polls of a Kafka data source, during which change
+events are processed.  The default value is `'1800000'`.  The server
+must be restarted for this parameter to take effect.
 
 === External SQL directives
 
@@ -549,9 +562,11 @@ be applied only if mappings are also defined for both the paths
 |Path to a JSON object or array.
 
 |`'*_target_identifier_*'`
-|A short, lowercase identifier to be used in naming the transformed
- data.  It must be unique for the transformed column; in other words,
- no two paths can be mapped to the same target identifier.
+| A short identifier to be used in naming the transformed data.  The
+  identifier must be in all lowercase and no more than 16 characters
+  in length.  It must also be unique for the transformed column; in
+  other words, no two paths can be mapped to the same target
+  identifier.
 |===
 
 [discrete]

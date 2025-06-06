@@ -274,7 +274,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 			var ref string
 			ref, err = cat.GetConfig("external_sql_folio")
 			if err != nil {
-				return fmt.Errorf("reading external_sql_folio: %w", err)
+				return err
 			}
 			if ref == "" {
 				break
@@ -300,7 +300,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 			var ref string
 			ref, err = cat.GetConfig("external_sql_reshare")
 			if err != nil {
-				return fmt.Errorf("reading external_sql_reshare: %w", err)
+				return err
 			}
 			if ref == "" {
 				break
@@ -326,7 +326,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 			var ref string
 			ref, err = cat.GetConfig("external_sql_reshare")
 			if err != nil {
-				return fmt.Errorf("reading external_sql_reshare: %w", err)
+				return err
 			}
 			if ref == "" {
 				break

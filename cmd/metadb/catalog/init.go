@@ -252,9 +252,11 @@ func createTableConfig(tx pgx.Tx) error {
 		return fmt.Errorf("creating table "+catalogSchema+".config: %w", err)
 	}
 	q = "INSERT INTO " + catalogSchema + ".config (parameter, value) VALUES " +
-		"('external_sql_folio', 'refs/tags/v1.8.0'), " +
-		"('external_sql_reshare', 'refs/tags/20230912004531'), " +
-		"('kafka_sync_concurrency', '1');"
+		"('checkpoint_segment_size', '3000'), " +
+		"('external_sql_folio', ''), " +
+		"('external_sql_reshare', ''), " +
+		"('kafka_sync_concurrency', '1'), " +
+		"('max_poll_interval', '1800000')"
 	if _, err := tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("writing to table "+catalogSchema+".config: %w", err)
 	}

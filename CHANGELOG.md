@@ -1,3 +1,13 @@
+# Recent changes
+
+* New configuration parameters `checkpoint_segment_size` and
+  `max_poll_interval` can be used to fine-tune the stream processor.
+
+* The folio-analytics and folio-reshare tags are no longer set in new
+  installations.  The ALTER SYSTEM command can be used to set them via
+  the configuration parameters `external_sql_folio` and
+  `external_sql_reshare`.
+
 # v1.4.0-rc1
 
 * JSON transformation has been extended to include objects and arrays,

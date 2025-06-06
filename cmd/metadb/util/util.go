@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -14,7 +13,7 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-const DatabaseVersion = 29
+const DatabaseVersion = 30
 
 // MetadbVersion is defined at build time via -ldflags.
 var MetadbVersion = ""
@@ -223,35 +222,24 @@ func ReadConfigDatabase(datadir string) (*dbx.DB, error) {
 	}
 	s := cfg.Section("main")
 
-	checkpointSegmentSize := 3000
 	v := s.Key("checkpoint_segment_size").String()
 	if v != "" {
-		checkpointSegmentSize, err = strconv.Atoi(v)
-		if err != nil {
-			return nil, fmt.Errorf("reading checkpoint_segment_size: parsing %q: invalid syntax", v)
-		}
+		return nil, fmt.Errorf("checkpoint_segment_size is no longer supported in metadb.conf (see ALTER SYSTEM command)")
 	}
-
-	maxPollInterval := 1800000
 	v = s.Key("max_poll_interval").String()
 	if v != "" {
-		maxPollInterval, err = strconv.Atoi(v)
-		if err != nil {
-			return nil, fmt.Errorf("reading max_poll_interval: parsing %q: invalid syntax", v)
-		}
+		return nil, fmt.Errorf("max_poll_interval is no longer supported in metadb.conf (see ALTER SYSTEM command)")
 	}
 
 	return &dbx.DB{
-		Host:                  s.Key("host").String(),
-		Port:                  s.Key("port").String(),
-		User:                  s.Key("systemuser").String(),
-		Password:              s.Key("systemuser_password").String(),
-		SuperUser:             s.Key("superuser").String(),
-		SuperPassword:         s.Key("superuser_password").String(),
-		DBName:                s.Key("database").String(),
-		SSLMode:               s.Key("sslmode").String(),
-		CheckpointSegmentSize: checkpointSegmentSize,
-		MaxPollInterval:       maxPollInterval,
+		Host:          s.Key("host").String(),
+		Port:          s.Key("port").String(),
+		User:          s.Key("systemuser").String(),
+		Password:      s.Key("systemuser_password").String(),
+		SuperUser:     s.Key("superuser").String(),
+		SuperPassword: s.Key("superuser_password").String(),
+		DBName:        s.Key("database").String(),
+		SSLMode:       s.Key("sslmode").String(),
 	}, nil
 }
 
