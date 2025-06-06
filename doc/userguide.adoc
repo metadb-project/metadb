@@ -1,18 +1,16 @@
 == User guide
 
-This is an overview of using Metadb.  We assume familiarity with
-databases and the basics of SQL.
-
 === Getting started
 
-Metadb extends PostgreSQL with features to support analytics such as
-streaming data sources, data model transforms, and historical data.
-The data contained in the Metadb database originally come from another
-place: a *data source* which could be, for example, a
-transaction-processing database or a sensor network.  Metadb updates
-its database continuously based on state changes in an external data
-source.  Also part of the design of Metadb is to support multiple data
-sources, although this is not yet fully implemented.
+Metadb is a system for synchronizing databases for analytics
+applications.  It extends PostgreSQL with features such as streaming
+data sources, data model transforms, and historical data.  The data
+contained in the Metadb database originally come from another place: a
+*data source* which could be, for example, a transaction-processing
+database or a sensor network.  Metadb updates its database
+continuously based on state changes in an external data source.  Also
+part of the design of Metadb is to support multiple data sources,
+although this is not yet fully implemented.
 
 === Main tables
 
@@ -31,7 +29,7 @@ names that begin with two underscores:
 
 * `\__origin` is an optional identifier used to group related data
   from one or more data sources.  For example, Metadb can combine data
-  from similar source tables into a single table in the analytic
+  from similar source tables into a single table in the Metadb
   database, and in that case it stores an identifier in `__origin` to
   record where the data came from.
 

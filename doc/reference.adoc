@@ -944,6 +944,14 @@ tables and functions.  It differs from a SQL GRANT command in that the
 privileges continue to be valid if a table or function is dropped and
 recreated.
 
+Metadb-managed tables and functions include:
+
+* System tables such as `metadb.table_update`
+* System functions such as `public.mdblog(interval)`
+* Main and current tables streamed from data sources
+* Transformed tables such as from JSON or MARC formats
+* Tables created by automated execution of external SQL
+
 WARNING: Issuing the command `GRANT ACCESS ON ALL` allows a user to
 access all Metadb-managed tables and functions.
 

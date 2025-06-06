@@ -280,7 +280,7 @@ Data flow in this direction:
 2. Kafka Connect/Debezium
 3. Kafka
 4. Metadb
-5. The analytics database
+5. The Metadb database
 
 ==== Creating a connector
 
@@ -419,12 +419,12 @@ DROP PUBLICATION dbz_publication;
 
 If a Kafka data stream fails and cannot be resumed, it may be
 necessary to re-stream a complete snapshot of the data to Metadb.  For
-example, a source database may become unsynchronized with the analytic
+example, a source database may become unsynchronized with the Metadb
 database, requiring a new snapshot of the source database to be
 streamed.  Metadb can accept re-streamed data in order to synchronize
 with the source, using the following procedure.
 
-Note that during the synchronization process, the analytics database
+Note that during the synchronization process, the Metadb database
 continues to be available to users.  However, streaming updates will
 be slower than usual, and there temporarily may be missing records
 (until they are re-streamed) or "extra" records (recently deleted in
@@ -478,8 +478,7 @@ The snapshot status is also available via the `LIST status` command.
 5. Start the server.
 +
 Until a failed stream is re-streamed by following the process above,
-the analytic database may continue to be unsynchronized with the
-source.
+the Metadb database may continue to be unsynchronized with the source.
 
 === Creating database users
 
