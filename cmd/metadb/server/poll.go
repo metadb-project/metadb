@@ -203,7 +203,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	}
 	if spr.svr.opt.Script {
 		var errString string
-		processStream(0, nil, ctx, cat, spr, syncMode, dedup, nil, nil, &errString)
+		processStream(0, nil, ctx, cat, spr, syncMode, dedup, nil, nil, 0, &errString)
 		if errString != "" {
 			spr.source.Status.Stream.Error()
 			return errors.New(errString)
@@ -213,6 +213,10 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	var brokers = spr.source.Brokers
 	var topics = spr.source.Topics
 	var group = spr.source.Group
+	var maxPollInterval int
+	if maxPollInterval, err = getConfigMaxPollInterval(cat); err != nil {
+		return err
+	}
 	log.Debug("connecting to %q, topics %q", brokers, topics)
 	log.Debug("connecting to source %q", spr.source.Name)
 	var config = &kafka.ConfigMap{
@@ -220,13 +224,19 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		"bootstrap.servers":    brokers,
 		"enable.auto.commit":   false,
 		"group.id":             group,
-		"max.poll.interval.ms": spr.svr.db.MaxPollInterval,
+		"max.poll.interval.ms": maxPollInterval,
 		// The default range strategy assigns partition 0 to the same consumer for all topics.
 		// We currently use round robin assignment which does not have this problem.
 		// A custom partitioner could attempt to balance the consumers.
 		"partition.assignment.strategy": "roundrobin",
 		"security.protocol":             spr.source.Security,
 	}
+
+	var checkpointSegmentSize int
+	if checkpointSegmentSize, err = getConfigCheckpointSegmentSize(cat); err != nil {
+		return err
+	}
+
 	var consumersN int // Number of concurrent consumers
 	if syncMode == dsync.NoSync {
 		// During normal operation, we run single-threaded to give priority to user queries.
@@ -236,11 +246,11 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 		var kafkaConcurrency string
 		kafkaConcurrency, err = cat.GetConfig("kafka_sync_concurrency")
 		if err != nil {
-			return fmt.Errorf("reading kafka_sync_concurrency: %w", err)
+			return err
 		}
 		consumersN, err = strconv.Atoi(kafkaConcurrency)
 		if err != nil {
-			return fmt.Errorf("reading kafka_sync_concurrency value %q: %w", kafkaConcurrency, err)
+			return fmt.Errorf("invalid value %q for kafka_sync_concurrency", kafkaConcurrency)
 		}
 		if consumersN < 1 {
 			consumersN = 1
@@ -293,7 +303,7 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 			waitStreamProcs.Add(1)
 			go func(thread int, consumer *kafka.Consumer, ctx context.Context, cat *catalog.Catalog, spr *sproc, syncMode dsync.Mode, dedup *log.MessageSet, rebalanceFlag *int32, firstEvent *int32, errString *string) {
 				defer waitStreamProcs.Done()
-				processStream(thread, consumer, ctx, cat, spr, syncMode, dedup, rebalanceFlag, firstEvent, errString)
+				processStream(thread, consumer, ctx, cat, spr, syncMode, dedup, rebalanceFlag, firstEvent, checkpointSegmentSize, errString)
 			}(i, consumers[i], ctx, cat, spr, syncMode, dedup, &rebalanceFlag, &firstEvent, &(errStrings[i]))
 		}
 
@@ -313,7 +323,37 @@ func pollLoop(ctx context.Context, cat *catalog.Catalog, spr *sproc) error {
 	return nil
 }
 
-func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, cat *catalog.Catalog, spr *sproc, syncMode dsync.Mode, dedup *log.MessageSet, rebalanceFlag *int32, firstEvent *int32, errString *string) {
+func getConfigMaxPollInterval(cat *catalog.Catalog) (int, error) {
+	var m string
+	var err error
+	m, err = cat.GetConfig("max_poll_interval")
+	if err != nil {
+		return 0, err
+	}
+	var maxPollInterval int
+	maxPollInterval, err = strconv.Atoi(m)
+	if err != nil {
+		return 0, fmt.Errorf("invalid value %q for max_poll_interval", m)
+	}
+	return maxPollInterval, nil
+}
+
+func getConfigCheckpointSegmentSize(cat *catalog.Catalog) (int, error) {
+	var c string
+	var err error
+	c, err = cat.GetConfig("checkpoint_segment_size")
+	if err != nil {
+		return 0, err
+	}
+	var checkpointSegmentSize int
+	checkpointSegmentSize, err = strconv.Atoi(c)
+	if err != nil {
+		return 0, fmt.Errorf("invalid value %q for checkpoint_segment_size", c)
+	}
+	return checkpointSegmentSize, nil
+}
+
+func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, cat *catalog.Catalog, spr *sproc, syncMode dsync.Mode, dedup *log.MessageSet, rebalanceFlag *int32, firstEvent *int32, checkpointSegmentSize int, errString *string) {
 	// Parameters spr and syncMode are not thread-safe and should not be modified during stream processing.
 
 	for { // Stream processing main loop
@@ -326,7 +366,7 @@ func processStream(thread int, consumer *kafka.Consumer, ctx context.Context, ca
 			eventReadCount, err = parseChangeEvents(cat, dedup, consumer, cmdgraph, spr.schemaPassFilter,
 				spr.schemaStopFilter, spr.tableStopFilter, spr.source.TrimSchemaPrefix,
 				spr.source.AddSchemaPrefix, spr.source.MapPublicSchema, spr.sourceLog,
-				spr.svr.db.CheckpointSegmentSize)
+				checkpointSegmentSize)
 			if err != nil {
 				*errString = fmt.Sprintf("parser: %v", err)
 				return

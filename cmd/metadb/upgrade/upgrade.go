@@ -418,6 +418,7 @@ var updbList = []updbFunc{
 	updb27,
 	updb28,
 	updb29,
+	updb30,
 }
 
 func updb8(opt *dbopt) error {
@@ -1974,7 +1975,7 @@ func updb28(opt *dbopt) error {
 	q = "INSERT INTO metadb.config (parameter, value) VALUES " +
 		"('external_sql_folio', 'refs/tags/v1.8.0'), " +
 		"('external_sql_reshare', 'refs/tags/20230912004531'), " +
-		"('kafka_sync_concurrency', '1');"
+		"('kafka_sync_concurrency', '1')"
 	if _, err = tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("writing to table metadb.config: %w", err)
 	}
@@ -2027,6 +2028,35 @@ func updb29(opt *dbopt) error {
 	}
 
 	if err = metadata.WriteDatabaseVersion(tx, 29); err != nil {
+		return util.PGErr(err)
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
+		return util.PGErr(err)
+	}
+	return nil
+}
+
+func updb30(opt *dbopt) error {
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return util.PGErr(err)
+	}
+	defer dbx.Rollback(tx)
+
+	q := "INSERT INTO metadb.config (parameter, value) VALUES " +
+		"('checkpoint_segment_size', '3000'), " +
+		"('max_poll_interval', '1800000')"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("writing to table metadb.config: %w", err)
+	}
+
+	if err = metadata.WriteDatabaseVersion(tx, 30); err != nil {
 		return util.PGErr(err)
 	}
 	if err = tx.Commit(context.TODO()); err != nil {
