@@ -48,6 +48,16 @@ type CreateDataOriginStmt struct {
 func (*CreateDataOriginStmt) node()     {}
 func (*CreateDataOriginStmt) stmtNode() {}
 
+type DropDataMappingStmt struct {
+	TypeName   string
+	TableName  string
+	ColumnName string
+	Path       string
+}
+
+func (*DropDataMappingStmt) node()     {}
+func (*DropDataMappingStmt) stmtNode() {}
+
 type AlterDataSourceStmt struct {
 	DataSourceName string
 	Options        []Option

@@ -282,6 +282,8 @@ func processQuery(cat *catalog.Catalog, conn net.Conn, query string, args []any,
 		err = alterSystem(conn, n, cat)
 	case *ast.DeregisterUserStmt:
 		err = deregisterUser(conn, n, db, dc)
+	case *ast.DropDataMappingStmt:
+		err = dropDataMapping(conn, n, cat)
 	case *ast.RegisterUserStmt:
 		err = registerUser(conn, n, db, dc)
 	case *ast.CreateDataSourceStmt:

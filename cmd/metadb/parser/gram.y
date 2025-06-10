@@ -17,6 +17,7 @@ import (
 
 %type <node> alter_system_stmt
 %type <node> deregister_user_stmt
+%type <node> drop_data_mapping_stmt
 %type <node> register_user_stmt
 %type <node> top_level_stmt stmt
 %type <node> select_stmt
@@ -123,6 +124,10 @@ stmt:
 			yylex.(*lexer).pass = true
 			// $$ = nil
 		}
+	| drop_data_mapping_stmt
+		{
+			$$ = $1
+		}
 	| drop_data_source_stmt
 		{
 			$$ = $1
@@ -218,6 +223,12 @@ create_user_stmt:
 	| CREATE USER MAPPING
 		{
 			yylex.(*lexer).pass = true
+		}
+
+drop_data_mapping_stmt:
+	DROP DATA MAPPING FOR name FROM TABLE name COLUMN name PATH SLITERAL ';'
+		{
+			$$ = &ast.DropDataMappingStmt{TypeName: $5, TableName: $8, ColumnName: $10, Path: $12}
 		}
 
 grant_stmt:

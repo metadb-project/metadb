@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/metadb-project/metadb/cmd/metadb/types"
 	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
@@ -39,12 +40,22 @@ func (c *Catalog) JSONPathLookup(path types.JSONPath) string {
 }
 
 func (c *Catalog) DefineJSONMapping(schema, table, column, path, mapping string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if err := writeJSONMapping(c, schema, table, column, path, mapping); err != nil {
 		return err
 	}
+	c.jsonTransform[types.NewJSONPath(schema, table, column, path)] = mapping
+	return nil
+}
+
+func (c *Catalog) RemoveJSONMapping(schema, table, column, path string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.jsonTransform[types.NewJSONPath(schema, table, column, path)] = mapping
+	if err := deleteJSONMapping(c, schema, table, column, path); err != nil {
+		return err
+	}
+	delete(c.jsonTransform, types.NewJSONPath(schema, table, column, path))
 	return nil
 }
 
@@ -56,6 +67,29 @@ func writeJSONMapping(c *Catalog, schema, table, column, path, mapping string) e
 			return fmt.Errorf("JSON mapping from (table \"%s.%s\", column %q, path %q) to (%q) conflicts with an existing mapping",
 				schema, table, column, path, mapping)
 		}
+		return util.PGErr(err)
+	}
+	return nil
+}
+
+func deleteJSONMapping(c *Catalog, schema, table, column, path string) error {
+	// confirm the mapping exists
+	var i int64
+	err := c.dp.QueryRow(context.TODO(), "SELECT 1 FROM metadb.transform_json WHERE schema_name=$1 AND table_name=$2 AND column_name=$3 AND path=$4",
+		schema, table, column, path).Scan(&i)
+	switch {
+	case err == pgx.ErrNoRows:
+		return fmt.Errorf("data mapping does not exist for json in table \"%s.%s__\", column %q, path %q",
+			schema, table, column, path)
+	case err != nil:
+		return util.PGErr(err)
+	default:
+		// NOP - the mapping was found
+	}
+	// delete the mapping
+	if _, err := c.dp.Exec(context.TODO(),
+		"DELETE FROM metadb.transform_json WHERE schema_name=$1 AND table_name=$2 AND column_name=$3 AND path=$4",
+		schema, table, column, path); err != nil {
 		return util.PGErr(err)
 	}
 	return nil
