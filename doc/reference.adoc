@@ -866,6 +866,49 @@ subsequent `GRANT` commands.
 DEREGISTER USER wegg;
 ----
 
+==== DROP DATA MAPPING
+
+Remove a data mapping configuration
+
+[source,subs="verbatim,quotes"]
+----
+DROP DATA MAPPING FOR *_mapping_type_*
+    FROM TABLE `*_table_name_*` COLUMN `*_column_name_*` PATH '*_object_path_*'
+----
+
+[discrete]
+===== Description
+
+`DROP DATA MAPPING` removes a data mapping configuration.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_mapping_type_*`
+|The type of data mapping.
+
+|`*_table_name_*`
+|The table being transformed.
+
+|`*_column_name_*`
+|The column being transformed.
+
+|`'*_object_path_*'`
+|The JSON path.
+|===
+
+[discrete]
+===== Examples
+
+Remove a data mapping:
+
+----
+DROP DATA MAPPING FOR json
+    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.tags.tagList';
+----
+
 ==== DROP DATA SOURCE
 
 Remove a data source configuration
