@@ -61,17 +61,11 @@ go install golang.org/x/tools/cmd/goyacc@master
 export PATH=$PATH:$GOPATH/bin
 ----
 
-Now we can clone the Metadb source code repository and check out the
-`latest` tag, which retrieves the latest stable version:
+Now we can clone the Metadb source code repository and check out a
+desired version, for example:
 
 ----
-git clone https://github.com/metadb-project/metadb.git -b latest
-----
-
-Or alternatively specify a desired version, for example:
-
-----
-git clone https://github.com/metadb-project/metadb.git -b v1.3.8
+git clone https://github.com/metadb-project/metadb.git -b v1.3.9
 ----
 
 Then compile the server by running the build script:
