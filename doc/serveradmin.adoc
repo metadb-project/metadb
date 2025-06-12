@@ -51,14 +51,8 @@ specify a path that can serve as the build workspace for Go, e.g.:
 export GOPATH=$HOME/go
 ----
 
-Now we can clone the Metadb source code repository and check out the
-`latest` tag, which retrieves the latest stable version:
-
-----
-git clone https://github.com/metadb-project/metadb.git -b latest
-----
-
-Or alternatively specify a desired version, for example:
+Now we can clone the Metadb source code repository and check out a
+desired version, for example:
 
 ----
 git clone https://github.com/metadb-project/metadb.git -b v1.4.0
