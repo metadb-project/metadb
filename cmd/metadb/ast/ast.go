@@ -169,6 +169,13 @@ type GrantAccessOnFunctionStmt struct {
 func (*GrantAccessOnFunctionStmt) node()     {}
 func (*GrantAccessOnFunctionStmt) stmtNode() {}
 
+type PurgeDataDropTableStmt struct {
+	TableName string
+}
+
+func (*PurgeDataDropTableStmt) node()     {}
+func (*PurgeDataDropTableStmt) stmtNode() {}
+
 type RevokeAccessOnAllStmt struct {
 	UserName string
 }

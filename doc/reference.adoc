@@ -1098,6 +1098,41 @@ other variables.
 LIST status;
 ----
 
+==== PURGE DATA
+
+Delete data or database objects
+
+[source,subs="verbatim,quotes"]
+----
+PURGE DATA DROP TABLE `*_table_name_*`
+----
+
+[discrete]
+===== Description
+
+`PURGE DATA` deletes all data stored in a database object.  The form
+`PURGE DATA DROP TABLE` removes an entire main table.
+
+WARNING: `PURGE DATA` deletes data permanently.  It cannot be undone.
+
+[discrete]
+===== Parameters
+
+[frame=none,grid=none,cols="1,2"]
+|===
+|`*_table_name_*`
+|The schema-qualified name of the main table to drop.
+|===
+
+[discrete]
+===== Examples
+
+Remove a table `library.inventory__`:
+
+----
+PURGE DATA DROP TABLE library.inventory__;
+----
+
 ==== REGISTER USER
 
 Register an existing user to receive database privileges

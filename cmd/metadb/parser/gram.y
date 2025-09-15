@@ -18,6 +18,7 @@ import (
 %type <node> alter_system_stmt
 %type <node> deregister_user_stmt
 %type <node> drop_data_mapping_stmt
+%type <node> purge_data_stmt
 %type <node> register_user_stmt
 %type <node> top_level_stmt stmt
 %type <node> select_stmt
@@ -40,6 +41,7 @@ import (
 
 %token DEREGISTER
 %token FUNCTION
+%token PURGE
 %token REGISTER
 %token SELECT
 %token SYSTEM
@@ -142,6 +144,10 @@ stmt:
 			$$ = $1
 		}
 	| deauthorize_stmt
+		{
+			$$ = $1
+		}
+	| purge_data_stmt
 		{
 			$$ = $1
 		}
@@ -281,6 +287,12 @@ revoke_stmt:
 	| REVOKE ACCESS ON FUNCTION name '(' parameter_type_list ')' FROM name ';'
 		{
 			$$ = &ast.RevokeAccessOnFunctionStmt{FunctionName: $5, FunctionParameterTypes: $7, UserName: $10}
+		}
+
+purge_data_stmt:
+	PURGE DATA DROP TABLE name ';'
+		{
+			$$ = &ast.PurgeDataDropTableStmt{TableName: $5}
 		}
 
 deregister_user_stmt:
