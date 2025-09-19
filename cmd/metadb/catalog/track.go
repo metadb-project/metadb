@@ -179,6 +179,45 @@ func (c *Catalog) CreateNewTable(table *dbx.Table, transformed bool, parentTable
 	return nil
 }
 
+func (c *Catalog) DropTable(dq dbx.Queryable, table *dbx.Table) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if err := removeTableEntry(c, dq, table); err != nil {
+		return err
+	}
+	q := "DROP TABLE \"" + table.Schema + "\".\"" + table.Table + "__\""
+	if _, err := dq.Exec(context.TODO(), q); err != nil {
+		return util.PGErr(err)
+	}
+	q = "DROP TABLE \"" + table.Schema + "\".\"zzz___" + table.Table + "___sync\""
+	if _, err := dq.Exec(context.TODO(), q); err != nil {
+		return util.PGErr(err)
+	}
+	return nil
+}
+
+func removeTableEntry(c *Catalog, dq dbx.Queryable, table *dbx.Table) error {
+	c.removeCacheTableEntry(table)
+	if err := deleteFromTableTrack(dq, table); err != nil {
+		return fmt.Errorf("deleting catalog entry in database for table %q: %v",
+			table, util.PGErr(err))
+	}
+	return nil
+}
+
+func (c *Catalog) removeCacheTableEntry(table *dbx.Table) {
+	delete(c.tableDir, *table)
+}
+
+func deleteFromTableTrack(dq dbx.Queryable, table *dbx.Table) error {
+	q := "DELETE FROM metadb.base_table WHERE schema_name=$1 AND table_name=$2"
+	if _, err := dq.Exec(context.TODO(), q, table.Schema, table.Table); err != nil {
+		return util.PGErr(err)
+	}
+	return nil
+}
+
 func createSchemaIfNotExists(c *Catalog, table *dbx.Table) error {
 	q := "CREATE SCHEMA IF NOT EXISTS \"" + table.Schema + "\""
 	if _, err := c.dp.Exec(context.TODO(), q); err != nil {

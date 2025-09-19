@@ -170,7 +170,7 @@ func (*GrantAccessOnFunctionStmt) node()     {}
 func (*GrantAccessOnFunctionStmt) stmtNode() {}
 
 type PurgeDataDropTableStmt struct {
-	TableName string
+	TableNames []string
 }
 
 func (*PurgeDataDropTableStmt) node()     {}

@@ -129,6 +129,14 @@ func RevokeAllFromUser(dq dbx.Queryable, userName string) error {
 	return nil
 }
 
+func RevokeAllOnObject(dq dbx.Queryable, schemaName, objectName string, objectType ObjectType) error {
+	q := "DELETE FROM metadb.acl WHERE schema_name=$1 AND object_name=$2 AND object_type=$3"
+	if _, err := dq.Exec(context.TODO(), q, schemaName, objectName, objectType); err != nil {
+		return util.PGErr(err)
+	}
+	return nil
+}
+
 // RestorePrivileges reapplies all privileges that were previously defined using Grant().
 // It is intended for restoring privileges after an object has been recreated.
 func RestorePrivileges(dq dbx.Queryable, schemaName, objectName string, objectType ObjectType) error {

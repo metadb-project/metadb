@@ -311,7 +311,7 @@ func processQuery(cat *catalog.Catalog, conn net.Conn, query string, args []any,
 	case *ast.GrantAccessOnTableStmt:
 		err = grantAccessOnTable(conn, n, dc)
 	case *ast.PurgeDataDropTableStmt:
-		err = purgeDataDropTable(conn, n, db, dc)
+		err = purgeDataDropTable(conn, n, db, dc, cat)
 	case *ast.RevokeAccessOnAllStmt:
 		err = revokeAccessOnAll(conn, n, dc)
 	case *ast.RevokeAccessOnFunctionStmt:

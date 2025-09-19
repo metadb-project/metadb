@@ -19,6 +19,8 @@ import (
 
 var catalogSchema = "metadb"
 
+var ExecMutex sync.Mutex
+
 type Catalog struct {
 	mu                 sync.Mutex
 	tableDir           map[dbx.Table]tableEntry

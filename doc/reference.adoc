@@ -1104,16 +1104,23 @@ Delete data or database objects
 
 [source,subs="verbatim,quotes"]
 ----
-PURGE DATA DROP TABLE `*_table_name_*`
+PURGE DATA DROP TABLE `*_table_name_*` [, ... ]
 ----
 
 [discrete]
 ===== Description
 
-`PURGE DATA` deletes all data stored in a database object.  The form
-`PURGE DATA DROP TABLE` removes an entire main table.
-
 WARNING: `PURGE DATA` deletes data permanently.  It cannot be undone.
+
+`PURGE DATA` deletes all data stored in a database object.  The form
+`PURGE DATA DROP TABLE` removes specified main tables and their
+corresponding current tables.
+
+WARNING: `PURGE DATA DROP TABLE` not only removes a specified main
+table but also removes its associated current table.
+
+Dropping tables can take significant time due to concurrency control.
+`PURGE DATA` waits until it can safely continue.
 
 [discrete]
 ===== Parameters
@@ -1127,10 +1134,11 @@ WARNING: `PURGE DATA` deletes data permanently.  It cannot be undone.
 [discrete]
 ===== Examples
 
-Remove a table `library.inventory__`:
+Remove main tables `+old_1__+` and `+old_2__+` and their corresponding
+current tables `+old_1+` and `+old_2+`:
 
 ----
-PURGE DATA DROP TABLE library.inventory__;
+PURGE DATA DROP TABLE library.old_1__, library.old_2__;
 ----
 
 ==== REGISTER USER

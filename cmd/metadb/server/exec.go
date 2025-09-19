@@ -18,6 +18,8 @@ import (
 )
 
 func execCommandGraph(thread int, ctx context.Context, cat *catalog.Catalog, cmdgraph *command.CommandGraph, dp *pgxpool.Pool, source string, uuopt bool, syncMode dsync.Mode, dedup *log.MessageSet) error {
+	catalog.ExecMutex.Lock()
+	defer catalog.ExecMutex.Unlock()
 	if cmdgraph.Commands.Len() == 0 {
 		return nil
 	}

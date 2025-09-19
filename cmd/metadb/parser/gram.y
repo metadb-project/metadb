@@ -9,6 +9,7 @@ import (
 
 %union{
 	str string
+	tableparamlist []string
 	funcparamtypelist []string
 	optlist []ast.Option
 	node ast.Node
@@ -30,6 +31,8 @@ import (
 %type <node> alter_table_stmt alter_table_cmd
 %type <node> verify_consistency_stmt
 %type <node> create_schema_for_user_stmt
+%type <tableparamlist> table_parameter
+%type <tableparamlist> table_parameter_list
 %type <funcparamtypelist> parameter_type
 %type <funcparamtypelist> parameter_type_list
 %type <optlist> options_clause alter_options_clause option_list alter_option_list option alter_option
@@ -255,6 +258,22 @@ grant_stmt:
 			$$ = &ast.GrantAccessOnFunctionStmt{FunctionName: $5, FunctionParameterTypes: $7, UserName: $10}
 		}
 
+table_parameter_list:
+	table_parameter
+		{
+			$$ = $1
+		}
+	| table_parameter_list ',' table_parameter
+		{
+			$$ = append($1, $3...)
+		}
+
+table_parameter:
+	name
+		{
+			$$ = []string{$1}
+		}
+
 parameter_type_list:
 	parameter_type
 		{
@@ -290,9 +309,9 @@ revoke_stmt:
 		}
 
 purge_data_stmt:
-	PURGE DATA DROP TABLE name ';'
+	PURGE DATA DROP TABLE table_parameter_list ';'
 		{
-			$$ = &ast.PurgeDataDropTableStmt{TableName: $5}
+			$$ = &ast.PurgeDataDropTableStmt{TableNames: $5}
 		}
 
 deregister_user_stmt:
