@@ -1107,20 +1107,24 @@ Delete data or database objects
 purge data drop table `*_table_name_*` [, ... ]
 ----
 
+WARNING: `purge data` deletes data permanently.  It cannot be undone.
+
 [discrete]
 ===== Description
 
-WARNING: `purge data` deletes data permanently.  It cannot be undone.
+`purge data` deletes all data stored in one or more database objects.
 
-`purge data` deletes all data stored in a database object.  The form
-`purge data drop table` removes specified main tables and their
-corresponding current tables.
+The form `purge data drop table` removes specified main tables.  This
+also results in the corresponding current tables being removed,
+because of the parent-child relationship of main tables and current
+tables.
 
-WARNING: `purge data drop table` not only removes a specified main
-table but also removes its associated current table.
+WARNING: `purge data drop table` not only removes the specified main
+tables but also removes their associated current tables.
 
-Dropping tables can take significant time due to concurrency control.
-`purge data` waits until it can safely continue.
+Due to concurrency control, `purge data drop table` has to acquire
+stream processing or table locks in order to finish executing.  It
+automatically waits until it can continue safely.
 
 [discrete]
 ===== Parameters
@@ -1134,11 +1138,11 @@ Dropping tables can take significant time due to concurrency control.
 [discrete]
 ===== Examples
 
-Remove main tables `+old_1__+` and `+old_2__+` and their corresponding
-current tables `+old_1+` and `+old_2+`:
+Remove main tables `+table1__+` and `+table2__+` and their
+corresponding current tables `+table1+` and `+table2+`:
 
 ----
-purge data drop table library.old_1__, library.old_2__;
+purge data drop table library.table1__, library.table2__;
 ----
 
 ==== register user
