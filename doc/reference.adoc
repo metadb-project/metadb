@@ -143,7 +143,7 @@ At present the only inferred type is `uuid`:
 |
 |===
 
-Types also can be set manually via the `ALTER TABLE` command.
+Types also can be set manually via the `alter table` command.
 
 === Functions
 
@@ -192,16 +192,16 @@ Types also can be set manually via the `ALTER TABLE` command.
 Show log messages from the past hour, and from the past 24 hours:
 
 ----
-SELECT * FROM mdblog('1 hour');
+select * from mdblog('1 hour');
 ----
 ----
-SELECT * FROM mdblog();
+select * from mdblog();
 ----
 
 Show the current Metadb version:
 
 ----
-SELECT mdbversion();
+select mdbversion();
 ----
 
 === System tables
@@ -311,7 +311,7 @@ folio-analytics repository to be used for running external SQL.
 For example:
 
 ----
-ALTER SYSTEM SET external_sql_folio = 'refs/tags/v1.8.0';
+alter system set external_sql_folio = 'refs/tags/v1.8.0';
 ----
 
 The default value is `''`, which disables running the external SQL.
@@ -357,10 +357,10 @@ directive, followed by an empty line, for example:
 ----
 --metadb:table library_patrons
 
-DROP TABLE IF EXISTS library_patrons;
+drop table if exists library_patrons;
 
-CREATE TABLE library_patrons AS
-SELECT . . . ;
+create table library_patrons as
+select . . . ;
 ----
 
 ==== --metadb:table
@@ -389,22 +389,22 @@ the server.  These statements are only available when connecting to
 the Metadb server (not the PostgreSQL server for the underlying
 database).
 
-==== ALTER DATA SOURCE
+==== alter data source
 
 Change the configuration of a data source
 
 [source,subs="verbatim,quotes"]
 ----
-ALTER DATA SOURCE `*_source_name_*`
-    OPTIONS ( [ ADD | SET | DROP ] *_option_* ['*_value_*'] [, ... ] )
+alter data source `*_source_name_*`
+    options ( [ add | set | drop ] *_option_* ['*_value_*'] [, ... ] )
 ----
 
 [discrete]
 ===== Description
 
-`ALTER DATA SOURCE` changes connection settings for a data source.
+`alter data source` changes connection settings for a data source.
 
-NOTE: `ALTER DATA SOURCE` currently requires restarting the server
+NOTE: `alter data source` currently requires restarting the server
 before it will take effect.
 
 [discrete]
@@ -415,7 +415,7 @@ before it will take effect.
 |`*_source_name_*`
 |The name of an existing data source.
 
-|`OPTIONS ( [ ADD \| SET \| DROP ] *_option_* ['*_value_*'] [, ... ] )`
+|`options ( [ add \| set \| drop ] *_option_* ['*_value_*'] [, ... ] )`
 |Connection settings and other configuration options for the data
  source.
 |===
@@ -423,7 +423,7 @@ before it will take effect.
 [discrete]
 ===== Options
 
-See `CREATE DATA SOURCE`.
+See `create data source`.
 
 [discrete]
 ===== Examples
@@ -431,27 +431,27 @@ See `CREATE DATA SOURCE`.
 Change the consumer group:
 
 ----
-ALTER DATA SOURCE sensor OPTIONS (SET consumer_group 'metadb_sensor_1');
+alter data source sensor options (set consumer_group 'metadb_sensor_1');
 ----
 
-==== ALTER SYSTEM
+==== alter system
 
 Change a server configuration parameter
 
 [source,subs="verbatim,quotes"]
 ----
-ALTER SYSTEM SET `*_configuration_parameter_*` = `*_value_*`
+alter system set `*_configuration_parameter_*` = `*_value_*`
 ----
 
 [discrete]
 ===== Description
 
-`ALTER SYSTEM` changes a server configuration parameter setting.  Some
+`alter system` changes a server configuration parameter setting.  Some
 parameters require restarting the server before they will take effect.
 See *Reference > Configuration parameters* for documentation of
 available parameters.
 
-Configuration values can be displayed via the `LIST config` command.
+Configuration values can be displayed via the `list config` command.
 
 [discrete]
 ===== Parameters
@@ -469,26 +469,26 @@ Configuration values can be displayed via the `LIST config` command.
 ===== Examples
 
 ----
-ALTER SYSTEM SET kafka_sync_concurrency = '1';
+alter system set kafka_sync_concurrency = '1';
 ----
 
-==== ALTER TABLE
+==== alter table
 
 Change a table definition
 
 [source,subs="verbatim,quotes"]
 ----
-ALTER TABLE `*_table_name_*`
-    ALTER COLUMN `*_column_name_*` TYPE `*_data_type_*`
+alter table `*_table_name_*`
+    alter column `*_column_name_*` type `*_data_type_*`
 ----
 
 [discrete]
 ===== Description
 
-`ALTER TABLE` changes the definition of a table that is extracted from
+`alter table` changes the definition of a table that is extracted from
 a data source.
 
-NOTE: `ALTER TABLE` currently requires restarting the server before it
+NOTE: `alter table` currently requires restarting the server before it
 will take effect.
 
 [discrete]
@@ -513,24 +513,24 @@ will take effect.
 Change a column type to `uuid`:
 
 ----
-ALTER TABLE library.patron__ ALTER COLUMN patrongroup_id TYPE uuid;
+alter table library.patron__ alter column patrongroup_id type uuid;
 ----
 
-==== CREATE DATA MAPPING
+==== create data mapping
 
 Define a new mapping for data transformation
 
 [source,subs="verbatim,quotes"]
 ----
-CREATE DATA MAPPING FOR *_mapping_type_*
-    FROM TABLE `*_table_name_*` COLUMN `*_column_name_*` PATH '*_object_path_*'
-    TO '*_target_identifier_*'
+create data mapping for *_mapping_type_*
+    from table `*_table_name_*` column `*_column_name_*` path '*_object_path_*'
+    to '*_target_identifier_*'
 ----
 
 [discrete]
 ===== Description
 
-`CREATE DATA MAPPING` defines mapping rules for data transformation.
+`create data mapping` defines mapping rules for data transformation.
 The output of a mapping is written to a new column or table based on
 the specified target identifier.
 
@@ -578,36 +578,36 @@ array at `$.tags.tagList`:
 image::create_data_mapping.png[]
 
 ----
-CREATE DATA MAPPING FOR json
-    FROM TABLE library.inventory__ COLUMN jsondata PATH '$'
-    TO 't';
+create data mapping for json
+    from table library.inventory__ column jsondata path '$'
+    to 't';
 
-CREATE DATA MAPPING FOR json
-    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.metadata'
-    TO 'metadata';
+create data mapping for json
+    from table library.inventory__ column jsondata path '$.metadata'
+    to 'metadata';
 
-CREATE DATA MAPPING FOR json
-    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.tags'
-    TO 'tags';
+create data mapping for json
+    from table library.inventory__ column jsondata path '$.tags'
+    to 'tags';
 
-CREATE DATA MAPPING FOR json
-    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.tags.tagList'
-    TO 'taglist';
+create data mapping for json
+    from table library.inventory__ column jsondata path '$.tags.tagList'
+    to 'taglist';
 ----
 
-==== CREATE DATA ORIGIN
+==== create data origin
 
 Define a new data origin
 
 [source,subs="verbatim,quotes"]
 ----
-CREATE DATA ORIGIN `*_origin_name_*`
+create data origin `*_origin_name_*`
 ----
 
 [discrete]
 ===== Description
 
-`CREATE DATA ORIGIN` defines a new origin.  An origin name can be
+`create data origin` defines a new origin.  An origin name can be
 stored by Metadb in the `__origin` column to tag individual records.
 The use and meaning of origins are typically defined by the
 application or by a Metadb module, but in general origins allow
@@ -630,23 +630,23 @@ e.g. geographically in a sensor network.
 Create a new origin `test_origin`:
 
 ----
-CREATE DATA ORIGIN test_origin;
+create data origin test_origin;
 ----
 
-==== CREATE DATA SOURCE
+==== create data source
 
 Define a new external data source
 
 [source,subs="verbatim,quotes"]
 ----
-CREATE DATA SOURCE `*_source_name_*` TYPE *_source_type_*
-    OPTIONS ( *_option_* '*_value_*' [, ... ] )
+create data source `*_source_name_*` type *_source_type_*
+    options ( *_option_* '*_value_*' [, ... ] )
 ----
 
 [discrete]
 ===== Description
 
-`CREATE DATA SOURCE` defines connection settings for an external data
+`create data source` defines connection settings for an external data
 source.
 
 The new data source starts out in synchronizing mode, which pauses
@@ -670,7 +670,7 @@ has completed, the Metadb server can be started again.
 |The type of data source.  The only type currently supported is
  `kafka`.
 
-|`OPTIONS ( *_option_* '*_value_*' [, ... ] )`
+|`options ( *_option_* '*_value_*' [, ... ] )`
 |Connection settings and other configuration options for the data
  source.
 |===
@@ -726,7 +726,7 @@ has completed, the Metadb server can be started again.
 Create `sensor` as a `kafka` data source:
 
 ----
-CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
+create data source sensor type kafka options (
     brokers 'kafka:29092',
     topics '^metadb_sensor_1\.',
     consumer_group 'metadb_sensor_1_1',
@@ -735,25 +735,25 @@ CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
 );
 ----
 
-==== CREATE SCHEMA
+==== create schema
 
 Define a new schema
 
 [source,subs="verbatim,quotes"]
 ----
-CREATE SCHEMA FOR USER `*_user_name_*`
+create schema for user `*_user_name_*`
 ----
 
 [discrete]
 ===== Description
 
-`CREATE SCHEMA` defines a new schema.  At present this command only
+`create schema` defines a new schema.  At present this command only
 supports creating a user schema, which serves as a workspace for a
 user.
 
-Typically user schemas are created automatically by `CREATE USER`.
+Typically user schemas are created automatically by `create user`.
 However, if a user already exists and is registered, but does not have
-a user schema, `CREATE SCHEMA` can be used to create it.
+a user schema, `create schema` can be used to create it.
 
 [discrete]
 ===== Parameters
@@ -770,32 +770,32 @@ a user schema, `CREATE SCHEMA` can be used to create it.
 Register an existing user `jane` and create its user schema:
 
 ----
-REGISTER USER jane;
+register user jane;
 
-CREATE SCHEMA FOR USER jane;
+create schema for user jane;
 ----
 
-==== CREATE USER
+==== create user
 
 Define a new database user
 
 [source,subs="verbatim,quotes"]
 ----
-CREATE USER `*_user_name_*` WITH *_option_* '*_value_*' [, ... ]
+create user `*_user_name_*` with *_option_* '*_value_*' [, ... ]
 ----
 
 [discrete]
 ===== Description
 
-`CREATE USER` defines a new database user and registers it with the
+`create user` defines a new database user and registers it with the
 Metadb instance, which allows it to receive access privileges.  In
-addition, `CREATE USER` creates a schema having the same name as the
+addition, `create user` creates a schema having the same name as the
 user, if the schema does not exist, and grants the user privileges on
 the schema.  The schema is intended as a workspace for the user.
 
 If a user already exists but is not registered or does not have a user
-schema, `CREATE USER` cannot be used to complete the process.
-Instead, `REGISTER USER` and `CREATE SCHEMA FOR USER` are provided for
+schema, `create user` cannot be used to complete the process.
+Instead, `register user` and `create schema for user` are provided for
 this purpose.
 
 [discrete]
@@ -806,7 +806,7 @@ this purpose.
 |`*_user_name_*`
 |The name of the new user.
 
-|`WITH ( *_option_* '*_value_*' [, ... ] )`
+|`with ( *_option_* '*_value_*' [, ... ] )`
 |Configuration options for the new user.
 |===
 
@@ -830,25 +830,25 @@ user interfaces.
 Create a user `wegg` and add it to this Metadb instance:
 
 ----
-CREATE USER wegg WITH PASSWORD 'LZn2DCajcNHpGR3ZXWHD', COMMENT 'Silas Wegg';
+create user wegg with password 'LZn2DCajcNHpGR3ZXWHD', comment 'Silas Wegg';
 ----
 
-==== DEREGISTER USER
+==== deregister user
 
 Deregister a user from having database privileges
 
 [source,subs="verbatim,quotes"]
 ----
-DEREGISTER USER `*_user_name_*`
+deregister user `*_user_name_*`
 ----
 
 [discrete]
 ===== Description
 
-`DEREGISTER USER` removes the ability to have database privileges from
-a user that was previously added with `REGISTER USER`.  It
-automatically executes `REVOKE ACCESS ON ALL` and also prevents
-subsequent `GRANT` commands.
+`deregister user` removes the ability to have database privileges from
+a user that was previously added with `register user`.  It
+automatically executes `revoke access on all` and also prevents
+subsequent `grant` commands.
 
 [discrete]
 ===== Parameters
@@ -863,23 +863,23 @@ subsequent `GRANT` commands.
 ===== Examples
 
 ----
-DEREGISTER USER wegg;
+deregister user wegg;
 ----
 
-==== DROP DATA MAPPING
+==== drop data mapping
 
 Remove a data mapping configuration
 
 [source,subs="verbatim,quotes"]
 ----
-DROP DATA MAPPING FOR *_mapping_type_*
-    FROM TABLE `*_table_name_*` COLUMN `*_column_name_*` PATH '*_object_path_*'
+drop data mapping for *_mapping_type_*
+    from table `*_table_name_*` column `*_column_name_*` path '*_object_path_*'
 ----
 
 [discrete]
 ===== Description
 
-`DROP DATA MAPPING` removes a data mapping configuration.
+`drop data mapping` removes a data mapping configuration.
 
 [discrete]
 ===== Parameters
@@ -905,25 +905,25 @@ DROP DATA MAPPING FOR *_mapping_type_*
 Remove a data mapping:
 
 ----
-DROP DATA MAPPING FOR json
-    FROM TABLE library.inventory__ COLUMN jsondata PATH '$.tags.tagList';
+drop data mapping for json
+    from table library.inventory__ column jsondata path '$.tags.tagList';
 ----
 
-==== DROP DATA SOURCE
+==== drop data source
 
 Remove a data source configuration
 
 [source,subs="verbatim,quotes"]
 ----
-DROP DATA SOURCE `*_source_name_*`
+drop data source `*_source_name_*`
 ----
 
 [discrete]
 ===== Description
 
-`DROP DATA SOURCE` removes a data source configuration.
+`drop data source` removes a data source configuration.
 
-NOTE: `DROP DATA SOURCE` currently requires restarting the server
+NOTE: `drop data source` currently requires restarting the server
 before it will take effect.
 
 [discrete]
@@ -941,29 +941,29 @@ before it will take effect.
 Drop a data source `sensor`:
 
 ----
-DROP DATA SOURCE sensor;
+drop data source sensor;
 ----
 
-==== DROP USER
+==== drop user
 
 Remove a database user
 
 [source,subs="verbatim,quotes"]
 ----
-DROP USER `*_user_name_*`
+drop user `*_user_name_*`
 ----
 
 [discrete]
 ===== Description
 
-`DROP USER` removes a database user.  Before doing so, it attempts to
+`drop user` removes a database user.  Before doing so, it attempts to
 find and revoke most authorizations held by the user that would
 typically prevent it from being removed.
 
-If a user is registered in more than one Metadb instance, `DROP USER`
+If a user is registered in more than one Metadb instance, `drop user`
 will not be able to remove all authorizations.  In that case, use
-`DEREGISTER USER` in each of the instances, and then issue `DROP
-USER`.
+`deregister user` in each of the instances, and then issue `drop
+user`.
 
 [discrete]
 ===== Parameters
@@ -980,25 +980,25 @@ USER`.
 Remove a user `wegg`:
 
 ----
-DROP USER wegg;
+drop user wegg;
 ----
 
-==== GRANT
+==== grant
 
 Enable access to data
 
 [source,subs="verbatim,quotes"]
 ----
-GRANT ACCESS
-    ON { TABLE `*_table_name_*` | FUNCTION `*_function_name_*` | ALL }
-    TO `*_user_name_*`
+grant access
+    on { table `*_table_name_*` | function `*_function_name_*` | all }
+    to `*_user_name_*`
 ----
 
 [discrete]
 ===== Description
 
-The `GRANT` command grants a user access privileges to Metadb-managed
-tables and functions.  It differs from a SQL GRANT command in that the
+The `grant` command grants a user access privileges to Metadb-managed
+tables and functions.  It differs from a SQL grant command in that the
 privileges continue to be valid if a table or function is dropped and
 recreated.
 
@@ -1010,7 +1010,7 @@ Metadb-managed tables and functions include:
 * Transformed tables such as from JSON or MARC formats
 * Tables created by automated execution of external SQL
 
-WARNING: Issuing the command `GRANT ACCESS ON ALL` allows a user to
+WARNING: Issuing the command `grant access on all` allows a user to
 access all Metadb-managed tables and functions.
 
 [discrete]
@@ -1034,31 +1034,31 @@ access all Metadb-managed tables and functions.
 To grant a user `anna` access to a single table:
 
 ----
-GRANT ACCESS ON TABLE library.patrongroup TO anna;
+grant access on table library.patrongroup to anna;
 ----
 
 To grant a user `bob` access only to a single table and to nothing
 else:
 
 ----
-REVOKE ACCESS ON ALL FROM bob;
+revoke access on all from bob;
 
-GRANT ACCESS ON TABLE library.patrongroup TO bob;
+grant access on table library.patrongroup to bob;
 ----
 
-==== LIST
+==== list
 
 Show the value of a system variable
 
 [source,subs="verbatim,quotes"]
 ----
-LIST `*_name_*`
+list `*_name_*`
 ----
 
 [discrete]
 ===== Description
 
-`LIST` shows the current setting of various system configurations and
+`list` shows the current setting of various system configurations and
 other variables.
 
 [discrete]
@@ -1095,32 +1095,32 @@ other variables.
 ===== Examples
 
 ----
-LIST status;
+list status;
 ----
 
-==== PURGE DATA
+==== purge data
 
 Delete data or database objects
 
 [source,subs="verbatim,quotes"]
 ----
-PURGE DATA DROP TABLE `*_table_name_*` [, ... ]
+purge data drop table `*_table_name_*` [, ... ]
 ----
 
 [discrete]
 ===== Description
 
-WARNING: `PURGE DATA` deletes data permanently.  It cannot be undone.
+WARNING: `purge data` deletes data permanently.  It cannot be undone.
 
-`PURGE DATA` deletes all data stored in a database object.  The form
-`PURGE DATA DROP TABLE` removes specified main tables and their
+`purge data` deletes all data stored in a database object.  The form
+`purge data drop table` removes specified main tables and their
 corresponding current tables.
 
-WARNING: `PURGE DATA DROP TABLE` not only removes a specified main
+WARNING: `purge data drop table` not only removes a specified main
 table but also removes its associated current table.
 
 Dropping tables can take significant time due to concurrency control.
-`PURGE DATA` waits until it can safely continue.
+`purge data` waits until it can safely continue.
 
 [discrete]
 ===== Parameters
@@ -1138,28 +1138,28 @@ Remove main tables `+old_1__+` and `+old_2__+` and their corresponding
 current tables `+old_1+` and `+old_2+`:
 
 ----
-PURGE DATA DROP TABLE library.old_1__, library.old_2__;
+purge data drop table library.old_1__, library.old_2__;
 ----
 
-==== REGISTER USER
+==== register user
 
 Register an existing user to receive database privileges
 
 [source,subs="verbatim,quotes"]
 ----
-REGISTER USER `*_user_name_*`
+register user `*_user_name_*`
 ----
 
 [discrete]
 ===== Description
 
-`REGISTER USER` associates an existing user with the Metadb instance.
+`register user` associates an existing user with the Metadb instance.
 This has the effect of allowing the user to be granted privileges in
-the database via the `GRANT` command.
+the database via the `grant` command.
 
-Normally there is no need to issue `REGISTER USER`, because `CREATE
-USER` executes it automatically.  However, if an existing user was
-created in some other way, `REGISTER USER` can enable it for the
+Normally there is no need to issue `register user`, because `create
+user` executes it automatically.  However, if an existing user was
+created in some other way, `register user` can enable it for the
 Metadb instance.
 
 [discrete]
@@ -1175,24 +1175,24 @@ Metadb instance.
 ===== Examples
 
 ----
-REGISTER USER beatrice;
+register user beatrice;
 ----
 
-==== REVOKE
+==== revoke
 
 Disable access to data
 
 [source,subs="verbatim,quotes"]
 ----
-REVOKE ACCESS
-    ON { TABLE `*_table_name_*` | FUNCTION `*_function_name_*` | ALL }
-    FROM `*_user_name_*`
+revoke access
+    on { table `*_table_name_*` | function `*_function_name_*` | all }
+    from `*_user_name_*`
 ----
 
 [discrete]
 ===== Description
 
-The `REVOKE` command revokes access to tables.
+The `revoke` command revokes access to tables.
 
 [discrete]
 ===== Parameters
@@ -1215,5 +1215,5 @@ The `REVOKE` command revokes access to tables.
 To disable access by a user `bob` to a table:
 
 ----
-REVOKE ACCESS ON TABLE library.patrongroup FROM bob;
+revoke access on table library.patrongroup from bob;
 ----

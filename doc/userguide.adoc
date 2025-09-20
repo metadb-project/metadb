@@ -41,7 +41,7 @@ library:
 
 [source]
 ----
-SELECT __start, __end, __current, id, groupname, description FROM library.patrongroup__;
+select __start, __end, __current, id, groupname, description from library.patrongroup__;
 ----
 
 [%header,cols="4m,4m,2m,>1m,2m,4m"]
@@ -55,35 +55,35 @@ SELECT __start, __end, __current, id, groupname, description FROM library.patron
 
 |2022-04-17 21:42:25-00
 |2022-04-18 19:27:18-00
-|FALSE
+|false
 |15
 |undergrad
 |Student
 
 |2022-04-18 19:27:18-00
 |9999-12-31 00:00:00+00
-|TRUE
+|true
 |15
 |undergrad
 |Undergraduate Student
 
 |2022-04-17 21:42:25-00
 |9999-12-31 00:00:00+00
-|TRUE
+|true
 |10
 |graduate
 |Graduate Student
 
 |2022-04-17 21:52:53-00
 |9999-12-31 00:00:00+00
-|TRUE
+|true
 |9
 |faculty
 |Faculty Member
 
 |2022-04-17 21:52:53-00
 |9999-12-31 00:00:00+00
-|TRUE
+|true
 |12
 |staff
 |Staff Member
@@ -96,12 +96,12 @@ because it was modified on `2022-04-18 19:27:18-00`, changing
 === Current tables
 
 It is often desirable to limit a query to retrieving only current
-records.  This can be done by filtering on `__current` = `TRUE`, for
+records.  This can be done by filtering on `__current` = `true`, for
 example:
 
 [source]
 ----
-SELECT id, groupname, description FROM library.patrongroup__ WHERE __current;
+select id, groupname, description from library.patrongroup__ where __current;
 ----
 
 For convenience, since this filter is so often used, Metadb provides
@@ -112,7 +112,7 @@ the following query is equivalent to the example above:
 
 [source]
 ----
-SELECT id, groupname, description FROM library.patrongroup;
+select id, groupname, description from library.patrongroup;
 ----
 
 A current table reflects the current state of each row in the data
@@ -128,7 +128,7 @@ To take another example:
 
 [source]
 ----
-SELECT __id, __start, __origin, id, groupname, description FROM library.patrongroup;
+select __id, __start, __origin, id, groupname, description from library.patrongroup;
 ----
 
 [%header,cols=">1m,4m,2m,>1m,2m,4m"]
@@ -190,7 +190,7 @@ for example:
 
 [source]
 ----
-SELECT __id, __start, id, jsondata FROM library.patrongroup;
+select __id, __start, id, jsondata from library.patrongroup;
 ----
 
 [%header,cols=">1m,4m,>1m,8m"]
@@ -249,12 +249,12 @@ The JSON fields can be selected using SQL:
 
 [source]
 ----
-SELECT __id,
+select __id,
        __start,
        id,
-       jsonb_extract_path_text(jsondata, 'groupname') AS groupname,
-       jsonb_extract_path_text(jsondata, 'description') AS description
-    FROM library.patrongroup;
+       jsonb_extract_path_text(jsondata, 'groupname') as groupname,
+       jsonb_extract_path_text(jsondata, 'description') as description
+    from library.patrongroup;
 ----
 
 Metadb can be configured to generate a *transformed table*, which in
@@ -265,9 +265,9 @@ To define the transformation, the Metadb system administrator can run
 this command:
 
 ----
-CREATE DATA MAPPING FOR json
-    FROM TABLE library.patrongroup__ COLUMN jsondata PATH '$'
-    TO 't';
+create data mapping for json
+    from table library.patrongroup__ column jsondata path '$'
+    to 't';
 ----
 
 The new transformation will take effect when the JSON data are next
@@ -275,7 +275,7 @@ updated.  Then the query can be written as:
 
 [source]
 ----
-SELECT __id, __start, id, groupname, description FROM library.patrongroup__t;
+select __id, __start, id, groupname, description from library.patrongroup__t;
 ----
 
 [%header,cols=">1m,4m,>1m,2m,6m"]
@@ -367,12 +367,12 @@ external data sets.  For example, the user `celia` can create a table
 in the schema `celia`:
 
 ----
-CREATE TABLE celia.westgroup AS
-    SELECT * FROM library.patrongroup WHERE __origin = 'west';
+create table celia.westgroup as
+    select * from library.patrongroup where __origin = 'west';
 ----
 
 ----
-SELECT * FROM celia.westgroup LIMIT 20;
+select * from celia.westgroup limit 20;
 ----
 
 Other users typically do not have privileges to access the table by
@@ -381,9 +381,9 @@ default.
 To grant the user `rosalind` read-only access to the schema and table:
 
 ----
-GRANT USAGE ON SCHEMA celia TO rosalind;
+grant usage on schema celia to rosalind;
 
-GRANT SELECT ON celia.westgroup TO rosalind;
+grant select on celia.westgroup to rosalind;
 ----
 
 The user `rosalind` can then access the table.
@@ -399,11 +399,11 @@ For example, suppose that the following query counts the number of
 loans in a library for each circulated item within a range of dates.
 
 ----
-SELECT item_id,
-       count(*) AS loan_count
-    FROM folio_circulation.loan__t
-    WHERE '2023-01-01' <= loan_date AND loan_date < '2024-01-01'
-    GROUP BY item_id;
+select item_id,
+       count(*) as loan_count
+    from folio_circulation.loan__t
+    where '2023-01-01' <= loan_date and loan_date < '2024-01-01'
+    group by item_id;
 ----
 
 We can create a function to generalize this query.  Instead of
@@ -411,31 +411,31 @@ including the dates directly within the query, we will define them as
 parameters: `start_date` and `end_date`.
 
 ----
-CREATE FUNCTION lisa.count_loans(
-    start_date date DEFAULT '2000-01-01',
-    end_date date DEFAULT '2050-01-01')
-RETURNS TABLE(
+create function lisa.count_loans(
+    start_date date default '2000-01-01',
+    end_date date default '2050-01-01')
+returns table(
     item_id uuid,
     loan_count integer)
-AS $$
-SELECT item_id,
-       count(*) AS loan_count
-    FROM folio_circulation.loan__t
-    WHERE start_date <= loan_date AND loan_date < end_date
-    GROUP BY item_id
+as $$
+select item_id,
+       count(*) as loan_count
+    from folio_circulation.loan__t
+    where start_date <= loan_date and loan_date < end_date
+    group by item_id
 $$
-LANGUAGE SQL
-STABLE
-PARALLEL SAFE;
+language sql
+stable
+parallel safe;
 ----
 
 Now the function can be called with different arguments to generate
 reports:
 
 ----
-SELECT * FROM lisa.count_loans(start_date => '2022-01-01', end_date => '2023-01-01');
+select * from lisa.count_loans(start_date => '2022-01-01', end_date => '2023-01-01');
 
-SELECT * FROM lisa.count_loans(start_date => '2023-01-01');
+select * from lisa.count_loans(start_date => '2023-01-01');
 ----
 
 The user `lisa` who created this function can share it with other
@@ -443,12 +443,12 @@ users in a similar way as described in the "User workspaces" section
 above.
 
 ----
-GRANT USAGE ON SCHEMA lisa TO celia, rosalind;
+grant usage on schema lisa to celia, rosalind;
 
-GRANT EXECUTE ON FUNCTION lisa.count_loans TO celia, rosalind;
+grant execute on function lisa.count_loans to celia, rosalind;
 ----
 
-Note that the `GRANT USAGE ON SCHEMA` command does not have to be run
+Note that the `grant usage on schema` command does not have to be run
 again if it was done previously.
 
 Defining shared functions in this way can be used together with a
@@ -474,7 +474,7 @@ described in the previous section.
 To show the current Metadb version:
 
 ----
-SELECT mdbversion();
+select mdbversion();
 ----
 
 [discrete]
@@ -484,7 +484,7 @@ Information about when certain tables were last updated is available
 in a table called `metadb.table_update`:
 
 ----
-SELECT * FROM metadb.table_update ORDER BY schema_name, table_name;
+select * from metadb.table_update order by schema_name, table_name;
 ----
 
 [discrete]
@@ -495,10 +495,10 @@ Metadb reports errors and other information in a logging table called
 2023:
 
 ----
-SELECT *
-    FROM metadb.log
-    WHERE '2023-01-01' <= log_time AND log_time < '2023-02-01'
-    ORDER BY log_time;
+select *
+    from metadb.log
+    where '2023-01-01' <= log_time and log_time < '2023-02-01'
+    order by log_time;
 ----
 
 The `mdblog()` function is provided for convenience and returns
@@ -506,7 +506,7 @@ ordered log messages, from the past 24 hours by default (or optionally
 from a specified interval):
 
 ----
-SELECT * FROM mdblog();
+select * from mdblog();
 ----
 
 [discrete]
@@ -516,7 +516,7 @@ When executing a long-running query, the `ps()` function can be used
 to check on the status of the query process from another session:
 
 ----
-SELECT * FROM ps();
+select * from ps();
 ----
 
 === Working with data types
@@ -546,7 +546,7 @@ most reliable method is to use inequalities of the form `_start_ \<=
 _t_ < _end_`, for example:
 
 ----
-SELECT *
-    FROM folio_circulation.loan__t
-    WHERE '2023-01-01' <= loan_date AND loan_date < '2024-01-01';
+select *
+    from folio_circulation.loan__t
+    where '2023-01-01' <= loan_date and loan_date < '2024-01-01';
 ----

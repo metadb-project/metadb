@@ -34,9 +34,9 @@ every few hours or so.  The time of the most recent update can be
 retrieved from the table `metadb.table_update`:
 
 ----
-SELECT last_update
-    FROM metadb.table_update
-    WHERE schema_name = 'folio_source_record' AND table_name = 'marc__t';
+select last_update
+    from metadb.table_update
+    where schema_name = 'folio_source_record' and table_name = 'marc__t';
 ----
 
 The MARC transform stores partition tables in the schema `marctab`.
@@ -54,7 +54,7 @@ To enable these tables, set the server configuration parameter
 folio-analytics repository.  For example:
 
 ----
-ALTER SYSTEM SET external_sql_folio = 'refs/tags/v1.8.0';
+alter system set external_sql_folio = 'refs/tags/v1.8.0';
 ----
 
 Note that the derived tables are based on a periodic snapshot of data,
@@ -470,19 +470,19 @@ clarity we give a few examples below.
 To select JSON data extracted from a FOLIO source, LDP supports:
 
 ----
-SELECT data FROM user_groups;
+select data from user_groups;
 ----
 
 In Metadb, this can be written as:
 
 ----
-SELECT jsonb FROM folio_users.groups;
+select jsonb from folio_users.groups;
 ----
 
 Or with easier to read formatting:
 
 ----
-SELECT jsonb_pretty(jsonb) FROM folio_users.groups;
+select jsonb_pretty(jsonb) from folio_users.groups;
 ----
 
 [discrete]
@@ -492,13 +492,13 @@ For non-array JSON fields, extracting the data directly from JSON in
 LDP usually takes the form:
 
 ----
-SELECT json_extract_path_text(data, 'group') FROM user_groups;
+select json_extract_path_text(data, 'group') from user_groups;
 ----
 
 The form recommended for Metadb is:
 
 ----
-SELECT jsonb_extract_path_text(jsonb, 'group') FROM folio_users.groups;
+select jsonb_extract_path_text(jsonb, 'group') from folio_users.groups;
 ----
 
 [discrete]
@@ -512,28 +512,28 @@ array element.
 For example, if the array elements are simple `text` strings:
 
 ----
-CREATE TABLE instance_format_ids AS
-SELECT id AS instance_id,
-       instance_format_ids.jsonb #>> '{}' AS instance_format_id,
+create table instance_format_ids as
+select id as instance_id,
+       instance_format_ids.jsonb #>> '{}' as instance_format_id,
        instance_format_ids.ordinality
-FROM folio_inventory.instance
-    CROSS JOIN LATERAL jsonb_array_elements(jsonb_extract_path(jsonb, 'instanceFormatIds'))
-        WITH ORDINALITY AS instance_format_ids (jsonb);
+from folio_inventory.instance
+    cross join lateral jsonb_array_elements(jsonb_extract_path(jsonb, 'instanceFormatIds'))
+        with ordinality as instance_format_ids (jsonb);
 ----
 
 If the array elements are JSON objects:
 
 ----
-CREATE TABLE holdings_notes AS
-SELECT id AS holdings_id,
+create table holdings_notes as
+select id as holdings_id,
        jsonb_extract_path_text(notes.jsonb, 'holdingsNoteTypeId')::uuid
-           AS holdings_note_type_id,
-       jsonb_extract_path_text(notes.jsonb, 'note') AS note,
-       jsonb_extract_path_text(notes.jsonb, 'staffOnly')::boolean AS staff_only,
+           as holdings_note_type_id,
+       jsonb_extract_path_text(notes.jsonb, 'note') as note,
+       jsonb_extract_path_text(notes.jsonb, 'staffOnly')::boolean as staff_only,
        notes.ordinality
-FROM folio_inventory.holdings_record
-    CROSS JOIN LATERAL jsonb_array_elements(jsonb_extract_path(jsonb, 'notes'))
-        WITH ORDINALITY AS notes (jsonb);
+from folio_inventory.holdings_record
+    cross join lateral jsonb_array_elements(jsonb_extract_path(jsonb, 'notes'))
+        with ordinality as notes (jsonb);
 ----
 
 [discrete]
@@ -543,13 +543,13 @@ LDP transforms simple, first-level JSON fields into columns, which can
 be queried as, for example:
 
 ----
-SELECT id, "group", "desc" FROM user_groups;
+select id, "group", "desc" from user_groups;
 ----
 
 The Metadb equivalent of this query is:
 
 ----
-SELECT id, "group", "desc" FROM folio_users.groups__t;
+select id, "group", "desc" from folio_users.groups__t;
 ----
 
 Note that the double quotation marks are needed here only because
@@ -557,7 +557,7 @@ Note that the double quotation marks are needed here only because
 be removed if the column names are prefixed with a table alias:
 
 ----
-SELECT g.id, g.group, g.desc FROM folio_users.groups__t AS g;
+select g.id, g.group, g.desc from folio_users.groups__t as g;
 ----
 
 Support for transforming subfields and arrays is planned in Metadb.
@@ -613,7 +613,7 @@ and `add_schema_prefix` to add a `folio_` prefix to the schema names.
 For example:
 
 ----
-CREATE DATA SOURCE folio TYPE kafka OPTIONS (
+create data source folio type kafka options (
     module 'folio',
     trim_schema_prefix 'tenantname_',
     add_schema_prefix 'folio_',
@@ -632,7 +632,7 @@ tenant.  We add the `folio_` prefix as a namespace to allow for other
 (non-FOLIO) library data to be imported into the database as well, in
 order to support cross-domain analytics.
 
-Note that the `CREATE DATA SOURCE` statement does not control which
+Note that the `create data source` statement does not control which
 tenant's data are to be streamed.  The tenant is typically selected in
 the configuration of the Debezium connector.
 
@@ -669,12 +669,12 @@ single FOLIO tenant.
 
 The data from consortium members are combined into aggregated tables,
 with the `__origin` column set to the name of the ReShare tenant
-(i.e. consortium member).  The `CREATE DATA ORIGIN` command defines
+(i.e. consortium member).  The `create data origin` command defines
 the set of known origins, and schema names in the source database are
 assumed to begin with a prefix that identifies the origin (because
 this is how FOLIO and ReShare store tenant data).  For example
 `west_mod_rs.table1` has the prefix `west` which is taken to be the
-origin if previously defined by `CREATE DATA ORIGIN`.
+origin if previously defined by `create data origin`.
 
 ==== Derived tables
 
@@ -686,7 +686,7 @@ To enable these tables, set the server configuration parameter
 reshare-analytics repository.  For example:
 
 ----
-ALTER SYSTEM SET external_sql_reshare = 'refs/tags/20230912004531';
+alter system set external_sql_reshare = 'refs/tags/20230912004531';
 ----
 
 Note that the derived tables are based on a periodic snapshot of data,
@@ -698,14 +698,14 @@ Before defining a ReShare data source, create a data origin for each
 ReShare tenant (i.e. each member of the consortium).  For example:
 
 ----
-CREATE DATA ORIGIN tenant1;
+create data origin tenant1;
 
-CREATE DATA ORIGIN tenant2;
+create data origin tenant2;
 
-CREATE DATA ORIGIN tenant3;
+create data origin tenant3;
 ----
 
-NOTE: CREATE DATA ORIGIN currently requires restarting the server
+NOTE: `create data origin` currently requires restarting the server
 before it will take effect.
 
 Then use the `module 'reshare'` option when creating the data source,
@@ -713,7 +713,7 @@ and set `add_schema_prefix` to add a `reshare_` prefix to the schema
 names:
 
 ----
-CREATE DATA SOURCE reshare TYPE kafka OPTIONS (
+create data source reshare type kafka options (
     module 'reshare',
     add_schema_prefix 'reshare_',
     brokers 'kafka:29092',
@@ -731,7 +731,7 @@ Note that the order of commands is important: The initial set of data
 origins should be created before the data source is created so that
 schema names of incoming data will be processed correctly.  Later,
 whenever a new consortial tenant is to be added, it should be defined
-in Metadb using `CREATE DATA ORIGIN` (and the server restarted) before
+in Metadb using `create data origin` (and the server restarted) before
 the tenant is added to ReShare.
 
 In the Debezium PostgreSQL connector configuration, it is suggested
@@ -740,11 +740,11 @@ supertenant (`supertenant_mod_.+`), and mod-pubsub data
 (`pubsub_config,.+_mod_pubsub`) be excluded using the
 `schema.exclude.list` setting.
 
-=== MARC transform for LDP/LDLite
+=== MARC transform for LDP
 
 The MARC transform (currently included in Metadb) can also be used
-with LDP and LDLite.  A command-line tool called `marct` is provided
-which is a drop-in replacement for `ldpmarc`.
+with LDP.  A command-line tool called `marct` is provided which is a
+drop-in replacement for `ldpmarc`.
 
 The system requirements are a subset of those for Metadb:
 
@@ -778,7 +778,7 @@ Typical usage is:
 ----
 
 where `datadir` is a LDP data directory containing `ldpconf.json`, and
-`ldp1_user` is a LDP user to be granted `SELECT` privileges on the
+`ldp1_user` is a LDP user to be granted `select` privileges on the
 output table.
 
 For example:
@@ -794,7 +794,7 @@ used to grant privileges to the users, for example:
 ----
 users=/path/to/list/of/users.txt
 for u in $( cat $users ); do
-    psql -c "GRANT SELECT ON public.srs_marctab TO $u ;"
+    psql -c "grant select on public.srs_marctab to $u ;"
 done
 ----
 

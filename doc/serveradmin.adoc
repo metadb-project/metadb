@@ -306,7 +306,7 @@ Next we create a connector configuration file for Kafka Connect:
         "truncate.handling.mode": "include",
         "publication.autocreate.mode", "filtered"
         "heartbeat.interval.ms": "30000",
-        "heartbeat.action.query": "UPDATE admin.heartbeat set last_heartbeat = now();"
+        "heartbeat.action.query": "update admin.heartbeat set last_heartbeat = now();"
     }
 }
 ----
@@ -315,17 +315,17 @@ It is recommended to use the connector configuration settings
 `heartbeat.interval.ms` and `heartbeat.action.query` as above to avoid
 spikes in disk space consumption within the source database.  (See the
 Debezium PostgreSQL connector documentation for more details.)  The
-`schema_stop_filter` option of the `CREATE DATA SOURCE` command is
+`schema_stop_filter` option of the `create data source` command is
 used to filter out the heartbeat table.
 
 In the source database:
 
 ----
-CREATE SCHEMA admin;
+create schema admin;
 
-CREATE TABLE admin.heartbeat (last_heartbeat timestamptz PRIMARY KEY);
+create table admin.heartbeat (last_heartbeat timestamptz primary key);
 
-INSERT INTO admin.heartbeat (last_heartbeat) VALUES (now());
+insert into admin.heartbeat (last_heartbeat) values (now());
 ----
 
 Then to create the connector:
@@ -362,11 +362,11 @@ source database.*
 
 ==== Creating the data source
 
-In Metadb, a data source is defined using the `CREATE DATA SOURCE`
+In Metadb, a data source is defined using the `create data source`
 statement, for example:
 
 ----
-CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
+create data source sensor type kafka options (
     brokers 'kafka:29092',
     topics '^metadb_sensor_1\.',
     consumer_group 'metadb_sensor_1_1',
@@ -377,7 +377,7 @@ CREATE DATA SOURCE sensor TYPE kafka OPTIONS (
 
 ==== Initial synchronization
 
-When a new data source is first configured using `CREATE DATA SOURCE`,
+When a new data source is first configured using `create data source`,
 Metadb automatically puts the database into synchronizing mode, just
 as if `metadb sync` had been run (see *Server administration >
 Resynchronizing a data source*).  This has the effect of pausing
@@ -404,9 +404,9 @@ deleting a connection, the replication slot and publication in the
 source database should be dropped using:
 
 ----
-SELECT pg_drop_replication_slot('debezium');
+select pg_drop_replication_slot('debezium');
 
-DROP PUBLICATION dbz_publication;
+drop publication dbz_publication;
 ----
 
 === Resynchronizing a data source
@@ -430,8 +430,8 @@ paused during synchronization.
 +
 [source]
 ----
-ALTER DATA SOURCE sensor OPTIONS
-    (SET topics '^metadb_sensor_2\.', SET consumer_group 'metadb_sensor_2_1');
+alter data source sensor options
+    (set topics '^metadb_sensor_2\.', set consumer_group 'metadb_sensor_2_1');
 ----
 +
 *Do not restart the Metadb server but continue directly to Step 2.*
@@ -467,7 +467,7 @@ Metadb detects when snapshot data are no longer being received, and
 then writes "source snapshot complete (deadline exceeded)" to the log.
 This generally means it is a good time to run "endsync".
 +
-The snapshot status is also available via the `LIST status` command.
+The snapshot status is also available via the `list status` command.
 
 5. Start the server.
 +
@@ -477,13 +477,13 @@ the Metadb database may continue to be unsynchronized with the source.
 === Creating database users
 
 [discrete]
-==== With the CREATE USER command
+==== With the create user command
 
 To create a new database user account:
 
 [source]
 ----
-CREATE USER wegg WITH PASSWORD 'LZn2DCajcNHpGR3ZXWHD', COMMENT 'Silas Wegg';
+create user wegg with password 'LZn2DCajcNHpGR3ZXWHD', comment 'Silas Wegg';
 ----
 
 In addition to creating the user, this also registers the user with
@@ -499,15 +499,15 @@ the user, which is intended as a workspace for the user.
 ==== Granting access to data
 
 A new user has very limited access to data.  To add privileges for
-tables and functions, use the `GRANT` command.
+tables and functions, use the `grant` command.
 
 [discrete]
 ==== Registering an existing user and creating a user schema
 
-As an alternative to `CREATE USER`, if a user already exists in the
+As an alternative to `create user`, if a user already exists in the
 database system, it can be enabled to work with the Metadb database
-via the command `REGISTER USER`.  A user schema can then be created
-with `CREATE SCHEMA FOR USER`.
+via the command `register user`.  A user schema can then be created
+with `create schema for user`.
 
 === Administrative database changes
 
