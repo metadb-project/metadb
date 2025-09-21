@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"gopkg.in/ini.v1"
 )
@@ -61,7 +62,19 @@ func SysdbFileName(datadir string) string {
 }
 
 func PGErr(err error) error {
-	return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
+	e := err.(*pgconn.PgError)
+	var b strings.Builder
+	b.WriteString(e.Message)
+	if e.Detail != "" {
+		b.WriteString(": ")
+		b.WriteString(e.Detail)
+	}
+	if e.Hint != "" {
+		b.WriteString(" (")
+		b.WriteString(e.Hint)
+		b.WriteRune(')')
+	}
+	return errors.New(b.String())
 }
 
 func MatchRegexps(res []*regexp.Regexp, s string) bool {

@@ -118,7 +118,7 @@ func DatabaseVersion(dq dbx.Queryable) (int64, error) {
 	case errors.Is(err, pgx.ErrNoRows):
 		return 0, fmt.Errorf("unable to query database version")
 	case err != nil:
-		return 0, fmt.Errorf("querying database version: %s", err)
+		return 0, fmt.Errorf("querying database version: %s", util.PGErr(err))
 	default:
 		return dbversion, nil
 	}

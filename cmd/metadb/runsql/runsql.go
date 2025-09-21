@@ -12,6 +12,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/metadb-project/metadb/cmd/metadb/acl"
 	"github.com/metadb-project/metadb/cmd/metadb/catalog"
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
@@ -28,11 +29,11 @@ func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, ref, path, sch
 	defer dbx.Close(dc)
 	q := "CREATE SCHEMA IF NOT EXISTS " + schema
 	if _, err = dc.Exec(context.TODO(), q); err != nil {
-		return err
+		return util.PGErr(err)
 	}
 	q = "SET search_path = " + schema
 	if _, err = dc.Exec(context.TODO(), q); err != nil {
-		return err
+		return util.PGErr(err)
 	}
 
 	tmpdir := filepath.Join(datadir, "tmp")
@@ -69,7 +70,7 @@ func RunSQL(datadir string, cat *catalog.Catalog, db dbx.DB, url, ref, path, sch
 		file := filepath.Join(workdir, f)
 		fullpath := filepath.Join(path, f)
 		if err = runFile(cat, url, ref, fullpath, dc, schema, file, source); err != nil {
-			log.Warning("runsql: %v: repository=%s ref=%s path=%s", err, url, ref, fullpath)
+			log.Warning("runsql: repository=%s ref=%s path=%s: %v", url, ref, fullpath, err)
 		}
 	}
 	if err := os.RemoveAll(rdir); err != nil {
@@ -87,7 +88,7 @@ func runFile(cat *catalog.Catalog, url, ref, fullpath string, dc *pgx.Conn, sche
 	list := sqlSeparator.Split(string(data), -1)
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
-		return err
+		return util.PGErr(err)
 	}
 	defer dbx.Rollback(tx)
 	start := time.Now()
@@ -100,12 +101,14 @@ func runFile(cat *catalog.Catalog, url, ref, fullpath string, dc *pgx.Conn, sche
 			return err
 		}
 		if _, err = tx.Exec(context.TODO(), q); err != nil {
-			return fmt.Errorf("%s", strings.TrimPrefix(err.Error(), "ERROR: "))
+			return fmt.Errorf("%v: %s",
+				util.PGErr(err),
+				excerpt(q, int(err.(*pgconn.PgError).Position)))
 		}
 	}
 	elapsed := time.Since(start)
 	if err = tx.Commit(context.TODO()); err != nil {
-		return err
+		return util.PGErr(err)
 	}
 	if table != "" {
 		if err = acl.RestorePrivileges(dc, schema, table, acl.Table); err != nil {
@@ -116,6 +119,18 @@ func runFile(cat *catalog.Catalog, url, ref, fullpath string, dc *pgx.Conn, sche
 		}
 	}
 	return nil
+}
+
+func excerpt(query string, position int) string {
+	p := position
+	for p >= 1 && rune(query[p-1]) != '\n' {
+		p--
+	}
+	q := position
+	for q < len(query) && rune(query[q]) != '\n' {
+		q++
+	}
+	return strings.ReplaceAll(strings.TrimSpace(query[p:q]), "\r", "")
 }
 
 var sqlSeparator = regexp.MustCompile("\\n\\s*\\n")
