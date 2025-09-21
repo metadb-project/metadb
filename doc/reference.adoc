@@ -320,7 +320,8 @@ The default value is `''`, which disables running the external SQL.
 
 The `external_sql_reshare` parameter sets the Git reference in the
 folio-reshare repository to be used for running external SQL.  The
-default value is `''`, which disables running the external SQL.
+default value is `''`, which disables running the external SQL.  Also
+see *Reference > Configuration parameters > external_sql_folio*.
 
 // ==== kafka_sync_concurrency
 
