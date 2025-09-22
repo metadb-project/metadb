@@ -1,33 +1,36 @@
-# Recent changes
+# current-1.4
 
-* New configuration parameters `checkpoint_segment_size` and
-  `max_poll_interval` can be used to fine-tune the stream processor.
+* JSON transformation has been extended to support objects and arrays.
+  New commands `create data mapping` and `drop data mapping` can be
+  used to define or disable transformation of objects and arrays at
+  specific JSON paths.  A new command `list data_mappings` shows
+  configured mappings.
 
-* The folio-analytics and folio-reshare tags are no longer set in new
-  installations.  The ALTER SYSTEM command can be used to set them via
-  the configuration parameters `external_sql_folio` and
-  `external_sql_reshare`.
+* JSON transformation is now disabled by default in new installations.
 
-# v1.4.0-rc1
-
-* JSON transformation has been extended to include objects and arrays,
-  and it is now disabled by default in new installations.  The `CREATE
-  DATA MAPPING` command can be used to enable and configure
-  transformation of specific JSON paths.  The `LIST data_mappings`
-  command shows configured mappings.
-
-* New commands `GRANT` and `REVOKE` improve support for managing user
+* New commands `grant` and `revoke` improve support for managing user
   privileges.
 
-* A new command `DROP USER` supports removing users.
-
-* New commands `ALTER SYSTEM` and `LIST config` support defining and
+* New commands `alter system` and `list config` support defining and
   viewing server configuration parameters.
 
-* A new command `CREATE SCHEMA` supports creating a user schema for an
+* The folio-analytics and folio-reshare tags are no longer set in new
+  installations.  The command `alter system` can be used to set them
+  via the configuration parameters `external_sql_folio` and
+  `external_sql_reshare`.
+
+* New configuration parameters `checkpoint_segment_size` and
+  `max_poll_interval` can be used to configure the operation of the
+  stream processor.
+
+* A new command `purge data` supports removing tables.
+
+* A new command `drop user` supports removing users.
+
+* A new command `create schema` supports creating a user schema for an
   existing user.
 
-* New commands `REGISTER USER` and `DEREGISTER USER` support adding an
+* New commands `register user` and `deregister user` support adding an
   existing database user to a Metadb instance.
 
 * A new function `mdbusers()` lists registered users.
@@ -35,13 +38,13 @@
 * A new data source option `map_public_schema` supports changing the
   schema name of tables that originate in the `public` schema.
 
-* The command `CREATE DATA ORIGIN` no longer requires restarting the
+* The command `create data origin` no longer requires restarting the
   server before it takes effect.
 
 * The compilation script `build.sh` has been renamed to `build`.
 
-* The folio-analytics tag has been updated to v1.8.0.
-
 * Go 1.24 is now required to build Metadb.
 
-* Various performance improvements and bug fixes.
+* Improvements in error logging.  Various performance improvements and
+  bug fixes.
+
