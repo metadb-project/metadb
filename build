@@ -52,10 +52,6 @@ if $verbose; then
     v='-v'
 fi
 
-if [[ -v METADB_FOLIO ]]; then
-    echo "build.sh: METADB_FOLIO is no longer supported (see ALTER SYSTEM command)." 1>&2
-fi
-
 tags=''
 
 if $tagsdynamic; then
@@ -70,6 +66,12 @@ bindir=bin
 
 if ! $fast; then
     rm -f ./$bindir/metadb
+fi
+
+if [[ -v METADB_FOLIO ]]; then
+    echo 'build.sh: The METADB_FOLIO environment variable is no longer supported.' 1>&2
+    echo 'build.sh: Use the "alter system" command instead.' 1>&2
+    exit 1
 fi
 
 mkdir -p $bindir
