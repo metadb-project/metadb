@@ -14,11 +14,6 @@
 * New commands `alter system` and `list config` support defining and
   viewing server configuration parameters.
 
-* The folio-analytics and folio-reshare tags are no longer set in new
-  installations.  The command `alter system` can be used to set them
-  via the configuration parameters `external_sql_folio` and
-  `external_sql_reshare`.
-
 * New configuration parameters `checkpoint_segment_size` and
   `max_poll_interval` can be used to configure the operation of the
   stream processor.
@@ -47,4 +42,9 @@
 
 * Improvements in error logging.  Various performance improvements and
   bug fixes.
+
+* The folio-analytics and folio-reshare tags are no longer defined by
+  default in new installations.  The command `alter system` can be
+  used to set them via the configuration parameters
+  `external_sql_folio` and `external_sql_reshare`.
 
