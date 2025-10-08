@@ -1,4 +1,4 @@
-# current-1.4
+# release-1.4
 
 * JSON transformation has been extended to support objects and arrays.
   New commands `create data mapping` and `drop data mapping` can be
@@ -38,7 +38,7 @@
 
 * The compilation script `build.sh` has been renamed to `build`.
 
-* Go 1.24 is now required to build Metadb.
+* Go 1.25.2 is now required to build Metadb.
 
 * Improvements in error logging.  Various performance improvements and
   bug fixes.
