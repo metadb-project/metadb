@@ -120,7 +120,7 @@ func runServer(svr *server, cat *catalog.Catalog) error {
 	if err := mainServer(svr, cat); err != nil {
 		return err
 	}
-	//log.Info("server is shut down")
+	log.Info("server is shut down")
 	return nil
 }
 
@@ -135,7 +135,7 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 	go func() {
 		<-sigc
 		log.Debug("received shutdown request")
-		log.Info("shutting down")
+		log.Debug("shutting down")
 		process.SetStop()
 	}()
 	// TODO also need to catch signals and call RemovePIDFile
