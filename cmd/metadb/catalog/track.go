@@ -127,20 +127,20 @@ func (c *Catalog) AllTables(source string) []dbx.Table {
 	return all
 }
 
-func (c *Catalog) TraverseDescendantTables(table dbx.Table, process func(table dbx.Table)) {
+func (c *Catalog) TraverseDescendantTables(table dbx.Table, process func(level int, table dbx.Table)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.traverseDescendantTables(table, process)
+	c.traverseDescendantTables(0, table, process)
 }
 
-func (c *Catalog) traverseDescendantTables(table dbx.Table, process func(table dbx.Table)) {
+func (c *Catalog) traverseDescendantTables(level int, table dbx.Table, process func(level int, table dbx.Table)) {
 	e, ok := c.tableDir[table]
 	if !ok {
 		return
 	}
-	process(table)
+	process(level, table)
 	for t := range e.children {
-		c.traverseDescendantTables(t, process)
+		c.traverseDescendantTables(level+1, t, process)
 	}
 }
 

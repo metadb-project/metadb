@@ -573,19 +573,37 @@ func execDeleteData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Command
 	if err := ebuf.flush(); err != nil {
 		return fmt.Errorf("exec delete data: %w", err)
 	}
-	primaryKeyFilter := wherePKDataEqualSQL(cmd.Column)
+	pkeyFilter := wherePKDataEqualSQL(cmd.Column)
+	rootFilter := wherePKDataEqualSQL(rootKey(cmd.Column))
 	// Find matching current records in table and descendants, and mark as not current.
 	batch := pgx.Batch{}
 	cat.TraverseDescendantTables(dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName},
-		func(table dbx.Table) {
+		func(level int, table dbx.Table) {
+			filter := selectFilter(level, pkeyFilter, rootFilter)
 			batch.Queue("UPDATE " + table.MainSQL() +
 				" SET __end='" + cmd.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" +
-				cmd.Origin + "'" + primaryKeyFilter)
+				cmd.Origin + "'" + filter)
 		})
 	if err := ebuf.dp.SendBatch(ebuf.ctx, &batch).Close(); err != nil {
 		return fmt.Errorf("exec delete data: %w", err)
 	}
 	return nil
+}
+
+func rootKey(pkey []command.CommandColumn) []command.CommandColumn {
+	rootkey := make([]command.CommandColumn, len(pkey))
+	_ = copy(rootkey, pkey)
+	for i := range rootkey {
+		rootkey[i].Name = "__root__" + rootkey[i].Name
+	}
+	return rootkey
+}
+
+func selectFilter(level int, pkeyFilter, rootFilter string) string {
+	if level > 0 {
+		return rootFilter
+	}
+	return pkeyFilter
 }
 
 func wherePKDataEqualSQL(columns []command.CommandColumn) string {
@@ -639,7 +657,7 @@ func execTruncateData(ebuf *execbuffer, cat *catalog.Catalog, cmd *command.Comma
 	// Find all current records in table and descendants, and mark as not current.
 	batch := pgx.Batch{}
 	cat.TraverseDescendantTables(dbx.Table{Schema: cmd.SchemaName, Table: cmd.TableName},
-		func(table dbx.Table) {
+		func(level int, table dbx.Table) {
 			batch.Queue("UPDATE " + table.MainSQL() + " SET __end='" +
 				cmd.SourceTimestamp + "',__current=FALSE WHERE __current AND __origin='" + cmd.Origin + "'")
 		})
