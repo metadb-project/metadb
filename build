@@ -8,7 +8,7 @@ verbose='false'
 tagsdynamic='false'
 
 usage() {
-    echo 'Usage:  build.sh [<flags>]'
+    echo 'Usage:  build [<flags>]'
     echo ''
     echo 'Builds the "metadb" executable in the bin directory'
     echo ''
@@ -27,7 +27,7 @@ while getopts 'fhJtvTd' flag; do
         T) runtests='true' ;;
         t) runalltests='true' ;;
         f) fast='true' ;;
-        J) echo "build.sh: -J option is deprecated" 1>&2 ;;
+        J) echo "build: -J option is deprecated" 1>&2 ;;
         h) usage
             exit 1 ;;
         v) verbose='true' ;;
@@ -44,7 +44,7 @@ for arg; do
         usage
         exit 1
     fi
-    echo "build.sh: unknown argument: $arg" 1>&2
+    echo "build: unknown argument: $arg" 1>&2
     exit 1
 done
 
@@ -69,8 +69,8 @@ if ! $fast; then
 fi
 
 if [[ -v METADB_FOLIO ]]; then
-    echo 'build.sh: The METADB_FOLIO environment variable is no longer supported.' 1>&2
-    echo 'build.sh: Use the "alter system" command instead.' 1>&2
+    echo 'build: The METADB_FOLIO environment variable is no longer supported.' 1>&2
+    echo 'build: Use the "alter system" command instead.' 1>&2
     exit 1
 fi
 
@@ -89,14 +89,14 @@ if $runtests || $runalltests; then
 fi
 
 if $runalltests; then
-    go vet $v $tags $(go list ./cmd/... | grep -v 'github.com/metadb-project/metadb/cmd/metadb/parser') 2>&1 | while read s; do echo "build.sh: $s" 1>&2; done
-    #go vet $v $tags -vettool=$GOPATH/bin/shadow ./cmd/... 2>&1 | while read s; do echo "build.sh: $s" 1>&2; done
+    go vet $v $tags $(go list ./cmd/... | grep -v 'github.com/metadb-project/metadb/cmd/metadb/parser') 2>&1 | while read s; do echo "build: $s" 1>&2; done
+    #go vet $v $tags -vettool=$GOPATH/bin/shadow ./cmd/... 2>&1 | while read s; do echo "build: $s" 1>&2; done
     go tool shadow ./cmd/...
-    # deadcode -test ./cmd/... 2>&1 | while read s; do echo "build.sh: deadcode: $s" 1>&2; done
+    # deadcode -test ./cmd/... 2>&1 | while read s; do echo "build: deadcode: $s" 1>&2; done
     if $verbose; then
         # Using -verbose outputs the function signature for .errcheck.
 	verrcheck='-verbose'
     fi
-    go tool errcheck $verrcheck -exclude .errcheck ./cmd/... 2>&1 | while read s; do echo "build.sh: errcheck: $s" 1>&2; done
+    go tool errcheck $verrcheck -exclude .errcheck ./cmd/... 2>&1 | while read s; do echo "build: errcheck: $s" 1>&2; done
     #go tool govulncheck ./cmd/...
 fi
