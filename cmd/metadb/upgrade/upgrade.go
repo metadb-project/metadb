@@ -419,6 +419,7 @@ var updbList = []updbFunc{
 	updb28,
 	updb29,
 	updb30,
+	updb31,
 }
 
 func updb8(opt *dbopt) error {
@@ -2060,6 +2061,33 @@ func updb30(opt *dbopt) error {
 		return util.PGErr(err)
 	}
 	if err = tx.Commit(context.TODO()); err != nil {
+		return util.PGErr(err)
+	}
+	return nil
+}
+
+func updb31(opt *dbopt) error {
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	q := "SELECT schema_name||'.'||table_name||'__t__' FROM metadb.transform_json " +
+		"WHERE path = '$' AND map = 't' ORDER BY schema_name, table_name"
+	rows, _ := dc.Query(context.Background(), q)
+	tables, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return err
+	}
+	for i := range tables {
+		q = "ALTER TABLE " + tables[i] + " ADD COLUMN IF NOT EXISTS __root__id uuid"
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return fmt.Errorf("adding column to table %s: %v", tables[i], err)
+		}
+	}
+
+	if err = metadata.WriteDatabaseVersion(dc, 31); err != nil {
 		return util.PGErr(err)
 	}
 	return nil
