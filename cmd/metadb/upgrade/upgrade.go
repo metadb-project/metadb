@@ -2082,9 +2082,7 @@ func updb31(opt *dbopt) error {
 	}
 	for i := range tables {
 		q = "ALTER TABLE " + tables[i] + " ADD COLUMN IF NOT EXISTS __root__id uuid"
-		if _, err = dc.Exec(context.TODO(), q); err != nil {
-			return fmt.Errorf("adding column to table %s: %v", tables[i], err)
-		}
+		_, _ = dc.Exec(context.TODO(), q)
 	}
 
 	if err = metadata.WriteDatabaseVersion(dc, 31); err != nil {
