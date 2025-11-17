@@ -1,4 +1,4 @@
-# v1.4.0-beta1
+# v1.4.0
 
 * JSON transformation has been extended to support objects and arrays.
   New commands `create data mapping` and `drop data mapping` can be
