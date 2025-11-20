@@ -14,7 +14,7 @@
 * To build from source, these dependencies should be installed:
 ** https://gcc.gnu.org/[GCC C compiler] 9 or later
 ** https://www.colm.net/open-source/ragel/[Ragel] 6
-** https://go.dev/[Go] 1.24 or later
+** https://go.dev/[Go] 1.21 or later
 
 In Debian 12, GCC and Ragel can be installed using `apt install gcc
 ragel`, but Go has to be downloaded from https://go.dev/[go.dev].
