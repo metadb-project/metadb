@@ -38,8 +38,6 @@
 
 * The compilation script `build.sh` has been renamed to `build`.
 
-* Go 1.25.2 is now required to build Metadb.
-
 * Improvements in error logging.  Various performance improvements and
   bug fixes.
 
@@ -47,4 +45,6 @@
   default in new installations.  The command `alter system` can be
   used to set them via the configuration parameters
   `external_sql_folio` and `external_sql_reshare`.
+
+* Metadb requires Go 1.21 or later.
 
