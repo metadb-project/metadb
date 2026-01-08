@@ -152,3 +152,11 @@ type FieldSF struct {
 	Field string
 	SF    string
 }
+
+func Analyze(ctx context.Context, dbc *DBC, table string) error {
+	q := "ANALYZE " + table
+	if _, err := dbc.Conn.Exec(ctx, q); err != nil {
+		return fmt.Errorf("analyzing table: %s: %s", table, err)
+	}
+	return nil
+}

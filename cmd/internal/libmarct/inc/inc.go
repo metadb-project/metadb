@@ -124,19 +124,14 @@ func IncrementalUpdate(opts *options.Options, connString string, srsRecords, srs
 	if err = updateChange(ctx, opts, dbc, srsRecords, srsMarc, srsMarcAttr, tablefinal, printerr, verbose); err != nil {
 		return fmt.Errorf("change: %s", err)
 	}
-	// vacuum
-	/*
-		startVacuum := time.Now()
-		if err = util.Vacuum(ctx, dbc, tablefinal); err != nil {
-			return fmt.Errorf("vacuum: %s", err)
-		}
-		if err = VacuumCksum(ctx, dbc); err != nil {
-			return fmt.Errorf("vacuum cksum: %s", err)
-		}
-		if verbose >= 1 {
-			printerr(" %s vacuum", util.ElapsedTime(startVacuum))
-		}
-	*/
+	// analyze
+	startAnalyze := time.Now()
+	if err = util.Analyze(ctx, dbc, tablefinal); err != nil {
+		return fmt.Errorf("analyze: %s", err)
+	}
+	if verbose >= 1 {
+		printerr(" %s analyze", util.ElapsedTime(startAnalyze))
+	}
 	if verbose >= 1 {
 		printerr("%s incremental update", util.ElapsedTime(startUpdate))
 	}
