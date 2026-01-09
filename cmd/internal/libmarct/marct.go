@@ -101,14 +101,12 @@ func marcTransform(opts *options.Options, marct *MARCTransform) error {
 			err = inc.IncrementalUpdate(opts, connString, marct.Loc.SrsRecords, marct.Loc.SrsMarc, marct.Loc.SrsMarcAttr,
 				marct.Loc.tablefinal(), marct.PrintErr, marct.Verbose)
 			if err != nil {
-				marct.PrintErr("restarting with full update due to early termination: %v", err)
+				// restart with full update due to early termination
 				retry = true
 			}
 		} else {
 			retry = false
-			if marct.Verbose >= 1 {
-				marct.PrintErr("starting full update")
-			}
+			marct.PrintErr("full update")
 			if err = fullUpdate(opts, marct, connString, marct.PrintErr); err != nil {
 				if _, errd := conn.Exec(context.TODO(), "DROP TABLE IF EXISTS "+tableout); errd != nil {
 					return fmt.Errorf("dropping table %q: %v", tableout, errd)
