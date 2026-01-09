@@ -345,6 +345,11 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 		}
 	}
 
+	// analyze marc__t
+	if folio {
+		_, _ = dp.Exec(context.TODO(), "ANALYZE folio_source_record.marc__t")
+	}
+
 	// Schedule next maintenance
 	q = "UPDATE metadb.maintenance " +
 		"SET next_maintenance_time = next_maintenance_time +" +

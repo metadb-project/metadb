@@ -208,14 +208,6 @@ func fullUpdate(opts *options.Options, marct *MARCTransform, connString string, 
 		if marct.Verbose >= 1 {
 			printerr(" %s checksum", util.ElapsedTime(startCksum))
 		}
-		// analyze
-		startAnalyze := time.Now()
-		if err = util.Analyze(context.TODO(), dbc, marct.Loc.tablefinal()); err != nil {
-			return err
-		}
-		if marct.Verbose >= 1 {
-			printerr(" %s analyze", util.ElapsedTime(startAnalyze))
-		}
 	}
 	if marct.Verbose >= 1 {
 		printerr("%s full update", util.ElapsedTime(startUpdate))
