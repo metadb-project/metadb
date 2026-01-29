@@ -383,12 +383,11 @@ For example:
 --metadb:table user_group
 ----
 
-=== Statements
+=== Commands
 
-Metadb extends SQL with statements for configuring and administering
-the server.  These statements are only available when connecting to
-the Metadb server (not the PostgreSQL server for the underlying
-database).
+Metadb extends SQL with commands for configuring and administering the
+server.  These commands are only available when connecting to the
+Metadb server (not the PostgreSQL server for the underlying database).
 
 ==== alter data source
 
