@@ -185,7 +185,7 @@ func mainServer(svr *server, cat *catalog.Catalog) error {
 			if process.Stop() {
 				break
 			}
-			time.Sleep(5 * time.Second)
+			time.Sleep(10 * time.Second)
 		}
 	}
 
