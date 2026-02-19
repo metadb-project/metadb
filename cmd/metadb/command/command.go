@@ -722,6 +722,9 @@ func DataToSQLData(data any, datatype types.DataType, semtype string) (*string, 
 			var i, f float64 = math.Modf(v / 1000000)
 			var t string = time.Unix(int64(i), int64(f*1000000000)).UTC().Format("2006-01-02 15:04:05.000000")
 			s := fixupSQLTime(t)
+			if strings.HasPrefix(s, "0000") {
+				s = "0001-01-01T00:00:00Z"
+			}
 			return &s, nil
 		}
 	case types.TextType, types.NumericType, types.UUIDType, types.JSONType, types.TimetzType, types.TimestamptzType:
