@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"regexp"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -115,9 +114,6 @@ func loggingServer(svr *server) error {
 }
 
 func runServer(svr *server, cat *catalog.Catalog) error {
-	if svr.db.DBName != "metadb" && !strings.HasPrefix(svr.db.DBName, "metadb_") {
-		log.Info("database has nonstandard name %q", svr.db.DBName)
-	}
 	setMemoryLimit(svr.opt.MemoryLimit)
 	if svr.opt.NoTLS {
 		log.Warning("TLS disabled for all client connections")
