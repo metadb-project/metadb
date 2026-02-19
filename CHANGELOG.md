@@ -1,3 +1,7 @@
+# v1.3.10
+
+* A patch was made that attempts to adjust some invalid time stamps.
+
 # v1.3.9
 
 * Minor fix.
