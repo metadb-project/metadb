@@ -77,11 +77,11 @@ func GoUpdateUserPerms(db *dbx.DB, dc, dcsuper *pgx.Conn, trackedTables []dbx.Ta
 		}
 		////////
 	}
-	if _, err := dc.Exec(context.TODO(), "UPDATE metadb.auth SET dbupdated=TRUE"); err != nil {
+	if _, err = dc.Exec(context.TODO(), "UPDATE metadb.auth SET dbupdated=TRUE"); err != nil {
 		log.Error("updating user authorizations: %v", err)
 		return
 	}
-	if _, err := dc.Exec(context.TODO(), "DELETE FROM metadb.auth WHERE tables=''"); err != nil {
+	if _, err = dc.Exec(context.TODO(), "DELETE FROM metadb.auth WHERE tables=''"); err != nil {
 		log.Error("cleaning up user authorizations: %v", err)
 		return
 	}
