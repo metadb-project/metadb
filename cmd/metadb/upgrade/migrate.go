@@ -133,13 +133,13 @@ func runMigration(dp *pgxpool.Pool, cat *catalog.Catalog, dpLDP *pgxpool.Pool, s
 			}
 		}
 		c := &dbx.Column{Schema: table.Schema, Table: table.Table, Column: "id"}
-		if cat.Column(c) == nil {
+		if cat.ColumnType(c) == nil {
 			if err = cat.AddColumn(&table, "id", types.UUIDType, 0); err != nil {
 				return fmt.Errorf("adding column \"id\" in table \"%s__\": %v", table, err)
 			}
 		}
 		c = &dbx.Column{Schema: table.Schema, Table: table.Table, Column: m.jsonColumn}
-		if cat.Column(c) == nil {
+		if cat.ColumnType(c) == nil {
 			if err = cat.AddColumn(&table, m.jsonColumn, types.JSONType, 0); err != nil {
 				return fmt.Errorf("adding column %q in table \"%s__\": %v", m.jsonColumn, table, err)
 			}

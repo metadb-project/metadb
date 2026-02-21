@@ -2,6 +2,8 @@
 package parser
 
 import (
+	"strings"
+
 	"github.com/metadb-project/metadb/cmd/metadb/ast"
 )
 
@@ -28,7 +30,7 @@ import (
 %type <node> create_user_stmt drop_user_stmt
 %type <node> create_data_mapping_stmt create_data_origin_stmt list_stmt
 %type <node> refresh_inferred_column_types_stmt
-%type <node> alter_table_stmt alter_table_cmd
+%type <node> alter_table_stmt
 %type <node> verify_consistency_stmt
 %type <node> create_schema_for_user_stmt
 %type <tableparamlist> table_parameter
@@ -339,15 +341,13 @@ create_schema_for_user_stmt:
 		}
 
 alter_table_stmt:
-	ALTER TABLE name alter_table_cmd ';'
+	ALTER TABLE name ADD COLUMN name name ';'
 		{
-			$$ = &ast.AlterTableStmt{TableName: $3, Cmd: ($4).(*ast.AlterTableCmd)}
+			$$ = &ast.AlterTableAddColumnStmt{TableName: $3, ColumnName: $6, ColumnType: $7}
 		}
-
-alter_table_cmd:
-	ALTER COLUMN name TYPE name
+	| ALTER TABLE name ALTER COLUMN name TYPE name ';'
 		{
-			$$ = &ast.AlterTableCmd{ColumnName: $3, ColumnType: $5}
+			$$ = &ast.AlterTableAlterColumnStmt{TableName: $3, ColumnName: $6, ColumnType: $8}
 		}
 
 alter_data_source_stmt:
@@ -463,7 +463,7 @@ verify_consistency_stmt:
 name:
 	IDENT
 		{
-			$$ = $1
+			$$ = strings.ToLower($1)
 		}
 	| unreserved_keyword
 		{

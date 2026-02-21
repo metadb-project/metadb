@@ -30,6 +30,9 @@
 
 * A new function `mdbusers()` lists registered users.
 
+* Support for creating new columns has been added to the command
+  `alter table`.
+
 * A new data source option `map_public_schema` supports changing the
   schema name of tables that originate in the `public` schema.
 

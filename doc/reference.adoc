@@ -479,6 +479,11 @@ Change a table definition
 [source,subs="verbatim,quotes"]
 ----
 alter table `*_table_name_*`
+    `*_action_*`
+
+where `*_action_*` is one of:
+
+    add column `*_column_name_*` `*_data_type_*`
     alter column `*_column_name_*` type `*_data_type_*`
 ----
 
@@ -488,8 +493,9 @@ alter table `*_table_name_*`
 `alter table` changes the definition of a table that is extracted from
 a data source.
 
-NOTE: `alter table` currently requires restarting the server before it
-will take effect.
+Due to concurrency control, `alter table` has to acquire stream
+processing or table locks in order to finish executing.  It
+automatically waits until it can continue safely.
 
 [discrete]
 ===== Parameters
@@ -500,15 +506,21 @@ will take effect.
 |Schema-qualified name of a main table.
 
 |`*_column_name_*`
-|Name of a column to alter.
+|Name of a column to add or alter.
 
 |`*_data_type_*`
-|The new data type of the column.  The only type currently supported
- is `uuid`.
+|The (new) data type of the column.  Types currently supported are
+`text` and `uuid`.
 |===
 
 [discrete]
 ===== Examples
+
+Add a column to a table:
+
+----
+alter table library.patrongroup__ add column description text;
+----
 
 Change a column type to `uuid`:
 

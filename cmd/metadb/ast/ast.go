@@ -117,20 +117,23 @@ type RefreshInferredColumnTypesStmt struct {
 func (*RefreshInferredColumnTypesStmt) node()     {}
 func (*RefreshInferredColumnTypesStmt) stmtNode() {}
 
-type AlterTableStmt struct {
-	TableName string
-	Cmd       *AlterTableCmd
-}
-
-func (*AlterTableStmt) node()     {}
-func (*AlterTableStmt) stmtNode() {}
-
-type AlterTableCmd struct {
+type AlterTableAddColumnStmt struct {
+	TableName  string
 	ColumnName string
 	ColumnType string
 }
 
-func (*AlterTableCmd) node() {}
+func (*AlterTableAddColumnStmt) node()     {}
+func (*AlterTableAddColumnStmt) stmtNode() {}
+
+type AlterTableAlterColumnStmt struct {
+	TableName  string
+	ColumnName string
+	ColumnType string
+}
+
+func (*AlterTableAlterColumnStmt) node()     {}
+func (*AlterTableAlterColumnStmt) stmtNode() {}
 
 type VerifyConsistencyStmt struct {
 }

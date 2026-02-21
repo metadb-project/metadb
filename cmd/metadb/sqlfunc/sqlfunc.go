@@ -180,7 +180,7 @@ func checkForDirectives(cat *catalog.Catalog, url, ref, fullpath string, input s
 					line, url, ref, fullpath)
 				continue
 			}
-			if cat.Column(&dbx.Column{Schema: requireTable.Schema, Table: requireTable.Table, Column: requireColumn}) != nil {
+			if cat.ColumnType(&dbx.Column{Schema: requireTable.Schema, Table: requireTable.Table, Column: requireColumn}) != nil {
 				continue
 			}
 			// Add table

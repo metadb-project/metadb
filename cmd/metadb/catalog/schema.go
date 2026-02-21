@@ -8,6 +8,7 @@ import (
 	"github.com/metadb-project/metadb/cmd/metadb/dbx"
 	"github.com/metadb-project/metadb/cmd/metadb/sqlx"
 	"github.com/metadb-project/metadb/cmd/metadb/types"
+	"github.com/metadb-project/metadb/cmd/metadb/util"
 )
 
 /*
@@ -78,6 +79,32 @@ func getColumnSchemas(dp *pgxpool.Pool) ([]*sqlx.ColumnSchema, error) {
 	return cs, nil
 }
 
+func (c *Catalog) AlterColumnType(column *dbx.Column, dataType string, cast bool) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	currentType := columnType(c, column)
+	if dataType != *currentType { // alter column, if types are not the same
+		var castSQL string
+		if cast {
+			castSQL = " USING \"" + column.Column + "\"::" + dataType
+		}
+		q := "ALTER TABLE \"" + column.Schema + "\".\"" + column.Table + "__\"" +
+			" ALTER COLUMN \"" + column.Column + "\" TYPE " + dataType + castSQL
+		if _, err := c.dp.Exec(context.TODO(), q); err != nil {
+			return util.PGErr(err)
+		}
+		updateColumn(c, column, dataType)
+		if dataType == "uuid" { // create index on a uuid column
+			if !c.indexExists(column) {
+				if err := c.addIndex(column); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (c *Catalog) UpdateColumn(column *dbx.Column, dataType string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -118,10 +145,14 @@ func (c *Catalog) TableSchema(table *dbx.Table) map[string]string {
 	return ts
 }
 
-func (c *Catalog) Column(column *dbx.Column) *string {
+func (c *Catalog) ColumnType(column *dbx.Column) *string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	cs, ok := c.columns[*column]
+	return columnType(c, column)
+}
+
+func columnType(cat *Catalog, column *dbx.Column) *string {
+	cs, ok := cat.columns[*column]
 	if ok {
 		return &cs
 	}

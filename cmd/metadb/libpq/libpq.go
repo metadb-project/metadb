@@ -2,7 +2,6 @@ package libpq
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -290,8 +289,10 @@ func processQuery(cat *catalog.Catalog, conn net.Conn, query string, args []any,
 		err = createDataSource(conn, n, dc)
 	case *ast.CreateDataMappingStmt:
 		err = createDataMapping(conn, n, cat)
-	case *ast.AlterTableStmt:
-		err = alterTable(conn, n, dc)
+	case *ast.AlterTableAddColumnStmt:
+		err = alterTableAddColumn(conn, n, dc, cat)
+	case *ast.AlterTableAlterColumnStmt:
+		err = alterTableAlterColumn(conn, n, dc, cat)
 	case *ast.AlterDataSourceStmt:
 		err = alterDataSource(conn, n, dc)
 	case *ast.CreateUserStmt:
@@ -431,75 +432,6 @@ func encodeRow(buffer []byte, rows pgx.Rows, cols []pgconn.FieldDescription) ([]
 		}
 	}
 	return row.Encode(buffer)
-}
-
-func alterTable(conn net.Conn, node *ast.AlterTableStmt, dc *pgx.Conn) error {
-	// The only type currently supported is uuid.
-	columnType := strings.ToLower(node.Cmd.ColumnType)
-	if columnType != "uuid" {
-		return fmt.Errorf("converting to type %q not supported", columnType)
-	}
-
-	// Ensure the table name is a main table, and parse it.
-	if !strings.HasSuffix(node.TableName, "__") {
-		return fmt.Errorf("%q is not a main table name", node.TableName)
-	}
-	table, err := dbx.ParseTable(node.TableName[0 : len(node.TableName)-2])
-	if err != nil {
-		return fmt.Errorf("%q is not a valid table name", node.TableName)
-	}
-
-	// Ensure the table is in the catalog.
-	q := "SELECT 1 FROM metadb.base_table WHERE schema_name=$1 AND table_name=$2"
-	var i int64
-	err = dc.QueryRow(context.TODO(), q, table.Schema, table.Table).Scan(&i)
-	switch {
-	case errors.Is(err, pgx.ErrNoRows):
-		return fmt.Errorf("table %q does not exist in a data source", node.TableName)
-	case err != nil:
-		return fmt.Errorf("looking up table %q: %v", node.TableName, err)
-	default:
-		// NOP: table found.
-	}
-
-	// Ensure the table has the requested column.
-	q = `SELECT t.typname
-    FROM pg_class c
-        JOIN pg_namespace n ON c.relnamespace=n.oid
-        JOIN pg_attribute a ON a.attrelid=c.oid
-        JOIN pg_type t ON t.oid=a.atttypid
-    WHERE n.nspname=$1 AND c.relname=$2 AND a.attname=$3`
-	var t string
-	err = dc.QueryRow(context.TODO(), q, table.Schema, table.Table+"__", node.Cmd.ColumnName).Scan(&t)
-	switch {
-	case errors.Is(err, pgx.ErrNoRows):
-		return fmt.Errorf("column %q of table %q does not exist", node.Cmd.ColumnName, node.TableName)
-	case err != nil:
-		return fmt.Errorf("looking up column %q in table %q: %v", node.Cmd.ColumnName, node.TableName, err)
-	default:
-		// NOP: column found.
-	}
-
-	if t != "uuid" { // No need to do anything if the type is already uuid.
-		// Convert the column type.
-		q = fmt.Sprintf("ALTER TABLE %s ALTER COLUMN \"%s\" TYPE %s USING \"%s\"::%s",
-			table.MainSQL(), node.Cmd.ColumnName, node.Cmd.ColumnType, node.Cmd.ColumnName, node.Cmd.ColumnType)
-		if _, err = dc.Exec(context.TODO(), q); err != nil {
-			return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
-		}
-		// Create an index on a uuid column.
-		q = fmt.Sprintf("CREATE INDEX ON %s (\"%s\")", table.MainSQL(), node.Cmd.ColumnName)
-		if _, err = dc.Exec(context.TODO(), q); err != nil {
-			return errors.New(strings.TrimPrefix(err.Error(), "ERROR: "))
-		}
-	}
-	_ = writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.NoticeResponse{Severity: "INFO", Message: "restart server for table changes to take full effect"},
-	})
-	return writeEncoded(conn, []pgproto3.Message{
-		&pgproto3.CommandComplete{CommandTag: []byte("ALTER TABLE")},
-		&pgproto3.ReadyForQuery{TxStatus: 'I'},
-	})
 }
 
 func dropDataSource(conn net.Conn, node *ast.DropDataSourceStmt, dc *pgx.Conn) error {
