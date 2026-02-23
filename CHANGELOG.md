@@ -1,4 +1,9 @@
-# v1.4.0
+# v1.4.0-beta4
+
+* Support for adding new columns has been added to the command `alter
+  table`.
+
+# (1.4)
 
 * JSON transformation has been extended to support objects and arrays.
   New commands `create data mapping` and `drop data mapping` can be
@@ -29,9 +34,6 @@
   existing database user to a Metadb instance.
 
 * A new function `mdbusers()` lists registered users.
-
-* Support for creating new columns has been added to the command
-  `alter table`.
 
 * A new data source option `map_public_schema` supports changing the
   schema name of tables that originate in the `public` schema.
