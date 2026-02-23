@@ -1,7 +1,7 @@
 # v1.4.0-beta4
 
 * Support for adding new columns has been added to the command `alter
-  table`.
+  table`.  See also: https://metadb.dev/metadb/doc/1.4/#_alter_table
 
 # (1.4)
 
