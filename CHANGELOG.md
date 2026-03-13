@@ -1,9 +1,4 @@
-# v1.4.0-beta4
-
-* Support for adding new columns has been added to the command `alter
-  table`.  See also: https://metadb.dev/metadb/doc/1.4/#_alter_table
-
-# (1.4)
+# 1.4
 
 * JSON transformation has been extended to support objects and arrays.
   New commands `create data mapping` and `drop data mapping` can be
@@ -15,6 +10,9 @@
 
 * New commands `grant` and `revoke` improve support for managing user
   privileges.
+
+* Support for adding new columns has been added to the command `alter
+  table`.
 
 * New commands `alter system` and `list config` support defining and
   viewing server configuration parameters.
