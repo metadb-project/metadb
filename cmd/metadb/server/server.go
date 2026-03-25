@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"regexp"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -270,14 +271,18 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 		tries := 0
 		for {
 			tries++
-			url := "https://github.com/folio-org/folio-analytics.git"
-			var ref string
-			ref, err = cat.GetConfig("external_sql_folio")
+			var spec string
+			spec, err = cat.GetConfig("external_sql_folio")
 			if err != nil {
 				return err
 			}
-			if ref == "" {
+			if spec == "" {
 				break
+			}
+			var url, ref string
+			url, ref, err = parseRef(spec)
+			if err != nil {
+				return err
 			}
 			path := "sql_metadb/derived_tables"
 			schema := "folio_derived"
@@ -296,14 +301,18 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 		tries := 0
 		for {
 			tries++
-			url := "https://github.com/openlibraryenvironment/reshare-analytics.git"
-			var ref string
-			ref, err = cat.GetConfig("external_sql_reshare")
+			var spec string
+			spec, err = cat.GetConfig("external_sql_reshare")
 			if err != nil {
 				return err
 			}
-			if ref == "" {
+			if spec == "" {
 				break
+			}
+			var url, ref string
+			url, ref, err = parseRef(spec)
+			if err != nil {
+				return err
 			}
 			path := "reports"
 			schema := "report"
@@ -360,6 +369,20 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 
 	log.Debug("completed maintenance")
 	return nil
+}
+
+// parses external_sql_folio or external_sql_reshare, and returns
+// the URL and ref
+func parseRef(spec string) (string, string, error) {
+	sp := strings.Split(spec, "/")
+	n := len(sp)
+	if n < 7 {
+		return "", "", fmt.Errorf("invalid reference: %s", spec)
+	}
+	if sp[n-3] != "refs" {
+		return "", "", fmt.Errorf("invalid reference: %s", spec)
+	}
+	return strings.Join(sp[:n-3], "/"), strings.Join(sp[n-3:], "/"), nil
 }
 
 func goCreateFunctions(db dbx.DB) {

@@ -305,23 +305,31 @@ parameter to take effect.
 
 ==== external_sql_folio
 
-The `external_sql_folio` parameter sets the Git reference in the
-folio-analytics repository to be used for running external SQL.
+The `external_sql_folio` parameter sets the Git repository and
+reference to be used for running FOLIO-specific, external SQL.
 
 For example:
 
 ----
-alter system set external_sql_folio = 'refs/tags/v1.8.0';
+alter system set external_sql_folio =
+    'https://github.com/folio-org/folio-analytics.git/refs/tags/v1.8.0';
 ----
 
 The default value is `''`, which disables running the external SQL.
 
 ==== external_sql_reshare
 
-The `external_sql_reshare` parameter sets the Git reference in the
-folio-reshare repository to be used for running external SQL.  The
-default value is `''`, which disables running the external SQL.  Also
-see *Reference > Configuration parameters > external_sql_folio*.
+The `external_sql_reshare` parameter sets the Git repository and
+reference to be used for running ReShare-specific, external SQL.
+
+For example:
+
+----
+alter system set external_sql_reshare =
+    'https://github.com/openlibraryenvironment/reshare-analytics.git/refs/tags/v1.1.0';
+----
+
+The default value is `''`, which disables running the external SQL.
 
 // ==== kafka_sync_concurrency
 
