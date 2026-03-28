@@ -2115,7 +2115,7 @@ func updb32(opt *dbopt) error {
 	}
 	defer dbx.Close(dc)
 
-	q := "SELECT schema_name||'.'||table_name||'__t__' FROM metadb.transform_json " +
+	q := "SELECT schema_name||'.'||table_name||'__t' FROM metadb.transform_json " +
 		"WHERE path = '$' AND map = 't' ORDER BY schema_name, table_name"
 	rows, _ := dc.Query(context.Background(), q)
 	tables, err := pgx.CollectRows(rows, pgx.RowTo[string])
@@ -2123,16 +2123,15 @@ func updb32(opt *dbopt) error {
 		return err
 	}
 	for i := range tables {
-		t := strings.TrimSuffix(tables[i], "__")
-		eout.Info("upgrading table %q", t)
+		eout.Info("upgrading table %q", tables[i])
 		// find pairs of old and new rows where null __root__id caused bifurcation;
 		// delete old row
-		q = "DELETE FROM " + t +
+		q = "DELETE FROM " + tables[i] +
 			"WHERE __root__id IS NULL AND" +
-			" id IN (SELECT id FROM " + t + " WHERE __root__id IS NOT NULL)"
+			" id IN (SELECT id FROM " + tables[i] + " WHERE __root__id IS NOT NULL)"
 		_, _ = dc.Exec(context.TODO(), q)
 		// fill in root id to prevent this problem from happening again
-		q = "UPDATE " + t + " SET __root__id = id WHERE __root__id IS NULL"
+		q = "UPDATE " + tables[i] + " SET __root__id = id WHERE __root__id IS NULL"
 		_, _ = dc.Exec(context.TODO(), q)
 	}
 
