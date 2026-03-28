@@ -240,7 +240,7 @@ func goMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat *catalog.Cat
 		}
 		if folio && syncMode == dsync.NoSync {
 			if err := marctab.RunMarctab(db, datadir, cat); err != nil {
-				log.Error("marc__t: %v", err)
+				log.Error("marct: %v", err)
 			}
 		}
 		if err := checkTimeDailyMaintenance(datadir, db, dp, cat, source, folio, reshare, syncMode); err != nil {
@@ -282,7 +282,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 			var url, ref string
 			url, ref, err = parseRef(spec)
 			if err != nil {
-				return err
+				return fmt.Errorf("runsql: %v", err)
 			}
 			path := "sql_metadb/derived_tables"
 			schema := "folio_derived"
@@ -312,7 +312,7 @@ func checkTimeDailyMaintenance(datadir string, db dbx.DB, dp *pgxpool.Pool, cat 
 			var url, ref string
 			url, ref, err = parseRef(spec)
 			if err != nil {
-				return err
+				return fmt.Errorf("runsql: %v", err)
 			}
 			path := "reports"
 			schema := "report"
@@ -377,10 +377,10 @@ func parseRef(spec string) (string, string, error) {
 	sp := strings.Split(spec, "/")
 	n := len(sp)
 	if n < 7 {
-		return "", "", fmt.Errorf("invalid reference: %s", spec)
+		return "", "", fmt.Errorf("invalid reference spec: %s", spec)
 	}
 	if sp[n-3] != "refs" {
-		return "", "", fmt.Errorf("invalid reference: %s", spec)
+		return "", "", fmt.Errorf("invalid reference spec: %s", spec)
 	}
 	return strings.Join(sp[:n-3], "/"), strings.Join(sp[n-3:], "/"), nil
 }

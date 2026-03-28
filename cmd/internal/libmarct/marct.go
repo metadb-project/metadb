@@ -92,6 +92,18 @@ func marcTransform(opts *options.Options, marct *MARCTransform) error {
 	if incUpdateAvail, err = inc.IncUpdateAvail(conn); err != nil {
 		return err
 	}
+
+	e, err := IsInputEmpty(conn, marct.Loc.SrsRecords)
+	if err != nil {
+		return err
+	}
+	if e {
+		if marct.Verbose >= 1 {
+			marct.PrintErr("no input records")
+		}
+		return nil
+	}
+
 	var retry bool
 	for {
 		if !retry && incUpdateAvail && !marct.FullUpdate {
@@ -119,6 +131,15 @@ func marcTransform(opts *options.Options, marct *MARCTransform) error {
 		}
 	}
 	return nil
+}
+
+func IsInputEmpty(conn *pgx.Conn, srsRecords string) (bool, error) {
+	q := "SELECT count(*) FROM " + srsRecords
+	var i int64
+	if err := conn.QueryRow(context.TODO(), q).Scan(&i); err != nil {
+		return false, fmt.Errorf("checking for input records: %v", err)
+	}
+	return i == 0, nil
 }
 
 func setupLocations(opts *MARCTransform) Locations {

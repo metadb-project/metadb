@@ -26,13 +26,21 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 
 	start := time.Now()
 	users := make([]string, 0)
+	verbose := 0
+	if log.IsLevelTrace() {
+		verbose = 2
+	} else {
+		if log.IsLevelDebug() {
+			verbose = 1
+		}
+	}
 	t := &libmarct.MARCTransform{
 		FullUpdate: false,
 		Datadir:    datadir,
 		Users:      users,
 		//TrigramIndex: false,
 		//NoIndexes:    false,
-		Verbose: 0,
+		Verbose: verbose,
 		//CSVFileName:  "",
 		SRSRecords:  "",
 		SRSMarc:     "",
@@ -40,7 +48,7 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 		Metadb:      true,
 		PrintErr: func(format string, v ...any) {
 			e := strings.ReplaceAll(fmt.Sprintf(format, v...), "ERROR: ", "")
-			log.Info("marc__t: %s\n", e)
+			log.Info("marct: %s\n", e)
 		},
 	}
 	if err = t.Transform(); err != nil {
@@ -54,6 +62,6 @@ func RunMarctab(db dbx.DB, datadir string, cat *catalog.Catalog) error {
 	if err := acl.RestorePrivileges(dc, "folio_source_record", "marc__t", acl.Table); err != nil {
 		return err
 	}
-	log.Debug("marc__t: updated table folio_source_record.marc__t")
+	log.Debug("marct: completed update of table folio_source_record.marc__t")
 	return nil
 }

@@ -124,6 +124,10 @@ func Detail(format string, args ...interface{}) {
 	printf(nil, false, "DETAIL", format, args...)
 }
 
+func IsLevelDebug() bool {
+	return std.logDebug
+}
+
 func IsLevelTrace() bool {
 	return std.logTrace
 }

@@ -477,7 +477,8 @@ Configuration values can be displayed via the `list config` command.
 ===== Examples
 
 ----
-alter system set kafka_sync_concurrency = '1';
+alter system set external_sql_folio =
+    'https://github.com/folio-org/folio-analytics.git/refs/tags/v1.8.0';
 ----
 
 ==== alter table
