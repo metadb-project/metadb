@@ -2123,15 +2123,16 @@ func updb32(opt *dbopt) error {
 		return err
 	}
 	for i := range tables {
-		eout.Info("upgrading table %q", tables[i])
+		t := strings.TrimSuffix(tables[i], "__")
+		eout.Info("upgrading table %q", t)
 		// find pairs of old and new rows where null __root__id caused bifurcation;
 		// delete old row
-		q = "DELETE FROM " + tables[i] +
+		q = "DELETE FROM " + t +
 			"WHERE __root__id IS NULL AND" +
-			" id IN (SELECT id FROM " + tables[i] + " WHERE __root__id IS NOT NULL)"
+			" id IN (SELECT id FROM " + t + " WHERE __root__id IS NOT NULL)"
 		_, _ = dc.Exec(context.TODO(), q)
 		// fill in root id to prevent this problem from happening again
-		q = "UPDATE " + tables[i] + " SET __root__id = id WHERE __root__id IS NULL"
+		q = "UPDATE " + t + " SET __root__id = id WHERE __root__id IS NULL"
 		_, _ = dc.Exec(context.TODO(), q)
 	}
 
