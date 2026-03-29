@@ -2141,7 +2141,7 @@ func updb32(opt *dbopt) error {
 			return err
 		}
 		// fill in root id to prevent this problem from happening again
-		q = "UPDATE " + tables[i] + " SET __root__id = id WHERE __root__id IS NULL"
+		q = "UPDATE " + tables[i] + " SET __root__id = id::uuid WHERE __root__id IS NULL"
 		if _, err = tx.Exec(context.TODO(), q); err != nil {
 			return err
 		}
