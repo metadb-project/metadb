@@ -2123,24 +2123,34 @@ func updb32(opt *dbopt) error {
 	if err != nil {
 		return err
 	}
+
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return util.PGErr(err)
+	}
+	defer dbx.Rollback(tx)
+
 	for i := range tables {
 		eout.Info("upgrading table %q", tables[i])
 		// find pairs of old and new rows where null __root__id caused bifurcation;
 		// delete old row
 		q = "DELETE FROM " + tables[i] +
-			"WHERE __root__id IS NULL AND" +
+			" WHERE __root__id IS NULL AND" +
 			" id IN (SELECT id FROM " + tables[i] + " WHERE __root__id IS NOT NULL)"
-		if _, err = dc.Exec(context.TODO(), q); err != nil {
+		if _, err = tx.Exec(context.TODO(), q); err != nil {
 			return err
 		}
 		// fill in root id to prevent this problem from happening again
 		q = "UPDATE " + tables[i] + " SET __root__id = id WHERE __root__id IS NULL"
-		if _, err = dc.Exec(context.TODO(), q); err != nil {
+		if _, err = tx.Exec(context.TODO(), q); err != nil {
 			return err
 		}
 	}
 
-	if err = metadata.WriteDatabaseVersion(dc, 32); err != nil {
+	if err = metadata.WriteDatabaseVersion(tx, 32); err != nil {
+		return util.PGErr(err)
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
 		return util.PGErr(err)
 	}
 	return nil
