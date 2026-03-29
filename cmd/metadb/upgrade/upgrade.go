@@ -2116,7 +2116,7 @@ func updb32(opt *dbopt) error {
 	defer dbx.Close(dc)
 
 	q := "SELECT t.schema_name||'.'||t.table_name||'__t' FROM metadb.transform_json t " +
-		"JOIN metadb.base_table b ON t.schema_name=b.schema_name AND t.table_name=b.table_name " +
+		"JOIN metadb.base_table b ON t.schema_name=b.schema_name AND t.table_name||'__t'=b.table_name " +
 		"WHERE t.path = '$' AND t.map = 't' ORDER BY t.schema_name, t.table_name"
 	rows, _ := dc.Query(context.Background(), q)
 	tables, err := pgx.CollectRows(rows, pgx.RowTo[string])
