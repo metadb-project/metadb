@@ -2115,8 +2115,9 @@ func updb32(opt *dbopt) error {
 	}
 	defer dbx.Close(dc)
 
-	q := "SELECT schema_name||'.'||table_name||'__t' FROM metadb.transform_json " +
-		"WHERE path = '$' AND map = 't' ORDER BY schema_name, table_name"
+	q := "SELECT t.schema_name||'.'||t.table_name||'__t' FROM metadb.transform_json t " +
+		"JOIN metadb.base_table b ON t.schema_name=b.schema_name AND t.table_name=b.table_name " +
+		"WHERE t.path = '$' AND t.map = 't' ORDER BY t.schema_name, t.table_name"
 	rows, _ := dc.Query(context.Background(), q)
 	tables, err := pgx.CollectRows(rows, pgx.RowTo[string])
 	if err != nil {
@@ -2129,10 +2130,14 @@ func updb32(opt *dbopt) error {
 		q = "DELETE FROM " + tables[i] +
 			"WHERE __root__id IS NULL AND" +
 			" id IN (SELECT id FROM " + tables[i] + " WHERE __root__id IS NOT NULL)"
-		_, _ = dc.Exec(context.TODO(), q)
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
 		// fill in root id to prevent this problem from happening again
 		q = "UPDATE " + tables[i] + " SET __root__id = id WHERE __root__id IS NULL"
-		_, _ = dc.Exec(context.TODO(), q)
+		if _, err = dc.Exec(context.TODO(), q); err != nil {
+			return err
+		}
 	}
 
 	if err = metadata.WriteDatabaseVersion(dc, 32); err != nil {
