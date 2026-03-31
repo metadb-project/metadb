@@ -437,6 +437,7 @@ var updbList = []updbFunc{
 	updb30,
 	updb31,
 	updb32,
+	updb33,
 }
 
 func updb8(opt *dbopt) error {
@@ -2141,7 +2142,6 @@ func updb32(opt *dbopt) error {
 			strings.HasPrefix(tables[i], "folio_audit.marc_bib_audit_p") ||
 			strings.HasPrefix(tables[i], "folio_audit.item_audit_p") {
 			// undo the addition of these tables
-			eout.Info("removing table %q", tables[i]+"__")
 			sp := strings.Split(tables[i], ".")
 			schema := sp[0]
 			table := sp[1]
@@ -2163,12 +2163,12 @@ func updb32(opt *dbopt) error {
 			" WHERE __root__id IS NULL AND" +
 			" id IN (SELECT id FROM " + tables[i] + " WHERE __root__id IS NOT NULL)"
 		if _, err = tx.Exec(context.TODO(), q); err != nil {
-			return err
+			return util.PGErr(err)
 		}
 		// fill in root id to prevent this problem from happening again
 		q = "UPDATE " + tables[i] + " SET __root__id = id::uuid WHERE __root__id IS NULL"
 		if _, err = tx.Exec(context.TODO(), q); err != nil {
-			return err
+			return util.PGErr(err)
 		}
 	}
 
@@ -2185,7 +2185,7 @@ func updb32(opt *dbopt) error {
 func updb32DeleteJSONMapping(dq dbx.Queryable, schema, table, column, path string) error {
 	q := "DELETE FROM metadb.transform_json WHERE schema_name=$1 AND table_name=$2 AND column_name=$3 AND path=$4"
 	if _, err := dq.Exec(context.TODO(), q, schema, table, column, path); err != nil {
-		return err
+		return util.PGErr(err)
 	}
 	return nil
 }
@@ -2194,12 +2194,12 @@ func updb32DropTable(dq dbx.Queryable, schema, table string) error {
 	// revoke all privileges on the table
 	q := "DELETE FROM metadb.acl WHERE schema_name=$1 AND object_name=$2 AND object_type='t'"
 	if _, err := dq.Exec(context.TODO(), q, schema, table); err != nil {
-		return err
+		return util.PGErr(err)
 	}
 	// drop the table
 	q = "DELETE FROM metadb.base_table WHERE schema_name=$1 AND table_name=$2"
 	if _, err := dq.Exec(context.TODO(), q, schema, table); err != nil {
-		return err
+		return util.PGErr(err)
 	}
 	q = "DROP TABLE IF EXISTS \"" + schema + "\".\"" + table + "__\""
 	if _, err := dq.Exec(context.TODO(), q); err != nil {
@@ -2207,6 +2207,71 @@ func updb32DropTable(dq dbx.Queryable, schema, table string) error {
 	}
 	q = "DROP TABLE IF EXISTS \"" + schema + "\".\"zzz___" + table + "___sync\""
 	if _, err := dq.Exec(context.TODO(), q); err != nil {
+		return util.PGErr(err)
+	}
+	return nil
+}
+
+func updb33(opt *dbopt) error {
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	q := "SELECT schema_name||'.'||table_name FROM metadb.transform_json " +
+		"WHERE schema_name||'.'||table_name IN (" +
+		"folio_audit.holdings_audit, folio_audit.item_audit, folio_linked_data.events, " +
+		"folio_source_record_manager.mapping_params_snapshots__t, " +
+		"folio_source_record_manager.mapping_rules_snapshots__t) OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.holdings_audit_p%' OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.instance_audit_p%' OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.marc_bib_audit_p%' OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.item_audit_p%'"
+	rows, _ := dc.Query(context.Background(), q)
+	tables, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return err
+	}
+
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return util.PGErr(err)
+	}
+	defer dbx.Rollback(tx)
+
+	// some clean up was missed in the previous upgrade
+	for i := range tables {
+		sp := strings.Split(tables[i], ".")
+		schema := sp[0]
+		table := sp[1]
+		q = "DELETE FROM metadb.transform_json WHERE schema_name=$1 AND table_name=$2 AND column_name='jsonb' AND path='$'"
+		if _, err = tx.Exec(context.TODO(), q, schema, table); err != nil {
+			return util.PGErr(err)
+		}
+		if err = updb33RemoveACL(tx, schema, table); err != nil {
+			return err
+		}
+		if err = updb33RemoveACL(tx, schema, table+"__"); err != nil {
+			return err
+		}
+		if err = updb33RemoveACL(tx, schema, table+"__t__"); err != nil {
+			return err
+		}
+	}
+
+	if err = metadata.WriteDatabaseVersion(tx, 33); err != nil {
+		return util.PGErr(err)
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
+		return util.PGErr(err)
+	}
+	return nil
+}
+
+func updb33RemoveACL(dq dbx.Queryable, schema, table string) error {
+	q := "DELETE FROM metadb.acl WHERE schema_name=$1 AND object_name=$2 AND object_type='t'"
+	if _, err := dq.Exec(context.TODO(), q, schema, table); err != nil {
 		return util.PGErr(err)
 	}
 	return nil
