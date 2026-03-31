@@ -2235,6 +2235,11 @@ func updb33(opt *dbopt) error {
 	if err != nil {
 		return err
 	}
+	tables = append(tables, "folio_audit.holdings_audit")
+	tables = append(tables, "folio_audit.item_audit")
+	tables = append(tables, "folio_linked_data.events")
+	tables = append(tables, "folio_source_record_manager.mapping_params_snapshots__t")
+	tables = append(tables, "folio_source_record_manager.mapping_rules_snapshots__t")
 
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
