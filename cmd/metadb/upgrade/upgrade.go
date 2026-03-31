@@ -438,6 +438,7 @@ var updbList = []updbFunc{
 	updb31,
 	updb32,
 	updb33,
+	updb34,
 }
 
 func updb8(opt *dbopt) error {
@@ -1783,20 +1784,22 @@ func updb26(opt *dbopt) error {
 		return fmt.Errorf("setting createrole: %w", util.PGErr(err))
 	}
 
-	for i := range users {
-		for j := range updb26ExtraManagedTables {
-			t := strings.Split(updb26ExtraManagedTables[j], ".")
-			_ = acl.Grant(dc, []acl.ACLItem{
-				{
-					SchemaName: t[0],
-					ObjectName: t[1],
-					ObjectType: acl.Table,
-					Privilege:  acl.Access,
-					UserName:   users[i],
-				},
-			})
+	/*
+		for i := range users {
+			for j := range updb26ExtraManagedTables {
+				t := strings.Split(updb26ExtraManagedTables[j], ".")
+				_ = acl.Grant(dc, []acl.ACLItem{
+					{
+						SchemaName: t[0],
+						ObjectName: t[1],
+						ObjectType: acl.Table,
+						Privilege:  acl.Access,
+						UserName:   users[i],
+					},
+				})
+			}
 		}
-	}
+	*/
 
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
@@ -1902,7 +1905,6 @@ func updb26GrantAccessOnAll(tx pgx.Tx, user string) error {
 }
 
 var updb26ExtraManagedSchemas = []string{"folio_derived", "reshare_derived"}
-var updb26ExtraManagedTables = []string{"folio_source_record.marc__t"}
 
 func updb27(opt *dbopt) error {
 	dc, err := opt.DB.Connect()
@@ -2276,6 +2278,54 @@ func updb33RemoveACL(dq dbx.Queryable, schema, table string) error {
 	}
 	return nil
 }
+
+func updb34(opt *dbopt) error {
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return util.PGErr(err)
+	}
+	defer dbx.Rollback(tx)
+
+	q := "SELECT username FROM metadb.auth"
+	rows, _ := dc.Query(context.Background(), q)
+	users, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return err
+	}
+
+	for i := range users {
+		for j := range updb34ExtraManagedTables {
+			t := strings.Split(updb34ExtraManagedTables[j], ".")
+			schema := t[0]
+			table := t[1]
+			_ = acl.Grant(tx, []acl.ACLItem{
+				{
+					SchemaName: schema,
+					ObjectName: table,
+					ObjectType: acl.Table,
+					Privilege:  acl.Access,
+					UserName:   users[i],
+				},
+			})
+		}
+	}
+
+	if err = metadata.WriteDatabaseVersion(tx, 34); err != nil {
+		return util.PGErr(err)
+	}
+	if err = tx.Commit(context.TODO()); err != nil {
+		return util.PGErr(err)
+	}
+	return nil
+}
+
+var updb34ExtraManagedTables = []string{"folio_source_record.marc__t"}
 
 //func toPostgresArray(slice []string) string {
 //	var b strings.Builder
