@@ -2221,9 +2221,9 @@ func updb33(opt *dbopt) error {
 
 	q := "SELECT schema_name||'.'||table_name FROM metadb.transform_json " +
 		"WHERE schema_name||'.'||table_name IN (" +
-		"folio_audit.holdings_audit, folio_audit.item_audit, folio_linked_data.events, " +
-		"folio_source_record_manager.mapping_params_snapshots__t, " +
-		"folio_source_record_manager.mapping_rules_snapshots__t) OR " +
+		"'folio_audit.holdings_audit', 'folio_audit.item_audit', 'folio_linked_data.events', " +
+		"'folio_source_record_manager.mapping_params_snapshots__t', " +
+		"'folio_source_record_manager.mapping_rules_snapshots__t') OR " +
 		"schema_name||'.'||table_name LIKE 'folio_audit.holdings_audit_p%' OR " +
 		"schema_name||'.'||table_name LIKE 'folio_audit.instance_audit_p%' OR " +
 		"schema_name||'.'||table_name LIKE 'folio_audit.marc_bib_audit_p%' OR " +
