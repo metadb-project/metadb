@@ -2139,10 +2139,11 @@ func updb32(opt *dbopt) error {
 			tables[i] == "folio_linked_data.events__t" ||
 			tables[i] == "folio_source_record_manager.mapping_params_snapshots__t" ||
 			tables[i] == "folio_source_record_manager.mapping_rules_snapshots__t" ||
-			strings.HasPrefix(tables[i], "folio_audit.holdings_audit_p") ||
-			strings.HasPrefix(tables[i], "folio_audit.instance_audit_p") ||
-			strings.HasPrefix(tables[i], "folio_audit.marc_bib_audit_p") ||
-			strings.HasPrefix(tables[i], "folio_audit.item_audit_p") {
+			(strings.HasPrefix(tables[i], "folio_audit.holdings_audit_p") ||
+				strings.HasPrefix(tables[i], "folio_audit.instance_audit_p") ||
+				strings.HasPrefix(tables[i], "folio_audit.marc_bib_audit_p") ||
+				strings.HasPrefix(tables[i], "folio_audit.item_audit_p") &&
+					strings.HasSuffix(tables[i], "__t")) {
 			// undo the addition of these tables
 			sp := strings.Split(tables[i], ".")
 			schema := sp[0]
@@ -2226,20 +2227,15 @@ func updb33(opt *dbopt) error {
 		"'folio_audit.holdings_audit', 'folio_audit.item_audit', 'folio_linked_data.events', " +
 		"'folio_source_record_manager.mapping_params_snapshots__t', " +
 		"'folio_source_record_manager.mapping_rules_snapshots__t') OR " +
-		"schema_name||'.'||table_name LIKE 'folio_audit.holdings_audit_p%' OR " +
-		"schema_name||'.'||table_name LIKE 'folio_audit.instance_audit_p%' OR " +
-		"schema_name||'.'||table_name LIKE 'folio_audit.marc_bib_audit_p%' OR " +
-		"schema_name||'.'||table_name LIKE 'folio_audit.item_audit_p%'"
+		"schema_name||'.'||table_name LIKE 'folio_audit.holdings_audit_p%__t' OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.instance_audit_p%__t' OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.marc_bib_audit_p%__t' OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.item_audit_p%__t'"
 	rows, _ := dc.Query(context.Background(), q)
 	tables, err := pgx.CollectRows(rows, pgx.RowTo[string])
 	if err != nil {
 		return err
 	}
-	tables = append(tables, "folio_audit.holdings_audit")
-	tables = append(tables, "folio_audit.item_audit")
-	tables = append(tables, "folio_linked_data.events")
-	tables = append(tables, "folio_source_record_manager.mapping_params_snapshots__t")
-	tables = append(tables, "folio_source_record_manager.mapping_rules_snapshots__t")
 
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
