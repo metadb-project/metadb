@@ -2317,6 +2317,15 @@ func updb34(opt *dbopt) error {
 		}
 	}
 
+	q = "UPDATE metadb.config SET value = 'https://github.com/folio-org/folio-analytics.git/'||value WHERE parameter=external_sql_folio and value<>''"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return util.PGErr(err)
+	}
+	q = "UPDATE metadb.config SET value = 'https://github.com/openlibraryenvironment/reshare-analytics.git/'||value WHERE parameter=external_sql_reshare and value<>''"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return util.PGErr(err)
+	}
+
 	if err = metadata.WriteDatabaseVersion(tx, 34); err != nil {
 		return util.PGErr(err)
 	}
