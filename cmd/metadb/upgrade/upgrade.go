@@ -2131,7 +2131,32 @@ func updb32(opt *dbopt) error {
 	defer dbx.Rollback(tx)
 
 	for i := range tables {
-		eout.Info("upgrading table %q", tables[i])
+		if tables[i] == "folio_audit.holdings_audit__t" ||
+			tables[i] == "folio_audit.item_audit__t" ||
+			tables[i] == "folio_linked_data.events__t" ||
+			tables[i] == "folio_source_record_manager.mapping_params_snapshots__t" ||
+			tables[i] == "folio_source_record_manager.mapping_rules_snapshots__t" ||
+			strings.HasPrefix(tables[i], "folio_audit.holdings_audit_p") ||
+			strings.HasPrefix(tables[i], "folio_audit.instance_audit_p") ||
+			strings.HasPrefix(tables[i], "folio_audit.marc_bib_audit_p") ||
+			strings.HasPrefix(tables[i], "folio_audit.item_audit_p") {
+			// undo the addition of these tables
+			eout.Info("removing table %q", tables[i]+"__")
+			sp := strings.Split(tables[i], ".")
+			schema := sp[0]
+			table := sp[1]
+			// drop mapping
+			if err = updb32DeleteJSONMapping(tx, schema, table, "jsonb", "$"); err != nil {
+				return err
+			}
+			// drop corrupted table
+			if err = updb32DropTable(tx, schema, table); err != nil {
+				return err
+			}
+			continue
+		}
+
+		eout.Info("upgrading table %q", tables[i]+"__")
 		// find pairs of old and new rows where null __root__id caused bifurcation;
 		// delete old row
 		q = "DELETE FROM " + tables[i] +
@@ -2150,7 +2175,38 @@ func updb32(opt *dbopt) error {
 	if err = metadata.WriteDatabaseVersion(tx, 32); err != nil {
 		return util.PGErr(err)
 	}
+	eout.Info("writing changes")
 	if err = tx.Commit(context.TODO()); err != nil {
+		return util.PGErr(err)
+	}
+	return nil
+}
+
+func updb32DeleteJSONMapping(dq dbx.Queryable, schema, table, column, path string) error {
+	q := "DELETE FROM metadb.transform_json WHERE schema_name=$1 AND table_name=$2 AND column_name=$3 AND path=$4"
+	if _, err := dq.Exec(context.TODO(), q, schema, table, column, path); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb32DropTable(dq dbx.Queryable, schema, table string) error {
+	// revoke all privileges on the table
+	q := "DELETE FROM metadb.acl WHERE schema_name=$1 AND object_name=$2 AND object_type='t'"
+	if _, err := dq.Exec(context.TODO(), q, schema, table); err != nil {
+		return err
+	}
+	// drop the table
+	q = "DELETE FROM metadb.base_table WHERE schema_name=$1 AND table_name=$2"
+	if _, err := dq.Exec(context.TODO(), q, schema, table); err != nil {
+		return err
+	}
+	q = "DROP TABLE IF EXISTS \"" + schema + "\".\"" + table + "__\""
+	if _, err := dq.Exec(context.TODO(), q); err != nil {
+		return util.PGErr(err)
+	}
+	q = "DROP TABLE IF EXISTS \"" + schema + "\".\"zzz___" + table + "___sync\""
+	if _, err := dq.Exec(context.TODO(), q); err != nil {
 		return util.PGErr(err)
 	}
 	return nil
