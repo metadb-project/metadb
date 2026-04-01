@@ -2325,7 +2325,7 @@ func updb34(opt *dbopt) error {
 		q = "REVOKE SELECT ON ALL TABLES IN SCHEMA folio_linked_data FROM " + users[i]
 		_, _ = dc.Exec(context.TODO(), q)
 	}
-	q = "DELETE FROM metadb.transform_json WHERE schema_name in ('folio_audit','folio_linked_data')"
+	q = "DELETE FROM metadb.acl WHERE schema_name in ('folio_audit','folio_linked_data')"
 	_, _ = dc.Exec(context.TODO(), q)
 
 	tx, err := dc.Begin(context.TODO())
