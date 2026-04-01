@@ -1733,9 +1733,20 @@ func updb25(opt *dbopt) error {
 	}
 
 	q = "INSERT INTO metadb.transform_json SELECT DISTINCT parent_schema_name AS schema_name, parent_table_name AS table_name, 'jsonb' AS column_name, '$' AS path, 't' AS map FROM metadb.base_table WHERE transformed AND parent_table_name<>'instance_authority_linking_rule'"
-	_, err = tx.Exec(context.TODO(), q)
-	if err != nil {
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
 		return fmt.Errorf("writing metadb.transform_json: %w", err)
+	}
+	q = "DELETE FROM metadb.transform_json " +
+		"WHERE schema_name||'.'||table_name IN (" +
+		"'folio_audit.holdings_audit', 'folio_audit.item_audit', 'folio_linked_data.events', " +
+		"'folio_source_record_manager.mapping_params_snapshots', " +
+		"'folio_source_record_manager.mapping_rules_snapshots') OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.holdings_audit_p%' OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.instance_audit_p%' OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.marc_bib_audit_p%' OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.item_audit_p%'"
+	if _, err = tx.Exec(context.TODO(), q); err != nil {
+		return fmt.Errorf("adjusting metadb.transform_json: %w", err)
 	}
 
 	if err = metadata.WriteDatabaseVersion(tx, 25); err != nil {
@@ -2139,11 +2150,11 @@ func updb32(opt *dbopt) error {
 			tables[i] == "folio_linked_data.events__t" ||
 			tables[i] == "folio_source_record_manager.mapping_params_snapshots__t" ||
 			tables[i] == "folio_source_record_manager.mapping_rules_snapshots__t" ||
-			(strings.HasPrefix(tables[i], "folio_audit.holdings_audit_p") ||
+			((strings.HasPrefix(tables[i], "folio_audit.holdings_audit_p") ||
 				strings.HasPrefix(tables[i], "folio_audit.instance_audit_p") ||
 				strings.HasPrefix(tables[i], "folio_audit.marc_bib_audit_p") ||
-				strings.HasPrefix(tables[i], "folio_audit.item_audit_p") &&
-					strings.HasSuffix(tables[i], "__t")) {
+				strings.HasPrefix(tables[i], "folio_audit.item_audit_p")) &&
+				strings.HasSuffix(tables[i], "__t")) {
 			// undo the addition of these tables
 			sp := strings.Split(tables[i], ".")
 			schema := sp[0]
@@ -2225,14 +2236,21 @@ func updb33(opt *dbopt) error {
 	q := "SELECT schema_name||'.'||table_name FROM metadb.transform_json " +
 		"WHERE schema_name||'.'||table_name IN (" +
 		"'folio_audit.holdings_audit', 'folio_audit.item_audit', 'folio_linked_data.events', " +
-		"'folio_source_record_manager.mapping_params_snapshots__t', " +
-		"'folio_source_record_manager.mapping_rules_snapshots__t') OR " +
-		"schema_name||'.'||table_name LIKE 'folio_audit.holdings_audit_p%__t' OR " +
-		"schema_name||'.'||table_name LIKE 'folio_audit.instance_audit_p%__t' OR " +
-		"schema_name||'.'||table_name LIKE 'folio_audit.marc_bib_audit_p%__t' OR " +
-		"schema_name||'.'||table_name LIKE 'folio_audit.item_audit_p%__t'"
+		"'folio_source_record_manager.mapping_params_snapshots', " +
+		"'folio_source_record_manager.mapping_rules_snapshots') OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.holdings_audit_p%' OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.instance_audit_p%' OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.marc_bib_audit_p%' OR " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.item_audit_p%'"
 	rows, _ := dc.Query(context.Background(), q)
 	tables, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return err
+	}
+
+	q = "SELECT username FROM metadb.auth"
+	rows, _ := dc.Query(context.Background(), q)
+	users, err := pgx.CollectRows(rows, pgx.RowTo[string])
 	if err != nil {
 		return err
 	}
@@ -2252,14 +2270,21 @@ func updb33(opt *dbopt) error {
 		if _, err = tx.Exec(context.TODO(), q, schema, table); err != nil {
 			return util.PGErr(err)
 		}
-		if err = updb33RemoveACL(tx, schema, table); err != nil {
-			return err
-		}
-		if err = updb33RemoveACL(tx, schema, table+"__"); err != nil {
+		if err = updb33RemoveACL(tx, schema, table+"__t"); err != nil {
 			return err
 		}
 		if err = updb33RemoveACL(tx, schema, table+"__t__"); err != nil {
 			return err
+		}
+		for j := range users {
+			q = "REVOKE SELECT ON " + tables[i] + "__t FROM " + users[j]
+			if _, err = tx.Exec(context.TODO(), q, schema, table); err != nil {
+				return util.PGErr(err)
+			}
+			q = "REVOKE SELECT ON " + tables[i] + "__t__ FROM " + users[j]
+			if _, err = tx.Exec(context.TODO(), q, schema, table); err != nil {
+				return util.PGErr(err)
+			}
 		}
 	}
 
@@ -2287,18 +2312,27 @@ func updb34(opt *dbopt) error {
 	}
 	defer dbx.Close(dc)
 
-	tx, err := dc.Begin(context.TODO())
-	if err != nil {
-		return util.PGErr(err)
-	}
-	defer dbx.Rollback(tx)
-
 	q := "SELECT username FROM metadb.auth"
 	rows, _ := dc.Query(context.Background(), q)
 	users, err := pgx.CollectRows(rows, pgx.RowTo[string])
 	if err != nil {
 		return err
 	}
+
+	for i := range users {
+		q = "REVOKE SELECT ON ALL TABLES IN SCHEMA folio_audit FROM " + users[i]
+		_, _ = dc.Exec(context.TODO(), q)
+		q = "REVOKE SELECT ON ALL TABLES IN SCHEMA folio_linked_data FROM " + users[i]
+		_, _ = dc.Exec(context.TODO(), q)
+	}
+	q = "DELETE FROM metadb.transform_json WHERE schema_name in ('folio_audit','folio_linked_data')"
+	_, _ = dc.Exec(context.TODO(), q)
+
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return util.PGErr(err)
+	}
+	defer dbx.Rollback(tx)
 
 	for i := range users {
 		for j := range updb34ExtraManagedTables {
