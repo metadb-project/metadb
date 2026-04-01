@@ -2249,7 +2249,7 @@ func updb33(opt *dbopt) error {
 	}
 
 	q = "SELECT username FROM metadb.auth"
-	rows, _ := dc.Query(context.Background(), q)
+	rows, _ = dc.Query(context.Background(), q)
 	users, err := pgx.CollectRows(rows, pgx.RowTo[string])
 	if err != nil {
 		return err
