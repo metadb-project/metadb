@@ -2312,12 +2312,12 @@ func updb34(opt *dbopt) error {
 	}
 	defer dbx.Close(dc)
 
-	//q := "SELECT username FROM metadb.auth"
-	//rows, _ := dc.Query(context.Background(), q)
-	//users, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	//if err != nil {
-	//        return err
-	//}
+	q := "SELECT username FROM metadb.auth"
+	rows, _ := dc.Query(context.Background(), q)
+	users, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return err
+	}
 
 	//for i := range users {
 	//        q = "REVOKE SELECT ON ALL TABLES IN SCHEMA folio_audit FROM " + users[i]
