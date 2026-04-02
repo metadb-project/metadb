@@ -2312,21 +2312,21 @@ func updb34(opt *dbopt) error {
 	}
 	defer dbx.Close(dc)
 
-	q := "SELECT username FROM metadb.auth"
-	rows, _ := dc.Query(context.Background(), q)
-	users, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	if err != nil {
-		return err
-	}
+	//q := "SELECT username FROM metadb.auth"
+	//rows, _ := dc.Query(context.Background(), q)
+	//users, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	//if err != nil {
+	//        return err
+	//}
 
-	for i := range users {
-		q = "REVOKE SELECT ON ALL TABLES IN SCHEMA folio_audit FROM " + users[i]
-		_, _ = dc.Exec(context.TODO(), q)
-		q = "REVOKE SELECT ON ALL TABLES IN SCHEMA folio_linked_data FROM " + users[i]
-		_, _ = dc.Exec(context.TODO(), q)
-	}
-	q = "DELETE FROM metadb.acl WHERE schema_name in ('folio_audit','folio_linked_data')"
-	_, _ = dc.Exec(context.TODO(), q)
+	//for i := range users {
+	//        q = "REVOKE SELECT ON ALL TABLES IN SCHEMA folio_audit FROM " + users[i]
+	//        _, _ = dc.Exec(context.TODO(), q)
+	//        q = "REVOKE SELECT ON ALL TABLES IN SCHEMA folio_linked_data FROM " + users[i]
+	//        _, _ = dc.Exec(context.TODO(), q)
+	//}
+	//q = "DELETE FROM metadb.acl WHERE schema_name in ('folio_audit','folio_linked_data')"
+	//_, _ = dc.Exec(context.TODO(), q)
 
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
