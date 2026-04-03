@@ -1768,7 +1768,7 @@ func updb26(opt *dbopt) error {
 	q := "SELECT username FROM metadb.auth"
 	rows, err := dc.Query(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("selecting user list: %w", util.PGErr(err))
+		return fmt.Errorf("selecting user list: %v", err)
 	}
 	defer rows.Close()
 	users := make([]string, 0)
@@ -1776,12 +1776,12 @@ func updb26(opt *dbopt) error {
 		var u string
 		err = rows.Scan(&u)
 		if err != nil {
-			return fmt.Errorf("reading user list: %w", util.PGErr(err))
+			return fmt.Errorf("reading user list: %v", err)
 		}
 		users = append(users, u)
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("reading user list: %w", util.PGErr(err))
+		return fmt.Errorf("reading user list: %v", err)
 	}
 	rows.Close()
 
@@ -1792,7 +1792,7 @@ func updb26(opt *dbopt) error {
 	defer dbx.Close(dcsuper)
 	if _, err = dcsuper.Exec(context.TODO(),
 		"ALTER USER "+opt.DB.User+" CREATEROLE"); err != nil {
-		return fmt.Errorf("setting createrole: %w", util.PGErr(err))
+		return fmt.Errorf("setting createrole: %v", err)
 	}
 
 	/*
@@ -1814,22 +1814,22 @@ func updb26(opt *dbopt) error {
 
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	defer dbx.Rollback(tx)
 
 	q = "REVOKE CONNECT ON DATABASE " + opt.DB.DBName + " FROM public"
 	if _, err = tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("revoking connect: %w", util.PGErr(err))
+		return fmt.Errorf("revoking connect: %v", err)
 	}
 
 	q = "ALTER TABLE metadb.auth DROP COLUMN tables"
 	if _, err = tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("modifying metadb.auth (tables): %w", util.PGErr(err))
+		return fmt.Errorf("modifying metadb.auth (tables): %v", err)
 	}
 	q = "ALTER TABLE metadb.auth DROP COLUMN dbupdated"
 	if _, err = tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("modifying metadb.auth (dbupdated): %w", util.PGErr(err))
+		return fmt.Errorf("modifying metadb.auth (dbupdated): %v", err)
 	}
 
 	q = "CREATE TABLE metadb.acl (" +
@@ -1840,25 +1840,25 @@ func updb26(opt *dbopt) error {
 		"user_name text NOT NULL, " +
 		"PRIMARY KEY (schema_name, object_name, object_type, privilege, user_name))"
 	if _, err = tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating table metadb.acl: %w", util.PGErr(err))
+		return fmt.Errorf("creating table metadb.acl: %v", err)
 	}
 
 	for i := range users {
 		eout.Info("upgrading user %q", users[i])
 		q = "GRANT CREATE, CONNECT, TEMPORARY ON DATABASE " + opt.DB.DBName + " TO " + users[i]
 		if _, err = tx.Exec(context.TODO(), q); err != nil {
-			return fmt.Errorf("enabling connect privileges for user %q: %w", users[i], util.PGErr(err))
+			return fmt.Errorf("enabling connect privileges for user %q: %v", users[i], err)
 		}
 		if err = updb26GrantAccessOnAll(tx, users[i]); err != nil {
-			return fmt.Errorf("upgrading privileges for user %q: %w", users[i], util.PGErr(err))
+			return fmt.Errorf("upgrading privileges for user %q: %v", users[i], err)
 		}
 	}
 
 	if err = metadata.WriteDatabaseVersion(tx, 26); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	if err = tx.Commit(context.TODO()); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	return nil
 }
@@ -1927,7 +1927,7 @@ func updb27(opt *dbopt) error {
 	q := "SELECT username FROM metadb.auth"
 	rows, err := dc.Query(context.TODO(), q)
 	if err != nil {
-		return fmt.Errorf("selecting user list: %w", util.PGErr(err))
+		return fmt.Errorf("selecting user list: %v", err)
 	}
 	defer rows.Close()
 	users := make([]string, 0)
@@ -1935,18 +1935,18 @@ func updb27(opt *dbopt) error {
 		var u string
 		err = rows.Scan(&u)
 		if err != nil {
-			return fmt.Errorf("reading user list: %w", util.PGErr(err))
+			return fmt.Errorf("reading user list: %v", err)
 		}
 		users = append(users, u)
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("reading user list: %w", util.PGErr(err))
+		return fmt.Errorf("reading user list: %v", err)
 	}
 	rows.Close()
 
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	defer dbx.Rollback(tx)
 
@@ -1972,10 +1972,10 @@ func updb27(opt *dbopt) error {
 	}
 
 	if err = metadata.WriteDatabaseVersion(tx, 27); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	if err = tx.Commit(context.TODO()); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	return nil
 }
@@ -1989,7 +1989,7 @@ func updb28(opt *dbopt) error {
 
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	defer dbx.Rollback(tx)
 
@@ -2002,7 +2002,7 @@ func updb28(opt *dbopt) error {
 		"parameter text PRIMARY KEY, " +
 		"value text NOT NULL)"
 	if _, err = tx.Exec(context.TODO(), q); err != nil {
-		return fmt.Errorf("creating table metadb.config: %w", util.PGErr(err))
+		return fmt.Errorf("creating table metadb.config: %v", err)
 	}
 	q = "INSERT INTO metadb.config (parameter, value) VALUES " +
 		"('external_sql_folio', 'refs/tags/v1.8.0'), " +
@@ -2013,10 +2013,10 @@ func updb28(opt *dbopt) error {
 	}
 
 	if err = metadata.WriteDatabaseVersion(tx, 28); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	if err = tx.Commit(context.TODO()); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	return nil
 }
@@ -2030,7 +2030,7 @@ func updb29(opt *dbopt) error {
 
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	defer dbx.Rollback(tx)
 
@@ -2060,10 +2060,10 @@ func updb29(opt *dbopt) error {
 	}
 
 	if err = metadata.WriteDatabaseVersion(tx, 29); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	if err = tx.Commit(context.TODO()); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	return nil
 }
@@ -2077,7 +2077,7 @@ func updb30(opt *dbopt) error {
 
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	defer dbx.Rollback(tx)
 
@@ -2089,10 +2089,10 @@ func updb30(opt *dbopt) error {
 	}
 
 	if err = metadata.WriteDatabaseVersion(tx, 30); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	if err = tx.Commit(context.TODO()); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	return nil
 }
@@ -2117,7 +2117,7 @@ func updb31(opt *dbopt) error {
 	}
 
 	if err = metadata.WriteDatabaseVersion(dc, 31); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	return nil
 }
@@ -2140,7 +2140,7 @@ func updb32(opt *dbopt) error {
 
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	defer dbx.Rollback(tx)
 
@@ -2177,21 +2177,21 @@ func updb32(opt *dbopt) error {
 			" WHERE __root__id IS NULL AND" +
 			" id IN (SELECT id FROM " + tables[i] + " WHERE __root__id IS NOT NULL)"
 		if _, err = tx.Exec(context.TODO(), q); err != nil {
-			return util.PGErr(err)
+			return err
 		}
 		// fill in root id to prevent this problem from happening again
 		q = "UPDATE " + tables[i] + " SET __root__id = id::uuid WHERE __root__id IS NULL"
 		if _, err = tx.Exec(context.TODO(), q); err != nil {
-			return util.PGErr(err)
+			return err
 		}
 	}
 
 	if err = metadata.WriteDatabaseVersion(tx, 32); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	eout.Info("writing changes")
 	if err = tx.Commit(context.TODO()); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	return nil
 }
@@ -2199,7 +2199,7 @@ func updb32(opt *dbopt) error {
 func updb32DeleteJSONMapping(dq dbx.Queryable, schema, table, column, path string) error {
 	q := "DELETE FROM metadb.transform_json WHERE schema_name=$1 AND table_name=$2 AND column_name=$3 AND path=$4"
 	if _, err := dq.Exec(context.TODO(), q, schema, table, column, path); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	return nil
 }
@@ -2208,20 +2208,20 @@ func updb32DropTable(dq dbx.Queryable, schema, table string) error {
 	// revoke all privileges on the table
 	q := "DELETE FROM metadb.acl WHERE schema_name=$1 AND object_name=$2 AND object_type='t'"
 	if _, err := dq.Exec(context.TODO(), q, schema, table); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	// drop the table
 	q = "DELETE FROM metadb.base_table WHERE schema_name=$1 AND table_name=$2"
 	if _, err := dq.Exec(context.TODO(), q, schema, table); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	q = "DROP TABLE IF EXISTS \"" + schema + "\".\"" + table + "__\""
 	if _, err := dq.Exec(context.TODO(), q); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	q = "DROP TABLE IF EXISTS \"" + schema + "\".\"zzz___" + table + "___sync\""
 	if _, err := dq.Exec(context.TODO(), q); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	return nil
 }
@@ -2257,7 +2257,7 @@ func updb33(opt *dbopt) error {
 
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	defer dbx.Rollback(tx)
 
@@ -2268,7 +2268,7 @@ func updb33(opt *dbopt) error {
 		table := sp[1]
 		q = "DELETE FROM metadb.transform_json WHERE schema_name=$1 AND table_name=$2 AND column_name='jsonb' AND path='$'"
 		if _, err = tx.Exec(context.TODO(), q, schema, table); err != nil {
-			return util.PGErr(err)
+			return err
 		}
 		if err = updb33RemoveACL(tx, schema, table+"__t"); err != nil {
 			return err
@@ -2279,20 +2279,20 @@ func updb33(opt *dbopt) error {
 		for j := range users {
 			q = "REVOKE SELECT ON " + tables[i] + "__t FROM " + users[j]
 			if _, err = tx.Exec(context.TODO(), q, schema, table); err != nil {
-				return util.PGErr(err)
+				return err
 			}
 			q = "REVOKE SELECT ON " + tables[i] + "__t__ FROM " + users[j]
 			if _, err = tx.Exec(context.TODO(), q, schema, table); err != nil {
-				return util.PGErr(err)
+				return err
 			}
 		}
 	}
 
 	if err = metadata.WriteDatabaseVersion(tx, 33); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	if err = tx.Commit(context.TODO()); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	return nil
 }
@@ -2300,7 +2300,7 @@ func updb33(opt *dbopt) error {
 func updb33RemoveACL(dq dbx.Queryable, schema, table string) error {
 	q := "DELETE FROM metadb.acl WHERE schema_name=$1 AND object_name=$2 AND object_type='t'"
 	if _, err := dq.Exec(context.TODO(), q, schema, table); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	return nil
 }
@@ -2330,7 +2330,7 @@ func updb34(opt *dbopt) error {
 
 	tx, err := dc.Begin(context.TODO())
 	if err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	defer dbx.Rollback(tx)
 
@@ -2353,18 +2353,18 @@ func updb34(opt *dbopt) error {
 
 	q = "UPDATE metadb.config SET value = 'https://github.com/folio-org/folio-analytics.git/'||value WHERE parameter='external_sql_folio' and value like 'refs/%'"
 	if _, err = tx.Exec(context.TODO(), q); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	q = "UPDATE metadb.config SET value = 'https://github.com/openlibraryenvironment/reshare-analytics.git/'||value WHERE parameter='external_sql_reshare' and value like 'refs/%'"
 	if _, err = tx.Exec(context.TODO(), q); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 
 	if err = metadata.WriteDatabaseVersion(tx, 34); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	if err = tx.Commit(context.TODO()); err != nil {
-		return util.PGErr(err)
+		return err
 	}
 	return nil
 }
