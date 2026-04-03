@@ -2276,22 +2276,23 @@ func updb33(opt *dbopt) error {
 		if err = updb33RemoveACL(tx, schema, table+"__t__"); err != nil {
 			return err
 		}
+	}
+
+	if err = tx.Commit(context.TODO()); err != nil {
+		return err
+	}
+
+	// more clean up
+	for i := range tables {
 		for j := range users {
 			q = "REVOKE SELECT ON " + tables[i] + "__t FROM " + users[j]
-			if _, err = tx.Exec(context.TODO(), q); err != nil {
-				return err
-			}
+			_, _ = dc.Exec(context.TODO(), q)
 			q = "REVOKE SELECT ON " + tables[i] + "__t__ FROM " + users[j]
-			if _, err = tx.Exec(context.TODO(), q); err != nil {
-				return err
-			}
+			_, _ = dc.Exec(context.TODO(), q)
 		}
 	}
 
-	if err = metadata.WriteDatabaseVersion(tx, 33); err != nil {
-		return err
-	}
-	if err = tx.Commit(context.TODO()); err != nil {
+	if err = metadata.WriteDatabaseVersion(dc, 33); err != nil {
 		return err
 	}
 	return nil
