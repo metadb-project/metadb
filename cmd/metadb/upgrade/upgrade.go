@@ -2278,11 +2278,11 @@ func updb33(opt *dbopt) error {
 		}
 		for j := range users {
 			q = "REVOKE SELECT ON " + tables[i] + "__t FROM " + users[j]
-			if _, err = tx.Exec(context.TODO(), q, schema, table); err != nil {
+			if _, err = tx.Exec(context.TODO(), q); err != nil {
 				return err
 			}
 			q = "REVOKE SELECT ON " + tables[i] + "__t__ FROM " + users[j]
-			if _, err = tx.Exec(context.TODO(), q, schema, table); err != nil {
+			if _, err = tx.Exec(context.TODO(), q); err != nil {
 				return err
 			}
 		}
