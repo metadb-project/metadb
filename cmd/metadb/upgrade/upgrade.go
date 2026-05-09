@@ -2329,18 +2329,12 @@ func updb34(opt *dbopt) error {
 	//q = "DELETE FROM metadb.acl WHERE schema_name in ('folio_audit','folio_linked_data')"
 	//_, _ = dc.Exec(context.TODO(), q)
 
-	tx, err := dc.Begin(context.TODO())
-	if err != nil {
-		return err
-	}
-	defer dbx.Rollback(tx)
-
 	for i := range users {
 		for j := range updb34ExtraManagedTables {
 			t := strings.Split(updb34ExtraManagedTables[j], ".")
 			schema := t[0]
 			table := t[1]
-			_ = acl.Grant(tx, []acl.ACLItem{
+			_ = acl.Grant(dc, []acl.ACLItem{
 				{
 					SchemaName: schema,
 					ObjectName: table,
@@ -2351,6 +2345,12 @@ func updb34(opt *dbopt) error {
 			})
 		}
 	}
+
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
 
 	q = "UPDATE metadb.config SET value = 'https://github.com/folio-org/folio-analytics.git/'||value WHERE parameter='external_sql_folio' and value like 'refs/%'"
 	if _, err = tx.Exec(context.TODO(), q); err != nil {
