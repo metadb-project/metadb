@@ -1,7 +1,7 @@
 Metadb
 ======
 
-Copyright (C) 2020-2025 The Open Library Foundation  
+Copyright (C) 2020-2026 The Open Library Foundation  
 
 This software is distributed under the terms of the Apache License,
 Version 2.0.  See the file
@@ -9,4 +9,5 @@ Version 2.0.  See the file
 for more information.
 
 Documentation is available at:
-[https://metadb.dev/doc/](https://metadb.dev/doc/)
+[https://metadb.dev/metadb/doc/](https://metadb.dev/metadb/doc/)
+
