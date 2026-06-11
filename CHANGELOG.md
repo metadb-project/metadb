@@ -1,3 +1,8 @@
+# v1.3.11
+
+* A patch was made that corrects for timestamp day out of range
+  errors.
+
 # v1.3.10
 
 * A patch was made that attempts to adjust some invalid time stamps.
