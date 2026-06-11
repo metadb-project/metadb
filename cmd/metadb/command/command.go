@@ -727,14 +727,29 @@ func DataToSQLData(data any, datatype types.DataType, semtype string) (*string, 
 			}
 			return &s, nil
 		}
-	case types.TextType, types.NumericType, types.UUIDType, types.JSONType, types.TimetzType, types.TimestamptzType:
+	case types.TextType, types.NumericType, types.UUIDType, types.JSONType, types.TimetzType:
 		s, ok := data.(string)
 		if !ok {
 			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
 		}
 		return &s, nil
+	case types.TimestamptzType:
+		s, ok := data.(string)
+		if !ok {
+			return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
+		}
+		correctForInvalidTimestamp(&s)
+		return &s, nil
 	}
 	return nil, fmt.Errorf("%s data \"%v\" has type %T", datatype, data, data)
+}
+
+func correctForInvalidTimestamp(t *string) {
+	if _, err := time.Parse("2006-01-02T15:04:05.999999999Z07:00", *t); err != nil {
+		if strings.HasSuffix(err.Error(), "day out of range") {
+			*t = "0001-01-01T00:00:00Z"
+		}
+	}
 }
 
 // fixupSQLTime prepares a time or timestamp for subsequent SQL encoding.  Any
