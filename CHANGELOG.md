@@ -1,3 +1,8 @@
+# v1.4.1
+
+* A change was made to correct for some forms of invalid timestamps in
+  source data.
+
 # v1.4.0
 
 * JSON transformation has been extended to support objects and arrays.
