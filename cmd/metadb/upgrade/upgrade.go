@@ -2148,11 +2148,14 @@ func updb32(opt *dbopt) error {
 		if tables[i] == "folio_audit.holdings_audit__t" ||
 			tables[i] == "folio_audit.item_audit__t" ||
 			tables[i] == "folio_linked_data.events__t" ||
+			tables[i] == "folio_linked_data.resources__t" ||
 			tables[i] == "folio_source_record_manager.mapping_params_snapshots__t" ||
 			tables[i] == "folio_source_record_manager.mapping_rules_snapshots__t" ||
 			((strings.HasPrefix(tables[i], "folio_audit.holdings_audit_p") ||
 				strings.HasPrefix(tables[i], "folio_audit.instance_audit_p") ||
 				strings.HasPrefix(tables[i], "folio_audit.marc_bib_audit_p") ||
+				strings.HasPrefix(tables[i], "folio_audit.marc_authority_audit_p") ||
+				strings.HasPrefix(tables[i], "folio_linked_data.resources_") ||
 				strings.HasPrefix(tables[i], "folio_audit.item_audit_p")) &&
 				strings.HasSuffix(tables[i], "__t")) {
 			// undo the addition of these tables
