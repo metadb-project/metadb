@@ -1,3 +1,7 @@
+# v1.4.2
+
+* A bug has been fixed that in some cases caused upgrading to fail.
+
 # v1.4.1
 
 * A change was made to correct for some forms of invalid timestamps in
