@@ -1,3 +1,8 @@
+# v1.3.12
+
+* A fix was made to correct for extraneous current values in
+  transformed tables.
+
 # v1.3.11
 
 * A patch was made that corrects for timestamp day out of range
