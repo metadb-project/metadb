@@ -96,6 +96,10 @@ func loggingServer(svr *server) error {
 	}
 	defer svr.dp.Close()
 
+	if err := fixupCatalog1(svr.db.ConnString(svr.db.User, svr.db.Password)); err != nil {
+		return fmt.Errorf("fixup-catalog-1: %v", err)
+	}
+
 	// Check that database is initialized and compatible
 	cat, err := catalog.Initialize(svr.db, svr.dp)
 	if err != nil {
@@ -856,3 +860,103 @@ func goCreateFunctions(db dbx.DB) {
 	//http.Error(w, "404 page not found", http.StatusNotFound)
 }
 */
+
+func fixupCatalog1(connString string) error {
+	ctx := context.TODO()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+
+	// check if this metadb instance is for folio
+	sql := "select module from metadb.source limit 1"
+	rows, _ := conn.Query(ctx, sql)
+	module, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return err
+	}
+	if len(module) == 0 || module[0] != "folio" {
+		return nil
+	}
+
+	// find possible problem entries in base_table
+	sql = "select schema_name, table_name from metadb.base_table " +
+		"where table_name like '%\\_\\_t' and " +
+		"not transformed and parent_schema_name='' and parent_table_name=''"
+	rows, _ = conn.Query(ctx, sql)
+	ctables, err := pgx.CollectRows(rows, pgx.RowToStructByPos[dbx.Table])
+	if err != nil {
+		return err
+	}
+	if len(ctables) == 0 {
+		return nil
+	}
+
+	for i := range ctables {
+		if err := fixupCatalog1fix(ctx, conn, ctables[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func fixupCatalog1fix(ctx context.Context, conn *pgx.Conn, ctable dbx.Table) error {
+	// does parent table exist?
+	sql := "select 1 from pg_tables where schemaname=$1 and tablename=$2"
+	rows, _ := conn.Query(ctx, sql, ctable.Schema, ctable.Table)
+	parentExists, err := pgx.CollectRows(rows, pgx.RowTo[int32])
+	if err != nil {
+		return err
+	}
+	if len(parentExists) == 0 {
+		return nil
+	}
+
+	// is parent table listed in base_table?
+	ptable := dbx.Table{Schema: ctable.Schema, Table: ctable.Table[:len(ctable.Table)-3]}
+	sql = "select 1 from metadb.base_table where schema_name=$1 and table_name=$2"
+	rows, _ = conn.Query(ctx, sql, ptable.Schema, ptable.Table)
+	parentListed, err := pgx.CollectRows(rows, pgx.RowTo[int32])
+	if err != nil {
+		return err
+	}
+	if len(parentListed) == 0 {
+		return nil
+	}
+
+	log.Info("fixing catalog entry for table %q", ctable.String())
+
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// set transformed, parent_schema_name, and parent_table_name in problem entry
+	sql = "update metadb.base_table set transformed = true, " +
+		"parent_schema_name = $1, " +
+		"parent_table_name = $2 " +
+		"where schema_name=$3 and table_name=$4"
+	if _, err := tx.Exec(ctx, sql, ptable.Schema, ptable.Table, ctable.Schema, ctable.Table); err != nil {
+		return err
+	}
+
+	// delete rows in transformed table whose id is not in parent
+	ctableMain := ctable.Schema + "." + ctable.Table + "__"
+	sql = "update " + ctableMain +
+		" set __end=now(), __current=false " +
+		"where __current and id in ( " +
+		"select c.id from " + ctable.String() + " c left join " + ptable.String() + " p " +
+		"on c.id=p.id " +
+		"where p.id is null )"
+	if _, err := tx.Exec(ctx, sql); err != nil {
+		return err
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
