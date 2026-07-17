@@ -97,7 +97,7 @@ func loggingServer(svr *server) error {
 	defer svr.dp.Close()
 
 	if err := fixupCatalog1(svr.db.ConnString(svr.db.User, svr.db.Password)); err != nil {
-		return fmt.Errorf("fixup-catalog-1: %v", err)
+		log.Info("fixup-catalog-1: %v", err)
 	}
 
 	// Check that database is initialized and compatible
