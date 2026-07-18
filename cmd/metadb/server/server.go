@@ -91,9 +91,9 @@ func loggingServer(svr *server) error {
 		return fmt.Errorf("reading configuration file: %w", err)
 	}
 
-	if err = fixupCatalog1(svr.db.ConnString(svr.db.User, svr.db.Password)); err != nil {
-		log.Info("fixup-catalog-1: %v", err)
-	}
+	// if err = fixupCatalog1(svr.db.ConnString(svr.db.User, svr.db.Password)); err != nil {
+	// 	log.Info("fixup-catalog-1: %v", err)
+	// }
 
 	svr.dp, err = dbx.NewPool(context.TODO(), svr.db.ConnString(svr.db.User, svr.db.Password))
 	if err != nil {

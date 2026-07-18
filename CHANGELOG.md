@@ -1,8 +1,5 @@
 # main
 
-* A fix was made to correct for extraneous current values in
-  transformed tables.
-
 * A change was made to correct for some forms of invalid timestamps in 
   source data.
 
