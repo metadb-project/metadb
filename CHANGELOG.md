@@ -1,3 +1,7 @@
+# v1.4.4
+
+* A bug has been fixed that in some cases caused upgrading to fail.
+
 # v1.4.3
 
 * A fix was made to correct for extraneous current values in
