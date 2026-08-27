@@ -2384,7 +2384,8 @@ func updb35(opt *dbopt) error {
 	defer dbx.Close(dc)
 
 	q := "SELECT schema_name||'.'||table_name FROM metadb.transform_json WHERE " +
-		"schema_name||'.'||table_name LIKE 'folio_audit.marc_authority_audit_p%'"
+		"schema_name||'.'||table_name LIKE 'folio_audit.marc_authority_audit_p%' OR " +
+		"schema_name||'.'||table_name LIKE 'folio_linked_data.resources_%'"
 	rows, _ := dc.Query(context.Background(), q)
 	tables, err := pgx.CollectRows(rows, pgx.RowTo[string])
 	if err != nil {
