@@ -2485,10 +2485,10 @@ func updb36(opt *dbopt) error {
 		if _, err = tx.Exec(context.TODO(), q, schema, table); err != nil {
 			return err
 		}
-		if err = updb35RemoveACL(tx, schema, table+"__t"); err != nil {
+		if err = updb36RemoveACL(tx, schema, table+"__t"); err != nil {
 			return err
 		}
-		if err = updb35RemoveACL(tx, schema, table+"__t__"); err != nil {
+		if err = updb36RemoveACL(tx, schema, table+"__t__"); err != nil {
 			return err
 		}
 	}
@@ -2507,6 +2507,14 @@ func updb36(opt *dbopt) error {
 	}
 
 	if err = metadata.WriteDatabaseVersion(dc, 36); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb36RemoveACL(dq dbx.Queryable, schema, table string) error {
+	q := "DELETE FROM metadb.acl WHERE schema_name=$1 AND object_name=$2 AND object_type='t'"
+	if _, err := dq.Exec(context.TODO(), q, schema, table); err != nil {
 		return err
 	}
 	return nil
