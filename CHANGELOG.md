@@ -1,3 +1,8 @@
+# v1.4.5
+
+* A bug has been fixed that in some cases caused the `drop user`
+  command to fail.
+
 # v1.4.4
 
 * A bug has been fixed that in some cases caused upgrading to fail.
