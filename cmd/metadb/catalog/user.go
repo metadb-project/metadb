@@ -46,7 +46,7 @@ func Users(dq dbx.Queryable) ([]string, error) {
 }
 
 func DatabaseUserExists(dq dbx.Queryable, user string) (bool, error) {
-	q := "SELECT 1 FROM pg_catalog.pg_user WHERE usename=$1"
+	q := "SELECT 1 FROM pg_catalog.pg_roles WHERE rolname=$1"
 	var i int64
 	err := dq.QueryRow(context.TODO(), q, user).Scan(&i)
 	switch {
