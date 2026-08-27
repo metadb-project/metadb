@@ -439,6 +439,7 @@ var updbList = []updbFunc{
 	updb32,
 	updb33,
 	updb34,
+	updb35,
 }
 
 func updb8(opt *dbopt) error {
@@ -2374,6 +2375,77 @@ func updb34(opt *dbopt) error {
 }
 
 var updb34ExtraManagedTables = []string{"folio_source_record.marc__t"}
+
+func updb35(opt *dbopt) error {
+	dc, err := opt.DB.Connect()
+	if err != nil {
+		return err
+	}
+	defer dbx.Close(dc)
+
+	q := "SELECT schema_name||'.'||table_name FROM metadb.transform_json WHERE " +
+		"schema_name||'.'||table_name LIKE 'folio_audit.marc_authority_audit_p%'"
+	rows, _ := dc.Query(context.Background(), q)
+	tables, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return err
+	}
+
+	q = "SELECT username FROM metadb.auth"
+	rows, _ = dc.Query(context.Background(), q)
+	users, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return err
+	}
+
+	tx, err := dc.Begin(context.TODO())
+	if err != nil {
+		return err
+	}
+	defer dbx.Rollback(tx)
+
+	for i := range tables {
+		sp := strings.Split(tables[i], ".")
+		schema := sp[0]
+		table := sp[1]
+		q = "DELETE FROM metadb.transform_json WHERE schema_name=$1 AND table_name=$2 AND column_name='jsonb' AND path='$'"
+		if _, err = tx.Exec(context.TODO(), q, schema, table); err != nil {
+			return err
+		}
+		if err = updb35RemoveACL(tx, schema, table+"__t"); err != nil {
+			return err
+		}
+		if err = updb35RemoveACL(tx, schema, table+"__t__"); err != nil {
+			return err
+		}
+	}
+
+	if err = tx.Commit(context.TODO()); err != nil {
+		return err
+	}
+
+	for i := range tables {
+		for j := range users {
+			q = "REVOKE SELECT ON " + tables[i] + "__t FROM " + users[j]
+			_, _ = dc.Exec(context.TODO(), q)
+			q = "REVOKE SELECT ON " + tables[i] + "__t__ FROM " + users[j]
+			_, _ = dc.Exec(context.TODO(), q)
+		}
+	}
+
+	if err = metadata.WriteDatabaseVersion(dc, 35); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updb35RemoveACL(dq dbx.Queryable, schema, table string) error {
+	q := "DELETE FROM metadb.acl WHERE schema_name=$1 AND object_name=$2 AND object_type='t'"
+	if _, err := dq.Exec(context.TODO(), q, schema, table); err != nil {
+		return err
+	}
+	return nil
+}
 
 //func toPostgresArray(slice []string) string {
 //	var b strings.Builder

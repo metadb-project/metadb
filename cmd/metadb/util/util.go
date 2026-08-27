@@ -14,7 +14,7 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-const DatabaseVersion = 34
+const DatabaseVersion = 35
 
 // MetadbVersion is defined at build time via -ldflags.
 var MetadbVersion = ""
