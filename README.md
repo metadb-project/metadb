@@ -8,6 +8,5 @@ Version 2.0.  See the file
 [LICENSE](https://github.com/metadb-project/metadb/blob/master/LICENSE)
 for more information.
 
-Documentation is available at:
-[https://metadb.dev/metadb/doc/](https://metadb.dev/metadb/doc/)
+Documentation:  https://d1f3dtrg62pav.cloudfront.net/metadb/doc/
 
