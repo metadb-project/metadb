@@ -1,3 +1,30 @@
+# v1.4.6
+
+* A change was made to correct for possible permission errors.
+
+# v1.4.5
+
+* A bug has been fixed that in some cases caused the `drop user`
+  command to fail.
+
+# v1.4.4
+
+* A bug has been fixed that in some cases caused upgrading to fail.
+
+# v1.4.3
+
+* A fix was made to correct for extraneous current values in
+  transformed tables.
+
+# v1.4.2
+
+* A bug has been fixed that in some cases caused upgrading to fail.
+
+# v1.4.1
+
+* A change was made to correct for some forms of invalid timestamps in
+  source data.
+
 # v1.4.0
 
 * JSON transformation has been extended to support objects and arrays.
