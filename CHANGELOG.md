@@ -1,3 +1,7 @@
+# v1.4.6
+
+* A change was made to correct for possible permission errors.
+
 # v1.4.5
 
 * A bug has been fixed that in some cases caused the `drop user`
