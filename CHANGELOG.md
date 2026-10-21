@@ -1,3 +1,8 @@
+# v1.4.7
+
+* A bug was fixed that prevented the server from starting in some
+  cases.
+
 # v1.4.6
 
 * A change was made to correct for possible permission errors.
@@ -76,5 +81,31 @@
   used to set them via the configuration parameters
   `external_sql_folio` and `external_sql_reshare`.
 
-* Metadb requires Go 1.21 or later.
+* Metadb 1.4 requires Go 1.21 or later.
 
+# v1.3.13
+
+* A bug was fixed that prevented the server from starting in some
+  cases.
+
+# v1.3.12
+
+* A fix was made to correct for extraneous current values in
+  transformed tables.
+
+# v1.3.11
+
+* A patch was made that corrects for timestamp day out of range
+  errors.
+
+# v1.3.10
+
+* A patch was made that attempts to adjust some invalid time stamps.
+
+# v1.3.9
+
+* Minor fix.
+
+# v1.3.8
+
+* The folio-analytics tag has been updated to v1.7.15.
