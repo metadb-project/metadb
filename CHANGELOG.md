@@ -1,3 +1,8 @@
+# v1.4.7
+
+* A bug was fixed that prevented the server from starting in some
+  cases.
+
 # v1.4.6
 
 * A change was made to correct for possible permission errors.

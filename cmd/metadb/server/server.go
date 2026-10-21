@@ -91,11 +91,6 @@ func loggingServer(svr *server) error {
 		return fmt.Errorf("reading configuration file: %w", err)
 	}
 
-	log.Info("running pre-start checks")
-	if err = fixupCatalog1(svr.db.ConnString(svr.db.User, svr.db.Password)); err != nil {
-		log.Info("fixup-catalog-1: %v", err)
-	}
-
 	svr.dp, err = dbx.NewPool(context.TODO(), svr.db.ConnString(svr.db.User, svr.db.Password))
 	if err != nil {
 		return fmt.Errorf("creating database connection pool: %w", err)
@@ -110,6 +105,10 @@ func loggingServer(svr *server) error {
 
 	log.SetDatabase(svr.dp)
 	defer log.SetDatabase(nil)
+
+	if err = fixupCatalog1(svr.db.ConnString(svr.db.User, svr.db.Password)); err != nil {
+		log.Info("fixup-catalog-1: %v", err)
+	}
 
 	if err := runServer(svr, cat); err != nil {
 		log.Fatal("%s", err)
