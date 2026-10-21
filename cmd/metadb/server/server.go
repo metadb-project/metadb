@@ -96,10 +96,6 @@ func loggingServer(svr *server) error {
 	}
 	defer svr.dp.Close()
 
-	if err := fixupCatalog1(svr.db.ConnString(svr.db.User, svr.db.Password)); err != nil {
-		log.Info("fixup-catalog-1: %v", err)
-	}
-
 	// Check that database is initialized and compatible
 	cat, err := catalog.Initialize(svr.db, svr.dp)
 	if err != nil {
@@ -108,6 +104,10 @@ func loggingServer(svr *server) error {
 
 	log.SetDatabase(svr.dp)
 	defer log.SetDatabase(nil)
+
+	if err := fixupCatalog1(svr.db.ConnString(svr.db.User, svr.db.Password)); err != nil {
+		log.Info("fixup-catalog-1: %v", err)
+	}
 
 	log.Info("starting Metadb %s", util.GetMetadbVersion())
 	if err := runServer(svr, cat); err != nil {

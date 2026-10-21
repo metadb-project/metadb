@@ -1,3 +1,8 @@
+# v1.3.13
+
+* A bug was fixed that prevented the server from starting in some
+  cases.
+
 # v1.3.12
 
 * A fix was made to correct for extraneous current values in
