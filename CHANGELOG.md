@@ -79,7 +79,9 @@
 * The folio-analytics and folio-reshare tags are no longer defined by
   default in new installations.  The command `alter system` can be
   used to set them via the configuration parameters
-  `external_sql_folio` and `external_sql_reshare`.
+  `external_sql_folio` and `external_sql_reshare`.  This supersedes
+  the `METADB_FOLIO` environment variable which is no longer
+  supported.
 
 * Metadb 1.4 requires Go 1.21 or later.
 
