@@ -478,7 +478,7 @@ Configuration values can be displayed via the `list config` command.
 
 ----
 alter system set external_sql_folio =
-    'https://github.com/folio-org/folio-analytics.git/refs/tags/v1.8.0';
+    'https://github.com/folio-org/folio-analytics.git/refs/tags/v1.8.1';
 ----
 
 ==== alter table
