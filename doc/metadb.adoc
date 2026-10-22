@@ -2,7 +2,7 @@
 // To build HTML:
 //     asciidoctor -a docinfo=shared *.adoc
 
-= Metadb Documentation
+= Metadb 1.4 Documentation
 :icons: font
 :sectnums:
 :sectnumlevels: 4
