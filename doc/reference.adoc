@@ -312,7 +312,7 @@ For example:
 
 ----
 alter system set external_sql_folio =
-    'https://github.com/folio-org/folio-analytics.git/refs/tags/v1.8.0';
+    'https://github.com/folio-org/folio-analytics.git/refs/tags/v1.8.1';
 ----
 
 The default value is `''`, which disables running the external SQL.

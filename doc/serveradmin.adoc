@@ -52,7 +52,7 @@ Now we can clone the Metadb source code repository and check out a
 desired version, for example:
 
 ----
-git clone https://github.com/metadb-project/metadb.git -b v1.4.0
+git clone https://github.com/metadb-project/metadb.git -b v1.5.0
 ----
 
 Then compile the server by running the build script:
