@@ -65,7 +65,7 @@ Now we can clone the Metadb source code repository and check out a
 desired version, for example:
 
 ----
-git clone https://github.com/metadb-project/metadb.git -b v1.3.9
+git clone https://github.com/metadb-project/metadb.git -b v1.3.13
 ----
 
 Then compile the server by running the build script:
@@ -80,7 +80,7 @@ For FOLIO users, the environment variable `METADB_FOLIO` can be
 defined to override the default tag for derived tables, for example:
 
 ----
-METADB_FOLIO="refs/tags/v1.7.7" ./build.sh
+METADB_FOLIO="refs/tags/v1.8.1" ./build.sh
 ----
 
 The build script creates a `bin/` subdirectory and creates the
