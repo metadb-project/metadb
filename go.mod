@@ -1,6 +1,6 @@
 module github.com/metadb-project/metadb
 
-go 1.27.1
+go 1.27.4
 
 require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.4.0
