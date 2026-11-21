@@ -1,3 +1,7 @@
+# v1.3.14
+
+* Security fixes.
+
 # v1.3.13
 
 * A bug was fixed that prevented the server from starting in some
