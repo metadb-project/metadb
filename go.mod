@@ -7,7 +7,7 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.7.2
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/mattn/go-isatty v0.0.20
 	github.com/shopspring/decimal v1.4.0
 	github.com/spf13/cobra v1.8.1
